@@ -1,4 +1,4 @@
-// Headless Chrome phone test (360x740, touch) for Crossfour v1.1: per-player dice, Star-style stacked rolls,
+// Headless Chrome phone test (360x740, touch) for Crossfour v1.2 (incl. Lucky Chaos Ludo): per-player dice, Star-style stacked rolls,
 // undo dice roll, triple-6 forfeit, quick chat, Mystery Tiles wheel events, classic house rule, result ranks.
 // Fails on any console error / failed request.
 // Usage: PUPPETEER=puppeteer-core node test/browser.test.js <url> [screenshot dir]
@@ -43,7 +43,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(await visible('#home') && !(await visible('#btn-continue')), 'home on launch, nothing to continue');
   ok(await visible('#btn-mystery'), 'Mystery Tiles mode on home screen');
   ok((await ev(() => window.__cf.gate.state.sessions)) === 1, 'first session counted');
-  ok(/1\.1\.0/.test(await ev(() => document.body.innerText + document.documentElement.innerHTML)), 'version 1.1.0 in page');
+  ok(/1\.2\.0/.test(await ev(() => document.body.innerText + document.documentElement.innerHTML)), 'version 1.2.0 in page');
   await page.screenshot({ path: OUT + '/cf-home.png' });
 
   // ---------- rules & settings ----------
@@ -210,6 +210,125 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await waitFor(() => { const g = window.__cf.game; return g.st.turn !== 3; }, 8000, 'computers take turns');
   await idleHuman('roll', 3);
   ok(true, 'computers played their mystery turns without errors');
+  await page.tap('#btn-home'); await sleep(200);
+  await page.tap('#btn-m-home'); await sleep(300);
+
+  // ---------- Lucky Chaos Ludo, 4 players ----------
+  ok(await visible('#btn-lucky') && /Lucky Chaos Ludo/.test(await ev(() => document.getElementById('btn-lucky').textContent)), 'Lucky Chaos Ludo on home screen');
+  await page.tap('#btn-lucky'); await sleep(200);
+  ok(await visible('#setup') && (await ev(() => document.getElementById('setup-title').textContent)) === 'Lucky Chaos Ludo' && await ev(() => document.querySelector('#mode-seg [data-mode="lucky"]').classList.contains('on')), 'Lucky Chaos setup selected');
+  ok(await visible('#btn-howto'), 'How to play button in Lucky Chaos setup');
+  await page.tap('#btn-howto'); await sleep(200);
+  ok(await visible('#rules') && await ev(() => !document.querySelector('.rules-page[data-page="lucky"]').classList.contains('hidden') && document.querySelectorAll('#ev-lboost .ev').length === 6 && document.querySelectorAll('#ev-lchaos .ev').length === 6 && document.querySelectorAll('#ev-mega .ev').length === 6), 'in-game How to play: Boost, Chaos and Mega wheels listed');
+  ok(await ev(() => /High Risk \/ High Reward/.test(document.querySelector('.rules-page[data-page="lucky"]').textContent)), 'How to play explains Danger tiles');
+  await ev(() => document.querySelector('#rules [data-close="rules"]').click()); await sleep(150);
+  await ev(() => document.querySelector('#presets [data-p="4"]').click()); await sleep(100);
+  await page.tap('#btn-start'); await sleep(300);
+  if (await visible('#confirm')) { await page.tap('#confirm-yes'); await sleep(400); }
+  s = await st();
+  ok(s.mode === 'lucky' && s.players.length === 4 && s.tiles.length === 12 && !!s.lk, 'lucky match: 4 players, 12 special tiles');
+  ok(await ev(() => document.querySelectorAll('#tiles .tile.boost').length === 4 && document.querySelectorAll('#tiles .tile.chaos').length === 4 && document.querySelectorAll('#tiles .tile.danger').length === 4), '4 Boost, 4 Chaos and 4 Danger tiles drawn');
+  ok(await ev(() => [...document.querySelectorAll('#tiles .tile.danger')].every(t => /High Risk \/ High Reward/.test(t.title) && t.textContent.indexOf('!!') >= 0)), 'Danger tiles labelled High Risk / High Reward');
+  ok(await ev(() => document.querySelectorAll('.pod:not(.empty) .chg').length === 4), 'Lucky Charge meter in every pod');
+  ok(/Lucky Chaos/.test(await ev(() => document.getElementById('turn-label').textContent)), 'Lucky Chaos tag in the top bar');
+  await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
+  await idleHuman('roll', 3);
+  const relOf = kind => ev(k => { const L = window.__cf.logic; return window.__cf.game.st.tiles.filter(t => t.kind === k).map(t => L.posFromAbs(3, t.abs)).filter(p => p >= 4 && p <= 45)[0]; }, kind);
+  const CLEAR = 'st.queue=[]; st.phase="roll"; st.sixes=0; st.bonus=0; st.effects=[]; st.tiles.forEach(t => { t.until = 0; }); st.lk.tg=false; st.lk.used=null;';
+  const wheelOpen = () => waitFor(() => !document.getElementById('wheel').classList.contains('hidden'), 8000, 'wheel to appear');
+  const flowDone = () => waitFor(() => document.getElementById('wheel').classList.contains('hidden') && document.getElementById('choice').classList.contains('hidden') && !window.__cf.busy, 12000, 'lucky flow to finish');
+
+  // Danger tile: 50/50 wheel, stronger outcome (Jump +5)
+  const dRel = await relOf('danger');
+  await edit('st.pieces=[[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1],[' + (dRel - 2) + ',-1,-1,-1]]; ' + CLEAR);
+  await idleHuman('roll', 3);
+  await ev(() => { window.__cf.save.settings.fast = false; window.__cf.force([2]); window.__cf.forceEvent({ kind: 'boost', event: 'jump3' }); });
+  await roll(3); await idleHuman('move', 3); await waitUndoGone();
+  await tapPiece(3, 0);
+  await wheelOpen();
+  ok(await ev(() => { const w = document.getElementById('wheel'); return w.classList.contains('danger') && w.classList.contains('boost') && /High Risk \/ High Reward/.test(document.getElementById('wheel-title').textContent); }), 'Danger tile spins a wheel titled High Risk / High Reward');
+  await waitFor(() => /Jump \+5/.test(document.getElementById('wheel-result').textContent), 6000, 'danger result');
+  ok(true, 'Danger result shows the stronger "Jump +5"');
+  await flowDone();
+  s = await st();
+  ok(s.pieces[3][0] === dRel + 5 && s.lk.charge[3] === 2, 'Danger Jump +5 moved 5 squares and gave +2 Lucky Charge');
+  ok(await ev(() => [...document.querySelectorAll('#tiles .tile.danger.rest .cd')].some(c => /\d/.test(c.textContent))), 'used tile shows its cooldown (rounds left)');
+
+  // Revenge Charge: two results, tap one
+  const bRel = await relOf('boost');
+  await idleHuman('roll', 3);
+  await edit('st.pieces=[[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1],[' + (bRel - 1) + ',-1,-1,-1]]; ' + CLEAR + ' st.lk.revenge[3]=true; st.lk.charge[3]=0;');
+  await idleHuman('roll', 3);
+  ok(await ev(() => !!document.querySelector('.pod[data-seat="3"] .rev')), 'Revenge Charge badge shown');
+  await ev(() => { window.__cf.force([1]); window.__cf.forceEvent({ event: 'extra', alt: 'shield' }); });
+  await roll(3); await idleHuman('move', 3); await waitUndoGone();
+  await tapPiece(3, 0);
+  await waitFor(() => !document.getElementById('choice').classList.contains('hidden'), 10000, 'revenge choice window');
+  ok(await ev(() => document.querySelectorAll('#choice .copt').length === 2 && !!document.querySelector('#choice .copt.best') && /Revenge/.test(document.getElementById('choice-title').textContent)), 'Revenge decision window: 2 results, best one highlighted');
+  await ev(() => [...document.querySelectorAll('#choice .copt')].find(b => /Shield/.test(b.textContent)).click());
+  await flowDone();
+  s = await st();
+  ok(s.effects.some(e => e.type === 'shield' && e.seat === 3 && e.piece === 0) && !s.lk.revenge[3], 'tapped Shield was applied, Revenge used');
+
+  // Decision window timeout -> default auto-pick (Wild Jump)
+  const cRel = await relOf('chaos');
+  await idleHuman('roll', 3);
+  await edit('st.pieces=[[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1],[' + (cRel - 1) + ',-1,-1,-1]]; ' + CLEAR);
+  await idleHuman('roll', 3);
+  await ev(() => { window.__cf.save.settings.fast = true; window.__cf.force([1]); window.__cf.forceEvent({ event: 'wild', wild: 4 }); });
+  await roll(3); await idleHuman('move', 3); await waitUndoGone();
+  await tapPiece(3, 0);
+  await waitFor(() => !document.getElementById('choice').classList.contains('hidden'), 10000, 'wild choice window');
+  ok(/Wild Jump/.test(await ev(() => document.getElementById('choice-title').textContent)), 'Chaos wheel Wild Jump asks jump or stay');
+  const t0 = Date.now();
+  await waitFor(() => document.getElementById('choice').classList.contains('hidden'), 6000, 'auto pick');
+  const waited = Date.now() - t0;
+  ok(waited > 2000 && waited < 4500, 'decision window auto-picks after ~3 s (' + waited + ' ms)');
+  await flowDone();
+  s = await st();
+  ok(s.pieces[3][0] === cRel + 4, 'default choice (Jump 4) applied on timeout');
+
+  // stored power: Lucky 6
+  await idleHuman('roll', 3);
+  await edit('st.pieces=[[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1],[-1,-1,-1,-1]]; ' + CLEAR + ' st.lk.powers[3]=["six","dbl"];');
+  await idleHuman('roll', 3);
+  ok(await ev(() => document.querySelectorAll('.pod[data-seat="3"] .pw.ok').length === 2), 'stored powers (max 2) shown as buttons');
+  await ev(() => document.querySelector('.pod[data-seat="3"] .pw[data-pw="six"]').click());
+  await idleHuman('roll', 3);
+  await roll(3); await sleep(900);
+  s = await st();
+  ok(s.faces[3] === 6 || s.pieces[3].some(p => p >= 0) || s.queue.indexOf(6) >= 0, 'Lucky 6 power gave a 6');
+  await waitFor(() => !window.__cf.busy, 8000, 'idle');
+
+  // Mega Wheel at 5/5 -> Crown -> King token
+  await idleHuman('roll', 3).catch(() => {});
+  await edit('st.pieces=[[5,20,-1,-1],[9,33,-1,-1],[14,-1,-1,-1],[' + (bRel + 6) + ',11,-1,-1]]; ' + CLEAR + ' st.turn=3; st.lk.powers=[[],[],[],[]]; st.lk.kings=[]; st.lk.charge=[2,4,1,5]; st.lk.streak=[1,0,0,2];');
+  await idleHuman('roll', 3);
+  ok(await ev(() => !!document.querySelector('.pod[data-seat="3"] .chg.full') && !!document.querySelector('.pod[data-seat="3"] .mega-btn')), 'full 5/5 meter glows and offers MEGA');
+  await ev(() => { window.__cf.save.settings.fast = false; window.__cf.forceMega('crown'); });
+  await ev(() => document.querySelector('.pod[data-seat="3"] .mega-btn').click());
+  await wheelOpen();
+  ok(await ev(() => document.getElementById('wheel').classList.contains('mega') && /MEGA WHEEL/.test(document.getElementById('wheel-title').textContent)), 'Mega Wheel spins');
+  await waitFor(() => /Crown/.test(document.getElementById('wheel-result').textContent), 6000, 'mega result');
+  await sleep(150);
+  await page.screenshot({ path: OUT + '/cf-lucky-mega.png' });
+  await flowDone();
+  s = await st();
+  ok(s.lk.charge[3] === 0 && s.lk.kings.some(k => k.seat === 3 && k.piece === 0), 'Mega Crown made the lead token King, meter reset');
+  ok(await ev(() => { const e = document.querySelectorAll('#pieces .pc.king'); return e.length === 1 && getComputedStyle(e[0].querySelector('.crown')).display !== 'none'; }), 'King token wears a visible crown');
+  // lively board for the store screenshot: tiles (one resting), meters, streak, stored powers, King
+  await edit('st.lk.charge=[2,4,1,3]; st.lk.streak=[1,0,0,2]; st.lk.powers[3]=["dbl","escape"]; st.lk.revenge[1]=true; st.tiles[2].until = st.turnCount + 4; st.tiles[9].until = st.turnCount + 8; st.faces=[4,2,5,1];');
+  await idleHuman('roll', 3); await waitFor(() => document.getElementById('toast').classList.contains('hidden'), 4000, 'toast to clear'); await sleep(200);
+  await page.screenshot({ path: OUT + '/cf-lucky-board.png' });
+  await ev(() => { window.__cf.save.settings.fast = true; });
+  // computers use the meter/powers on their own
+  await edit('st.lk.charge=[5,5,5,0];');
+  await ev(() => window.__cf.force([4])); await roll(3); await idleHuman('move', 3); await waitUndoGone();
+  await tapPiece(3, (await st()).moves[0].piece);
+  await waitFor(() => { const g = window.__cf.game; return g.st.turn !== 3; }, 10000, 'computers take turns');
+  await waitFor(() => { const g = window.__cf.game; return g.st.turn === 3 && !window.__cf.busy; }, 40000, 'back to the human');
+  s = await st();
+  ok(s.lk.charge[0] < 5 && s.lk.charge[1] < 5 && s.lk.charge[2] < 5, 'computer players spent their Mega Wheels');
   await page.tap('#btn-home'); await sleep(200);
   await page.tap('#btn-m-home'); await sleep(300);
 

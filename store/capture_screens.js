@@ -1,4 +1,4 @@
-// Captures raw 1080x1920 screenshots from the real game (360x640 CSS px @3x) for the store kit (v1.1).
+// Captures raw 1080x1920 screenshots from the real game (360x640 CSS px @3x) for the store kit (v1.2).
 // Usage: PUPPETEER=puppeteer-core node store/capture_screens.js <url> <outdir>
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
 const URL = (process.argv[2] || 'http://localhost:8781/').replace(/\/?$/, '/');
@@ -10,7 +10,7 @@ const baseSave = extra => Object.assign({
   coins: 1260, xp: 2350, owned: { boards: ['graphite', 'linen', 'walnut', 'aurora'], dice: ['ivory', 'onyx', 'brass', 'frost', 'ember'] }, board: 'graphite', dice: 'ivory',
   settings: { sound: false, haptics: false, auto: false, fast: false, undo: true, timer: false, chat: true },
   setup: { ai: [AI('hard'), AI('medium'), AI('easy'), H], pass: [H, null, H, null], mode: { ai: 'classic', pass: 'classic' } },
-  stats: { played: 48, won: 27, captures: 131, home: 164, sixes: 212, pass: 9, events: 57, vs: { easy: [12, 10], medium: [15, 9], hard: [12, 5] }, mystery: [11, 6], duel: [20, 13], four: [19, 9] },
+  stats: { played: 48, won: 27, captures: 131, home: 164, sixes: 212, pass: 9, events: 57, vs: { easy: [12, 10], medium: [15, 9], hard: [12, 5] }, mystery: [11, 6], lucky: [9, 5], duel: [20, 13], four: [19, 9] },
   game: null, ad: { sessions: 5 }
 }, extra || {});
 
@@ -106,6 +106,22 @@ const baseSave = extra => Object.assign({
   await edit('st.pieces=[[6,19,-1,-1],[14,45,-1,-1],[28,-1,-1,52],[33,2,-1,-1]]; st.queue=[]; st.phase="roll"; st.sixes=0; st.bonus=0;');
   await sleep(400);
   await shot('7-walnut');
+
+  // 9) Lucky Chaos Ludo board: 12 tiles (one resting), charge meters, streak, revenge, stored powers, a King
+  await load(baseSave());
+  await start('#btn-lucky', '4', 'lucky');
+  await humanIdle('roll');
+  await edit('st.pieces=[[8,22,-1,-1],[3,31,-1,-1],[14,40,-1,-1],[23,11,-1,-1]]; st.faces=[4,2,5,1];' + RESET + ' st.lk.kings=[{seat:3,piece:0,left:3,at:st.turnCount}]; st.lk.charge=[2,4,1,3]; st.lk.streak=[1,0,0,2]; st.lk.powers[3]=["dbl","escape"]; st.lk.revenge[1]=true; st.tiles[2].until = st.turnCount + 4; st.tiles[9].until = st.turnCount + 8;');
+  await humanIdle('roll'); await sleep(400);
+  await shot('9-lucky-board');
+
+  // 10) Lucky Chaos Ludo Mega Wheel moment
+  await edit('st.lk.charge[3]=5;' + RESET);
+  await humanIdle('roll');
+  await ev(() => window.__cf.forceMega('rocket'));
+  await ev(() => document.querySelector('.pod[data-seat="3"] .mega-btn').click());
+  await waitFor(() => /\w/.test(document.getElementById('wheel-result').textContent) && !document.getElementById('wheel').classList.contains('hidden'), 8000); await sleep(200);
+  await shot('10-lucky-mega');
 
   // 8) home
   await load(baseSave()); await sleep(200); await shot('8-home');

@@ -24,7 +24,7 @@
         pass: [null, { type: 'human' }, null, { type: 'human' }],
         mode: { ai: 'classic', pass: 'classic' }
       },
-      stats: { played: 0, won: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], duel: [0, 0], four: [0, 0] },
+      stats: { played: 0, won: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], duel: [0, 0], four: [0, 0] },
       game: null, ad: {}
     };
   }
@@ -55,7 +55,7 @@
 
   function validGame(g) {
     return g && g.st && g.st.v === 2 && Array.isArray(g.st.pieces) && g.st.pieces.length === 4 && Array.isArray(g.st.players) && g.st.players.length >= 2 &&
-      ['roll', 'move', 'over'].indexOf(g.st.phase) >= 0 && g.st.seats && g.st.seats[g.st.turn];
+      ['roll', 'move', 'over', 'choose'].indexOf(g.st.phase) >= 0 && (g.st.phase !== 'choose' || !!g.st.pending) && (g.st.mode !== 'lucky' || !!g.st.lk) && g.st.seats && g.st.seats[g.st.turn];
   }
   var G = validGame(save.game) ? save.game : null;
   if (!G) save.game = null;
@@ -185,7 +185,7 @@
       el.className = 'pod' + side;
       el.style.setProperty('--pc', seatColor(s)); el.style.setProperty('--pca', rgba(seatColor(s), 0.25));
       el.innerHTML = '<div class="avatar"><svg class="tring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/></svg><span class="av">' + ART.avatar(pl.type) + '</span>' +
-        (pl.type === 'ai' ? '<span class="lvtag">' + LEVEL_NAMES[pl.level].charAt(0) + '</span>' : '') + '</div>' +
+        (pl.type === 'ai' ? '<span class="lvtag">' + LEVEL_NAMES[pl.level].charAt(0) + '</span>' : '') + '<span class="lkb"></span></div>' +
         '<div class="pmeta"><b class="pname"></b><small class="plvl"></small><div class="chips"></div></div>' +
         '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + '">' + cubeHTML() + '<em class="boost-tag hidden"></em></button>' +
         '<div class="bubble hidden"></div>';
@@ -193,20 +193,26 @@
       setDiceFace(s, G.st.faces ? G.st.faces[s] : 1, true);
     });
   }
+  function hasTiles() { return G && (G.st.mode === 'mystery' || G.st.mode === 'lucky'); }
   function buildTiles() {
     var box = $('tiles'); box.innerHTML = '';
-    if (!G || G.st.mode !== 'mystery') return;
+    if (!hasTiles()) return;
+    var lucky = G.st.mode === 'lucky';
     G.st.tiles.forEach(function (t, i) {
-      var e = document.createElement('div'); e.className = 'tile ' + t.kind; e.dataset.i = i; e.textContent = t.kind === 'boost' ? '?' : '!';
+      var e = document.createElement('div'); e.className = 'tile ' + t.kind + (lucky ? ' lk' : ''); e.dataset.i = i;
+      e.innerHTML = '<span>' + (t.kind === 'boost' ? '?' : t.kind === 'chaos' ? '!' : '!!') + '</span>' + (lucky ? '<i class="cd"></i>' : '');
+      e.title = t.kind === 'danger' ? 'Danger tile: High Risk / High Reward' : t.kind === 'boost' ? 'Boost tile' : 'Chaos tile';
       box.appendChild(e);
     });
   }
   function layoutTiles() {
-    if (!G || G.st.mode !== 'mystery') return;
+    if (!hasTiles()) return;
+    var st = G.st, n = Math.max(1, L.activeLeft(st).length);
     each($('tiles').children, function (e) {
-      var t = G.st.tiles[+e.dataset.i], c = center(L.TRACK_CELLS[t.abs]);
+      var t = st.tiles[+e.dataset.i], c = center(L.TRACK_CELLS[t.abs]), rest = st.turnCount < t.until;
       e.style.transform = 'translate(' + c.x.toFixed(1) + 'px,' + c.y.toFixed(1) + 'px)';
-      e.classList.toggle('rest', G.st.turnCount < t.until);
+      e.classList.toggle('rest', rest);
+      var cd = e.querySelector('.cd'); if (cd) cd.textContent = rest ? Math.ceil((t.until - st.turnCount) / n) : ''; // rounds left
     });
   }
   function buildPieces() {
@@ -216,7 +222,7 @@
       if (!G.st.pieces[s]) continue;
       var col = seatColor(s);
       for (var i = 0; i < 4; i++) {
-        var el = document.createElement('div'); el.className = 'pc';
+        var el = document.createElement('div'); el.className = 'pc'; el.innerHTML = '<i class="crown">' + ART.icon('crown', 16) + '</i>';
         el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45));
         el.dataset.seat = s; el.dataset.piece = i;
         box.appendChild(el); pieceEls[s].push(el);
@@ -250,6 +256,7 @@
         el.classList.toggle('done', p === L.HOME);
         el.classList.toggle('shield', L.isShielded(st, s, i));
         el.classList.toggle('frozen', L.isFrozen(st, s, i));
+        el.classList.toggle('king', !!(st.lk && L.isKing(st, s, i)));
         piecePos[id] = c;
       });
     });
@@ -270,7 +277,7 @@
   // ---------------- flow control ----------------
   var runToken = 0, timers = [], busy = false, paused = false;
   function later(fn, ms) { var tk = runToken; var id = setTimeout(function () { var k = timers.indexOf(id); if (k >= 0) timers.splice(k, 1); if (tk === runToken) fn(); }, ms); timers.push(id); return id; }
-  function cancelFlow() { runToken++; timers.forEach(clearTimeout); timers = []; busy = false; moving = {}; if (G) G.undo = null; hide('wheel'); hide('picker'); }
+  function cancelFlow() { runToken++; timers.forEach(clearTimeout); timers = []; busy = false; moving = {}; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
   function gameVisible() { return !$('game').classList.contains('hidden') && document.visibilityState === 'visible'; }
   function humans(st) { return st.players.filter(function (s) { return st.seats[s].type === 'human'; }); }
   function hasAI(st) { return st.players.some(function (s) { return st.seats[s].type === 'ai'; }); }
@@ -279,7 +286,7 @@
   function levelOf(s) { var pl = G.st.seats[s]; return pl.type === 'human' ? (humans(G.st).length === 1 ? 'Lv ' + L.levelFromXp(save.xp).level : 'P' + (humans(G.st).indexOf(s) + 1)) : LEVEL_NAMES[pl.level]; }
   function undoActive() { return !!(G && G.undo && G.undo.until > Date.now()); }
 
-  var forced = [], forcedEvents = []; // test hooks
+  var forced = [], forcedEvents = [], forcedMega = []; // test hooks
   function chipMoves(v) { return G.st.moves.filter(function (m) { return m.v === v; }); }
   function ensureSel() {
     var st = G.st;
@@ -287,6 +294,30 @@
     if (G.sel != null && chipMoves(G.sel).length) return;
     G.sel = null;
     for (var i = 0; i < st.queue.length; i++) if (chipMoves(st.queue[i]).length) { G.sel = st.queue[i]; break; }
+  }
+  // ---- Lucky Chaos pod widgets: charge meter, streak, revenge, stored powers, Mega button ----
+  var POWER_NAMES = { dbl: 'Double Roll', six: 'Lucky 6', escape: 'Safe Escape' };
+  function luckyMeter(st, s) {
+    var lk = st.lk, c = lk.charge[s], h = '<span class="chg' + (c >= L.MAX_CHARGE ? ' full' : '') + '" title="Lucky Charge ' + c + '/5">';
+    for (var k = 0; k < L.MAX_CHARGE; k++) h += '<i' + (k < c ? ' class="on"' : '') + '></i>';
+    return h + '</span>';
+  }
+  function luckyBadges(st, s) {
+    var lk = st.lk, h = '';
+    if (lk.streak[s]) h += '<span class="stk" title="Lucky Streak ×' + lk.streak[s] + '">' + ART.icon('flame', 10) + lk.streak[s] + '</span>';
+    if (lk.revenge[s]) h += '<span class="rev" title="Revenge Charge">' + ART.icon('revenge', 10) + '</span>';
+    return h;
+  }
+  function luckyPowers(st, s, active) {
+    var lk = st.lk, mine = active && isHuman(s) && st.phase === 'roll' && !busy, h = '';
+    if (mine && L.canMega(st, s)) h += '<button class="mega-btn" data-mega="1" aria-label="Spin the Mega Wheel">' + ART.icon('mega', 12) + 'MEGA</button>';
+    lk.powers[s].forEach(function (id) {
+      var ok = mine && L.powerValid(st, s, id);
+      h += '<button class="pw' + (ok ? ' ok' : '') + (lk.used === id ? ' used' : '') + '" data-pw="' + id + '" ' + (ok ? '' : 'disabled ') + 'aria-label="' + POWER_NAMES[id] + '" title="' + POWER_NAMES[id] + '">' + ART.icon(id, 13) + '</button>';
+    });
+    if (st.boost[s] === 'double' && st.turn === s) h += '<span class="pw-on">×2</span>';
+    if (lk.forceSix && st.turn === s) h += '<span class="pw-on">6!</span>';
+    return h;
   }
   function render() {
     if (!G) return;
@@ -300,8 +331,13 @@
       el.classList.toggle('active', active); el.classList.toggle('done', rank >= 0);
       el.querySelector('.pname').textContent = nameOf(s);
       var dots = ''; for (var k = 0; k < 4; k++) dots += '<i' + (k < home ? ' class="on"' : '') + '></i>';
-      el.querySelector('.plvl').innerHTML = rank >= 0 ? '<span class="prank">' + ['1st', '2nd', '3rd', '4th'][rank] + '</span>' : '<span class="hd">' + dots + '</span>' + levelOf(s);
+      var lk = st.lk;
+      if (rank >= 0) el.querySelector('.plvl').innerHTML = '<span class="prank">' + ['1st', '2nd', '3rd', '4th'][rank] + '</span>';
+      else if (lk) el.querySelector('.plvl').innerHTML = luckyMeter(st, s);
+      else el.querySelector('.plvl').innerHTML = '<span class="hd">' + dots + '</span>' + levelOf(s);
+      var lkb = el.querySelector('.lkb'); if (lkb) lkb.innerHTML = lk && rank < 0 ? luckyBadges(st, s) : '';
       var chips = el.querySelector('.chips'), html = '', selDone = false;
+      if (lk && rank < 0 && !(active && st.phase === 'move')) html = luckyPowers(st, s, active);
       if (active) st.queue.forEach(function (v) {
         var usable = st.phase === 'move' && chipMoves(v).length > 0, sel = usable && v === G.sel && !selDone;
         if (sel) selDone = true;
@@ -316,9 +352,10 @@
     var s = cur, lbl = $('turn-label');
     if (over) lbl.innerHTML = 'Match over';
     else lbl.innerHTML = '<span class="dot" style="background:' + seatColor(s) + '"></span>' + (isHuman(s) ? (nameOf(s) === 'You' ? 'Your turn' : NAMES[s] + "'s turn") : NAMES[s] + ' is playing') +
-      (st.mode === 'mystery' ? '<span class="mode-tag">Mystery</span>' : '');
+      (st.mode === 'mystery' ? '<span class="mode-tag">Mystery</span>' : st.mode === 'lucky' ? '<span class="mode-tag lucky">Lucky Chaos</span>' : '');
     var hint = '';
-    if (!over && isHuman(s) && !busy) {
+    if (!over && st.phase === 'choose') hint = isHuman(st.turn) ? 'Make your choice' : NAMES[st.turn] + ' is choosing…';
+    else if (!over && isHuman(s) && !busy) {
       if (st.phase === 'roll') hint = L.mustChoose(st) ? 'Tap your die and pick a number' : st.queue.length ? 'Six! Roll again' : (st.bonus || st.sixes) ? 'Roll again' : 'Tap your die to roll';
       else if (st.phase === 'move') hint = st.queue.length > 1 ? 'Pick a chip, then a token' : 'Pick a token';
     } else if (!over && !isHuman(s)) hint = NAMES[s] + ' is thinking…';
@@ -373,8 +410,12 @@
     if (undoActive() && !isHuman(st.turn)) return; // waiting for the undo window after a human roll that passed the turn
     var s = st.turn, pl = st.seats[s];
     highlight();
+    if (st.phase === 'choose') { busy = true; G.actor = st.pending.seat; resolveFlow(null, function () { busy = false; G.actor = null; layoutPieces(); render(); later(advance, 300); }); return; }
     if (pl.type === 'ai') {
-      if (st.phase === 'roll') later(function () { doRoll(); }, aiDelay());
+      if (st.phase === 'roll') later(function () {
+        var pre = st.lk ? L.aiPreRoll(G.st, pl.level) : null;
+        if (pre && pre.type === 'mega') doMega(); else if (pre) doPower(pre.id); else doRoll();
+      }, aiDelay());
       else later(aiMove, aiDelay() * 0.6);
     } else if (st.phase === 'move') offerMoves();
     else startTimer();
@@ -527,46 +568,57 @@
         aiReact('capture', s, res.captures);
       }
       if (res.finish) { pause = Math.max(pause, 520); ring(7.5 * CELL, 7.5 * CELL, seatColor(s)); floatAt(7.5 * CELL, 6.8 * CELL, res.finishedPlayer ? NAMES[s] + ' finished!' : 'Home!'); SFX.home(); haptic('success'); if (!human) aiReact('home', s); }
+      if (res.stride) floatAt(c.x, c.y + CELL * 0.7, 'King +1');
+      if (res.kingCaptured) { pause = Math.max(pause, 900); toast(nameOf(s) + ' toppled a King! Mega Wheel charged (5/5)', 1600); later(function () { SFX.mega(); }, 300); }
+      if (res.crowned) { pause = Math.max(pause, 900); later(function () { crownFx(res.crowned); }, res.captures.length ? 420 : 0); }
       var done = function () {
         layoutPieces(); busy = false; G.actor = null;
         if (human && !res.over && st.turn === s && st.phase === 'roll') toast(st.boost[s] === 'choose' ? 'Pick a number for your next roll' : 'Bonus roll!', 1000);
         render(); later(advance, pause);
       };
-      if (res.event) later(function () { showWheel(res.event, function () { animateEvent(res.event, done); }); }, res.captures.length ? 500 : 150);
+      if (res.event && res.event.lucky) later(function () { showWheel(res.event, function () { resolveFlow(res.event, done); }); }, res.captures.length || res.crowned ? 700 : 150);
+      else if (res.event) later(function () { showWheel(res.event, function () { animateEvent(res.event, done); }); }, res.captures.length ? 500 : 150);
       else done();
     });
   }
 
   // ---------------- Mystery Tiles: wheel & events ----------------
-  var WHEEL_SHORT = { shield: 'Shield', jump3: '+3', extra: 'Extra', double: '×2', choose: 'Pick', freeze: 'Freeze', back3: 'Back 3', swap: 'Swap', zap: 'Zap', frozen: 'Frozen', jump6: '+6', calm: 'Calm' };
-  var WHEEL_COL = { boost: ['#2a86e0', '#18b3b8'], chaos: ['#8e3fe0', '#e0407a'] };
-  function wheelSVG(kind) {
-    var list = L.WHEELS[kind], n = list.length, out = '', cols = WHEEL_COL[kind];
+  var WHEEL_SHORT = { shield: 'Shield', jump3: '+3', extra: 'Extra', double: '×2', choose: 'Pick', freeze: 'Freeze', back3: 'Back 3', swap: 'Swap', zap: 'Zap', frozen: 'Frozen', jump6: '+6', calm: 'Calm',
+    dbl: 'Double', six: 'Lucky 6', escape: 'Escape', bomb: 'Bomb', swapc: 'Swap', zapc: 'Zap', wild: 'Wild', rocket: 'Rocket', free: 'Free', guard: 'Guard', turn2: '+2 Rolls', storm: 'Storm', crown: 'Crown' };
+  var DANGER_SHORT = { jump3: '+5', extra: '+2 Rolls', bomb: 'Big Bomb', back3: 'Back 5' };
+  var WHEEL_COL = { boost: ['#2a86e0', '#18b3b8'], chaos: ['#8e3fe0', '#e0407a'], mega: ['#e0a21c', '#c2571a'] };
+  function wheelSVG(kind, list, danger) {
+    list = list || L.WHEELS[kind];
+    var n = list.length, out = '', cols = WHEEL_COL[kind];
     for (var i = 0; i < n; i++) {
       var a0 = (i - 0.5) / n * Math.PI * 2 - Math.PI / 2, a1 = (i + 0.5) / n * Math.PI * 2 - Math.PI / 2, R = 96;
       out += '<path d="M0 0 L' + (Math.cos(a0) * R).toFixed(2) + ' ' + (Math.sin(a0) * R).toFixed(2) + ' A' + R + ' ' + R + ' 0 0 1 ' + (Math.cos(a1) * R).toFixed(2) + ' ' + (Math.sin(a1) * R).toFixed(2) + 'Z" fill="' + cols[i % 2] + '" stroke="rgba(0,0,0,.25)" stroke-width="1"/>';
       var info = L.EVENT_INFO[list[i]];
       out += '<g transform="rotate(' + (i / n * 360) + ') translate(0 -60)" color="#fff"><g transform="translate(-13 -18)">' + ART.icon(list[i], 26) + '</g>' +
-        '<text y="22" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter, system-ui, sans-serif">' + (WHEEL_SHORT[list[i]] || info.name) + '</text></g>';
+        '<text y="22" text-anchor="middle" font-size="12" font-weight="800" fill="#fff" font-family="Inter, system-ui, sans-serif">' + ((danger && DANGER_SHORT[list[i]]) || WHEEL_SHORT[list[i]] || info.name) + '</text></g>';
     }
     out += '<circle r="96" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="3"/>';
-    out += '<circle r="19" fill="#12151b" stroke="#fff" stroke-width="3"/><text y="7.5" text-anchor="middle" font-size="21" font-weight="900" fill="#fff" font-family="Inter, system-ui, sans-serif">' + (kind === 'boost' ? '?' : '!') + '</text>';
+    out += '<circle r="19" fill="#12151b" stroke="#fff" stroke-width="3"/><text y="7.5" text-anchor="middle" font-size="21" font-weight="900" fill="#fff" font-family="Inter, system-ui, sans-serif">' + (kind === 'boost' ? '?' : kind === 'mega' ? 'M' : '!') + '</text>';
     return out;
   }
   function showWheel(ev, cb) {
     var w = $('wheel'), svg = $('wheel-svg'), fast = save.settings.fast, dur = fast ? 1100 : 1800;
-    $('wheel-title').textContent = (ev.kind === 'boost' ? 'Boost wheel' : 'Chaos wheel') + ' · ' + NAMES[ev.seat];
-    w.className = 'wheel ' + ev.kind;
+    var n = ev.wheel ? ev.wheel.length : 6, wname = ev.kind === 'boost' ? 'Boost wheel' : ev.kind === 'mega' ? 'MEGA WHEEL' : 'Chaos wheel';
+    $('wheel-title').innerHTML = (ev.danger ? '<span class="danger-tag">' + ART.icon('danger', 14) + 'DANGER · High Risk / High Reward</span>' : '') + wname + ' · ' + NAMES[ev.seat];
+    w.className = 'wheel ' + ev.kind + (ev.danger ? ' danger' : '');
     var res = $('wheel-result'); res.innerHTML = '&nbsp;'; res.className = 'wheel-result';
-    svg.innerHTML = wheelSVG(ev.kind);
+    var note = $('wheel-note'); note.innerHTML = ev.revenge ? ART.icon('revenge', 14) + ' Revenge Charge: two results, you pick one!' : ev.nudged ? ART.icon('flame', 14) + ' Lucky Streak nudge: better result!' : ev.lucky && !ev.mega && ev.streak ? ART.icon('flame', 14) + ' Lucky Streak ×' + ev.streak : '';
+    svg.innerHTML = wheelSVG(ev.kind, ev.wheel, ev.danger);
     svg.style.transition = 'none'; svg.style.transform = 'rotate(0deg)'; void svg.getBoundingClientRect();
-    var target = -(ev.index * 60) - 360 * (fast ? 3 : 5) + (Math.random() * 24 - 12);
+    if (ev.mega) SFX.mega(); else if (ev.danger) SFX.danger(); else if (ev.revenge) SFX.revenge();
+    var target = -(ev.index * 360 / n) - 360 * (fast ? 3 : 5) + (Math.random() * 24 - 12);
     later(function () { svg.style.transition = 'transform ' + dur + 'ms cubic-bezier(.12,.72,.2,1)'; svg.style.transform = 'rotate(' + target + 'deg)'; }, 30);
     var ticks = 0, tk = setInterval(function () { SFX.spinTick(ticks++); if (ticks > (fast ? 10 : 16)) clearInterval(tk); }, dur / 22);
     later(function () {
       clearInterval(tk);
-      var info = L.EVENT_INFO[ev.event];
-      res.innerHTML = '<b>' + info.name + '</b><span>' + info.text + '</span>';
+      var info = ev.lucky ? L.eventLabel(ev.event, ev.danger) : L.EVENT_INFO[ev.event];
+      if (ev.choice && ev.choice.type === 'revenge') { var o2 = L.eventLabel(ev.choice.options[1], ev.danger); res.innerHTML = '<b>' + info.name + ' or ' + o2.name + '?</b><span>Revenge Charge: choose one of the two results.</span>'; }
+      else res.innerHTML = '<b>' + info.name + '</b><span>' + info.text + '</span>';
       res.className = 'wheel-result on ' + (info.good === true ? 'good' : info.good === false ? 'bad' : 'meh');
       if (info.good === false) { SFX.bad(); haptic('warn'); } else { SFX.good(); haptic('medium'); }
       later(function () { hide('wheel'); cb(); }, fast ? 900 : 1500);
@@ -596,6 +648,126 @@
       case 'extra': case 'double': case 'choose': iconPop(at.x, at.y, ev.event, 'good'); render(); later(cb, 550); return;
       default: later(cb, 200);
     }
+  }
+
+  // ---------------- Lucky Chaos: decision window, effect animations, Mega Wheel, powers ----------------
+  var CHOICE_MS = 3000;
+  function choiceOptions(pd) {
+    var st = G.st, dg = pd.ctx && pd.ctx.danger;
+    if (pd.type === 'revenge') return pd.options.map(function (e) { var l = L.eventLabel(e, dg); return { icon: e, name: l.name, text: l.text }; });
+    if (pd.type === 'swap') {
+      var t = L.luckyTarget(st, 'swapc', pd.seat, pd.ctx.piece);
+      return [{ icon: 'swapc', name: 'Swap', text: t ? 'Trade places with ' + NAMES[t.seat] + "'s token ahead" : 'Trade places' }, { icon: 'shield', name: 'Stay', text: 'Keep your token where it is' }];
+    }
+    return [{ icon: 'wild', name: 'Jump ' + pd.n, text: 'Move this token ' + pd.n + ' squares forward' }, { icon: 'shield', name: 'Stay', text: 'Stay on this square' }];
+  }
+  /** Shows the 3-second decision window. Humans tap (or the best option is auto-picked); computer players decide instantly. */
+  function openChoice(cb) {
+    var st = G.st, pd = st.pending, seat = pd.seat, human = isHuman(seat), opts = choiceOptions(pd), best = L.defaultChoice(st), tk = runToken;
+    var title = pd.type === 'revenge' ? 'Revenge Charge: pick your result' : pd.type === 'swap' ? 'Chaos: Swap?' : 'Wild Jump: rolled ' + pd.n;
+    $('choice-title').textContent = title + ' · ' + NAMES[seat];
+    var row = $('choice-row'); row.innerHTML = '';
+    var done = false;
+    function pick(i, how) {
+      if (done || tk !== runToken) return; done = true;
+      clearTimeout(timer); hide('choice');
+      if (how === 'auto') toast('Auto-picked: ' + opts[i].name, 1100); else if (how === 'ai') toast(NAMES[seat] + ' chose ' + opts[i].name, 1000);
+      SFX.click(); cb(i);
+    }
+    opts.forEach(function (o, i) {
+      var b = document.createElement('button'); b.className = 'copt' + (i === best ? ' best' : ''); b.dataset.i = i;
+      b.innerHTML = '<span class="ci">' + ART.icon(o.icon, 26) + '</span><b>' + o.name + '</b><small>' + o.text + '</small>' + (i === best ? '<em>best</em>' : '');
+      b.disabled = !human;
+      b.addEventListener('click', function () { pick(i, 'tap'); });
+      row.appendChild(b);
+    });
+    var bar = $('choice-bar'); bar.style.transition = 'none'; bar.style.width = '100%';
+    show('choice'); void bar.offsetWidth;
+    var timer;
+    if (!human) { var ai = L.aiChoose(st, st.seats[seat].level); timer = setTimeout(function () { pick(ai, 'ai'); }, save.settings.fast ? 350 : 700); return; }
+    bar.style.transition = 'width ' + CHOICE_MS + 'ms linear'; bar.style.width = '0%';
+    timer = setTimeout(function () { pick(best, 'auto'); }, CHOICE_MS + 60);
+  }
+  /** Resolve any pending choice (possibly nested: Revenge → Swap/Wild), then animate the final effect. */
+  function resolveFlow(ev, cb) {
+    var st = G.st;
+    if (st.phase === 'choose' && st.pending) {
+      render();
+      openChoice(function (i) { var r = L.choose(G.st, i); persist(); resolveFlow(r.event, cb); });
+      return;
+    }
+    animateLucky(ev, cb);
+  }
+  function slideTo(seat, piece, pos) {
+    var el = pieceEls[seat][piece]; if (!el) return;
+    el.style.transition = 'transform .45s cubic-bezier(.3,.7,.3,1)'; placeToken(seat, piece, pos);
+    setTimeout(function () { el.style.transition = ''; }, 520);
+  }
+  function crownFx(c) {
+    var p = piecePos[c.seat + '-' + c.piece] || { x: 7.5 * CELL, y: 7.5 * CELL };
+    layoutPieces(); iconPop(p.x, p.y, 'crown', 'gold'); ring(p.x, p.y, '#ffd24a'); floatAt(p.x, p.y - CELL * 0.8, 'KING!');
+    SFX.crown(); haptic('success');
+    toast((nameOf(c.seat) === 'You' ? 'Your token' : NAMES[c.seat] + "'s token") + ' is King for ' + L.KING_TURNS + ' turns: +1 stride, Chaos-proof', 1700);
+  }
+  function animateLucky(ev, cb) {
+    if (!ev || !ev.event) { layoutPieces(); render(); later(cb, 60); return; }
+    var s = ev.seat, id = ev.event, lab = L.eventLabel(id, ev.danger);
+    var pp = ev.piece != null ? piecePos[s + '-' + ev.piece] : null, at = pp || { x: 7.5 * CELL, y: 7.5 * CELL };
+    var tp = ev.target ? piecePos[ev.target.seat + '-' + ev.target.piece] : null;
+    var human = isHuman(s);
+    if (human && ev.stored) toast(lab.name + ' stored: tap it next to your die before a roll', 1500);
+    floatAt(at.x, at.y - CELL * 0.8, lab.name);
+    switch (id) {
+      case 'bomb': iconPop(at.x, at.y, 'bomb', 'bad'); ring(at.x, at.y, '#ff8a3d'); burst(at.x, at.y, '#ffb03d', 18); SFX.bomb(); shake(); haptic('heavy'); break;
+      case 'storm': iconPop(at.x, at.y, 'storm', 'gold'); shake(); SFX.zap(); haptic('heavy'); break;
+      case 'zapc': if (tp) bolt(tp.x, tp.y); SFX.zap(); shake(); haptic('heavy'); break;
+      case 'freeze': var fp = tp || at; iconPop(fp.x, fp.y, 'freeze', 'ice'); SFX.freeze(); break;
+      case 'shield': iconPop(at.x, at.y, 'shield', 'good'); ring(at.x, at.y, '#6fd3ff'); SFX.good(); break;
+      case 'guard': ev.moves.forEach(function (m) { var q = piecePos[m.seat + '-' + m.piece]; if (q) ring(q.x, q.y, '#6fd3ff'); }); iconPop(at.x, at.y, 'guard', 'good'); SFX.good(); break;
+      case 'back3': iconPop(at.x, at.y, 'back3', 'bad'); SFX.bad(); haptic('warn'); break;
+      case 'crown': break;
+      default: iconPop(at.x, at.y, id, lab.good === false ? 'bad' : ev.mega ? 'gold' : 'good'); SFX.pop();
+    }
+    var fwd = ev.moves.filter(function (m) { return m.path && !m.back && !m.swap && !m.shield; });
+    var rest = ev.moves.filter(function (m) { return (m.back || m.swap) && !m.shield; });
+    var k = 0, last = null;
+    later(function nextFwd() {
+      if (k < fwd.length) { var m = fwd[k++]; last = m; animatePath(m.seat, m.piece, m.from, m.path, nextFwd); return; }
+      var pause = 450;
+      rest.forEach(function (m) { slideTo(m.seat, m.piece, m.to); });
+      if (rest.length) { pause = 650; if (id === 'swapc') SFX.leave(); }
+      ev.sent.forEach(function (x) { var q = piecePos[x.seat + '-' + x.piece] || at; burst(q.x, q.y, seatColor(x.seat), 12); sendToBase(x.seat, x.piece); pause = 750; aiReact('capture', s, [x]); });
+      if (ev.captures.length) { var c = last ? piecePos[last.seat + '-' + last.piece] : at; captureFx(s, ev.captures, c || at); pause = 800; aiReact('capture', s, ev.captures); }
+      if (ev.crowned) { later(function () { crownFx(ev.crowned); }, ev.captures.length ? 400 : 0); pause = Math.max(pause, 950); }
+      if (ev.finish) { ring(7.5 * CELL, 7.5 * CELL, seatColor(s)); SFX.home(); pause = Math.max(pause, 600); }
+      later(function () { layoutPieces(); render(); cb(); }, pause);
+    }, 380);
+  }
+  function doMega(forcedEv) {
+    if (!G || busy || paused) return;
+    var st = G.st, s = st.turn;
+    if (!L.canMega(st, s)) return;
+    busy = true; G.actor = s; closeUndo(); stopTimer(); clearHighlights(); hide('chat');
+    var r = L.mega(st, forcedEv || (forcedMega.length ? forcedMega.shift() : undefined));
+    if (isHuman(s)) save.stats.events++;
+    render(); persist();
+    showWheel(r, function () {
+      animateLucky(r, function () { busy = false; G.actor = null; render(); later(advance, 250); });
+    });
+  }
+  function doPower(id) {
+    if (!G || busy || paused) return;
+    var st = G.st, s = st.turn;
+    if (!L.powerValid(st, s, id)) return;
+    busy = true; G.actor = s; closeUndo(); stopTimer();
+    var out = L.usePower(st, id), lab = L.eventLabel(id), pc = podEl(s), br = $('board-wrap').getBoundingClientRect();
+    var pr = pc ? pc.getBoundingClientRect() : br, px = pr.left + pr.width / 2 - br.left, py = slotOf(s) < 2 ? 10 : BS - 10;
+    iconPop(Math.max(20, Math.min(BS - 20, px)), py, id, 'good'); SFX.good(); haptic('medium');
+    toast((nameOf(s) === 'You' ? 'You used ' : NAMES[s] + ' used ') + lab.name + (id === 'dbl' ? ': next roll counts double' : id === 'six' ? ': the next roll is a 6' : ''), 1300);
+    render(); persist();
+    var fin = function () { busy = false; G.actor = null; render(); later(advance, isHuman(s) ? 0 : 300); };
+    if (id === 'escape') { var m = out.moves[0]; animatePath(s, m.piece, m.from, m.path, function () { var c = piecePos[s + '-' + m.piece]; iconPop(c.x, c.y, 'escape', 'good'); if (out.captures.length) captureFx(s, out.captures, c); later(fin, 450); }); }
+    else later(fin, 500);
   }
 
   // ---------------- quick chat & emotes (cosmetic, offline) ----------------
@@ -664,6 +836,7 @@
       var S = save.stats; S.played++; if (best === 1) S.won++;
       if (ai.length) { var top = ai.indexOf('hard') >= 0 ? 'hard' : ai.indexOf('medium') >= 0 ? 'medium' : 'easy'; S.vs[top][0]++; if (best === 1) S.vs[top][1]++; } else S.pass++;
       if (st.mode === 'mystery') { S.mystery[0]++; if (best === 1) S.mystery[1]++; }
+      if (st.mode === 'lucky') { S.lucky[0]++; if (best === 1) S.lucky[1]++; }
       if (st.players.length === 2) { S.duel[0]++; if (best === 1) S.duel[1]++; } else if (st.players.length === 4) { S.four[0]++; if (best === 1) S.four[1]++; }
       gate.matchCompleted();
       persist();
@@ -675,7 +848,7 @@
   function showResult() {
     var st = G.st, hs = humans(st), single = hs.length === 1, winner = st.ranking[0];
     $('r-title').textContent = single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
-    $('r-kicker').textContent = (st.mode === 'mystery' ? 'MYSTERY TILES · ' : '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
+    $('r-kicker').textContent = (st.mode === 'mystery' ? 'MYSTERY TILES · ' : st.mode === 'lucky' ? 'LUCKY CHAOS LUDO · ' : '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
     $('r-rank').innerHTML = st.ranking.map(function (s, k) {
       return '<li class="' + (isHuman(s) ? 'me' : '') + '"><span class="medal m' + (k + 1) + '">' + (k + 1) + '</span><span class="pdot" style="background:' + seatColor(s) + '"></span>' + nameOf(s) +
         '<small>' + levelOf(s) + (st.seats[s].type === 'ai' ? ' AI' : '') + ' · ' + st.pieces[s].filter(function (p) { return p === L.HOME; }).length + '/4 home</small></li>';
@@ -716,12 +889,12 @@
   function updateHome() {
     var cont = G && G.st.phase !== 'over';
     $('btn-continue').classList.toggle('hidden', !cont);
-    if (cont) { var st = G.st; $('continue-sub').textContent = (st.mode === 'mystery' ? 'Mystery Tiles · ' : '') + (hasAI(st) ? 'vs Computer' : 'Pass & Play') + ' · ' + st.players.length + ' players'; }
+    if (cont) { var st = G.st; $('continue-sub').textContent = (st.mode === 'mystery' ? 'Mystery Tiles · ' : st.mode === 'lucky' ? 'Lucky Chaos Ludo · ' : '') + (hasAI(st) ? 'vs Computer' : 'Pass & Play') + ' · ' + st.players.length + ' players'; }
   }
   var setupKind = 'ai', setupMode = 'classic';
   function showSetup(kind, mode) {
     setupKind = kind; setupMode = mode || save.setup.mode[kind] || 'classic'; screen('setup');
-    $('setup-title').textContent = kind === 'ai' ? (setupMode === 'mystery' ? 'Mystery Tiles' : 'Play vs Computer') : 'Pass & Play';
+    $('setup-title').textContent = kind === 'ai' ? (setupMode === 'mystery' ? 'Mystery Tiles' : setupMode === 'lucky' ? 'Lucky Chaos Ludo' : 'Play vs Computer') : 'Pass & Play';
     renderSetup();
   }
   function rulesSummary() {
@@ -736,7 +909,9 @@
   function renderSetup() {
     var seats = save.setup[setupKind], list = $('seat-list'); list.innerHTML = '';
     each($('mode-seg').children, function (b) { b.classList.toggle('on', b.dataset.mode === setupMode); });
-    $('mode-note').textContent = setupMode === 'mystery' ? 'Mystery Tiles: ? and ! tiles on the track spin a wheel of events (shield, jump, swap, zap, freeze…). No stakes: every match is free.' : 'Classic Ludo on a clean board.';
+    $('mode-note').textContent = setupMode === 'mystery' ? 'Mystery Tiles: ? and ! tiles on the track spin a wheel of events (shield, jump, swap, zap, freeze…). No stakes: every match is free.' :
+      setupMode === 'lucky' ? 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.' : 'Classic Ludo on a clean board.';
+    $('btn-howto').classList.toggle('hidden', setupMode !== 'lucky');
     var order = [0, 1, 3, 2], pos = ['top left', 'top right', 'bottom right', 'bottom left'];
     order.forEach(function (s) {
       var x = seats[s], cur = !x ? 'off' : x.type === 'human' ? 'human' : x.level;
@@ -787,7 +962,7 @@
     var S = save.stats, rate = S.played ? Math.round(S.won / S.played * 100) + '%' : '–', lv = L.levelFromXp(save.xp);
     var cells = [['Level', lv.level], ['XP', save.xp], ['Matches', S.played], ['Wins', S.won], ['Win rate', rate], ['Captures', S.captures], ['Tokens home', S.home], ['Sixes rolled', S.sixes],
       ['Wins vs Easy', S.vs.easy[1] + ' / ' + S.vs.easy[0]], ['Wins vs Normal', S.vs.medium[1] + ' / ' + S.vs.medium[0]], ['Wins vs Hard', S.vs.hard[1] + ' / ' + S.vs.hard[0]], ['Mystery events', S.events],
-      ['Mystery wins', S.mystery[1] + ' / ' + S.mystery[0]], ['1 v 1 wins', S.duel[1] + ' / ' + S.duel[0]], ['4-player wins', S.four[1] + ' / ' + S.four[0]], ['Pass & Play', S.pass]];
+      ['Mystery wins', S.mystery[1] + ' / ' + S.mystery[0]], ['Lucky Chaos wins', S.lucky[1] + ' / ' + S.lucky[0]], ['1 v 1 wins', S.duel[1] + ' / ' + S.duel[0]], ['4-player wins', S.four[1] + ' / ' + S.four[0]], ['Pass & Play', S.pass]];
     $('stats-body').innerHTML = cells.map(function (c) { return '<div><b>' + c[1] + '</b><span>' + c[0] + '</span></div>'; }).join('');
   }
   var skinTab = 'boards';
@@ -826,6 +1001,12 @@
     ['boost', 'chaos'].forEach(function (k) {
       $('ev-' + k).innerHTML = L.WHEELS[k].map(function (e) { var i = L.EVENT_INFO[e]; return '<div class="ev ' + k + '"><span class="ev-ico">' + ART.icon(e, 22) + '</span><b>' + i.name + '</b><small>' + i.text + '</small></div>'; }).join('');
     });
+    [['lboost', 'boost'], ['lchaos', 'chaos'], ['mega', 'mega']].forEach(function (x) {
+      $('ev-' + x[0]).innerHTML = L.LWHEELS[x[1]].map(function (e) {
+        var i = L.eventLabel(e), d = L.eventLabel(e, true), extra = d.name !== i.name ? ' <em>Danger: ' + d.name + '</em>' : '';
+        return '<div class="ev ' + x[1] + '"><span class="ev-ico">' + ART.icon(e, 22) + '</span><b>' + i.name + extra + '</b><small>' + i.text + '</small></div>';
+      }).join('');
+    });
   }
   function openRules(tab) {
     each($('rules-tabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
@@ -838,6 +1019,15 @@
   $('btn-continue').addEventListener('click', function () { SFX.unlock(); SFX.click(); if (G) showGame(); });
   $('btn-vs-ai').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('ai', 'classic'); });
   $('btn-mystery').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('ai', 'mystery'); });
+  $('btn-lucky').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('ai', 'lucky'); });
+  $('btn-howto').addEventListener('click', function () { SFX.click(); openRules('lucky'); });
+  // Lucky Chaos: stored powers and the Mega Wheel (buttons live in the active player's pod)
+  $('stage').addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('.pw, .mega-btn') : null;
+    if (!b || !G || busy || paused || G.st.phase !== 'roll' || !isHuman(G.st.turn)) return;
+    SFX.unlock();
+    if (b.dataset.mega) doMega(); else doPower(b.dataset.pw);
+  });
   $('btn-pass').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('pass'); });
   $('btn-setup-back').addEventListener('click', function () { SFX.click(); showHome(); });
   each($('mode-seg').children, function (b) { b.addEventListener('click', function () { SFX.click(); setupMode = b.dataset.mode; save.setup.mode[setupKind] = setupMode; persist(); renderSetup(); }); });
@@ -869,7 +1059,7 @@
   $('btn-chat').addEventListener('click', function () { SFX.click(); if (isOpen('chat')) hide('chat'); else show('chat'); });
   $('btn-home').addEventListener('click', function () { SFX.click(); hide('chat'); openMenu(); });
   $('btn-m-resume').addEventListener('click', function () { SFX.click(); resumeFromMenu(); });
-  $('btn-m-rules').addEventListener('click', function () { SFX.click(); openRules(G && G.st.mode === 'mystery' ? 'mystery' : 'basics'); });
+  $('btn-m-rules').addEventListener('click', function () { SFX.click(); openRules(G && G.st.mode === 'mystery' ? 'mystery' : G && G.st.mode === 'lucky' ? 'lucky' : 'basics'); });
   $('btn-m-home').addEventListener('click', function () { SFX.click(); hide('menu'); showHome(); });
   $('btn-m-restart').addEventListener('click', function () { SFX.click(); hide('menu'); askConfirm('Restart the match?', 'The current match starts again with the same players.', 'Restart', function () { startMatch(G.seats, G.mode); }); });
   $('btn-r-again').addEventListener('click', function () { leaveResult('again'); });
@@ -935,10 +1125,12 @@
 
   window.__cf = {
     get game() { return G; }, get save() { return save; }, logic: L, gate: gate,
-    get busy() { return busy; }, get paused() { return paused; }, get idle() { return !busy && timers.length === 0 && !isOpen('wheel'); },
+    get busy() { return busy; }, get paused() { return paused; }, get idle() { return !busy && timers.length === 0 && !isOpen('wheel') && !isOpen('choice'); },
     get undoActive() { return undoActive(); },
     force: function (vals) { forced = vals.slice(); },
     forceEvent: function (evs) { forcedEvents = [].concat(evs); },
+    forceMega: function (evs) { forcedMega = [].concat(evs); },
+    mega: function (ev) { doMega(ev); },
     /** Test helper: edit the running match state, then redraw and continue. */
     edit: function (fn) { cancelFlow(); fn(G.st); G.st.moves = G.st.phase === 'move' ? L.queueMoves(G.st) : []; buildPods(); buildTiles(); buildPieces(); layout(); render(); advance(); },
     piecePoint: function (s, i) { var r = $('board-wrap').getBoundingClientRect(), p = piecePos[s + '-' + i]; return p ? { x: r.left + p.x, y: r.top + p.y } : null; },

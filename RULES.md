@@ -1,4 +1,4 @@
-# Crossfour: Offline Ludo — Rules (v1.1)
+# Crossfour: Offline Ludo — Rules (v1.2)
 
 The same rules are shown in the game (**Rules** on the home screen or in the match menu). The rules engine is
 `www/js/logic.js` and every rule below is covered by `test/logic.test.js`.
@@ -92,6 +92,109 @@ are never on start or star squares.
 There is **no entry fee, stake or bet** in Mystery Tiles (or anywhere in the game). Finishing any match
 awards cosmetic coins and XP; coins only unlock board and dice skins and can't be bought or cashed out.
 
+## Lucky Chaos Ludo mode (new in v1.2)
+
+A third mode, added at the player's request under the name **Lucky Chaos Ludo**. It keeps normal Ludo
+(Star-style rolls and your house rules: 6 to leave base, exact roll home, captures, safe squares) and adds
+luck you can steer. 1 v 1 or 3–4 players, vs computer (Easy / Normal / Hard) or pass & play.
+Tap **How to play** in the mode setup (or **Rules → Lucky** in the game) for the short version.
+
+### Special tiles (12, always in the same places)
+
+| Tile | Where | What it does |
+|---|---|---|
+| **?** Boost tile (4) | 4 squares after each start square | Spin the **Boost wheel** |
+| **!** Chaos tile (4) | 10 squares after each start square | Spin the **Chaos wheel** |
+| **!!** Danger tile (4), labelled **High Risk / High Reward** | 6 squares after each start square (yellow/black stripes) | 50/50: Boost **or** Chaos wheel, with **stronger** results |
+
+A tile triggers only when a token **ends its move exactly** on it. It then rests for **2 rounds**
+(dimmed, with a small number showing the rounds left). The wheels only land on results that can
+actually happen at that moment.
+
+### Boost wheel (?)
+
+| Result | Effect | On a Danger tile |
+|---|---|---|
+| Shield | This token can't be captured and ignores Chaos effects until the end of your next turn | – |
+| Jump +3 | This token jumps 3 squares (can capture) | **Jump +5** |
+| Double Roll | **Stored power**: use before a roll to make it count double | – |
+| Extra Roll | One more roll this turn | **2 extra rolls** |
+| Lucky 6 | **Stored power**: use instead of rolling to get a 6 (never counts toward three 6s) | – |
+| Safe Escape | **Stored power**: your most threatened token dashes to the next safe square (up to 8 ahead) | – |
+
+### Chaos wheel (!)
+
+| Result | Effect | On a Danger tile |
+|---|---|---|
+| Bomb | Every other token within 2 squares (**yours too**) slides back 3. Never to base; safe squares, start squares, shields and Kings are immune | **Big Bomb**: radius 3 |
+| Swap | **Your choice**: swap with the nearest rival token up to 12 squares ahead, or stay | – |
+| Zap | The nearest rival within 3 squares goes back to base; a token 40+ squares along only slides back 6 | – |
+| Freeze | The nearest rival token up to 12 squares ahead can't move on its owner's next turn | – |
+| Back 3 | This token slides back 3 (never behind its start square) | **Back 5** |
+| Wild Jump | A random 1–6 is drawn; **your choice**: jump that far or stay | – |
+
+### Lucky Streak, Revenge, Lucky Charge and the Mega Wheel
+
+- **Lucky Streak** (flame ×1–×3 under your name): +1 for each tile spin. A higher streak gives a chance
+  (15% per level) of a second spin where the better result is kept. It resets when one of your tokens is captured.
+- **Revenge Charge**: when one of your tokens is captured you get a Revenge Charge (shown under your name).
+  Your next tile spin shows **two different results and you pick one**.
+- **Lucky Charge** (5 pips): +1 per tile spin, +1 more on a Danger tile, +1 at a ×3 streak and +1 when far
+  behind (tiles charge at most once per turn); +1 for every capture. At **5/5** tap **MEGA** next to your die
+  before a roll to spin the **Mega Wheel**. The meter then empties.
+
+| Mega Wheel | Effect |
+|---|---|
+| Rocket | Your best token blasts up to 8 squares forward (can capture) |
+| Free Token | A token leaves your base onto your start square |
+| Royal Guard | All your tokens on the track get a Shield until the end of your next turn |
+| Double Turn | Two extra rolls this turn |
+| Storm | Rival tokens up to 6 squares behind your tokens slide back 3 (safe squares/shields/Kings immune) |
+| Crown | Your most advanced token becomes King for 3 turns |
+
+### King token
+
+A token that captures **2 rival tokens** becomes **King** (gold crown) for **3 of its owner's turns** or until
+it is captured or gets home. A King moves **+1 square** when that fits (and still lands exactly) and is
+**immune to Chaos effects** (Bomb, Swap, Zap, Freeze, Storm). It can still be captured by a normal landing:
+capturing a King fills the attacker's Lucky Charge to **5/5** (a Mega spin).
+
+### Stored powers
+
+Double Roll, Lucky 6 and Safe Escape are stored in your pod: **at most 2**, never two of the same (the wheel
+skips a power you can't store). Tap one before a roll; one power per roll.
+
+### Choices and fairness
+
+- Swap, Wild Jump and Revenge open a **3-second decision window**. If time runs out the best option (marked
+  "best") is picked for you. Computer players decide instantly.
+- Nothing decides the winner by itself: tokens in the home lane are never touched, Bombs and Storms only push
+  back 3 (never to base), Zap on a token 40+ squares along only slides it back 6, safe squares/shields/Kings are
+  protected and Back 3 never goes behind the start square.
+- **Comeback**: a player well behind the leader (15%+ / 30%+ of total progress) gets a slightly higher chance of
+  a better wheel result, and at 30%+ an extra charge per tile spin (capped).
+
+### Balance (simulated, test suite)
+
+From `npm test` (1000 simulated games per setting, computer vs computer):
+
+| | Lucky Chaos | Star (classic mode) |
+|---|---|---|
+| 1 v 1 Hard beats Easy | 91.9% | 91.9% |
+| 1 v 1 Hard beats Normal | 67.5% | – |
+| 1 v 1 Normal beats Easy | 84.6% | – |
+| 4 players: one Hard vs three Easy wins (fair share 25%) | 77.0% | 78.5% |
+| 4 players: one Hard vs three Normal / one Normal vs three Easy | 42.8% / 64.6% | – |
+| Average 1 v 1 game | 148 rolls / 106 turns | 174 rolls / 137 turns |
+| Average 4-player game | 438 rolls / 306 turns | 557 rolls / 427 turns |
+| Leader at 50% progress still wins (1 v 1 / 4 players) | 71.4% / 55.2% | 65.7% / 58.1% |
+
+About 9.5 Mega spins and 2.4 Kings per 1 v 1 game (27 and 10 in 4-player games). Every simulated game
+(1000 each with 2, 3 and 4 players, all levels and house-rule sets) finished with a winner.
+
+There is **no entry fee, stake or bet** in Lucky Chaos Ludo (or anywhere in the game). The wheels only
+change the board; they never award or cost coins. Finishing a match awards cosmetic coins and XP only.
+
 ## Computer players
 
 - **Easy:** mostly random, sometimes takes an obvious capture or finish.
@@ -99,5 +202,9 @@ awards cosmetic coins and XP; coins only unlock board and dice skins and can't b
 - **Hard:** scores every move: captures (worth more the further the victim travelled), getting home,
   safe squares, avoiding squares rivals can hit next roll (counting stacked 6s), escaping threats,
   building/keeping blocks when blocks are on, and the value of mystery tiles and events.
+- In **Lucky Chaos Ludo** Normal and Hard also value Boost/Chaos/Danger tiles, hunt Kings (a Mega charge),
+  try to crown their own King, spin the Mega Wheel when it is full, use stored powers at sensible moments
+  (Safe Escape when threatened, Lucky 6 with tokens in base, Double Roll mid-board) and pick the best option
+  in choices. Easy uses them more randomly.
 
 In simulated 1 v 1 games (test suite) Hard beats Easy about 93% of the time and Normal about 87%.

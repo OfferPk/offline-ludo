@@ -1,5 +1,5 @@
 """Builds the Play Store graphics from real in-game captures in store/raw/ (made by store/capture_screens.js).
-  store/screenshots/01..07.png  1080x1920 captioned screenshots
+  store/screenshots/01..08.png  1080x1920 captioned screenshots
   store/feature-graphic-1024x500.png
 Run from the repo root: python3 store/make_store_art.py  (needs Pillow)"""
 import os, sys
@@ -28,13 +28,14 @@ def font(path, size, style=None):
 
 
 CAPTIONS = [
-    ('01', '1-dice', 'Your own dice, your corner', 'Stack your 6s: roll again, then pick chip + token'),
-    ('02', '3-wheel', 'New: Mystery Tiles', '? and ! tiles spin wheels of surprise events'),
-    ('03', '2-capture', 'Capture and race home', 'Bonus roll for every capture and every token home'),
-    ('04', '4-chat', 'Quick chat & emotes', 'Computer players react. 1 v 1 or 4 players'),
-    ('05', '5-rules', 'Play by your house rules', 'Star style or Classic, blocks, undo roll & more'),
-    ('06', '6-win', 'Ranked results, coins & XP', 'Coins unlock cosmetic skins only'),
-    ('07', '7-walnut', 'Pass & play, fully offline', 'Stylish skins. No internet, no login'),
+    ('01', '9-lucky-board', 'New: Lucky Chaos Ludo', 'Boost, Chaos & Danger tiles, King tokens, Lucky Charge'),
+    ('02', '10-lucky-mega', 'Spin the Mega Wheel', 'Fill your meter to 5/5, then pick your moment'),
+    ('03', '1-dice', 'Your own dice, your corner', 'Stack your 6s: roll again, then pick chip + token'),
+    ('04', '3-wheel', 'Mystery Tiles mode', '? and ! tiles spin wheels of surprise events'),
+    ('05', '2-capture', 'Capture and race home', 'Bonus roll for every capture and every token home'),
+    ('06', '4-chat', 'Quick chat & emotes', 'Computer players react. 1 v 1 or 4 players'),
+    ('07', '6-win', 'Ranked results, coins & XP', 'Coins unlock cosmetic skins only'),
+    ('08', '7-walnut', 'Pass & play, fully offline', 'Stylish skins. No internet, no login'),
 ]
 
 
@@ -105,8 +106,8 @@ def feature():
     d.text((64, 110), 'Crossfour', font=font(SERIF, 100, 'ExtraBold'), fill=INK)
     d.text((70, 248), 'OFFLINE LUDO', font=font(SANS, 36, 'Bold'), fill=BLUE)
     d.rounded_rectangle([(70, 312), (170, 318)], 3, fill=BLUE)
-    d.text((70, 340), '2-4 players · vs computer · Mystery Tiles', font=font(SANS, 27, 'Medium'), fill=MUTED)
-    d.text((70, 378), 'Stacked sixes · pass & play · no internet', font=font(SANS, 27, 'Medium'), fill=MUTED)
+    d.text((70, 340), '2-4 players · vs computer · Lucky Chaos', font=font(SANS, 27, 'Medium'), fill=MUTED)
+    d.text((70, 378), 'Mystery Tiles · pass & play · no internet', font=font(SANS, 27, 'Medium'), fill=MUTED)
     out = os.path.join(HERE, 'feature-graphic-1024x500.png')
     canvas.convert('RGB').save(out, optimize=True)
     return out

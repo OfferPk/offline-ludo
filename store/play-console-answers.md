@@ -1,6 +1,6 @@
 # Play Console: App content answers for Crossfour: Offline Ludo
 
-App: **Crossfour** (store title "Crossfour: Offline Ludo") · Package `com.offerpk.offlineludo` · v1.1.0 (versionCode 2)
+App: **Crossfour** (store title "Crossfour: Offline Ludo") · Package `com.offerpk.offlineludo` · v1.2.0 (versionCode 3)
 Where: **Play Console → your app → Policy and programs → App content** (also listed in Dashboard → "Set up your app").
 
 The app itself has **no accounts, no login, no analytics, no in-app purchases, no online chat, no online mode and no location permission**. (The quick-chat phrases and emoji faces added in v1.1 are a fixed, preset list shown only on the same phone; nothing is typed, sent or received.) The match in progress, statistics, coins, skins and settings stay on the device (local storage) and are never sent anywhere.
@@ -37,7 +37,7 @@ Answer **No** to every content question:
 | Sexuality / nudity / sexual content | **No** |
 | Language (profanity, crude humor) | **No** |
 | Controlled substances (drugs, alcohol, tobacco) | **No** |
-| Gambling / simulated gambling / loot boxes | **No**. Ludo is a traditional dice board game, not simulated gambling: there is no betting, no stakes or entry fees, no casino mechanics and no random rewards. The Mystery Tiles wheels are an in-match board-game event (like a chance card): they only move tokens or change the next roll, cost nothing, and never award or take coins or items. Coins are earned by finishing matches, cannot be wagered, bought or cashed out, and only unlock cosmetic skins at fixed prices. |
+| Gambling / simulated gambling / loot boxes | **No**. Ludo is a traditional dice board game, not simulated gambling: there is no betting, no stakes or entry fees, no casino mechanics and no random rewards. The Mystery Tiles wheels and the Lucky Chaos Ludo wheels (Boost, Chaos, Danger and the Mega Wheel) are in-match board-game events (like a chance card): they only move tokens, change rolls or give in-match powers that vanish when the match ends; they cost nothing, can't be bought or re-spun for coins or ads, and never award or take coins or items. The Lucky Charge meter fills only by playing (landing on tiles and capturing). The word "Lucky" in the mode name refers to these board events, not to any prize. Coins are earned by finishing matches, cannot be wagered, bought or cashed out, and only unlock cosmetic skins at fixed prices. |
 | Discrimination / hate | **No** |
 | Miscellaneous: does the app let users interact or exchange content with each other (chat, UGC)? | **No** (pass & play is several people taking turns on one phone; quick chat is a fixed set of preset phrases/emoji shown on the same screen; there is no online play, free-text chat or content sharing) |
 | Does the app share the user's current physical location with other users? | **No** |

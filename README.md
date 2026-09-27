@@ -1,6 +1,6 @@
 # ◆ Crossfour: Offline Ludo
 
-A modern, **fully offline Ludo** for 2–4 players. Play against computer players (**Easy, Normal, Hard**), pass one phone around with friends, or mix both. v1.1 adds **per-player dice in each corner**, the **Star-style stacked-sixes roll system**, the new **Mystery Tiles** mode, **Undo dice roll**, quick chat & emotes, levels/XP and ranked results. There's no server, no login and no online mode. It's written in vanilla HTML/CSS/JavaScript (the board is drawn on a canvas) with no framework, and ships as an **Android app** (Capacitor 8 + Google AdMob) that **GitHub Actions** builds and signs automatically.
+A modern, **fully offline Ludo** for 2–4 players. Play against computer players (**Easy, Normal, Hard**), pass one phone around with friends, or mix both. v1.2 adds the new **Lucky Chaos Ludo** mode (Boost/Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens). v1.1 added **per-player dice in each corner**, the **Star-style stacked-sixes roll system**, the **Mystery Tiles** mode, **Undo dice roll**, quick chat & emotes, levels/XP and ranked results. There's no server, no login and no online mode. It's written in vanilla HTML/CSS/JavaScript (the board is drawn on a canvas) with no framework, and ships as an **Android app** (Capacitor 8 + Google AdMob) that **GitHub Actions** builds and signs automatically.
 
 **▶ Play the live demo:** https://offerpk.github.io/offline-ludo/
 **Privacy policy:** https://offerpk.github.io/offline-ludo/privacy.html
@@ -9,6 +9,8 @@ A modern, **fully offline Ludo** for 2–4 players. Play against computer player
 <p align="center">
   <img src="docs/screenshot-home.png" width="200" alt="Home">
   <img src="docs/screenshot-dice-board.png" width="200" alt="Per-player dice and stacked rolls">
+  <img src="docs/screenshot-lucky-board.png" width="200" alt="Lucky Chaos Ludo board with tiles, meters and a King">
+  <img src="docs/screenshot-lucky-mega.png" width="200" alt="Lucky Chaos Ludo Mega Wheel">
   <img src="docs/screenshot-mystery-wheel.png" width="200" alt="Mystery Tiles wheel">
   <img src="docs/screenshot-result.png" width="200" alt="Ranked result">
 </p>
@@ -27,7 +29,8 @@ Full rules: **[RULES.md](RULES.md)** (also in the game under **Rules**). In shor
 ## Modes
 
 - **Play vs Computer:** 1 v 1 (opposite corners), 3 or 4 players, each computer Easy / Normal / Hard.
-- **Mystery Tiles (new in v1.1):** 4 **?** tiles spin the Boost wheel (Shield, Jump +3, Extra roll, Double die, Pick a number, Freeze) and 4 **!** tiles spin the Chaos wheel (Back 3, Swap, Zap, Stuck, Jump +6, Calm). Tiles recharge for two rounds after use. 1 v 1 or 4 players. No stake or entry fee.
+- **Lucky Chaos Ludo (new in v1.2):** 4 **?** Boost tiles (Shield, Jump +3, Double Roll, Extra Roll, Lucky 6, Safe Escape), 4 **!** Chaos tiles (Bomb, Swap, Zap, Freeze, Back 3, Wild Jump) and 4 **!!** Danger tiles (High Risk / High Reward: 50/50 wheel, stronger results). Lucky Streak, Revenge Charge (pick 1 of 2 results), Lucky Charge meter → manual **Mega Wheel**, **King** tokens (2 captures → crown), up to 2 stored powers, 3-second decision windows, capped comeback help and near-home protections. 1 v 1 or 4 players, vs AI or pass & play. See [RULES.md](RULES.md#lucky-chaos-ludo-mode-new-in-v12). No stake or entry fee.
+- **Mystery Tiles (v1.1):** 4 **?** tiles spin the Boost wheel (Shield, Jump +3, Extra roll, Double die, Pick a number, Freeze) and 4 **!** tiles spin the Chaos wheel (Back 3, Swap, Zap, Stuck, Jump +6, Calm). Tiles recharge for two rounds after use. 1 v 1 or 4 players. No stake or entry fee.
 - **Pass & Play:** 2–4 humans on one phone (humans and computers can be mixed).
 
 ## Features
@@ -37,7 +40,7 @@ Full rules: **[RULES.md](RULES.md)** (also in the game under **Rules**). In shor
 - **Feel:** 3D dice per player, tokens stepping square by square, capture bursts with a board shake, animated event wheels, zap/freeze/shield effects, **WebAudio** synthesized sounds (no audio files), **haptics** via `@capacitor/haptics`. Sound, haptics, auto-move, undo, timer, computer chat and fast animations are toggles in Settings.
 - **Save & resume:** the whole match (including the dice RNG state) is saved after every roll and move. v1.0 saves (coins, skins, stats, settings) are migrated.
 - **Skins:** boards Graphite and Linen (free), Walnut and Aurora; dice Ivory (free), Onyx, Brass, Frost and Ember.
-- **Stats:** level/XP, matches, wins, win rate, captures, tokens home, sixes, wins vs each AI level, Mystery wins, 1 v 1 and 4-player wins, events triggered. Result screen ranks all players 1st–4th.
+- **Stats:** level/XP, matches, wins, win rate, captures, tokens home, sixes, wins vs each AI level, Mystery and Lucky Chaos wins, 1 v 1 and 4-player wins, events triggered. Result screen ranks all players 1st–4th.
 - Original art and name: flat board with muted jewel colours (Coral, Jade, Saffron, Cobalt), simple robot/person avatars and drawn emoji faces, no mascots. It doesn't use the names, logos, art or designs of other Ludo apps.
 
 ## Project layout
@@ -65,11 +68,11 @@ test/                 ← logic + ad-gate tests (Node) and a headless-Chrome pla
 ```bash
 npm install
 npm run serve          # http://localhost:8080
-npm test               # stacked 6s, triple-6 forfeit, capture/home bonus, safe squares, exact home, blocks, every Mystery event, AI legality & strength, 1000 simulated games (all modes, 2–4 players, rule combos), ad pacing
+npm test               # stacked 6s, triple-6 forfeit, capture/home bonus, safe squares, exact home, blocks, every Mystery event, every Lucky Chaos effect/cooldown/streak/revenge/charge/Mega/King/power rule + balance sims (≥1000 games per player count), AI legality & strength, 1000 simulated games (all modes, 2–4 players, rule combos), ad pacing
 GAMES=200 node test/logic.test.js   # quicker run
 ```
 
-Headless phone-size (360x740) play test through the UI: pods and per-player dice positions, stacked 6,6,3 chips, undo dice roll, chip + token moves, emote bubble, triple-6 forfeit, exact home and ranked result, Mystery Tiles 4-player with Boost and Chaos wheel events, pass & play with the Classic rule; it fails on any console error:
+Headless phone-size (360x740) play test through the UI: pods and per-player dice positions, stacked 6,6,3 chips, undo dice roll, chip + token moves, emote bubble, triple-6 forfeit, exact home and ranked result, Mystery Tiles 4-player with Boost and Chaos wheel events, Lucky Chaos Ludo (How to play, Danger tile wheel, Revenge choice, decision-window auto-pick, stored power, Mega Wheel, King crown, computers spending Mega spins), pass & play with the Classic rule; it fails on any console error:
 
 ```bash
 npm i --no-save puppeteer-core
@@ -137,8 +140,8 @@ ANDROID_KEYSTORE_FILE=/path/upload.jks KEYSTORE_PASSWORD=... KEY_ALIAS=upload KE
 
 See **[`store/LAUNCH-CHECKLIST.md`](store/LAUNCH-CHECKLIST.md)** (it opens with a Roman Urdu summary), [`store/listing-en.md`](store/listing-en.md) and [`store/play-console-answers.md`](store/play-console-answers.md).
 
-1. Bump `versionCode` (+1 every upload) and `versionName`, and switch to your real AdMob IDs.
-2. `git tag v1.1.1 && git push origin v1.1.1`. CI attaches `offline-ludo-v1.1.1.aab` and `.apk` to a Release.
+1. Bump `versionCode` (+1 every upload) and `versionName` (the real-ads build is planned as **v1.2.1 / versionCode 4**), and switch to your real AdMob IDs.
+2. `git tag v1.2.1 && git push origin v1.2.1`. CI attaches `offline-ludo-v1.2.1.aab` and `.apk` to a Release.
 3. Upload the `.aab` in Play Console with **Play App Signing** turned on. The CI keystore is your **upload key**.
 
 ## License

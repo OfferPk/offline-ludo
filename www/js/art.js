@@ -28,7 +28,25 @@
     swap: '<path d="M5 8h13l-3-3M19 16H6l3 3" ' + S + '/>',
     zap: '<path d="M13.5 2.5 5.5 13.5h6l-1.5 8 8.5-11.5h-6z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
     frozen: '<rect x="5" y="10.5" width="14" height="10" rx="2.5" ' + S + '/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" ' + S + '/><circle cx="12" cy="15.5" r="1.4" fill="currentColor"/>',
-    calm: '<path d="M3 12c2.2-3 4.3-3 6.5 0s4.3 3 6.5 0 4-3 5 -1" ' + S + '/>'
+    calm: '<path d="M3 12c2.2-3 4.3-3 6.5 0s4.3 3 6.5 0 4-3 5 -1" ' + S + '/>',
+    // Lucky Chaos Ludo
+    dbl: '<rect x="2.5" y="7" width="9" height="9" rx="2.5" ' + S + '/><rect x="12.5" y="7" width="9" height="9" rx="2.5" ' + S + '/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/><circle cx="17" cy="11.5" r="1.2" fill="currentColor"/>',
+    six: '<rect x="4" y="4" width="16" height="16" rx="4.5" ' + S + '/><g fill="currentColor"><circle cx="9" cy="8.5" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="9" cy="15.5" r="1.3"/><circle cx="15" cy="8.5" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="15" cy="15.5" r="1.3"/></g><path d="M18 2.5l.8 1.7 1.7.8-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.8z" fill="currentColor"/>',
+    escape: '<path d="M3 14h9M5 10h7M7 18h5" ' + S + '/><path d="M16 5.5l4 3-4 3" ' + S + '/><path d="M12 8.5h8" ' + S + '/><path d="M18.5 13.5l.9 2 2.1.2-1.6 1.4.5 2.1-1.9-1.1-1.9 1.1.5-2.1-1.6-1.4 2.1-.2z" fill="currentColor"/>',
+    bomb: '<circle cx="10.5" cy="14" r="6.5" fill="currentColor"/><path d="M15 9.5l2.5-2.5" ' + S + '/><path d="M18.5 3.5v2M21 6h-2M20.2 4.2l-1.3 1.3" ' + S + '/><circle cx="8" cy="12" r="1.6" fill="#fff" opacity=".55"/>',
+    swapc: '<path d="M5 8h13l-3-3M19 16H6l3 3" ' + S + '/>',
+    zapc: '<path d="M13.5 2.5 5.5 13.5h6l-1.5 8 8.5-11.5h-6z" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/>',
+    wild: '<path d="M3 17c1.5-4 4-6 6-3s4 1 5-3 4-5 7-3" ' + S + '/><path d="M18 5.2l3 .8-.8 3" ' + S + '/><text x="4" y="10" font-size="8" font-weight="900" fill="currentColor" font-family="sans-serif">?</text>',
+    rocket: '<path d="M12 2.5c3.5 2.3 5 6 4.5 10.5l-2 2.5h-5l-2-2.5C7 8.5 8.5 4.8 12 2.5z" ' + S + '/><circle cx="12" cy="9.5" r="1.8" fill="currentColor"/><path d="M9.5 18.5 12 21.5l2.5-3M7.5 13 4.5 16l3 .5M16.5 13l3 3-3 .5" ' + S + '/>',
+    free: '<rect x="3" y="3" width="10" height="10" rx="3" ' + S + '/><circle cx="8" cy="8" r="2.2" fill="currentColor"/><path d="M11 16h9M16.5 12.5 20 16l-3.5 3.5" ' + S + '/>',
+    guard: '<path d="M8 4l5 2v3.6c0 3.3-2.1 6-5 7.2-2.9-1.2-5-3.9-5-7.2V6z" ' + S + '/><path d="M16 7.5l5 2v3.6c0 3.3-2.1 6-5 7.2-1.2-.5-2.2-1.2-3-2.1" ' + S + '/>',
+    turn2: '<path d="M19 12a7 7 0 1 1-2.1-5" ' + S + '/><path d="M17.5 3v4.5H13" ' + S + '/><text x="12" y="15.6" text-anchor="middle" font-size="8" font-weight="900" fill="currentColor" font-family="sans-serif">+2</text>',
+    storm: '<path d="M7 14.5h9.5a3.5 3.5 0 0 0 .3-7A5 5 0 0 0 7.3 8 3.3 3.3 0 0 0 7 14.5z" ' + S + '/><path d="M5 18h7M8 21h8" ' + S + '/>',
+    crown: '<path d="M4 17.5 3 8l5 4 4-6.5 4 6.5 5-4-1 9.5z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M4.5 20h15" ' + S + '/>',
+    revenge: '<path d="M4 12a8 8 0 1 0 2.5-5.8" ' + S + '/><path d="M3.5 3.5V8H8" ' + S + '/><path d="M12 8v4.5l3 2" ' + S + '/>',
+    flame: '<path d="M12 21.5c-4 0-6.5-2.8-6.5-6.4 0-3.3 2.3-5.2 3.4-7.6.4 1.8 1.2 2.9 2.2 3.6.3-3.3 1.8-6.1 4.4-8.1-.2 3.2 3 5.5 3 10.1 0 5-2.8 8.4-6.5 8.4z" fill="currentColor"/>',
+    mega: '<circle cx="12" cy="12" r="8.5" ' + S + '/><path d="M12 3.5v17M3.5 12h17M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.3" opacity=".7"/><circle cx="12" cy="12" r="2.6" fill="currentColor"/>',
+    danger: '<path d="M12 3 2.5 20h19z" ' + S + '/><path d="M12 9.5v5" ' + S + '/><circle cx="12" cy="17.2" r="1.2" fill="currentColor"/>'
   };
   function icon(id, size) { return '<svg class="ico" viewBox="0 0 24 24" width="' + (size || 24) + '" height="' + (size || 24) + '">' + (ICONS[id] || '') + '</svg>'; }
 

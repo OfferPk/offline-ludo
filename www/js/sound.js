@@ -66,6 +66,11 @@
     zap: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; for (var i = 0; i < 5; i++) tick(t + i * 0.03, 3000 - i * 400, 0.25, 0.05); thud(t + 0.1, 0.4); },
     freeze: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [2093, 2637, 3136].forEach(function (f, i) { ting(t + i * 0.05, f, 0.07, 0.6); }); },
     pop: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; tick(t, 900, 0.2, 0.04); ting(t + 0.02, 1568, 0.06, 0.18); },
+    bomb: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; thud(t, 0.7); thud(t + 0.05, 0.5); for (var i = 0; i < 6; i++) tick(t + i * 0.025, 300 + i * 90, 0.35 - i * 0.04, 0.14); },
+    mega: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [392, 523, 659, 784, 1046].forEach(function (f, i) { ting(t + i * 0.07, f, 0.16, 0.9); }); },
+    crown: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [659, 831, 988, 1319].forEach(function (f, i) { ting(t + i * 0.09, f, 0.16, 1.1); }); },
+    revenge: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; thud(t, 0.35); [330, 392, 494].forEach(function (f, i) { ting(t + 0.05 + i * 0.07, f, 0.12, 0.5); }); },
+    danger: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [0, 0.16].forEach(function (d) { ting(t + d, 880, 0.12, 0.2); ting(t + d + 0.08, 660, 0.12, 0.2); }); },
     undo: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; tick(t, 900, 0.2, 0.06); tick(t + 0.06, 1400, 0.16, 0.05); }
   };
   window.SFX = S;

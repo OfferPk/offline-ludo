@@ -27,7 +27,8 @@
         <div class="home-actions">
           <button id="btn-continue" class="btn primary big hidden"><span>Continue match</span><small id="continue-sub">vs Computer</small></button>
           <button id="btn-vs-ai" class="btn big"><span>Play vs Computer</span><small>Easy · Normal · Hard</small></button>
-          <button id="btn-mystery" class="btn big mystery-btn"><span><em class="new-badge">NEW</em>Mystery Tiles</span><small>1 v 1 or 4 players · wheels of surprises</small></button>
+          <button id="btn-lucky" class="btn big lucky-btn"><span><em class="new-badge">NEW</em>Lucky Chaos Ludo</span><small>Wheels · Danger tiles · Mega Wheel · Kings</small></button>
+          <button id="btn-mystery" class="btn big mystery-btn"><span>Mystery Tiles</span><small>1 v 1 or 4 players · wheels of surprises</small></button>
           <button id="btn-pass" class="btn big"><span>Pass &amp; Play</span><small>2–4 players on one phone</small></button>
         </div>
         <div class="home-row">
@@ -48,8 +49,9 @@
       </header>
       <div class="setup-body">
         <div class="sect">Mode</div>
-        <div class="seg big-seg" id="mode-seg"><button data-mode="classic">Classic</button><button data-mode="mystery">Mystery Tiles</button></div>
+        <div class="seg big-seg" id="mode-seg"><button data-mode="classic">Classic</button><button data-mode="mystery">Mystery</button><button data-mode="lucky">Lucky Chaos</button></div>
         <p class="note" id="mode-note"></p>
+        <button id="btn-howto" class="btn plate small-btn hidden">How to play Lucky Chaos Ludo</button>
         <div class="sect">Players</div>
         <div class="presets" id="presets"><button data-p="1v1">1 v 1</button><button data-p="3">3 players</button><button data-p="4">4 players</button></div>
         <div id="seat-list" class="seat-list"></div>
@@ -80,6 +82,14 @@
               <div class="wheel-title" id="wheel-title">Boost wheel</div>
               <div class="wheel-disc"><svg id="wheel-svg" viewBox="-100 -100 200 200"></svg><i class="wheel-pin"></i></div>
               <div class="wheel-result" id="wheel-result"></div>
+              <div class="wheel-note" id="wheel-note"></div>
+            </div>
+          </div>
+          <div id="choice" class="choice hidden" aria-live="polite">
+            <div class="choice-card">
+              <div class="choice-title" id="choice-title">Choose</div>
+              <div class="choice-row" id="choice-row"></div>
+              <div class="choice-time"><i id="choice-bar"></i></div>
             </div>
           </div>
           <div id="picker" class="picker hidden"><div class="picker-card"><b>Pick a number</b><div class="picker-row" id="picker-row"></div></div></div>
@@ -165,7 +175,7 @@
     <div id="rules" class="overlay hidden">
       <div class="panel wide">
         <div class="panel-head"><h3>Rules</h3><button class="icon-btn close" data-close="rules" aria-label="Close">✕</button></div>
-        <div class="tabs" id="rules-tabs"><button data-tab="basics" class="on">Basics</button><button data-tab="rolls">Rolls</button><button data-tab="mystery">Mystery</button><button data-tab="house">House</button></div>
+        <div class="tabs" id="rules-tabs"><button data-tab="basics" class="on">Basics</button><button data-tab="rolls">Rolls</button><button data-tab="mystery">Mystery</button><button data-tab="lucky">Lucky</button><button data-tab="house">House</button></div>
         <div class="rules-page" data-page="basics">
           <ul class="rules-list">
             <li>2–4 players, 4 tokens each. The first to bring all 4 tokens home to the centre wins; the others are ranked 2nd, 3rd and 4th.</li>
@@ -194,6 +204,26 @@
           <div class="ev-list" id="ev-boost"></div>
           <div class="ev-head"><span class="tile-ico chaos">!</span><b>Chaos wheel</b><small>high risk, high reward</small></div>
           <div class="ev-list" id="ev-chaos"></div>
+        </div>
+        <div class="rules-page hidden" data-page="lucky">
+          <p class="note"><b>Lucky Chaos Ludo: how to play.</b> Normal Ludo rules (Star-style rolls and your house rules), plus luck you can steer. No entry fee, no stakes: every match is free and coins are cosmetic.</p>
+          <ul class="rules-list">
+            <li><span class="tile-ico boost">?</span> <b>4 Boost tiles</b> and <span class="tile-ico chaos">!</span> <b>4 Chaos tiles</b>: end a move <b>exactly</b> on one to spin its wheel. A used tile rests for <b>2 rounds</b> (the number on it shows the rounds left).</li>
+            <li><span class="tile-ico danger">!!</span> <b>4 Danger tiles, High Risk / High Reward</b>: a 50/50 spin of the Boost or Chaos wheel with <b>stronger</b> results (Jump +5, 2 extra rolls, Big Bomb, Back 5).</li>
+            <li><b>Lucky Charge</b> (5 pips under your name): +1 per wheel spin (+1 more on Danger tiles, at a ×3 streak or when far behind; tiles charge once per turn) and +1 per capture. At <b>5/5</b> tap <b>MEGA</b> before rolling to spin the Mega Wheel.</li>
+            <li><b>Lucky Streak</b> (flame): each tile spin raises it (max ×3). Higher streaks give a chance of a better wheel result. It resets when one of your tokens is captured.</li>
+            <li><b>Revenge Charge</b>: when your token is captured, your next tile spin shows <b>two results and you pick one</b>.</li>
+            <li><b>King token</b> (crown): a token that captures 2 rival tokens becomes King for 3 of your turns: +1 square on moves when it fits and immune to Chaos effects. Capturing a King fills your Lucky Charge to 5/5.</li>
+            <li><b>Stored powers</b> (Double Roll, Lucky 6, Safe Escape): hold up to <b>2</b>, never two of the same. Tap one next to your die before a roll; one power per roll.</li>
+            <li><b>Choices</b>: Swap, Wild Jump and Revenge give you about 3 seconds to decide; if time runs out the best option is picked for you.</li>
+            <li><b>Fair play</b>: safe squares, shields and Kings are protected; Bombs slide tokens back 3 (never to base); Zap on a token 40+ squares along only slides it back 6; nothing touches tokens in the home lane. Players who are far behind get slightly luckier spins and faster charge (capped).</li>
+          </ul>
+          <div class="ev-head"><span class="tile-ico boost">?</span><b>Boost wheel</b><small>always helpful</small></div>
+          <div class="ev-list" id="ev-lboost"></div>
+          <div class="ev-head"><span class="tile-ico chaos">!</span><b>Chaos wheel</b><small>mostly hits rivals, some choices</small></div>
+          <div class="ev-list" id="ev-lchaos"></div>
+          <div class="ev-head"><span class="tile-ico mega">M</span><b>Mega Wheel</b><small>strong, never game-deciding</small></div>
+          <div class="ev-list" id="ev-mega"></div>
         </div>
         <div class="rules-page hidden" data-page="house">
           <ul class="rules-list">
@@ -231,7 +261,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.1.0 · © OfferPk</p>
+        <p class="ver">Crossfour v1.2.0 · © OfferPk</p>
       </div>
     </div>
 

@@ -17,7 +17,8 @@
  * Both: three 6s in a row forfeit the whole turn (the unused queue is lost), a capture and a token
  * reaching home each give a bonus roll (toggles), 6 to leave base, exact roll to reach home.
  *
- * Modes: 'classic' and 'mystery' (Mystery Tiles: ? and ! tiles on the track spin a wheel of events).
+ * Modes: 'classic', 'mystery' (Mystery Tiles: ? and ! tiles on the track spin a wheel of events) and
+ *        'lucky' (Lucky Chaos Ludo: Lucky/Danger tiles, streaks, revenge, charge meter + Mega Wheel, King tokens, powers).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -30,7 +31,7 @@
   var STAR_SQUARES = [8, 21, 34, 47];
   var DEFAULT_RULES = { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true };
   var LEVELS = ['easy', 'medium', 'hard'];
-  var MODES = ['classic', 'mystery'];
+  var MODES = ['classic', 'mystery', 'lucky'];
   var MAX_SIXES = 3;
 
   // Mystery Tiles: fixed tiles on the track (absolute squares, never a start or star square)
@@ -127,7 +128,9 @@
       capd: [false, false, false, false], // has captured at least once (capture-to-enter rule)
       boost: [null, null, null, null],    // 'double' | 'choose' for the seat's next roll
       effects: [],          // { type: 'shield' | 'freeze', seat, piece, at }
-      tiles: md === 'mystery' ? BOOST_TILES.map(function (a) { return { abs: a, kind: 'boost', until: 0 }; }).concat(CHAOS_TILES.map(function (a) { return { abs: a, kind: 'chaos', until: 0 }; })) : [],
+      tiles: md === 'mystery' ? BOOST_TILES.map(function (a) { return { abs: a, kind: 'boost', until: 0 }; }).concat(CHAOS_TILES.map(function (a) { return { abs: a, kind: 'chaos', until: 0 }; })) : md === 'lucky' ? luckyTiles() : [],
+      lk: md === 'lucky' ? newLucky() : null,
+      pending: null,        // Lucky Chaos: a decision waiting for the current player (phase 'choose')
       stats: seats.map(function (x) { return x ? { captures: 0, captured: 0, sixes: 0, home: 0, rolls: 0, events: 0 } : null; }),
       rolls: 0, turnCount: 0,
       rng: (seed >>> 0) || 1,
@@ -140,7 +143,10 @@
   function hasEffect(st, type, seat, piece) { for (var i = 0; i < st.effects.length; i++) { var e = st.effects[i]; if (e.type === type && e.seat === seat && e.piece === piece) return true; } return false; }
   function isShielded(st, seat, piece) { return hasEffect(st, 'shield', seat, piece); }
   function isFrozen(st, seat, piece) { return hasEffect(st, 'freeze', seat, piece); }
-  function clearEffects(st, seat, piece) { st.effects = st.effects.filter(function (e) { return !(e.seat === seat && e.piece === piece); }); }
+  function clearEffects(st, seat, piece) {
+    st.effects = st.effects.filter(function (e) { return !(e.seat === seat && e.piece === piece); });
+    if (st.lk) st.lk.kings = st.lk.kings.filter(function (k) { return !(k.seat === seat && k.piece === piece); });
+  }
 
   function tokensAt(st, abs, exceptSeat) {
     var out = [];
@@ -186,13 +192,16 @@
     var p = st.pieces[seat][piece], path, to;
     if (p === HOME || isFrozen(st, seat, piece)) return null;
     if (p < 0) { if (v !== 6) return null; path = [0]; }
-    else { path = pathOf(p, v, canEnter(st, seat)); if (!path) return null; } // exact roll needed to reach home
+    else {
+      var kg = st.lk && isKing(st, seat, piece);  // King's stride: +1 square when it fits
+      path = (kg && pathOf(p, v + 1, canEnter(st, seat))) || pathOf(p, v, canEnter(st, seat)); if (!path) return null; // exact roll needed to reach home
+    }
     to = path[path.length - 1];
     for (var k = 0; k < path.length; k++) if (onTrack(path[k]) && opponentBlockAt(st, seat, absOf(seat, path[k]))) return null; // blocks can't be passed or landed on
     var caps = onTrack(to) ? capturesAt(st, seat, absOf(seat, to)) : [];
     var tile = tileAt(st, to, seat);
     return { seat: seat, piece: piece, v: v, from: p, to: to, path: path, captures: caps, leave: p < 0, finish: to === HOME,
-      entersHomeColumn: p <= CIRCLE && to >= COL0 && to < HOME, tile: tile ? tile.kind : null };
+      entersHomeColumn: p <= CIRCLE && to >= COL0 && to < HOME, tile: tile ? tile.kind : null, stride: p >= 0 && path.length === v + 1 };
   }
   /** Legal moves for `seat` with die value v. */
   function legalMoves(st, seat, v) {
@@ -208,7 +217,7 @@
     return out;
   }
   function tileAt(st, p, seat) {
-    if (st.mode !== 'mystery' || !onTrack(p)) return null;
+    if ((st.mode !== 'mystery' && st.mode !== 'lucky') || !onTrack(p)) return null;
     var a = absOf(seat, p);
     for (var i = 0; i < st.tiles.length; i++) if (st.tiles[i].abs === a && st.turnCount >= st.tiles[i].until) return st.tiles[i];
     return null;
@@ -234,6 +243,10 @@
     var out = st.turn;
     // shields / freezes last until the end of the owner's next turn
     st.effects = st.effects.filter(function (e) { return !(e.seat === out && st.turnCount > e.at); });
+    if (st.lk) { // Kings last for 3 of their owner's turns after the one they were crowned in
+      st.lk.kings = st.lk.kings.filter(function (k) { if (k.seat === out && st.turnCount > k.at) k.left--; return k.left > 0; });
+      st.lk.used = null; st.lk.forceSix = false; st.pending = null; st.lk.tg = false;
+    }
     st.sixes = 0; st.queue = []; st.moves = []; st.bonus = 0; st.rollAgain = false; st.turnCount++;
     if (checkOver(st)) return;
     var idx = st.players.indexOf(out);
@@ -268,12 +281,15 @@
     if (st.phase !== 'roll') throw new Error('not in roll phase');
     var seat = st.turn, boost = st.boost[seat];
     if (boost === 'choose' && !value) value = chooseDieValue(st, seat, 'hard');
+    var free = !!(st.lk && st.lk.forceSix); // Lucky 6 power: a 6 that never counts toward three 6s
+    if (free) { value = 6; st.lk.forceSix = false; }
+    if (st.lk) st.lk.used = null;
     var raw = value || rollDie(st), v = raw;
     if (boost === 'double') v = raw * 2;
     st.boost[seat] = null;
     st.faces[seat] = raw; st.rolls++; st.stats[seat].rolls++;
-    if (raw === 6) { st.stats[seat].sixes++; st.sixes++; }
-    var res = { seat: seat, raw: raw, value: v, doubled: boost === 'double', chosen: boost === 'choose', forfeit: false, again: false, next: null };
+    if (raw === 6) { st.stats[seat].sixes++; if (!free) st.sixes++; }
+    var res = { seat: seat, raw: raw, value: v, doubled: boost === 'double', chosen: boost === 'choose', lucky6: free, forfeit: false, again: false, next: null };
     if (raw === 6 && st.sixes >= MAX_SIXES) {
       st.last = { type: 'forfeit', seat: seat, lost: st.queue.slice() };
       res.forfeit = true; res.lost = st.queue.slice();
@@ -294,9 +310,19 @@
   }
 
   function removeQueueValue(st, v) { var i = st.queue.indexOf(v); if (i >= 0) st.queue.splice(i, 1); }
-  function sendHome(st, byseat, t) {
+  function sendHome(st, byseat, t, bypiece) {
+    var wasKing = isKing(st, t.seat, t.piece);
     st.pieces[t.seat][t.piece] = -1; clearEffects(st, t.seat, t.piece);
     if (byseat != null) { st.stats[byseat].captures++; st.stats[t.seat].captured++; st.capd[byseat] = true; }
+    if (st.lk) {
+      st.lk.kills[t.seat][t.piece] = 0;
+      if (byseat != null) {
+        st.lk.revenge[t.seat] = true; st.lk.streak[t.seat] = 0; // Revenge Charge; Lucky Streak resets
+        addCharge(st, byseat, 1);
+        if (wasKing) { st.lk.charge[byseat] = MAX_CHARGE; st.lk.kingFall = { by: byseat, seat: t.seat, piece: t.piece, at: st.turnCount }; }
+        if (bypiece != null) st.lk.kills[byseat][bypiece]++;
+      }
+    }
   }
 
   // ---------- Mystery Tiles events ----------
@@ -397,23 +423,452 @@
     var seat = st.turn;
     st.pieces[seat][piece] = m.to;
     removeQueueValue(st, m.v);
-    m.captures.forEach(function (t) { sendHome(st, seat, t); });
+    var kingCaps = m.captures.filter(function (t) { return isKing(st, t.seat, t.piece); });
+    m.captures.forEach(function (t) { sendHome(st, seat, t, piece); });
     if (m.captures.length && st.rules.bonusOnCapture) st.bonus++;
     if (m.finish) { st.stats[seat].home++; clearEffects(st, seat, piece); if (st.rules.bonusOnHome) st.bonus++; }
-    var res = { seat: seat, piece: piece, v: m.v, from: m.from, to: m.to, path: m.path, captures: m.captures, finish: m.finish, event: null, finishedPlayer: false, over: false, next: null };
+    var res = { seat: seat, piece: piece, v: m.v, from: m.from, to: m.to, path: m.path, captures: m.captures, finish: m.finish, event: null, finishedPlayer: false, over: false, next: null,
+      stride: !!m.stride, crowned: null, kingCaptured: kingCaps.length > 0 };
+    if (st.lk && m.captures.length && checkKing(st, seat, piece)) res.crowned = { seat: seat, piece: piece };
     var tile = !m.finish ? tileAt(st, m.to, seat) : null;
-    if (tile) res.event = applyEvent(st, tile, seat, piece, forcedEvent);
+    if (tile) res.event = st.mode === 'lucky' ? luckyActivate(st, tile, seat, piece, forcedEvent) : applyEvent(st, tile, seat, piece, forcedEvent);
     st.last = { type: 'move', seat: seat, piece: piece, from: m.from, to: st.pieces[seat][piece], captures: m.captures.length, finish: m.finish, event: res.event ? res.event.event : null };
-    if (st.pieces[seat].every(function (p) { return p === HOME; })) {
-      st.ranking.push(seat); res.finishedPlayer = true;
-      nextTurn(st); res.next = 'pass';
-    } else {
-      st.moves = st.queue.length ? queueMoves(st) : [];
-      if (st.moves.length) { st.phase = 'move'; res.next = 'move'; }
-      else res.next = afterQueue(st);
-    }
+    if (st.phase === 'choose') { res.next = 'choose'; return res; }
+    var t = continueTurn(st, seat);
+    res.finishedPlayer = t.finishedPlayer; res.next = t.next;
     res.over = st.phase === 'over';
     return res;
+  }
+  /** After a move (or a resolved Lucky choice): finished player, remaining queue, bonus rolls or next player. */
+  function continueTurn(st, seat) {
+    var out = { finishedPlayer: false, next: null };
+    if (st.pieces[seat].every(function (p) { return p === HOME; }) && st.ranking.indexOf(seat) < 0) {
+      st.ranking.push(seat); out.finishedPlayer = true;
+      nextTurn(st); out.next = 'pass';
+    } else {
+      st.moves = st.queue.length ? queueMoves(st) : [];
+      if (st.moves.length) { st.phase = 'move'; out.next = 'move'; }
+      else out.next = afterQueue(st);
+    }
+    return out;
+  }
+
+
+  // ================= Lucky Chaos Ludo (mode 'lucky') =================
+  // 8 Lucky Tiles (4 Boost "?" + 4 Chaos "!") and 4 Danger Tiles ("High Risk / High Reward": 50/50 Boost or Chaos,
+  // stronger outcomes). Lucky Streak, Revenge Charge, Lucky Charge meter + Mega Wheel, King tokens, stored powers.
+  var LUCKY_BOOST = [4, 17, 30, 43], LUCKY_CHAOS = [10, 23, 36, 49], DANGER_TILES = [6, 19, 32, 45];
+  var LWHEELS = {
+    boost: ['shield', 'jump3', 'dbl', 'extra', 'six', 'escape'],
+    chaos: ['bomb', 'swapc', 'zapc', 'freeze', 'back3', 'wild'],
+    mega: ['rocket', 'free', 'guard', 'turn2', 'storm', 'crown']
+  };
+  var POWERS = ['dbl', 'six', 'escape'];
+  var MAX_CHARGE = 5, MAX_POWERS = 2, KING_TURNS = 3, KING_KILLS = 2, ZAP_CAP = 40, MAX_STREAK = 3;
+  var LUCKY_INFO = {
+    dbl: { name: 'Double Roll', text: 'Stored power: use it before a roll to make that roll count double.', good: true },
+    six: { name: 'Lucky 6', text: 'Stored power: use it instead of rolling to get a 6 (it never counts toward three 6s).', good: true },
+    escape: { name: 'Safe Escape', text: 'Stored power: your most threatened token dashes to the next safe square (up to 8 ahead).', good: true },
+    bomb: { name: 'Bomb', text: 'Every other token within 2 squares (yours too!) slides back 3. Safe squares, shields and Kings are immune.', good: null },
+    swapc: { name: 'Swap', text: 'You may swap this token with the nearest rival token up to 12 squares ahead.', good: true },
+    zapc: { name: 'Zap', text: 'The nearest rival within 3 squares goes back to base (tokens 40+ squares along only slide back 6).', good: true },
+    wild: { name: 'Wild Jump', text: 'A random 1-6 is drawn: jump this token that far, or stay.', good: null },
+    rocket: { name: 'Rocket', text: 'Your best token blasts up to 8 squares forward.', good: true },
+    free: { name: 'Free Token', text: 'A token leaves your base onto your start square.', good: true },
+    guard: { name: 'Royal Guard', text: 'All your tokens on the track get a Shield until the end of your next turn.', good: true },
+    turn2: { name: 'Double Turn', text: 'You get two extra rolls this turn.', good: true },
+    storm: { name: 'Storm', text: 'Rival tokens up to 6 squares behind your tokens slide back 3.', good: true },
+    crown: { name: 'Crown', text: 'Your most advanced token becomes King for 3 turns.', good: true }
+  };
+  Object.keys(LUCKY_INFO).forEach(function (k) { EVENT_INFO[k] = LUCKY_INFO[k]; });
+  var DANGER_INFO = {
+    jump3: { name: 'Jump +5', text: 'Danger bonus: this token jumps 5 squares forward.' },
+    extra: { name: '2 Extra rolls', text: 'Danger bonus: you get two more rolls this turn.' },
+    bomb: { name: 'Big Bomb', text: 'Every other token within 3 squares (yours too!) slides back 3.' },
+    back3: { name: 'Back 5', text: 'Danger! This token slides 5 squares back.' }
+  };
+  /** Name/text for an event result (Danger tiles make some outcomes stronger). */
+  function eventLabel(ev, danger) {
+    var b = EVENT_INFO[ev] || { name: ev, text: '' }, d = danger && DANGER_INFO[ev];
+    return { name: d ? d.name : b.name, text: d ? d.text : b.text, good: b.good };
+  }
+
+  function isLucky(st) { return st.mode === 'lucky' && !!st.lk; }
+  function newLucky() {
+    return { charge: [0, 0, 0, 0], streak: [0, 0, 0, 0], revenge: [false, false, false, false], powers: [[], [], [], []],
+      kills: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], kings: [], used: null, forceSix: false, kingFall: null, tg: false };
+  }
+  function luckyTiles() {
+    return LUCKY_BOOST.map(function (a) { return { abs: a, kind: 'boost', until: 0 }; })
+      .concat(LUCKY_CHAOS.map(function (a) { return { abs: a, kind: 'chaos', until: 0 }; }))
+      .concat(DANGER_TILES.map(function (a) { return { abs: a, kind: 'danger', until: 0 }; }));
+  }
+  function isKing(st, seat, piece) {
+    if (!st.lk) return false;
+    for (var i = 0; i < st.lk.kings.length; i++) { var k = st.lk.kings[i]; if (k.seat === seat && k.piece === piece) return true; }
+    return false;
+  }
+  function kingOf(st, seat, piece) { if (!st.lk) return null; for (var i = 0; i < st.lk.kings.length; i++) { var k = st.lk.kings[i]; if (k.seat === seat && k.piece === piece) return k; } return null; }
+  /** Immune to Chaos effects (shielded tokens and Kings). */
+  function immune(st, seat, piece) { return isShielded(st, seat, piece) || isKing(st, seat, piece); }
+  function onMainTrack(p) { return p >= 0 && (p <= LAST_TRACK || p === CIRCLE); }
+  /** Comeback level 0..2 from the progress gap to the leader (capped). */
+  function comebackLevel(st, seat) {
+    var lead = 0; activeLeft(st).forEach(function (s) { lead = Math.max(lead, progressOf(st, s)); });
+    var gap = (lead - progressOf(st, seat)) / (PIECES * 58);
+    return gap >= 0.3 ? 2 : gap >= 0.15 ? 1 : 0;
+  }
+  function addCharge(st, seat, n) { st.lk.charge[seat] = Math.min(MAX_CHARGE, st.lk.charge[seat] + n); }
+  function canStore(st, seat, id) { var pw = st.lk.powers[seat]; return pw.length < MAX_POWERS && pw.indexOf(id) < 0; }
+  function canMega(st, seat) { return isLucky(st) && st.phase === 'roll' && st.turn === seat && st.lk.charge[seat] >= MAX_CHARGE; }
+  function backPos(p, n) { return p === CIRCLE ? LAST_TRACK - (n - 1) : Math.max(0, p - n); }
+  function backPath(p, to) { var out = [], c = p; while (c !== to) { c = c === CIRCLE ? LAST_TRACK : c - 1; out.push(c); } return out; }
+  function circDist(a, b) { var d = Math.abs(a - b) % TRACK; return Math.min(d, TRACK - d); }
+  function safeHere(st, abs) { return st.rules.safeSquares && isSafeAbs(abs); }
+
+  /** Called when a token becomes King-eligible after its captures. */
+  function checkKing(st, seat, piece) {
+    if (!isLucky(st) || !onTrack(st.pieces[seat][piece]) && !(st.pieces[seat][piece] >= COL0 && st.pieces[seat][piece] < HOME)) return false;
+    if (st.lk.kills[seat][piece] >= KING_KILLS && !isKing(st, seat, piece)) {
+      st.lk.kings.push({ seat: seat, piece: piece, left: KING_TURNS, at: st.turnCount });
+      st.lk.kills[seat][piece] = 0;
+      return true;
+    }
+    return false;
+  }
+  function crown(st, seat, piece) {
+    var k = kingOf(st, seat, piece);
+    if (k) { k.left = KING_TURNS; k.at = st.turnCount; } else st.lk.kings.push({ seat: seat, piece: piece, left: KING_TURNS, at: st.turnCount });
+  }
+
+  function jumpCapture(st, seat, piece, path, out) {
+    if (!path.length) return;
+    var from = st.pieces[seat][piece], to = path[path.length - 1];
+    st.pieces[seat][piece] = to;
+    out.moves.push({ seat: seat, piece: piece, from: from, to: to, path: path });
+    if (onTrack(to)) {
+      var caps = capturesAt(st, seat, absOf(seat, to));
+      caps.forEach(function (x) { sendHome(st, seat, x, piece); out.captures.push(x); });
+      if (caps.length && st.rules.bonusOnCapture) st.bonus++;
+      if (caps.length && checkKing(st, seat, piece)) out.crowned = { seat: seat, piece: piece };
+    }
+    if (to === HOME) { out.finish = true; st.stats[seat].home++; clearEffects(st, seat, piece); if (st.rules.bonusOnHome) st.bonus++; }
+  }
+  function slideBack(st, t, n, out) {
+    var p = st.pieces[t.seat][t.piece], to = backPos(p, n);
+    if (to === p) return;
+    st.pieces[t.seat][t.piece] = to;
+    out.moves.push({ seat: t.seat, piece: t.piece, from: p, to: to, path: backPath(p, to), back: true });
+  }
+  function bombTargets(st, seat, piece, r) {
+    var a = absOf(seat, st.pieces[seat][piece]), out = [];
+    for (var s = 0; s < 4; s++) {
+      if (!st.pieces[s]) continue;
+      for (var i = 0; i < PIECES; i++) {
+        if (s === seat && i === piece) continue;
+        var p = st.pieces[s][i]; if (!onMainTrack(p) || p === 0) continue;
+        var b = absOf(s, p);
+        if (circDist(a, b) > r || safeHere(st, b) || immune(st, s, i)) continue;
+        out.push({ seat: s, piece: i });
+      }
+    }
+    return out;
+  }
+  function luckyTarget(st, ev, seat, piece) {
+    var p = st.pieces[seat][piece], abs = absOf(seat, p);
+    if (ev === 'freeze') return nearestRival(st, seat, abs, 12, 1, function (t) { return !isFrozen(st, t.seat, t.piece) && !isKing(st, t.seat, t.piece) && !isShielded(st, t.seat, t.piece); });
+    if (ev === 'zapc') return nearestRival(st, seat, abs, 3, 0, function (t) { return !safeHere(st, t.abs) && !immune(st, t.seat, t.piece) && !inBlock(st, t.seat, t.piece) && onMainTrack(st.pieces[t.seat][t.piece]); });
+    if (ev === 'swapc') return nearestRival(st, seat, abs, 12, 1, function (t) {
+      return !immune(st, t.seat, t.piece) && !inBlock(st, t.seat, t.piece) && !safeHere(st, t.abs) && st.pieces[t.seat][t.piece] <= LAST_TRACK &&
+        p <= LAST_TRACK && posFromAbs(seat, t.abs) <= LAST_TRACK && posFromAbs(seat, t.abs) > p && posFromAbs(t.seat, abs) <= LAST_TRACK;
+    });
+    return null;
+  }
+  function escapeTarget(st, seat) {
+    var best = null, bs = -Infinity;
+    for (var i = 0; i < PIECES; i++) {
+      var p = st.pieces[seat][i]; if (p < 0 || p > LAST_TRACK || isFrozen(st, seat, i)) continue;
+      if (isSafeAbs(absOf(seat, p))) continue;
+      for (var d = 1; d <= 8 && p + d <= LAST_TRACK; d++) {
+        var a = absOf(seat, p + d);
+        if (opponentBlockAt(st, seat, a)) break;
+        if (isSafeAbs(a)) {
+          var sc = threatsTo(st, seat, absOf(seat, p)) * 100 + p;
+          if (sc > bs) { bs = sc; best = { piece: i, to: p + d, threat: threatsTo(st, seat, absOf(seat, p)) }; }
+          break;
+        }
+      }
+    }
+    return best;
+  }
+  function eventValidL(st, ev, seat, piece, danger) {
+    var p = st.pieces[seat][piece];
+    switch (ev) {
+      case 'shield': return !isShielded(st, seat, piece);
+      case 'jump3': return jumpDest(st, seat, piece, danger ? 5 : 3).length > 0;
+      case 'extra': return true;
+      case 'dbl': case 'six': case 'escape': return canStore(st, seat, ev);
+      case 'bomb': return bombTargets(st, seat, piece, danger ? 3 : 2).length > 0;
+      case 'swapc': case 'zapc': case 'freeze': return !!luckyTarget(st, ev, seat, piece);
+      case 'back3': return onMainTrack(p) && p > 0;
+      case 'wild': return jumpDest(st, seat, piece, 1).length > 0;
+    }
+    return false;
+  }
+  var EV_VALUE = { shield: 2, jump3: 3, dbl: 2.5, extra: 3, six: 2.5, escape: 2, bomb: 1, swapc: 2.5, zapc: 4, freeze: 2, back3: -3, wild: 1.5 };
+  /** Wheel spin. Lucky Streak and comeback add a capped "lucky nudge": a second spin, keeping the better result. */
+  function spinLucky(st, ctx, forced, exclude) {
+    var list = LWHEELS[ctx.kind].filter(function (e) { return e !== exclude && eventValidL(st, e, ctx.seat, ctx.piece, ctx.danger); });
+    if (!list.length) return exclude ? null : 'extra';
+    if (forced && list.indexOf(forced) >= 0) return forced;
+    var pick = list[Math.floor(rngNext(st) * list.length)];
+    var nudge = nudgeChance(st, ctx.seat);
+    if (nudge > 0 && list.length > 1 && rngNext(st) < nudge) {
+      var alt = list[Math.floor(rngNext(st) * list.length)];
+      if (EV_VALUE[alt] > EV_VALUE[pick]) { pick = alt; ctx.nudged = true; }
+    }
+    return pick;
+  }
+  function nudgeChance(st, seat) { return Math.min(0.5, 0.15 * st.lk.streak[seat] + 0.1 * comebackLevel(st, seat)); }
+
+  function luckyOut(ctx, ev) {
+    return { tile: ctx.tile, tileKind: ctx.tileKind, kind: ctx.kind, danger: ctx.danger, seat: ctx.seat, piece: ctx.piece, wheel: LWHEELS[ctx.kind],
+      index: LWHEELS[ctx.kind].indexOf(ev), event: ev, gain: ctx.gain, nudged: !!ctx.nudged, revenge: !!ctx.revenge, streak: ctx.streak,
+      moves: [], sent: [], captures: [], finish: false, crowned: null, target: null, stored: null, choice: null, amount: 0, lucky: true };
+  }
+  /** Landing exactly on an active Lucky/Danger tile. May leave a pending choice (st.phase 'choose'). */
+  function luckyActivate(st, tile, seat, piece, forced) {
+    var lk = st.lk, danger = tile.kind === 'danger';
+    var fo = typeof forced === 'string' ? { event: forced } : (forced || {});
+    var kind = danger ? (fo.kind || (rngNext(st) < 0.5 ? 'boost' : 'chaos')) : tile.kind;
+    tile.until = st.turnCount + 2 * activeLeft(st).length; // inactive for 2 rounds
+    st.stats[seat].events++;
+    // Lucky Charge: +1 per activation, +1 on a Danger tile, +1 at the top Lucky Streak, +1 when far behind (comeback)
+    var gain = 1 + (danger ? 1 : 0) + (lk.streak[seat] >= MAX_STREAK ? 1 : 0) + (comebackLevel(st, seat) >= 2 ? 1 : 0);
+    if (lk.tg) gain = 0; // charge from tiles: once per turn (captures still add +1 each)
+    lk.tg = true;
+    addCharge(st, seat, gain);
+    var ctx = { tile: tile.abs, tileKind: tile.kind, kind: kind, danger: danger, seat: seat, piece: piece, gain: gain, streak: lk.streak[seat] };
+    var ev;
+    if (lk.revenge[seat]) {
+      lk.revenge[seat] = false;
+      var a = spinLucky(st, ctx, fo.event), b = spinLucky(st, ctx, fo.alt, a);
+      lk.streak[seat] = Math.min(MAX_STREAK, lk.streak[seat] + 1);
+      if (b) {
+        ctx.revenge = true;
+        var out = luckyOut(ctx, a);
+        out.choice = { type: 'revenge', options: [a, b] };
+        st.pending = { type: 'revenge', seat: seat, options: [a, b], ctx: ctx, fo: fo };
+        st.phase = 'choose';
+        return out;
+      }
+      ev = a;
+    } else {
+      ev = spinLucky(st, ctx, fo.event);
+      lk.streak[seat] = Math.min(MAX_STREAK, lk.streak[seat] + 1);
+    }
+    return resolveLucky(st, ctx, ev, fo);
+  }
+  function resolveLucky(st, ctx, ev, fo) {
+    if (ev === 'swapc') {
+      var out = luckyOut(ctx, ev), t = luckyTarget(st, 'swapc', ctx.seat, ctx.piece);
+      out.target = { seat: t.seat, piece: t.piece };
+      out.choice = { type: 'swap', options: ['swap', 'stay'] };
+      st.pending = { type: 'swap', seat: ctx.seat, options: ['swap', 'stay'], ctx: ctx, ev: ev };
+      st.phase = 'choose';
+      return out;
+    }
+    if (ev === 'wild') {
+      var n = (fo && fo.wild) || rollDie(st), o2 = luckyOut(ctx, ev);
+      o2.amount = n; o2.choice = { type: 'wild', options: ['jump', 'stay'], n: n };
+      st.pending = { type: 'wild', seat: ctx.seat, options: ['jump', 'stay'], n: n, ctx: ctx, ev: ev };
+      st.phase = 'choose';
+      return o2;
+    }
+    return applyLucky(st, ctx, ev, null);
+  }
+  function applyLucky(st, ctx, ev, arg) {
+    var seat = ctx.seat, piece = ctx.piece, out = luckyOut(ctx, ev), t, p = st.pieces[seat][piece];
+    switch (ev) {
+      case 'shield': st.effects.push({ type: 'shield', seat: seat, piece: piece, at: st.turnCount }); break;
+      case 'jump3': jumpCapture(st, seat, piece, jumpDest(st, seat, piece, ctx.danger ? 5 : 3), out); break;
+      case 'extra': st.bonus += ctx.danger ? 2 : 1; break;
+      case 'dbl': case 'six': case 'escape': st.lk.powers[seat].push(ev); out.stored = ev; break;
+      case 'bomb': bombTargets(st, seat, piece, ctx.danger ? 3 : 2).forEach(function (x) { slideBack(st, x, 3, out); }); break;
+      case 'swapc':
+        if (arg) {
+          t = luckyTarget(st, 'swapc', seat, piece); if (!t) break;
+          var mine = absOf(seat, p), tp = st.pieces[t.seat][t.piece], np = posFromAbs(seat, t.abs), tn = posFromAbs(t.seat, mine);
+          st.pieces[seat][piece] = np; st.pieces[t.seat][t.piece] = tn;
+          out.target = { seat: t.seat, piece: t.piece };
+          out.moves.push({ seat: seat, piece: piece, from: p, to: np, swap: true }, { seat: t.seat, piece: t.piece, from: tp, to: tn, swap: true });
+        }
+        break;
+      case 'zapc':
+        t = luckyTarget(st, 'zapc', seat, piece); if (!t) break;
+        out.target = { seat: t.seat, piece: t.piece };
+        var zp = st.pieces[t.seat][t.piece];
+        if (zp >= ZAP_CAP) slideBack(st, t, 6, out); // near-home cap: never all the way to base
+        else { sendHome(st, seat, t); out.sent.push({ seat: t.seat, piece: t.piece, from: zp }); }
+        break;
+      case 'freeze':
+        t = luckyTarget(st, 'freeze', seat, piece); if (!t) break;
+        out.target = { seat: t.seat, piece: t.piece };
+        st.effects.push({ type: 'freeze', seat: t.seat, piece: t.piece, at: st.turnCount }); break;
+      case 'back3': slideBack(st, { seat: seat, piece: piece }, ctx.danger ? 5 : 3, out); break;
+      case 'wild': out.amount = arg || 0; if (arg) jumpCapture(st, seat, piece, jumpDest(st, seat, piece, arg), out); break;
+    }
+    st.last = { type: 'lucky', seat: seat, event: ev };
+    return out;
+  }
+  /** Resolve the pending choice without continuing the turn (used by choose() and by the AI look-ahead). */
+  function applyChoice(st, idx) {
+    var pd = st.pending; st.pending = null; st.phase = 'move';
+    if (pd.type === 'revenge') return resolveLucky(st, pd.ctx, pd.options[idx] || pd.options[0], pd.fo);
+    if (pd.type === 'swap') return applyLucky(st, pd.ctx, 'swapc', idx === 0);
+    return applyLucky(st, pd.ctx, 'wild', idx === 0 ? pd.n : 0);
+  }
+  /** Player's decision for the pending Lucky choice (option index). */
+  function choose(st, idx) {
+    if (st.phase !== 'choose' || !st.pending) throw new Error('nothing to choose');
+    var seat = st.pending.seat, r = applyChoice(st, idx);
+    if (st.pending) { st.phase = 'choose'; return { event: r, next: 'choose', finishedPlayer: false, over: false }; }
+    var t = continueTurn(st, seat);
+    return { event: r, next: t.next, finishedPlayer: t.finishedPlayer, over: st.phase === 'over' };
+  }
+  /** Position score used by the AI and as the auto-pick when a decision window times out. */
+  function scoreState(st, seat) {
+    var me = progressOf(st, seat) * 2, riv = 0, n = 0;
+    st.players.forEach(function (o) { if (o !== seat && st.ranking.indexOf(o) < 0) { riv += progressOf(st, o); n++; } });
+    var sc = me - (n ? riv / n : 0) * 1.2;
+    for (var i = 0; i < PIECES; i++) {
+      var p = st.pieces[seat][i];
+      if (p >= 0 && p <= LAST_TRACK && !immune(st, seat, i)) sc -= threatsTo(st, seat, absOf(seat, p)) * (6 + p * 0.35);
+    }
+    if (st.turn === seat) sc += st.bonus * 7;
+    if (st.lk) sc += st.lk.powers[seat].length * 6 + st.lk.charge[seat] * 1.5;
+    if (st.boost[seat] === 'double') sc += 5;
+    return sc;
+  }
+  /** Best option for the pending choice (AI decision and the default when the decision window runs out). */
+  function defaultChoice(st) {
+    var pd = st.pending; if (!pd) return 0;
+    var best = 0, bs = -Infinity;
+    for (var i = 0; i < pd.options.length; i++) {
+      var c = clone(st); applyChoice(c, i);
+      var sc = c.pending ? Math.max.apply(null, c.pending.options.map(function (_, j) { var d = clone(c); applyChoice(d, j); return scoreState(d, pd.seat); })) : scoreState(c, pd.seat);
+      if (sc > bs + 1e-9) { bs = sc; best = i; }
+    }
+    return best;
+  }
+  function aiChoose(st, level) { return level === 'easy' ? Math.floor(rngNext(st) * st.pending.options.length) : defaultChoice(st); }
+
+  // ---- stored powers (max 2, no duplicates; one power per roll) ----
+  function powerValid(st, seat, id) {
+    if (!isLucky(st) || st.phase !== 'roll' || st.turn !== seat || st.lk.used || st.lk.powers[seat].indexOf(id) < 0) return false;
+    if (id === 'dbl') return !st.boost[seat] && !st.lk.forceSix;
+    if (id === 'six') return !st.boost[seat] && !st.lk.forceSix;
+    if (id === 'escape') return !!escapeTarget(st, seat);
+    return false;
+  }
+  function usePower(st, id) {
+    var seat = st.turn;
+    if (!powerValid(st, seat, id)) throw new Error('power not usable');
+    st.lk.powers[seat].splice(st.lk.powers[seat].indexOf(id), 1);
+    st.lk.used = id;
+    var out = { power: id, seat: seat, moves: [], sent: [], captures: [], finish: false, crowned: null };
+    if (id === 'dbl') st.boost[seat] = 'double';
+    else if (id === 'six') st.lk.forceSix = true;
+    else {
+      var e = escapeTarget(st, seat), from = st.pieces[seat][e.piece];
+      out.piece = e.piece;
+      jumpCapture(st, seat, e.piece, pathOf(from, e.to - from, true), out);
+    }
+    return out;
+  }
+
+  // ---- Mega Wheel (5/5 charge, activated manually before a roll) ----
+  function rocketPick(st, seat) {
+    var best = null, bs = -Infinity;
+    for (var i = 0; i < PIECES; i++) {
+      var p = st.pieces[seat][i]; if (p < 0 || p === HOME || isFrozen(st, seat, i)) continue;
+      var path = jumpDest(st, seat, i, 8); if (!path.length) continue;
+      var to = path[path.length - 1];
+      var m = { seat: seat, piece: i, v: path.length, from: p, to: to, path: path, captures: onTrack(to) ? capturesAt(st, seat, absOf(seat, to)) : [], leave: false, finish: to === HOME, entersHomeColumn: p <= CIRCLE && to >= COL0 && to < HOME, tile: null };
+      var sc = evalHard(st, m);
+      if (sc > bs) { bs = sc; best = { piece: i, path: path }; }
+    }
+    return best;
+  }
+  function stormTargets(st, seat) {
+    var mine = [], out = [];
+    for (var i = 0; i < PIECES; i++) { var p = st.pieces[seat][i]; if (onMainTrack(p)) mine.push(absOf(seat, p)); }
+    for (var o = 0; o < 4; o++) {
+      if (!st.pieces[o] || o === seat) continue;
+      for (var j = 0; j < PIECES; j++) {
+        var q = st.pieces[o][j]; if (!onMainTrack(q) || q === 0) continue;
+        var b = absOf(o, q);
+        if (safeHere(st, b) || immune(st, o, j)) continue;
+        if (mine.some(function (a) { var d = (a - b + TRACK) % TRACK; return d >= 1 && d <= 6; })) out.push({ seat: o, piece: j });
+      }
+    }
+    return out;
+  }
+  function crownPick(st, seat) {
+    var best = -1, bp = -1;
+    for (var i = 0; i < PIECES; i++) { var p = st.pieces[seat][i]; if (onMainTrack(p) && !isKing(st, seat, i) && advance(p) > bp) { bp = advance(p); best = i; } }
+    return best;
+  }
+  function megaValid(st, seat, ev) {
+    switch (ev) {
+      case 'rocket': return !!rocketPick(st, seat);
+      case 'free': return st.pieces[seat].some(function (p) { return p < 0; }) && !opponentBlockAt(st, seat, absOf(seat, 0));
+      case 'guard': return st.pieces[seat].some(function (p, i) { return onMainTrack(p) && !isShielded(st, seat, i); });
+      case 'turn2': return true;
+      case 'storm': return stormTargets(st, seat).length > 0;
+      case 'crown': return crownPick(st, seat) >= 0;
+    }
+    return false;
+  }
+  function mega(st, forced) {
+    var seat = st.turn;
+    if (!canMega(st, seat)) throw new Error('Mega Wheel not ready');
+    var list = LWHEELS.mega.filter(function (e) { return megaValid(st, seat, e); });
+    var ev = forced && list.indexOf(forced) >= 0 ? forced : list[Math.floor(rngNext(st) * list.length)];
+    st.lk.charge[seat] = 0; st.stats[seat].events++;
+    var out = { mega: true, kind: 'mega', seat: seat, piece: null, wheel: LWHEELS.mega, index: LWHEELS.mega.indexOf(ev), event: ev,
+      moves: [], sent: [], captures: [], finish: false, crowned: null, target: null, lucky: true, finishedPlayer: false, over: false };
+    var i;
+    switch (ev) {
+      case 'rocket': var r = rocketPick(st, seat); out.piece = r.piece; jumpCapture(st, seat, r.piece, r.path, out); break;
+      case 'free':
+        for (i = 0; i < PIECES; i++) if (st.pieces[seat][i] < 0) break;
+        out.piece = i; jumpCapture(st, seat, i, [0], out); break;
+      case 'guard': st.pieces[seat].forEach(function (p, k) { if (onMainTrack(p) && !isShielded(st, seat, k)) { st.effects.push({ type: 'shield', seat: seat, piece: k, at: st.turnCount }); out.moves.push({ seat: seat, piece: k, from: p, to: p, shield: true }); } }); break;
+      case 'turn2': st.bonus += 2; break;
+      case 'storm': stormTargets(st, seat).forEach(function (x) { slideBack(st, x, 3, out); }); break;
+      case 'crown': i = crownPick(st, seat); out.piece = i; crown(st, seat, i); out.crowned = { seat: seat, piece: i }; break;
+    }
+    if (st.pieces[seat].every(function (p) { return p === HOME; })) { st.ranking.push(seat); out.finishedPlayer = true; nextTurn(st); }
+    out.over = st.phase === 'over';
+    st.last = { type: 'mega', seat: seat, event: ev };
+    return out;
+  }
+  /** AI: use the Mega Wheel / a stored power before rolling? Returns { type: 'mega' } | { type: 'power', id } | null. */
+  function aiPreRoll(st, level) {
+    if (!isLucky(st) || st.phase !== 'roll') return null;
+    var seat = st.turn;
+    if (canMega(st, seat) && (level !== 'easy' || rngNext(st) < 0.5)) return { type: 'mega' };
+    var pw = st.lk.powers[seat].filter(function (id) { return powerValid(st, seat, id); });
+    if (!pw.length) return null;
+    if (level === 'easy') return rngNext(st) < 0.25 ? { type: 'power', id: pw[Math.floor(rngNext(st) * pw.length)] } : null;
+    var pcs = st.pieces[seat], inBase = pcs.filter(function (p) { return p < 0; }).length;
+    var onBoard = pcs.filter(function (p) { return p >= 0 && p < HOME; }).length;
+    var maxTrack = Math.max.apply(null, pcs.map(function (p) { return onMainTrack(p) ? p : -1; }));
+    if (pw.indexOf('escape') >= 0) { var e = escapeTarget(st, seat); if (e && e.threat >= (level === 'hard' ? 1 : 1.5)) return { type: 'power', id: 'escape' }; }
+    if (pw.indexOf('six') >= 0 && inBase > 0 && st.sixes === 0 && (onBoard === 0 || (level === 'hard' && inBase >= 2))) return { type: 'power', id: 'six' };
+    if (pw.indexOf('dbl') >= 0 && onBoard > 0 && maxTrack >= 0 && maxTrack <= 38 && (level === 'hard' || onBoard >= 2)) return { type: 'power', id: 'dbl' };
+    return null;
   }
 
   // ---------- AI ----------
@@ -437,13 +892,18 @@
   }
   function tileValue(st, m, level) {
     if (!m.tile) return 0;
+    if (st.mode === 'lucky') {
+      var hv = { boost: 16, chaos: 9, danger: 10 }, mv = { boost: 12, chaos: 7, danger: 8 };
+      return (level === 'hard' ? hv : mv)[m.tile] + (st.lk.revenge[m.seat] ? 4 : 0);
+    }
     if (m.tile === 'boost') return level === 'hard' ? 26 : 16;
     return level === 'hard' ? 9 - m.to * 0.15 : 3; // chaos: small upside, risky for advanced tokens
   }
   function evalHard(st, m) {
     var seat = m.seat, sc = 0, star = st.rules.rollStyle === 'star';
     if (m.finish) sc += 120;
-    m.captures.forEach(function (c) { sc += 95 + advance(st.pieces[c.seat][c.piece]) * 1.2; });
+    m.captures.forEach(function (c) { sc += 95 + advance(st.pieces[c.seat][c.piece]) * 1.2 + (isKing(st, c.seat, c.piece) ? 45 : 0); });
+    if (st.lk && m.captures.length && !isKing(st, seat, m.piece) && st.lk.kills[seat][m.piece] + m.captures.length >= KING_KILLS) sc += 20; // becomes King
     if (m.captures.length && st.rules.captureToEnter && !st.capd[seat]) sc += 40;
     if (m.leave) sc += 55 + 5 * st.pieces[seat].filter(function (p) { return p < 0; }).length;
     if (m.entersHomeColumn) sc += 45;
@@ -482,7 +942,7 @@
   }
   function evalMedium(st, m) {
     var sc = 0;
-    if (m.captures.length) sc += 60;
+    if (m.captures.length) sc += 60 + (m.captures.some(function (c) { return isKing(st, c.seat, c.piece); }) ? 25 : 0);
     if (m.finish) sc += 50;
     if (m.leave) sc += 40;
     if (m.entersHomeColumn) sc += 25;
@@ -534,20 +994,27 @@
     var base = [0, 40, 20, 12, 6][place] || 0;
     if (nPlayers === 2 && place === 2) base = 10;
     var bonus = (aiLevels || []).indexOf('hard') >= 0 ? 10 : (aiLevels || []).indexOf('medium') >= 0 ? 5 : 0;
-    return base + (place === 1 ? bonus : 0) + (mode === 'mystery' && place === 1 ? 5 : 0);
+    return base + (place === 1 ? bonus : 0) + ((mode === 'mystery' || mode === 'lucky') && place === 1 ? 5 : 0);
   }
   /** Experience points (cosmetic level on the home screen). */
   function xpFor(place, nPlayers) { return place === 1 ? 40 + 10 * nPlayers : Math.max(10, 30 - place * 5); }
   function levelFromXp(xp) { var lv = 1, need = 100, x = xp; while (x >= need) { x -= need; lv++; need = 100 + (lv - 1) * 25; } return { level: lv, into: x, need: need }; }
 
   /** Plays a whole game with AI for every seat (used by the tests). */
-  function simulate(seats, rules, seed, maxRolls, mode) {
-    var st = newGame(seats, rules, seed, mode), cap = maxRolls || 30000;
-    while (st.phase !== 'over' && st.rolls < cap) {
-      var lv = st.seats[st.turn].level;
-      if (st.phase === 'roll') roll(st, mustChoose(st) ? chooseDieValue(st, st.turn, lv) : undefined);
-      else { var c = chooseMove(st, lv); move(st, c.piece, c.v); }
+  /** One AI action for the current player (roll, pre-roll power / Mega, choice or move). */
+  function aiStep(st) {
+    var lv = st.seats[st.turn].level;
+    if (st.phase === 'roll') {
+      var a = aiPreRoll(st, lv);
+      if (a) return a.type === 'mega' ? { mega: mega(st) } : { power: usePower(st, a.id) };
+      return { roll: roll(st, mustChoose(st) ? chooseDieValue(st, st.turn, lv) : undefined) };
     }
+    if (st.phase === 'choose') return { choice: choose(st, aiChoose(st, lv)) };
+    var c = chooseMove(st, lv); return { move: move(st, c.piece, c.v) };
+  }
+  function simulate(seats, rules, seed, maxRolls, mode) {
+    var st = newGame(seats, rules, seed, mode), cap = maxRolls || 30000, guard = 0;
+    while (st.phase !== 'over' && st.rolls < cap && guard++ < cap * 6) aiStep(st);
     return st;
   }
 
@@ -562,6 +1029,12 @@
     nextTurn: nextTurn, activeLeft: activeLeft, progressOf: progressOf, canEnter: canEnter, isShielded: isShielded, isFrozen: isFrozen, opponentBlockAt: opponentBlockAt,
     tileAt: tileAt, applyEvent: applyEvent, eventValid: eventValid, eventTarget: eventTarget,
     threatsTo: threatsTo, evalHard: evalHard, chooseMove: chooseMove, chooseDieValue: chooseDieValue, distinctMoves: distinctMoves,
-    coinsFor: coinsFor, xpFor: xpFor, levelFromXp: levelFromXp, simulate: simulate, clone: clone
+    coinsFor: coinsFor, xpFor: xpFor, levelFromXp: levelFromXp, simulate: simulate, clone: clone, aiStep: aiStep, continueTurn: continueTurn,
+    // Lucky Chaos Ludo
+    LUCKY_BOOST: LUCKY_BOOST, LUCKY_CHAOS: LUCKY_CHAOS, DANGER_TILES: DANGER_TILES, LWHEELS: LWHEELS, POWERS: POWERS, MAX_CHARGE: MAX_CHARGE, MAX_POWERS: MAX_POWERS,
+    KING_TURNS: KING_TURNS, KING_KILLS: KING_KILLS, ZAP_CAP: ZAP_CAP, MAX_STREAK: MAX_STREAK, eventLabel: eventLabel, isKing: isKing, kingOf: kingOf, immune: immune,
+    comebackLevel: comebackLevel, nudgeChance: nudgeChance, luckyActivate: luckyActivate, applyLucky: applyLucky, eventValidL: eventValidL, spinLucky: spinLucky, luckyTarget: luckyTarget,
+    bombTargets: bombTargets, escapeTarget: escapeTarget, choose: choose, defaultChoice: defaultChoice, aiChoose: aiChoose, scoreState: scoreState,
+    powerValid: powerValid, usePower: usePower, canMega: canMega, mega: mega, megaValid: megaValid, stormTargets: stormTargets, aiPreRoll: aiPreRoll, canStore: canStore, checkKing: checkKing
   };
 });
