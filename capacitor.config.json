@@ -1,0 +1,11 @@
+{
+  "appId": "com.offerpk.offlineludo",
+  "appName": "Crossfour Ludo",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#12151b"
+  },
+  "plugins": {
+    "AdMob": {}
+  }
+}

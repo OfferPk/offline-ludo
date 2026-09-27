@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#12151b">
+  <meta name="description" content="Crossfour: offline Ludo for 2 to 4 players. Play against computer players (Easy, Medium, Hard) or pass and play on one phone.">
+  <title>Crossfour – Offline Ludo</title>
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="skin-graphite">
+  <div id="app">
+    <!-- HOME -->
+    <section id="home" class="screen">
+      <div class="home-top">
+        <button id="btn-stats" class="chip">Stats</button>
+        <div class="coins"><span class="coin-ico"></span><span class="coins-val">0</span></div>
+      </div>
+      <div class="home-main">
+        <div class="logo">
+          <div class="logo-mark" aria-hidden="true"><i class="q0"></i><i class="q1"></i><i class="q3"></i><i class="q2"></i></div>
+          <h1>Crossfour</h1>
+          <p class="tag">offline ludo</p>
+        </div>
+        <div class="home-actions">
+          <button id="btn-continue" class="btn primary big hidden"><span>Continue match</span><small id="continue-sub">vs Computer</small></button>
+          <button id="btn-vs-ai" class="btn big"><span>Play vs Computer</span><small>Easy · Medium · Hard</small></button>
+          <button id="btn-pass" class="btn big"><span>Pass &amp; Play</span><small>2–4 players on one phone</small></button>
+        </div>
+        <div class="home-row">
+          <button id="btn-skins" class="btn plate">Skins</button>
+          <button id="btn-rules" class="btn plate">How to play</button>
+          <button id="btn-settings" class="btn plate">Settings</button>
+        </div>
+        <a class="home-link" href="privacy.html">Privacy policy</a>
+      </div>
+    </section>
+
+    <!-- SETUP -->
+    <section id="setup" class="screen hidden">
+      <header class="topbar">
+        <button id="btn-setup-back" class="icon-btn" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15.5 4.5 8 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <h2 id="setup-title">New match</h2>
+        <span class="icon-btn"></span>
+      </header>
+      <div class="setup-body">
+        <div class="sect">Players</div>
+        <div id="seat-list" class="seat-list"></div>
+        <p id="setup-msg" class="setup-msg"></p>
+        <div class="sect">Rules</div>
+        <label class="row"><span>Safe squares <small>stars &amp; start squares protect pieces</small></span><input type="checkbox" id="rule-safe"><i class="sw"></i></label>
+        <label class="row"><span>Extra turn on a 6</span><input type="checkbox" id="rule-six"><i class="sw"></i></label>
+        <label class="row"><span>Extra turn on a capture</span><input type="checkbox" id="rule-cap"><i class="sw"></i></label>
+        <p class="note">Always on: roll a 6 to leave base, exact roll to reach home, a capture sends the piece back to base, three 6s in a row lose the turn.</p>
+      </div>
+      <div class="setup-foot"><button id="btn-start" class="btn primary big"><span>Start match</span></button></div>
+    </section>
+
+    <!-- GAME -->
+    <section id="game" class="screen hidden">
+      <header class="topbar">
+        <button id="btn-home" class="icon-btn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M15.5 4.5 8 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="turn-label" id="turn-label">—</div>
+        <button id="btn-game-settings" class="icon-btn" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+      </header>
+      <div id="stage">
+        <div class="panels top"><div class="pp" data-seat="0"></div><div class="pp" data-seat="1"></div></div>
+        <div id="board-wrap">
+          <canvas id="board"></canvas>
+          <div id="pieces"></div>
+          <div id="fx"></div>
+        </div>
+        <div class="panels bottom"><div class="pp" data-seat="3"></div><div class="pp" data-seat="2"></div></div>
+        <div class="dice-row">
+          <button id="btn-undo" class="tool rewarded hidden" aria-label="Undo last move"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4.5 12H15a5 5 0 0 1 0 10h-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 -3)"/></svg><span>Undo</span><em class="ad-badge">▶ AD</em></button>
+          <div class="dice-zone">
+            <button id="dice" class="dice" aria-label="Roll the die">
+              <div class="cube" id="cube">
+                <div class="face f1"><i></i></div>
+                <div class="face f2"><i></i><i></i></div>
+                <div class="face f3"><i></i><i></i><i></i></div>
+                <div class="face f4"><i></i><i></i><i></i><i></i></div>
+                <div class="face f5"><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="face f6"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              </div>
+            </button>
+            <div class="dice-hint" id="dice-hint">Tap to roll</div>
+          </div>
+          <div class="sixes" id="sixes" aria-label="Sixes this turn"><i></i><i></i></div>
+        </div>
+      </div>
+      <div id="banner-slot" aria-hidden="true"></div>
+    </section>
+
+    <!-- RESULT -->
+    <div id="result" class="overlay hidden">
+      <div class="panel">
+        <div class="kicker" id="r-kicker">MATCH OVER</div>
+        <h2 id="r-title">You win!</h2>
+        <ol id="r-rank" class="rank"></ol>
+        <div class="r-coins"><span class="coin-ico"></span><b id="r-coins">+0</b><small>coins (cosmetic)</small></div>
+        <button id="btn-r-double" class="btn rewarded-btn">▶ Watch an ad for 2× coins</button>
+        <div class="panel-actions">
+          <button id="btn-r-home" class="btn plate">Home</button>
+          <button id="btn-r-again" class="btn primary">Play again</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONFIRM -->
+    <div id="confirm" class="overlay hidden">
+      <div class="panel">
+        <h3 id="confirm-title">Start a new match?</h3>
+        <p id="confirm-text">Your saved match will be replaced.</p>
+        <div class="panel-actions">
+          <button id="confirm-no" class="btn plate">Cancel</button>
+          <button id="confirm-yes" class="btn primary">Start</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MENU (in game) -->
+    <div id="menu" class="overlay hidden">
+      <div class="panel">
+        <h3>Match paused</h3>
+        <p class="note">Your match is saved automatically. You can continue it later from the home screen.</p>
+        <div class="panel-actions col">
+          <button id="btn-m-resume" class="btn primary">Resume</button>
+          <button id="btn-m-restart" class="btn plate">Restart with same players</button>
+          <button id="btn-m-home" class="btn plate">Save &amp; go home</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS -->
+    <div id="stats" class="overlay hidden">
+      <div class="panel wide">
+        <div class="panel-head"><h3>Statistics</h3><button class="icon-btn close" data-close="stats" aria-label="Close">✕</button></div>
+        <div id="stats-body" class="stats-grid"></div>
+      </div>
+    </div>
+
+    <!-- SKINS -->
+    <div id="skins" class="overlay hidden">
+      <div class="panel wide">
+        <div class="panel-head"><h3>Skins</h3><div class="coins"><span class="coin-ico"></span><span class="coins-val">0</span></div><button class="icon-btn close" data-close="skins" aria-label="Close">✕</button></div>
+        <p class="note">Cosmetic only. Earn coins by finishing matches. Coins can't be bought, bet or cashed out.</p>
+        <div class="tabs" id="skin-tabs"><button data-tab="boards" class="on">Boards</button><button data-tab="dice">Dice</button></div>
+        <div id="skin-grid" class="skin-grid"></div>
+      </div>
+    </div>
+
+    <!-- RULES -->
+    <div id="rules" class="overlay hidden">
+      <div class="panel wide">
+        <div class="panel-head"><h3>How to play</h3><button class="icon-btn close" data-close="rules" aria-label="Close">✕</button></div>
+        <ul class="rules-list">
+          <li>Each player has 4 pieces in a base. The first to bring all 4 home, to the centre, wins.</li>
+          <li>Roll a <b>6</b> to bring a piece out onto your start square.</li>
+          <li>Pieces move clockwise around the board, then up your own coloured lane to the centre. You need the <b>exact roll</b> to reach home.</li>
+          <li>Land on an opponent's piece to <b>capture</b> it: it goes back to its base.</li>
+          <li><b>Safe squares</b> (stars and start squares) protect pieces from capture, if the rule is on.</li>
+          <li>A 6 and a capture earn an extra roll (both can be switched off). <b>Three 6s in a row</b> lose the turn.</li>
+          <li>When only one move is possible it is played for you (you can turn this off in Settings).</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="settings" class="overlay hidden">
+      <div class="panel">
+        <div class="panel-head"><h3>Settings</h3><button class="icon-btn close" data-close="settings" aria-label="Close">✕</button></div>
+        <label class="row"><span>Sound effects</span><input type="checkbox" id="set-sound"><i class="sw"></i></label>
+        <label class="row"><span>Haptics</span><input type="checkbox" id="set-haptics"><i class="sw"></i></label>
+        <label class="row"><span>Auto-move when only one move</span><input type="checkbox" id="set-auto"><i class="sw"></i></label>
+        <label class="row"><span>Fast animations</span><input type="checkbox" id="set-fast"><i class="sw"></i></label>
+        <div class="panel-actions col">
+          <a class="btn plate" href="privacy.html">Privacy policy</a>
+          <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
+          <button id="btn-reset" class="btn plate danger">Reset progress</button>
+        </div>
+        <p class="ver">Crossfour v1.0.0 · © OfferPk</p>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="js/ads-config.js"></script>
+  <script src="js/adgate.js"></script>
+  <script src="js/ads.js"></script>
+  <script src="js/logic.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/themes.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

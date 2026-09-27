@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Android build outputs
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/local.properties
+android/.idea/
+*.apk
+*.aab
+*.ap_
+dist/
+
+# Signing – NEVER commit keystores or their passwords
+*.jks
+*.keystore
+*.p12
+keystore.properties
+*keystore*.txt
+offlineludo-upload.txt
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+offlineludo-upload*
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/capacitor-cordova-android-plugins/
+__pycache__/
+__pycache__/
