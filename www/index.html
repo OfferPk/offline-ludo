@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#12151b">
-  <meta name="description" content="Crossfour: offline Ludo for 2 to 4 players. Play against computer players (Easy, Medium, Hard) or pass and play on one phone.">
+  <meta name="description" content="Crossfour: offline Ludo for 2 to 4 players. Star-style stacked rolls, Mystery Tiles mode, computer players (Easy, Normal, Hard) or pass and play on one phone.">
   <title>Crossfour – Offline Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body class="skin-graphite">
+<body>
   <div id="app">
     <!-- HOME -->
     <section id="home" class="screen">
       <div class="home-top">
-        <button id="btn-stats" class="chip">Stats</button>
+        <button id="btn-stats" class="chip lvl-chip"><span class="lvl-badge" id="lvl-badge">1</span><span class="lvl-bar"><i id="lvl-fill"></i></span></button>
         <div class="coins"><span class="coin-ico"></span><span class="coins-val">0</span></div>
       </div>
       <div class="home-main">
@@ -26,12 +26,13 @@
         </div>
         <div class="home-actions">
           <button id="btn-continue" class="btn primary big hidden"><span>Continue match</span><small id="continue-sub">vs Computer</small></button>
-          <button id="btn-vs-ai" class="btn big"><span>Play vs Computer</span><small>Easy · Medium · Hard</small></button>
+          <button id="btn-vs-ai" class="btn big"><span>Play vs Computer</span><small>Easy · Normal · Hard</small></button>
+          <button id="btn-mystery" class="btn big mystery-btn"><span><em class="new-badge">NEW</em>Mystery Tiles</span><small>1 v 1 or 4 players · wheels of surprises</small></button>
           <button id="btn-pass" class="btn big"><span>Pass &amp; Play</span><small>2–4 players on one phone</small></button>
         </div>
         <div class="home-row">
           <button id="btn-skins" class="btn plate">Skins</button>
-          <button id="btn-rules" class="btn plate">How to play</button>
+          <button id="btn-rules" class="btn plate">Rules</button>
           <button id="btn-settings" class="btn plate">Settings</button>
         </div>
         <a class="home-link" href="privacy.html">Privacy policy</a>
@@ -46,14 +47,16 @@
         <span class="icon-btn"></span>
       </header>
       <div class="setup-body">
+        <div class="sect">Mode</div>
+        <div class="seg big-seg" id="mode-seg"><button data-mode="classic">Classic</button><button data-mode="mystery">Mystery Tiles</button></div>
+        <p class="note" id="mode-note"></p>
         <div class="sect">Players</div>
+        <div class="presets" id="presets"><button data-p="1v1">1 v 1</button><button data-p="3">3 players</button><button data-p="4">4 players</button></div>
         <div id="seat-list" class="seat-list"></div>
         <p id="setup-msg" class="setup-msg"></p>
-        <div class="sect">Rules</div>
-        <label class="row"><span>Safe squares <small>stars &amp; start squares protect pieces</small></span><input type="checkbox" id="rule-safe"><i class="sw"></i></label>
-        <label class="row"><span>Extra turn on a 6</span><input type="checkbox" id="rule-six"><i class="sw"></i></label>
-        <label class="row"><span>Extra turn on a capture</span><input type="checkbox" id="rule-cap"><i class="sw"></i></label>
-        <p class="note">Always on: roll a 6 to leave base, exact roll to reach home, a capture sends the piece back to base, three 6s in a row lose the turn.</p>
+        <div class="sect">House rules</div>
+        <div class="rules-sum" id="rules-sum"></div>
+        <button id="btn-edit-rules" class="btn plate small-btn">Change house rules</button>
       </div>
       <div class="setup-foot"><button id="btn-start" class="btn primary big"><span>Start match</span></button></div>
     </section>
@@ -66,29 +69,30 @@
         <button id="btn-game-settings" class="icon-btn" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
       </header>
       <div id="stage">
-        <div class="panels top"><div class="pp" data-seat="0"></div><div class="pp" data-seat="1"></div></div>
+        <div class="pods top"><div class="pod" data-slot="0"></div><div class="pod right" data-slot="1"></div></div>
         <div id="board-wrap">
           <canvas id="board"></canvas>
+          <div id="tiles"></div>
           <div id="pieces"></div>
           <div id="fx"></div>
-        </div>
-        <div class="panels bottom"><div class="pp" data-seat="3"></div><div class="pp" data-seat="2"></div></div>
-        <div class="dice-row">
-          <button id="btn-undo" class="tool rewarded hidden" aria-label="Undo last move"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4.5 12H15a5 5 0 0 1 0 10h-2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" transform="translate(0 -3)"/></svg><span>Undo</span><em class="ad-badge">▶ AD</em></button>
-          <div class="dice-zone">
-            <button id="dice" class="dice" aria-label="Roll the die">
-              <div class="cube" id="cube">
-                <div class="face f1"><i></i></div>
-                <div class="face f2"><i></i><i></i></div>
-                <div class="face f3"><i></i><i></i><i></i></div>
-                <div class="face f4"><i></i><i></i><i></i><i></i></div>
-                <div class="face f5"><i></i><i></i><i></i><i></i><i></i></div>
-                <div class="face f6"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-              </div>
-            </button>
-            <div class="dice-hint" id="dice-hint">Tap to roll</div>
+          <div id="wheel" class="wheel hidden" aria-live="polite">
+            <div class="wheel-card">
+              <div class="wheel-title" id="wheel-title">Boost wheel</div>
+              <div class="wheel-disc"><svg id="wheel-svg" viewBox="-100 -100 200 200"></svg><i class="wheel-pin"></i></div>
+              <div class="wheel-result" id="wheel-result"></div>
+            </div>
           </div>
-          <div class="sixes" id="sixes" aria-label="Sixes this turn"><i></i><i></i></div>
+          <div id="picker" class="picker hidden"><div class="picker-card"><b>Pick a number</b><div class="picker-row" id="picker-row"></div></div></div>
+        </div>
+        <div class="pods bottom"><div class="pod" data-slot="3"></div><div class="pod right" data-slot="2"></div></div>
+        <div class="toolbar">
+          <button id="btn-undo" class="tool hidden" aria-label="Undo dice roll"><svg viewBox="0 0 24 24"><path d="M9 4 4 9l5 5M4.5 9H15a5 5 0 0 1 0 10h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="undo-label">Undo</span><em class="ad-badge hidden" id="undo-ad">▶ AD</em><i class="undo-bar" id="undo-bar"></i></button>
+          <div class="hint" id="hint"></div>
+          <button id="btn-chat" class="tool" aria-label="Quick chat"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/><circle cx="12" cy="10.5" r="1.2" fill="currentColor"/><circle cx="15" cy="10.5" r="1.2" fill="currentColor"/></svg><span>Chat</span></button>
+        </div>
+        <div id="chat" class="chat hidden">
+          <div class="chat-phrases" id="chat-phrases"></div>
+          <div class="chat-emotes" id="chat-emotes"></div>
         </div>
       </div>
       <div id="banner-slot" aria-hidden="true"></div>
@@ -100,8 +104,12 @@
         <div class="kicker" id="r-kicker">MATCH OVER</div>
         <h2 id="r-title">You win!</h2>
         <ol id="r-rank" class="rank"></ol>
-        <div class="r-coins"><span class="coin-ico"></span><b id="r-coins">+0</b><small>coins (cosmetic)</small></div>
+        <div class="r-rewards">
+          <div class="r-coins"><span class="coin-ico"></span><b id="r-coins">+0</b><small>coins</small></div>
+          <div class="r-xp"><b id="r-xp">+0</b><small>XP</small><span class="lvl-bar"><i id="r-lvl-fill"></i></span><small id="r-lvl">Level 1</small></div>
+        </div>
         <button id="btn-r-double" class="btn rewarded-btn">▶ Watch an ad for 2× coins</button>
+        <p class="note tiny">Coins only unlock cosmetic skins. They can't be bought, bet or cashed out.</p>
         <div class="panel-actions">
           <button id="btn-r-home" class="btn plate">Home</button>
           <button id="btn-r-again" class="btn primary">Play again</button>
@@ -128,6 +136,7 @@
         <p class="note">Your match is saved automatically. You can continue it later from the home screen.</p>
         <div class="panel-actions col">
           <button id="btn-m-resume" class="btn primary">Resume</button>
+          <button id="btn-m-rules" class="btn plate">Rules</button>
           <button id="btn-m-restart" class="btn plate">Restart with same players</button>
           <button id="btn-m-home" class="btn plate">Save &amp; go home</button>
         </div>
@@ -155,16 +164,47 @@
     <!-- RULES -->
     <div id="rules" class="overlay hidden">
       <div class="panel wide">
-        <div class="panel-head"><h3>How to play</h3><button class="icon-btn close" data-close="rules" aria-label="Close">✕</button></div>
-        <ul class="rules-list">
-          <li>Each player has 4 pieces in a base. The first to bring all 4 home, to the centre, wins.</li>
-          <li>Roll a <b>6</b> to bring a piece out onto your start square.</li>
-          <li>Pieces move clockwise around the board, then up your own coloured lane to the centre. You need the <b>exact roll</b> to reach home.</li>
-          <li>Land on an opponent's piece to <b>capture</b> it: it goes back to its base.</li>
-          <li><b>Safe squares</b> (stars and start squares) protect pieces from capture, if the rule is on.</li>
-          <li>A 6 and a capture earn an extra roll (both can be switched off). <b>Three 6s in a row</b> lose the turn.</li>
-          <li>When only one move is possible it is played for you (you can turn this off in Settings).</li>
-        </ul>
+        <div class="panel-head"><h3>Rules</h3><button class="icon-btn close" data-close="rules" aria-label="Close">✕</button></div>
+        <div class="tabs" id="rules-tabs"><button data-tab="basics" class="on">Basics</button><button data-tab="rolls">Rolls</button><button data-tab="mystery">Mystery</button><button data-tab="house">House</button></div>
+        <div class="rules-page" data-page="basics">
+          <ul class="rules-list">
+            <li>2–4 players, 4 tokens each. The first to bring all 4 tokens home to the centre wins; the others are ranked 2nd, 3rd and 4th.</li>
+            <li>Each player rolls their own die, shown next to their name in their corner.</li>
+            <li>Roll a <b>6</b> to bring a token out of base onto your start square.</li>
+            <li>Tokens move clockwise round the board, then up your own coloured lane. You need the <b>exact roll</b> to reach home.</li>
+            <li>Land on a rival token to <b>capture</b> it: it goes back to its base and you get a <b>bonus roll</b>.</li>
+            <li>A token reaching home also earns a <b>bonus roll</b>.</li>
+            <li><b>Safe squares</b>: the start squares and the grey stars. Nobody can be captured there; tokens share the square.</li>
+            <li><b>Three 6s in a row</b> cancel the whole turn, including any rolls not yet moved.</li>
+          </ul>
+        </div>
+        <div class="rules-page hidden" data-page="rolls">
+          <ul class="rules-list">
+            <li><b>Star style</b> (default): a 6 gives you another roll straight away. Your rolls stack up as chips next to your die, for example <span class="mini-chips"><i>6</i><i>6</i><i>3</i></span>.</li>
+            <li>After your first roll that is not a 6, move your chips one by one, in any order. Tap a chip, then a token. When only one move is possible it is played for you.</li>
+            <li>Chips that can't be used (for example a 5 when every token is in base) are dropped.</li>
+            <li><b>Classic style</b>: you move each roll before rolling again; a 6 still gives another roll after moving.</li>
+            <li><b>Undo dice roll</b>: for about 2 seconds after your roll you can undo it and roll again. 3 free undos per match; after that, an optional ad gives one more. You can switch undo off in Settings.</li>
+            <li><b>Turn timer</b> (optional, off by default): if time runs out the game rolls or moves for you.</li>
+          </ul>
+        </div>
+        <div class="rules-page hidden" data-page="mystery">
+          <p class="note">Mystery Tiles is a Crossfour mode with 8 special tiles on the track. End a move on one to spin its wheel. A tile rests for two rounds after it has been used. There's no entry fee or stake: every match is free and coins are cosmetic.</p>
+          <div class="ev-head"><span class="tile-ico boost">?</span><b>Boost wheel</b><small>always helpful</small></div>
+          <div class="ev-list" id="ev-boost"></div>
+          <div class="ev-head"><span class="tile-ico chaos">!</span><b>Chaos wheel</b><small>high risk, high reward</small></div>
+          <div class="ev-list" id="ev-chaos"></div>
+        </div>
+        <div class="rules-page hidden" data-page="house">
+          <ul class="rules-list">
+            <li>House rules are in <b>Settings</b> and apply to new matches.</li>
+            <li><b>Roll style</b>: Star (stacked rolls) or Classic (move each roll first).</li>
+            <li><b>Safe squares</b>: switch off for a rougher game where any square can be hit.</li>
+            <li><b>Capture to enter home</b>: you must capture at least once before your tokens may enter your home lane; until then they keep circling.</li>
+            <li><b>Blocks</b>: two of your tokens on one square form a block. Rivals can't land on it or pass it.</li>
+            <li><b>Bonus roll on capture</b> and <b>on reaching home</b> can each be switched off.</li>
+          </ul>
+        </div>
       </div>
     </div>
 
@@ -175,13 +215,23 @@
         <label class="row"><span>Sound effects</span><input type="checkbox" id="set-sound"><i class="sw"></i></label>
         <label class="row"><span>Haptics</span><input type="checkbox" id="set-haptics"><i class="sw"></i></label>
         <label class="row"><span>Auto-move when only one move</span><input type="checkbox" id="set-auto"><i class="sw"></i></label>
+        <label class="row"><span>Undo dice roll <small>about 2 s to undo after your roll</small></span><input type="checkbox" id="set-undo"><i class="sw"></i></label>
+        <label class="row"><span>Turn timer <small>20 s per turn for human players</small></span><input type="checkbox" id="set-timer"><i class="sw"></i></label>
+        <label class="row"><span>Computer chat &amp; emotes</span><input type="checkbox" id="set-chat"><i class="sw"></i></label>
         <label class="row"><span>Fast animations</span><input type="checkbox" id="set-fast"><i class="sw"></i></label>
+        <div class="sect">House rules <small>(new matches)</small></div>
+        <div class="row nolabel"><span>Roll style</span><div class="seg mini" id="rule-style"><button data-v="star">Star</button><button data-v="classic">Classic</button></div></div>
+        <label class="row"><span>Safe squares <small>start squares &amp; stars</small></span><input type="checkbox" id="rule-safeSquares"><i class="sw"></i></label>
+        <label class="row"><span>Capture to enter home</span><input type="checkbox" id="rule-captureToEnter"><i class="sw"></i></label>
+        <label class="row"><span>Blocks <small>2 tokens on a square can't be passed</small></span><input type="checkbox" id="rule-blocks"><i class="sw"></i></label>
+        <label class="row"><span>Bonus roll on capture</span><input type="checkbox" id="rule-bonusOnCapture"><i class="sw"></i></label>
+        <label class="row"><span>Bonus roll on reaching home</span><input type="checkbox" id="rule-bonusOnHome"><i class="sw"></i></label>
         <div class="panel-actions col">
           <a class="btn plate" href="privacy.html">Privacy policy</a>
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.0.0 · © OfferPk</p>
+        <p class="ver">Crossfour v1.1.0 · © OfferPk</p>
       </div>
     </div>
 
@@ -194,6 +244,7 @@
   <script src="js/logic.js"></script>
   <script src="js/sound.js"></script>
   <script src="js/themes.js"></script>
+  <script src="js/art.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

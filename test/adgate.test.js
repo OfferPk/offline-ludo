@@ -13,8 +13,8 @@ const fresh = () => AdGate.create(CFG, {});
 const secondSession = () => { const g = fresh(); g.sessionStarted(); g.sessionStarted(); return g; };
 
 console.log('adgate.test.js');
-t('shipped config: 2nd session, 3 matches, 3 min, every 2 matches, 120 s', () => {
-  assert.strictEqual(CFG.INTERSTITIAL_MIN_SESSIONS, 2); assert.strictEqual(CFG.INTERSTITIAL_MIN_MATCHES, 3);
+t('shipped config: 2nd session, 5 matches, 3 min, every 2 matches, 120 s', () => {
+  assert.strictEqual(CFG.INTERSTITIAL_MIN_SESSIONS, 2); assert.strictEqual(CFG.INTERSTITIAL_MIN_MATCHES, 5);
   assert.strictEqual(CFG.INTERSTITIAL_MIN_PLAY_MS, 3 * MIN); assert.strictEqual(CFG.INTERSTITIAL_EVERY_N_MATCHES, 2);
   assert.strictEqual(CFG.INTERSTITIAL_MIN_INTERVAL_MS, 120000);
 });
@@ -24,10 +24,9 @@ t('never in the first session, however many matches and minutes', () => {
   for (let i = 0; i < 20; i++) { g.matchCompleted(); for (let k = 0; k < 60; k++) g.addPlayTime(1000); assert.strictEqual(g.canShow(1e12 + i * 10 * MIN), false); }
   g.sessionStarted(); assert.strictEqual(g.canShow(2e12), true, 'allowed from the 2nd launch');
 });
-t('not before 3 completed matches even with lots of play time', () => {
+t('not before 5 completed matches even with lots of play time', () => {
   const g = secondSession(); for (let i = 0; i < 40; i++) g.addPlayTime(30000);
-  g.matchCompleted(); assert.strictEqual(g.canShow(1e12), false);
-  g.matchCompleted(); assert.strictEqual(g.canShow(1e12), false);
+  for (let m = 1; m <= 4; m++) { g.matchCompleted(); assert.strictEqual(g.canShow(1e12), false, 'after ' + m + ' matches'); }
   g.matchCompleted(); assert.strictEqual(g.canShow(1e12), true);
 });
 t('not before 3 minutes of play even after many matches', () => {
@@ -37,7 +36,7 @@ t('not before 3 minutes of play even after many matches', () => {
   g.addPlayTime(1000); assert.strictEqual(g.canShow(1e12), true);
 });
 t('play-time ignores bogus deltas (negative / huge)', () => { const g = fresh(); g.addPlayTime(-5); g.addPlayTime(10 * MIN); assert.strictEqual(g.state.playMs, 0); });
-function eligible() { const g = secondSession(); for (let i = 0; i < 3; i++) g.matchCompleted(); for (let i = 0; i < 180; i++) g.addPlayTime(1000); return g; }
+function eligible() { const g = secondSession(); for (let i = 0; i < 5; i++) g.matchCompleted(); for (let i = 0; i < 180; i++) g.addPlayTime(1000); return g; }
 t('after one ad: needs 2 more completed matches', () => {
   const g = eligible(); let now = 1e9;
   assert.ok(g.canShow(now)); g.shown(now); now += 10 * MIN;
@@ -60,7 +59,7 @@ t('clock moving backwards resets the interval instead of blocking forever', () =
 t('state persists through JSON round trip (sessions included)', () => {
   const g = eligible(); g.shown(1e9); g.matchCompleted();
   const g2 = AdGate.create(CFG, JSON.parse(JSON.stringify(g.state)));
-  assert.strictEqual(g2.state.sessions, 2); assert.strictEqual(g2.state.matchesCompleted, 4); assert.strictEqual(g2.state.matchesSince, 1); assert.strictEqual(g2.state.playMs, 180000);
+  assert.strictEqual(g2.state.sessions, 2); assert.strictEqual(g2.state.matchesCompleted, 6); assert.strictEqual(g2.state.matchesSince, 1); assert.strictEqual(g2.state.playMs, 180000);
   g2.matchCompleted(); assert.strictEqual(g2.canShow(1e9 + 120000), true);
 });
 t('corrupt saved state is repaired', () => { const g = AdGate.create(CFG, { sessions: 'x', playMs: null, lastTs: NaN }); assert.strictEqual(g.state.sessions, 0); assert.strictEqual(g.state.playMs, 0); assert.strictEqual(g.state.lastTs, 0); });
@@ -90,10 +89,10 @@ t('game.js asks for an interstitial in exactly one place: leaving the match-resu
 });
 t('the session counter is bumped once at boot', () => { assert.strictEqual((game.match(/gate\.sessionStarted\(\)/g) || []).length, 1); });
 t('matchCompleted is counted in one place (match end)', () => { assert.strictEqual((game.match(/gate\.matchCompleted\(\)/g) || []).length, 1); });
-t('rewarded ads only from the Undo and 2x-coins buttons', () => {
+t('rewarded ads only from the Undo-roll and 2x-coins buttons (player taps)', () => {
   const calls = game.match(/Ads\.showRewarded\(/g) || []; assert.strictEqual(calls.length, 2);
-  assert.ok(/function undoMove[\s\S]{0,600}Ads\.showRewarded\(/.test(game)); assert.ok(/function doubleCoins[\s\S]{0,600}Ads\.showRewarded\(/.test(game));
-  assert.ok(/btn-undo'\)\.addEventListener\('click', undoMove\)/.test(game) && /btn-r-double'\)\.addEventListener\('click', doubleCoins\)/.test(game));
+  assert.ok(/function undoRoll[\s\S]{0,600}Ads\.showRewarded\(/.test(game)); assert.ok(/function doubleCoins[\s\S]{0,600}Ads\.showRewarded\(/.test(game));
+  assert.ok(/btn-undo'\)\.addEventListener\('click', undoRoll\)/.test(game) && /btn-r-double'\)\.addEventListener\('click', doubleCoins\)/.test(game));
 });
 t('no billing anywhere in the app', () => {
   const pkg = fs.readFileSync(__dirname + '/../package.json', 'utf8'); const man = fs.readFileSync(__dirname + '/../android/app/src/main/AndroidManifest.xml', 'utf8');

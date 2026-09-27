@@ -1,6 +1,6 @@
 # ◆ Crossfour: Offline Ludo
 
-A modern, **fully offline Ludo** for 2–4 players. Play against computer players (**Easy, Medium, Hard**), pass one phone around with friends, or mix both. There's no server, no login and no online mode. It's written in vanilla HTML/CSS/JavaScript (the board is drawn on a canvas) with no framework, and ships as an **Android app** (Capacitor 8 + Google AdMob) that **GitHub Actions** builds and signs automatically.
+A modern, **fully offline Ludo** for 2–4 players. Play against computer players (**Easy, Normal, Hard**), pass one phone around with friends, or mix both. v1.1 adds **per-player dice in each corner**, the **Star-style stacked-sixes roll system**, the new **Mystery Tiles** mode, **Undo dice roll**, quick chat & emotes, levels/XP and ranked results. There's no server, no login and no online mode. It's written in vanilla HTML/CSS/JavaScript (the board is drawn on a canvas) with no framework, and ships as an **Android app** (Capacitor 8 + Google AdMob) that **GitHub Actions** builds and signs automatically.
 
 **▶ Play the live demo:** https://offerpk.github.io/offline-ludo/
 **Privacy policy:** https://offerpk.github.io/offline-ludo/privacy.html
@@ -8,44 +8,46 @@ A modern, **fully offline Ludo** for 2–4 players. Play against computer player
 
 <p align="center">
   <img src="docs/screenshot-home.png" width="200" alt="Home">
-  <img src="docs/screenshot-playing.png" width="200" alt="Playing vs computer">
-  <img src="docs/screenshot-capture.png" width="200" alt="Capture">
-  <img src="docs/screenshot-walnut.png" width="200" alt="Walnut board skin">
+  <img src="docs/screenshot-dice-board.png" width="200" alt="Per-player dice and stacked rolls">
+  <img src="docs/screenshot-mystery-wheel.png" width="200" alt="Mystery Tiles wheel">
+  <img src="docs/screenshot-result.png" width="200" alt="Ranked result">
 </p>
 
 ## How to play
 
-- Each player has 4 pieces in a base. Roll a **6** to bring a piece out onto your start square.
-- Pieces move clockwise around the 52-square track, then up your own coloured lane to the centre. You need the **exact roll** to reach home.
-- Land on an opponent to **capture** it: the piece goes back to its base. All opponent pieces on that square are captured.
-- **Three 6s in a row** lose the turn (the third roll is not played).
-- Options for each match: **safe squares** (the 4 start squares and 4 stars protect pieces), **extra turn on a 6**, and **extra turn on a capture**. All three are on by default.
-- When only one distinct move is possible, it's played for you (**auto-move**, can be switched off).
-- The match ends when all humans have finished (the rest are ranked by progress), or when only one player is left.
-- Finishing a match earns **coins** (by the best human placement, 6–50) that unlock cosmetic **board and dice skins**. Coins can't be bought, bet, wagered or cashed out. There are no purchases.
+Full rules: **[RULES.md](RULES.md)** (also in the game under **Rules**). In short:
+
+- Every player rolls **their own die**, shown in their own corner next to their avatar (you sit bottom-left). The active player is highlighted; an optional 20 s turn timer ring is off by default.
+- **Star style (default):** a 6 gives another roll straight away; rolls stack as **dice chips** (e.g. 6, 6, 3). After the non-6 roll you tap a chip, then a token (auto when only one move is possible). **Three 6s in a row forfeit the whole turn.** A **capture** and a token **reaching home** each give a bonus roll.
+- 6 to leave base, exact roll to reach home, safe start and star squares.
+- **House rules** in Settings: Star style vs **Classic** (move each 6 before rolling again), safe squares, **capture to enter home**, **blocks**, capture/home bonus rolls.
+- **Undo dice roll:** about 2 s after your roll, 3 free per match; one more only via an optional rewarded ad that the player taps.
+- Finishing a match earns cosmetic **coins** and **XP/levels**. Coins only unlock board and dice skins; they can't be bought, bet, wagered or cashed out. There are no purchases and no entry fees.
+
+## Modes
+
+- **Play vs Computer:** 1 v 1 (opposite corners), 3 or 4 players, each computer Easy / Normal / Hard.
+- **Mystery Tiles (new in v1.1):** 4 **?** tiles spin the Boost wheel (Shield, Jump +3, Extra roll, Double die, Pick a number, Freeze) and 4 **!** tiles spin the Chaos wheel (Back 3, Swap, Zap, Stuck, Jump +6, Calm). Tiles recharge for two rounds after use. 1 v 1 or 4 players. No stake or entry fee.
+- **Pass & Play:** 2–4 humans on one phone (humans and computers can be mixed).
 
 ## Features
 
-- **2–4 players, any mix:** each colour can be Off, Human, Easy AI, Medium AI or Hard AI. Humans take turns on one phone (pass & play).
-- **Three AI levels** (`chooseMove()` in `www/js/logic.js`):
-  - **Easy:** mostly random, takes an obvious capture or finish half the time.
-  - **Medium:** simple priorities: capture, finish, leave base, enter the home lane, safe squares, progress.
-  - **Hard:** scores every move: captures (worth more the further the victim had travelled), getting pieces home, entering the home lane, landing on safe squares, **avoiding squares that opponents can hit next roll**, escaping threatened squares, and leaving base.
-
-  In 2-player tests Hard beats Easy about 89% of the time and Medium about 82%.
-- **Feel:** a 3D dice roll, pieces stepping square by square, capture bursts with a board shake, "Home!" effects, **WebAudio** synthesized sounds (no audio files) and light **haptics** via `@capacitor/haptics`. Sound, haptics, auto-move and fast animations are toggles in Settings.
-- **Save & resume:** the whole match (including the dice RNG state) is saved after every roll and move; Continue picks it up after closing the app.
+- **Three AI levels** (`chooseMove()` in `www/js/logic.js`): Easy (mostly random), Normal (simple priorities), Hard (scores captures, safety vs. stacked-6 threats, escaping, blocks, mystery tiles and event targets; uses Pick-a-number sensibly). In the test suite Hard beats Easy ~93% and Normal ~87% of 1 v 1 games.
+- **Quick chat & emotes:** preset phrases and 8 original drawn emoji faces shown as bubbles at the player's corner; computer players react now and then (toggle). Everything is local and cosmetic: there is no online chat.
+- **Feel:** 3D dice per player, tokens stepping square by square, capture bursts with a board shake, animated event wheels, zap/freeze/shield effects, **WebAudio** synthesized sounds (no audio files), **haptics** via `@capacitor/haptics`. Sound, haptics, auto-move, undo, timer, computer chat and fast animations are toggles in Settings.
+- **Save & resume:** the whole match (including the dice RNG state) is saved after every roll and move. v1.0 saves (coins, skins, stats, settings) are migrated.
 - **Skins:** boards Graphite and Linen (free), Walnut and Aurora; dice Ivory (free), Onyx, Brass, Frost and Ember.
-- **Stats:** matches, wins, win rate, captures, pieces home, sixes, and wins vs each AI level.
-- Original art and name: a clean flat board with muted jewel colours (Coral, Jade, Saffron, Cobalt), disc-shaped pieces, no mascots or crowns. It doesn't use the names, logos or designs of other Ludo apps.
+- **Stats:** level/XP, matches, wins, win rate, captures, tokens home, sixes, wins vs each AI level, Mystery wins, 1 v 1 and 4-player wins, events triggered. Result screen ranks all players 1st–4th.
+- Original art and name: flat board with muted jewel colours (Coral, Jade, Saffron, Cobalt), simple robot/person avatars and drawn emoji faces, no mascots. It doesn't use the names, logos, art or designs of other Ludo apps.
 
 ## Project layout
 
 ```
 www/                  ← the whole game (also the Capacitor webDir & the Pages site)
   index.html, css/style.css, privacy.html, icon.png
-  js/logic.js         ← pure rules: board geometry, moves, captures, safe squares, sixes, turn order, AI, simulator
-  js/game.js          ← canvas board, DOM pieces & dice, animations, turn flow, undo, persistence, skins, settings
+  js/logic.js         ← pure rules engine v2: geometry, stacked rolls, captures, safe squares, blocks, Mystery Tiles events, AI, simulator
+  js/game.js          ← canvas board, player pods & dice, chips, wheel, animations, turn flow, undo roll, chat, persistence, skins, settings
+  js/art.js           ← original SVG emotes, event icons and avatars
   js/sound.js         ← WebAudio SFX
   js/themes.js        ← cosmetic board and dice skins
   js/ads-config.js    ← ★ ALL AdMob IDs + pacing numbers live here
@@ -63,11 +65,11 @@ test/                 ← logic + ad-gate tests (Node) and a headless-Chrome pla
 ```bash
 npm install
 npm run serve          # http://localhost:8080
-npm test               # rules, captures, safe squares, exact home, triple 6, toggles, AI sanity, 1000 AI-vs-AI games, ad pacing
+npm test               # stacked 6s, triple-6 forfeit, capture/home bonus, safe squares, exact home, blocks, every Mystery event, AI legality & strength, 1000 simulated games (all modes, 2–4 players, rule combos), ad pacing
 GAMES=200 node test/logic.test.js   # quicker run
 ```
 
-Headless phone-size play test (plays through the UI with taps: setup validation, 6 to leave base, auto-move, choosing a piece, capture + effect, extra rolls, undo vs AI, exact home, triple 6, save/resume after reload, winning a match, 2× coins, pass & play with a rule off, buying skins, settings, and it fails on any console error):
+Headless phone-size (360x740) play test through the UI: pods and per-player dice positions, stacked 6,6,3 chips, undo dice roll, chip + token moves, emote bubble, triple-6 forfeit, exact home and ranked result, Mystery Tiles 4-player with Boost and Chaos wheel events, pass & play with the Classic rule; it fails on any console error:
 
 ```bash
 npm i --no-save puppeteer-core
@@ -81,11 +83,11 @@ PUPPETEER=puppeteer-core node test/browser.test.js http://localhost:8080/ /tmp  
 | `Ads.init()` | on launch: **UMP consent** + SDK init only, **no ad is shown** | no-op |
 | `Ads.showBanner()` | adaptive banner at the bottom of the **menu and gameplay screens**; the layout reserves its height so it never covers the board or the die | no-op |
 | `Ads.maybeInterstitial(gate)` | only when leaving the **match result** screen (**Play again** or **Home**), when `AdGate` allows it | never |
-| `Ads.showRewarded(cb)` | only when the player taps **▶ Undo** (undo your last move in a match with computer players, up to 3 per match) or **▶ 2× coins** on the result screen. The reward is granted only on the SDK's *earned reward* event | grants the reward immediately |
+| `Ads.showRewarded(cb)` | only when the player taps **Undo ▶ AD** (an extra dice-roll undo after the 3 free ones in a match) or **▶ 2× coins** on the result screen. The reward is granted only on the SDK's *earned reward* event | grants the reward immediately |
 
 Interstitial pacing, enforced in `www/js/adgate.js` and tested in `test/adgate.test.js`:
 
-- **None in the first session** (first app launch), and none until the player has completed **3 matches** *and* played for **3 minutes** in total.
+- **None in the first session** (first app launch), and none until the player has completed **5 matches** *and* played for **3 minutes** in total.
 - After that, at most **one every 2 completed matches** and at most **one per 120 s**, only after a match has ended. If an ad isn't ready, the game simply continues.
 - **Never** on launch, exit, back press or mid-match. There are no app-open ads, and the pacing state is saved so restarting the app doesn't reset it.
 
@@ -101,7 +103,7 @@ Then bump the version, commit and tag. CI builds a new signed AAB. In AdMob, als
 ## Android build
 
 - Capacitor 8, appId **`com.offerpk.offlineludo`**, name **Crossfour Ludo** (launcher label), plugins `@capacitor-community/admob` 8.1.0 and `@capacitor/haptics` 8.
-- `compileSdk`/`targetSdk` **36**, `minSdk` **24**, versionCode **1**, versionName **1.0.0** (in `android/app/build.gradle` / `android/variables.gradle`).
+- `compileSdk`/`targetSdk` **36**, `minSdk` **24**, versionCode **2**, versionName **1.1.0** (in `android/app/build.gradle` / `android/variables.gradle`).
 - Permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, `AD_ID` (AdMob) and `VIBRATE` (haptics). No billing: the game has no purchases.
 
 ### CI (GitHub Actions)
@@ -136,7 +138,7 @@ ANDROID_KEYSTORE_FILE=/path/upload.jks KEYSTORE_PASSWORD=... KEY_ALIAS=upload KE
 See **[`store/LAUNCH-CHECKLIST.md`](store/LAUNCH-CHECKLIST.md)** (it opens with a Roman Urdu summary), [`store/listing-en.md`](store/listing-en.md) and [`store/play-console-answers.md`](store/play-console-answers.md).
 
 1. Bump `versionCode` (+1 every upload) and `versionName`, and switch to your real AdMob IDs.
-2. `git tag v1.0.1 && git push origin v1.0.1`. CI attaches `offline-ludo-v1.0.1.aab` and `.apk` to a Release.
+2. `git tag v1.1.1 && git push origin v1.1.1`. CI attaches `offline-ludo-v1.1.1.aab` and `.apk` to a Release.
 3. Upload the `.aab` in Play Console with **Play App Signing** turned on. The CI keystore is your **upload key**.
 
 ## License

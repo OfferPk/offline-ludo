@@ -1,14 +1,27 @@
 # Launch checklist: Crossfour on Google Play (new personal account)
 
+## v1.1.0 update — Roman Urdu khulasa (naya kya hai)
+
+- **Har player ka dice uske apne corner mein:** aap ka dice neeche-baayen (bottom-left) aap ke avatar ke saath. Jis ki baari ho us ka corner chamakta hai. Turn timer (20 sec) Settings mein hai, default band.
+- **Ludo Star / Yalla jaisa roll system (default "Star style"):** 6 aaye to foran dobara roll. Rolls chips ki shakal mein jama hote hain (jaise 6, 6, 3). Phir chip tap karo aur goti tap karo. Sirf ek chaal ho to khud chal jati hai. **Teen 6 lagatar = poori baari ke rolls zaya.** Goti maarne (capture) par aur goti ghar pohanchne par bonus roll. Base se sirf 6 par nikalti hai, ghar ke liye exact number, start aur star squares safe.
+- **House rules (Settings):** "Classic" (har 6 pehle chalo phir roll) ya "Star style", safe squares, **capture ke baghair ghar mein entry nahin**, **blocks** (do gotiyan ek square par = rasta band), bonus rolls on/off. Poore rules `RULES.md` aur game ke **Rules** screen mein.
+- **Naya mode "Mystery Tiles":** board par **?** (Boost wheel: Shield, Jump +3, Extra roll, Double die, Pick a number, Freeze) aur **!** (Chaos wheel: Back 3, Swap, Zap, Stuck, Jump +6, Calm) tiles. Goti tile par ruke to wheel ghoomta hai. 1 v 1 ya 4 players. **Koi coin entry fee / shart nahin** (Play policy ke mutabiq).
+- **Undo dice roll:** roll ke baad ~2 second mein undo, har match mein 3 muft; us ke baad sirf player ke tap par optional rewarded ad se ek aur.
+- **Computer:** Easy / Normal / Hard (Hard captures, safety, blocks aur events samajh kar khelta hai). Computer kabhi kabhi quick-chat / emoji bhejta hai; aap bhi bhej sakte hain (sirf isi phone par, online kuch nahin jata). Pass & Play 2–4 log.
+- **Polish:** goti qadam ba qadam, capture effect, awazein, haptics, level/XP, stats, result screen par 1st–4th rank.
+- **Ads rules wahi:** interstitial sirf **5 matches AUR 3 minute** ke baad, har 2 match mein zyada se zyada ek, 120 sec ka faasla, launch/exit/back par kabhi nahin, pehle session mein kabhi nahin. Google TEST ad IDs abhi bhi lagi hain.
+- **Upload:** `offline-ludo-v1.1.0.aab` (version 1.1.0, **versionCode 2**), wahi purani upload key se sign hai (SHA-256 `F1:C8:15:EA:…:9C:47`), is liye Play Console isay qabool karega. Agar v1.0.0 abhi upload nahin kiya tha to seedha v1.1.0 upload karo.
+- **Store listing update:** nayi description aur 7 nayi screenshots `listing-en.md` / `store/screenshots/` mein. Release notes bhi wahin hain.
+
 ## Roman Urdu mein khulasa (short summary)
 
 1. **Play Console account banao:** play.google.com/console par "Yourself" (personal) chuno, **$25 ek dafa** fee do, aur apna **ID card / identity verify** karo. Verification mein kuch din lag sakte hain.
 2. **App banao:** naam "Crossfour: Offline Ludo", Game, Free. Phir "App content" ke sawal `play-console-answers.md` se copy karo, aur store listing `listing-en.md` se. Tasveerein `store/` folder mein hain.
-3. **Closed testing:** v1.0.0 wali **AAB** file closed testing track par upload karo. **Play App Signing** on rakho (Google-generated key).
+3. **Closed testing:** v1.1.0 wali **AAB** file (`offline-ludo-v1.1.0.aab`) closed testing track par upload karo. **Play App Signing** on rakho (Google-generated key).
 4. **12 testers, 14 din:** kam az kam **12 log (behtar hai 15–20)** opt-in karein aur **lagatar 14 din** tak test mein rahein. Beech mein koi nikal gaya to ginti dobara ho sakti hai.
 5. **Production ke liye apply karo:** 14 din ke baad Dashboard par "Apply for production" dabao aur sawalon ke jawab do.
 6. **AdMob:** app banao, **Banner, Interstitial, Rewarded** teen ad units banao, **GDPR (UMP) message** publish karo. App Play par live hone ke baad AdMob mein Play se **link** karo.
-7. **IDs mujhe bhejo:** AdMob **App ID** aur teeno **ad unit IDs** mujhe do. Main inhein `www/js/ads-config.js` aur `AndroidManifest.xml` mein laga kar naya version (v1.0.1) bana dunga. Wo version production mein jayega.
+7. **IDs mujhe bhejo:** AdMob **App ID** aur teeno **ad unit IDs** mujhe do. Main inhein `www/js/ads-config.js` aur `AndroidManifest.xml` mein laga kar naya version (v1.1.1) bana dunga. Wo version production mein jayega.
 8. **Kabhi apne ads par khud click na karo.** Is se AdMob account band ho sakta hai.
 9. **Target audience:** sirf **13–15, 16–17 aur 18+** tick karo (bachon wale age groups nahin). Data safety mein AdMob wale 4 data types bharo (details `play-console-answers.md` mein hain).
 10. **Upload key ka backup:** `offline-ludo-key-backup.zip` (keystore + password file) ko kisi mehfooz jagah, jaise USB ya password manager, mein rakho. GitHub par kabhi mat daalna. Key gum ho jaye to Play Console se upload key reset karwani padegi.
@@ -25,7 +38,7 @@
 - A support email address. It is shown on the store page.
 - 15–20 friends or family with Android phones and Gmail accounts (testers).
 - The files in this `store/` folder.
-- The app bundle: https://github.com/OfferPk/offline-ludo/releases/download/v1.0.0/offline-ludo-v1.0.0.aab
+- The app bundle: https://github.com/OfferPk/offline-ludo/releases/download/v1.1.0/offline-ludo-v1.1.0.aab
 
 ---
 
@@ -63,10 +76,10 @@
 
 ---
 
-## Part C: Closed testing with Play App Signing and the v1.0.0 AAB
+## Part C: Closed testing with Play App Signing and the v1.1.0 AAB
 
 1. Download the AAB to your computer:
-   https://github.com/OfferPk/offline-ludo/releases/download/v1.0.0/offline-ludo-v1.0.0.aab
+   https://github.com/OfferPk/offline-ludo/releases/download/v1.1.0/offline-ludo-v1.1.0.aab
 2. Go to **Test and release → Testing → Closed testing**.
 3. Open the default track (often called **"Closed testing – Alpha"**) and click **Manage track**. You can also create a new track.
 4. **Countries/regions tab:** add the countries where your testers live (for example Pakistan). You can also add all countries.
@@ -78,10 +91,10 @@
 6. **Releases tab → Create new release.**
 7. **Play App Signing:** when asked about the app signing key, keep **"Use a Google-generated key"** (the default) and accept. Google keeps the real signing key safe. The key in our GitHub Actions (the repository secrets) is now your **upload key**.
    - Keep a backup of the upload keystore file and its passwords in a safe place (the build box has `/workspace/keybackup/offline-ludo-key-backup.zip`). If you lose it, you can ask Google support to reset the upload key, but it takes time.
-8. **Upload** `offline-ludo-v1.0.0.aab`. Play will read the package `com.offerpk.offlineludo`, version 1.0.0 (code 1).
-9. **Release name:** `1.0.0`. **Release notes** (en-US):
+8. **Upload** `offline-ludo-v1.1.0.aab`. Play will read the package `com.offerpk.offlineludo`, version 1.1.0 (code 2). (If you already uploaded v1.0.0 (code 1), this is simply the next release on the same track.)
+9. **Release name:** `1.1.0`. **Release notes** (en-US):
    ```
-   First test release of Crossfour. Please play a few matches (vs Easy, Medium and Hard computer players, and pass & play) and tell us about any problem.
+   New in 1.1: every player rolls their own dice in their own corner. Star-style rolls: a 6 gives another roll and rolls stack as chips; three 6s lose the turn. New Mystery Tiles mode with Boost and Chaos wheels (1 v 1 or 4 players). Undo dice roll, quick chat and emotes, Easy/Normal/Hard computer players, house rules (Classic rolls, capture to enter home, blocks), levels and ranked results.
    ```
 10. Click **Next**, fix any errors, then **Save**.
 11. Go to **Publishing overview** and click **Send changes for review**. Review usually takes 1–7 days for a new app.
@@ -93,7 +106,7 @@
     - **Stay in the test.** They should not click "Leave the program".
     - Open and play the game a few times during the 14 days, and send you short feedback.
 
-> Note: v1.0.0 still uses Google's **test ad IDs**, so testers will see "Test Ad" banners. That is fine and safe for testing. The real ad IDs go into v1.0.1 (see Part F).
+> Note: v1.1.0 still uses Google's **test ad IDs**, so testers will see "Test Ad" banners. That is fine and safe for testing. The real ad IDs go into v1.1.1 (see Part F).
 
 ---
 
@@ -107,7 +120,7 @@
 - If you drop below 12, add new testers quickly. The 14-day window must be unbroken.
 - Check progress on the **Dashboard**. It shows how many testers are opted in and for how many days.
 - Tip: invite 15–20 people. Keep a simple list with their name, Gmail, the date they joined, and their feedback. You will need this for the production questions.
-- You can upload a newer build (for example v1.0.1 with real ads) to the **same closed track** during the test. Testers stay opted in.
+- You can upload a newer build (for example v1.1.1 with real ads) to the **same closed track** during the test. Testers stay opted in.
 - Official rule: https://support.google.com/googleplay/android-developer/answer/14151465
 
 ---
@@ -118,11 +131,11 @@
 2. Answer the questions honestly and in detail. For example:
    - How you found testers (friends, family, colleagues).
    - What they tested (2, 3 and 4 player matches, all three computer levels, pass & play, each house rule on and off, captures, exact home entry, three 6s, undo vs computer, resume after closing, stats, skins, settings, ads).
-   - What feedback you got and what you changed. Even small fixes count (for example, "added real ad IDs and turned off test mode in v1.0.1").
+   - What feedback you got and what you changed. Even small fixes count (for example, "added real ad IDs and turned off test mode in v1.1.1").
    - Why the app is ready (stable, no crashes, rules covered by automated tests including 1000 simulated computer-vs-computer matches that all finish, works offline, match saved automatically).
 3. Submit. Google usually answers within about 7 days.
 4. When approved: go to **Test and release → Production → Create new release**.
-   - Upload the **newest AAB** (v1.0.1 with real ad IDs, see Part F), or promote the release from closed testing.
+   - Upload the **newest AAB** (v1.1.1 with real ad IDs, see Part F), or promote the release from closed testing.
    - Choose countries/regions.
    - Add release notes, then **Save → Send changes for review**.
 5. After review, the app is live on Google Play. 🎉
@@ -200,8 +213,8 @@ Ad IDs are not secret, so it's fine to send them in chat. **Never** send your pa
 Then I will:
 1. Put the IDs in `www/js/ads-config.js` and set `IS_TESTING: false`.
 2. Put the App ID in `android/app/src/main/AndroidManifest.xml` (`com.google.android.gms.ads.APPLICATION_ID`).
-3. Bump the version to **1.0.1 (versionCode 2)**.
-4. Tag **v1.0.1** so GitHub Actions builds the signed AAB and creates the release.
+3. Bump the version to **1.1.1 (versionCode 3)**.
+4. Tag **v1.1.1** so GitHub Actions builds the signed AAB and creates the release.
 5. Give you the new AAB link. You upload it to the closed test track (and later to production).
 
 ---
@@ -211,8 +224,8 @@ Then I will:
 | Day | What happens |
 |---|---|
 | Day 0 | Sign up for Play Console, pay $25, verify identity |
-| Day 1–3 | Identity approved. Create the app, fill in App content and the store listing, upload v1.0.0 to closed testing. Set up AdMob. |
-| Day 2–7 | Closed test review done. Send the opt-in link to 15–20 testers. Send me the AdMob IDs and I build v1.0.1. |
-| Day ~5–21 | 14 continuous days with 12+ testers. Upload v1.0.1 to the closed track. |
+| Day 1–3 | Identity approved. Create the app, fill in App content and the store listing, upload v1.1.0 to closed testing. Set up AdMob. |
+| Day 2–7 | Closed test review done. Send the opt-in link to 15–20 testers. Send me the AdMob IDs and I build v1.1.1. |
+| Day ~5–21 | 14 continuous days with 12+ testers. Upload v1.1.1 to the closed track. |
 | Day ~21 | Apply for production |
-| Day ~28 | Production approved. Release v1.0.1. Link AdMob to Play. Add app-ads.txt. |
+| Day ~28 | Production approved. Release v1.1.1. Link AdMob to Play. Add app-ads.txt. |

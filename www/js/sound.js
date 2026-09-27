@@ -60,6 +60,12 @@
     lose: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [523, 440, 349].forEach(function (f, i) { ting(t + i * 0.16, f, 0.2, 1.0); }); },
     click: function () { if (!enabled || !ac()) return; tick(ctx.currentTime, 3200, 0.18, 0.025); },
     coin: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; ting(t, 1760, 0.18, 0.3); ting(t + 0.07, 2350, 0.16, 0.35); },
+    spinTick: function (i) { if (!enabled || !ac()) return; tick(ctx.currentTime, 2400 + (i % 3) * 200, 0.12, 0.02); },
+    good: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [880, 1109, 1319].forEach(function (f, i) { ting(t + i * 0.07, f, 0.13, 0.55); }); },
+    bad: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; thud(t, 0.35); ting(t + 0.03, 247, 0.14, 0.5); ting(t + 0.12, 208, 0.12, 0.5); },
+    zap: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; for (var i = 0; i < 5; i++) tick(t + i * 0.03, 3000 - i * 400, 0.25, 0.05); thud(t + 0.1, 0.4); },
+    freeze: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [2093, 2637, 3136].forEach(function (f, i) { ting(t + i * 0.05, f, 0.07, 0.6); }); },
+    pop: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; tick(t, 900, 0.2, 0.04); ting(t + 0.02, 1568, 0.06, 0.18); },
     undo: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; tick(t, 900, 0.2, 0.06); tick(t + 0.06, 1400, 0.16, 0.05); }
   };
   window.SFX = S;

@@ -1,9 +1,9 @@
 # Play Console: App content answers for Crossfour: Offline Ludo
 
-App: **Crossfour** (store title "Crossfour: Offline Ludo") · Package `com.offerpk.offlineludo` · v1.0.0 (versionCode 1)
+App: **Crossfour** (store title "Crossfour: Offline Ludo") · Package `com.offerpk.offlineludo` · v1.1.0 (versionCode 2)
 Where: **Play Console → your app → Policy and programs → App content** (also listed in Dashboard → "Set up your app").
 
-The app itself has **no accounts, no login, no analytics, no in-app purchases, no chat, no online mode and no location permission**. The match in progress, statistics, coins, skins and settings stay on the device (local storage) and are never sent anywhere.
+The app itself has **no accounts, no login, no analytics, no in-app purchases, no online chat, no online mode and no location permission**. (The quick-chat phrases and emoji faces added in v1.1 are a fixed, preset list shown only on the same phone; nothing is typed, sent or received.) The match in progress, statistics, coins, skins and settings stay on the device (local storage) and are never sent anywhere.
 The only thing that sends data off the device is the **Google Mobile Ads SDK (AdMob)**. It comes in through `@capacitor-community/admob` 8.1.0, which uses `play-services-ads` 25.4.x. The manifest declares `INTERNET`, `ACCESS_NETWORK_STATE`, `com.google.android.gms.permission.AD_ID` (all for AdMob) and `VIBRATE` (light haptics through `@capacitor/haptics`, no data involved).
 
 Coins are a **virtual, non-purchasable** currency earned by finishing matches (a fixed amount by finishing place) and spent only on cosmetic board and dice skins at fixed prices. Coins are **never staked, bet or wagered** on a match (there is no entry fee and nothing is lost when you lose), and there's no real money, no cash-out, no loot boxes and no random rewards. The dice roll decides moves inside the board game only; nothing of value depends on it.
@@ -37,9 +37,9 @@ Answer **No** to every content question:
 | Sexuality / nudity / sexual content | **No** |
 | Language (profanity, crude humor) | **No** |
 | Controlled substances (drugs, alcohol, tobacco) | **No** |
-| Gambling / simulated gambling / loot boxes | **No**. Ludo is a traditional dice board game, not simulated gambling: there is no betting, no stakes or entry fees, no casino mechanics and no random rewards. Coins are earned by finishing matches, cannot be wagered, bought or cashed out, and only unlock cosmetic skins at fixed prices. |
+| Gambling / simulated gambling / loot boxes | **No**. Ludo is a traditional dice board game, not simulated gambling: there is no betting, no stakes or entry fees, no casino mechanics and no random rewards. The Mystery Tiles wheels are an in-match board-game event (like a chance card): they only move tokens or change the next roll, cost nothing, and never award or take coins or items. Coins are earned by finishing matches, cannot be wagered, bought or cashed out, and only unlock cosmetic skins at fixed prices. |
 | Discrimination / hate | **No** |
-| Miscellaneous: does the app let users interact or exchange content with each other (chat, UGC)? | **No** (pass & play is several people taking turns on one phone; there is no online play, chat or content sharing) |
+| Miscellaneous: does the app let users interact or exchange content with each other (chat, UGC)? | **No** (pass & play is several people taking turns on one phone; quick chat is a fixed set of preset phrases/emoji shown on the same screen; there is no online play, free-text chat or content sharing) |
 | Does the app share the user's current physical location with other users? | **No** |
 | Does the app allow users to purchase digital goods? | **No** (there are no in-app purchases; cosmetic skins are unlocked with earned coins only) |
 | Is the app a web browser or search engine / unrestricted internet access? | **No** |
