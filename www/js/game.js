@@ -189,7 +189,7 @@
         '<div class="pmeta"><b class="pname"></b><small class="plvl"></small><div class="chips"></div></div>' +
         '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + '">' + cubeHTML() + '<em class="boost-tag hidden"></em></button>' +
         '<div class="bubble hidden"></div>';
-      el.querySelector('.pdice').addEventListener('click', function () { SFX.unlock(); if (G && G.st.turn === s && isHuman(s)) doRoll(); });
+      el.querySelector('.pdice').addEventListener('click', function (e) { SFX.unlock(); if (G && G.st.turn === s && isHuman(s)) { keyboardRoll = e.detail === 0; doRoll(); } });
       setDiceFace(s, G.st.faces ? G.st.faces[s] : 1, true);
     });
   }
@@ -222,9 +222,16 @@
       if (!G.st.pieces[s]) continue;
       var col = seatColor(s);
       for (var i = 0; i < 4; i++) {
-        var el = document.createElement('div'); el.className = 'pc'; el.innerHTML = '<i class="crown">' + ART.icon('crown', 16) + '</i>';
+        var el = document.createElement('button'); el.type = 'button'; el.className = 'pc'; el.innerHTML = '<i class="crown">' + ART.icon('crown', 16) + '</i>';
         el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45));
         el.dataset.seat = s; el.dataset.piece = i;
+        el.addEventListener('click', function (e) {
+          if (e.detail !== 0 || !G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn)) return;
+          var seat = +this.dataset.seat, piece = +this.dataset.piece;
+          var pool = G.sel != null && chipMoves(G.sel).length ? chipMoves(G.sel) : G.st.moves;
+          var m = pool.filter(function (x) { return x.seat === seat && x.piece === piece; })[0];
+          if (m) { SFX.unlock(); doMove(m.piece, m.v); }
+        });
         box.appendChild(el); pieceEls[s].push(el);
       }
     }
@@ -275,9 +282,9 @@
   }
 
   // ---------------- flow control ----------------
-  var runToken = 0, timers = [], busy = false, paused = false;
+  var runToken = 0, timers = [], busy = false, paused = false, keyboardRoll = false;
   function later(fn, ms) { var tk = runToken; var id = setTimeout(function () { var k = timers.indexOf(id); if (k >= 0) timers.splice(k, 1); if (tk === runToken) fn(); }, ms); timers.push(id); return id; }
-  function cancelFlow() { runToken++; timers.forEach(clearTimeout); timers = []; busy = false; moving = {}; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
+  function cancelFlow() { runToken++; timers.forEach(clearTimeout); timers = []; busy = false; keyboardRoll = false; moving = {}; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
   function gameVisible() { return !$('game').classList.contains('hidden') && document.visibilityState === 'visible'; }
   function humans(st) { return st.players.filter(function (s) { return st.seats[s].type === 'human'; }); }
   function hasAI(st) { return st.players.some(function (s) { return st.seats[s].type === 'ai'; }); }
@@ -348,6 +355,13 @@
       var dz = el.querySelector('.pdice'); dz.disabled = !humanRoll; dz.classList.toggle('ready', humanRoll);
       var bt = el.querySelector('.boost-tag'), b = st.boost[s];
       bt.classList.toggle('hidden', !b); bt.innerHTML = b === 'double' ? '×2' : b === 'choose' ? '1-6' : '';
+      var pieceMoves = !over && active && isHuman(s) && st.phase === 'move' && !busy ? (G.sel != null && chipMoves(G.sel).length ? chipMoves(G.sel) : st.moves) : [];
+      each(pieceEls[s], function (pc, i) {
+        var pos = st.pieces[s][i], place = pos < 0 ? 'in base' : pos === L.HOME ? 'home' : pos >= 52 ? 'in home lane' : 'on the track';
+        var canMove = pieceMoves.some(function (m) { return m.seat === s && m.piece === i; });
+        pc.disabled = !canMove;
+        pc.setAttribute('aria-label', nameOf(s) + ' token ' + (i + 1) + ', ' + place + (canMove ? ', select to move' : ''));
+      });
     });
     var s = cur, lbl = $('turn-label');
     if (over) lbl.innerHTML = 'Match over';
@@ -377,6 +391,7 @@
   function offerMoves() {
     var st = G.st; if (st.phase !== 'move' || !isHuman(st.turn)) return;
     render(); highlight();
+    if (keyboardRoll) { var target = document.querySelector('#pieces .pc.can'); if (target) target.focus(); keyboardRoll = false; }
     var distinct = L.distinctMoves(st.moves);
     if (save.settings.auto && distinct.length === 1 && !undoActive()) { var m = distinct[0]; later(function () { doMove(m.piece, m.v); }, save.settings.fast ? 220 : 420); return; }
     startTimer();
@@ -1045,7 +1060,9 @@
     var c = e.target.closest ? e.target.closest('.chip-v') : null;
     if (!c || !G || busy || G.st.phase !== 'move' || !isHuman(G.st.turn)) return;
     var v = +c.dataset.v; if (!chipMoves(v).length) return;
-    SFX.click(); G.sel = v; render(); highlight();
+    var keyboard = e.detail === 0;
+    SFX.click(); G.sel = v; render(); highlight(); $('hint').textContent = 'Dice chip ' + v + ' selected. Choose a highlighted token.';
+    if (keyboard) { var target = document.querySelector('#pieces .pc.can'); if (target) target.focus(); }
   });
   // tap near a movable token (tokens are small on phones, so pick the nearest highlighted one)
   $('board-wrap').addEventListener('pointerdown', function (e) {
@@ -1095,7 +1112,10 @@
   });
   document.addEventListener('keydown', function (e) {
     if (!G || $('game').classList.contains('hidden') || paused) return;
-    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (isHuman(G.st.turn)) doRoll(); }
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (e.target && e.target.closest && e.target.closest('button, a, input, select, textarea')) return;
+      e.preventDefault(); if (isHuman(G.st.turn)) doRoll();
+    }
     else if (/^[1-4]$/.test(e.key) && G.st.phase === 'move' && isHuman(G.st.turn)) {
       var p = +e.key - 1, ms = G.st.moves.filter(function (x) { return x.piece === p; }), m = ms.filter(function (x) { return x.v === G.sel; })[0] || ms[0];
       if (m) doMove(m.piece, m.v);

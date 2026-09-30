@@ -87,13 +87,14 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await idleHuman('roll', 3);
   ok(await ev(() => document.querySelector('.pod[data-seat="3"]').classList.contains('active')), 'active seat highlighted');
   await ev(() => window.__cf.force([6, 6, 3]));
-  await roll(3);
+  await page.focus('.pod[data-seat="3"] .pdice'); await page.keyboard.press('Enter');
   await idleHuman('roll', 3); s = await st();
   ok(s.queue.join() === '6' && s.phase === 'roll', 'rolled 6: another roll right away, 6 queued');
   ok(await ev(() => document.getElementById('btn-undo').classList.contains('live') && !document.getElementById('btn-undo').disabled), 'undo button live after a human roll');
-  await roll(3); await idleHuman('roll', 3);
-  await roll(3); await idleHuman('move', 3); s = await st();
+  await page.keyboard.press('Enter'); await idleHuman('roll', 3);
+  await page.keyboard.press('Enter'); await idleHuman('move', 3); s = await st();
   ok(s.queue.join() === '6,6,3' && (await chips(3)).join() === '6,6,3', 'queue 6,6,3 shown as dice chips on the human pod');
+  ok(await ev(() => document.activeElement && document.activeElement.matches('#pieces .pc.can')), 'keyboard die moves focus to a legal token after the roll');
   // ---------- undo dice roll ----------
   ok(await ev(() => window.__cf.undoActive), 'undo window open after the roll');
   await page.tap('#btn-undo'); await sleep(200);
@@ -105,10 +106,14 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await waitUndoGone();
   ok(await waitFor(() => document.getElementById('btn-undo').disabled, 1500, 'undo button off'), 'undo window closes after about 2 s');
   // ---------- pick chip, then token ----------
-  await chip(3, 6); await sleep(100);
+  await page.focus('.pod[data-seat="3"] .chip-v[data-v="6"]'); await page.keyboard.press('Enter'); await sleep(100);
   ok(await ev(() => window.__cf.game.sel === 6), 'tapped chip 6 is selected');
-  await tapPiece(3, 0); await idleHuman('move', 3); s = await st();
-  ok(s.pieces[3][0] === 0 && s.queue.join() === '6,4', 'first 6 brings a token out, 6,4 left');
+  const keyboardToken = '.pc[data-seat="3"][data-piece="0"]';
+  ok(await ev(sel => { const b = document.querySelector(sel); return b.tagName === 'BUTTON' && !b.disabled && /You token 1, in base, select to move/.test(b.getAttribute('aria-label')); }, keyboardToken), 'legal token is a named, enabled button with its position');
+  ok(await ev(() => { const h = document.getElementById('hint'); return h.getAttribute('role') === 'status' && h.getAttribute('aria-live') === 'polite' && /Dice chip 6 selected/.test(h.textContent); }), 'move guidance is announced after a chip is selected');
+  ok(await ev(sel => document.activeElement === document.querySelector(sel), keyboardToken), 'keyboard chip selection focuses the matching legal token');
+  await page.keyboard.press('Enter'); await idleHuman('move', 3); s = await st();
+  ok(s.pieces[3][0] === 0 && s.queue.join() === '6,4', 'Enter moves a focused token out of base without triggering a roll');
   await chip(3, 4); await sleep(80); await tapPiece(3, 0); await idleHuman('move', 3); s = await st();
   ok(s.pieces[3][0] === 4 && s.queue.join() === '6', 'chip 4 moved that token 4 squares');
   await tapPiece(3, 1);
