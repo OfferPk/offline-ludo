@@ -230,7 +230,7 @@
           var seat = +this.dataset.seat, piece = +this.dataset.piece;
           var pool = G.sel != null && chipMoves(G.sel).length ? chipMoves(G.sel) : G.st.moves;
           var m = pool.filter(function (x) { return x.seat === seat && x.piece === piece; })[0];
-          if (m) { SFX.unlock(); doMove(m.piece, m.v); }
+          if (m) { SFX.unlock(); doMove(m.piece, m.v, true); }
         });
         box.appendChild(el); pieceEls[s].push(el);
       }
@@ -387,6 +387,13 @@
     var st = G.st; if (st.phase !== 'move' || !isHuman(st.turn) || busy) return;
     var ms = G.sel != null ? chipMoves(G.sel) : st.moves;
     ms.forEach(function (m) { var el = pieceEls[m.seat][m.piece]; if (el) el.classList.add('can'); });
+  }
+  function focusTurnControl() {
+    if (!G || busy || paused || !isHuman(G.st.turn)) return;
+    var target = null;
+    if (G.st.phase === 'roll') { var pod = podEl(G.st.turn); target = pod && pod.querySelector('.pdice'); }
+    else if (G.st.phase === 'move') target = document.querySelector('#pieces .pc.can');
+    if (target && !target.disabled) target.focus();
   }
   function offerMoves() {
     var st = G.st; if (st.phase !== 'move' || !isHuman(st.turn)) return;
@@ -566,7 +573,7 @@
     SFX.capture(); haptic('heavy');
   }
 
-  function doMove(piece, v) {
+  function doMove(piece, v, keyboard) {
     if (!G || busy || G.st.phase !== 'move' || paused) return;
     var st = G.st, s = st.turn, human = isHuman(s);
     if (!st.moves.some(function (m) { return m.piece === piece && (v == null || m.v === v); })) return;
@@ -589,7 +596,9 @@
       var done = function () {
         layoutPieces(); busy = false; G.actor = null;
         if (human && !res.over && st.turn === s && st.phase === 'roll') toast(st.boost[s] === 'choose' ? 'Pick a number for your next roll' : 'Bonus roll!', 1000);
-        render(); later(advance, pause);
+        render();
+        if (keyboard) { highlight(); focusTurnControl(); }
+        later(advance, pause);
       };
       if (res.event && res.event.lucky) later(function () { showWheel(res.event, function () { resolveFlow(res.event, done); }); }, res.captures.length || res.crowned ? 700 : 150);
       else if (res.event) later(function () { showWheel(res.event, function () { animateEvent(res.event, done); }); }, res.captures.length ? 500 : 150);
@@ -1118,7 +1127,7 @@
     }
     else if (/^[1-4]$/.test(e.key) && G.st.phase === 'move' && isHuman(G.st.turn)) {
       var p = +e.key - 1, ms = G.st.moves.filter(function (x) { return x.piece === p; }), m = ms.filter(function (x) { return x.v === G.sel; })[0] || ms[0];
-      if (m) doMove(m.piece, m.v);
+      if (m) doMove(m.piece, m.v, true);
     } else if (e.key === 'u' || e.key === 'U') undoRoll();
   });
   document.addEventListener('visibilitychange', function () {

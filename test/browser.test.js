@@ -37,6 +37,14 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   const chips = seat => ev(s => [...document.querySelectorAll('.pod[data-seat="' + s + '"] .chip-v')].map(c => +c.dataset.v), seat);
   const waitUndoGone = async () => { await waitFor(() => !window.__cf.undoActive, 5000, 'undo window to close'); await sleep(80); };
   const edit = (code) => ev(c => { window.__cf.edit(new Function('st', c)); }, code);
+  async function keyboardMoveToHandoff(seat, nextSeat, label) {
+    await ev(v => window.__cf.force([v]), 1);
+    await page.focus('.pod[data-seat="' + seat + '"] .pdice'); await page.keyboard.press('Enter');
+    await idleHuman('move', seat);
+    ok(await ev(s => document.activeElement.matches('#pieces .pc.can[data-seat="' + s + '"]') && !document.activeElement.disabled, seat), label + ': keyboard roll focuses a legal token');
+    await page.keyboard.press('Enter');
+    await waitFor(s => { const c = window.__cf, d = document.querySelector('.pod[data-seat="' + s + '"] .pdice'); return c.game.st.turn === s && c.game.st.phase === 'roll' && !c.busy && d && !d.disabled && document.activeElement === d; }, 15000, label + ' focus handoff', nextSeat);
+  }
 
   await page.goto(URL, { waitUntil: 'networkidle0' });
   await ev(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle0' }); await sleep(300);
@@ -349,13 +357,38 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   s = await st();
   ok(s.players.every(p => s.seats[p].type === 'human') && s.rules.rollStyle === 'classic', 'pass & play: all human seats, classic rules');
   await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
-  const first = s.turn;
-  await idleHuman('roll');
-  await ev(() => window.__cf.force([6]));
-  await roll(first); await idleHuman('move');
+  ok(s.players.join() === '1,3', '1v1 pass & play seats Jade and Cobalt');
+  await edit('st.pieces=[[-1,-1,-1,-1],[5,-1,-1,-1],[-1,-1,-1,-1],[5,-1,-1,-1]]; st.queue=[]; st.moves=[]; st.phase="roll"; st.turn=3; st.sixes=0; st.bonus=0; st.rollAgain=false;');
+  await idleHuman('roll', 3);
+  const duelRolls = s.rolls, duelTurns = s.turnCount;
+  await keyboardMoveToHandoff(3, 1, 'Cobalt to Jade');
   s = await st();
-  ok(s.phase === 'move' && s.queue.join() === '6', 'classic: a 6 must be moved before rolling again');
+  ok(s.turn === 1 && s.phase === 'roll' && s.pieces[3][0] === 6 && s.rolls === duelRolls + 1 && s.turnCount === duelTurns + 1, 'valid Cobalt move advances exactly one square and hands the turn to Jade');
   await page.screenshot({ path: OUT + '/cf-pass.png' });
+
+  // ---------- keyboard focus handoff in four-player pass & play ----------
+  await page.tap('#btn-home'); await sleep(150); await page.tap('#btn-m-home'); await sleep(250);
+  await page.tap('#btn-pass'); await sleep(200);
+  await ev(() => document.querySelector('#presets [data-p="4"]').click()); await sleep(100);
+  await page.tap('#btn-start'); await sleep(250);
+  if (await visible('#confirm')) { await page.tap('#confirm-yes'); await sleep(350); }
+  s = await st();
+  ok(s.players.length === 4 && s.players.every(p => s.seats[p].type === 'human'), 'four-player pass & play has four human seats');
+  const seats4 = s.players.slice();
+  await edit('st.pieces=[[5,-1,-1,-1],[5,-1,-1,-1],[5,-1,-1,-1],[5,-1,-1,-1]]; st.queue=[]; st.moves=[]; st.phase="roll"; st.turn=' + seats4[0] + '; st.sixes=0; st.bonus=0; st.rollAgain=false; st.ranking=[];');
+  for (let i = 0; i < seats4.length; i++) {
+    const seat = seats4[i], nextSeat = seats4[(i + 1) % seats4.length];
+    await idleHuman('roll', seat);
+    await keyboardMoveToHandoff(seat, nextSeat, 'four-player seat ' + seat + ' to ' + nextSeat);
+    s = await st();
+    ok(s.turn === nextSeat && s.phase === 'roll' && s.pieces[seat][0] === 6, 'four-player move advances and activates the next seat');
+  }
+  const eliminated = seats4[1], current = seats4[0], afterEliminated = seats4[2];
+  await edit('st.pieces=[[5,-1,-1,-1],[5,-1,-1,-1],[5,-1,-1,-1],[5,-1,-1,-1]]; st.pieces[' + eliminated + ']=[57,57,57,57]; st.queue=[]; st.moves=[]; st.phase="roll"; st.turn=' + current + '; st.sixes=0; st.bonus=0; st.rollAgain=false; st.ranking=[' + eliminated + '];');
+  await idleHuman('roll', current);
+  await keyboardMoveToHandoff(current, afterEliminated, 'four-player skip of finished seat ' + eliminated);
+  s = await st();
+  ok(s.ranking.join() === String(eliminated) && s.turn === afterEliminated, 'finished seat is skipped without changing turn progression');
 
   ok(errors.length === 0, 'no console errors / failed requests' + (errors.length ? ': ' + errors.join(' | ') : ''));
   console.log(`\n${n} checks passed`);
