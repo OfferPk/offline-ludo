@@ -390,6 +390,47 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   s = await st();
   ok(s.ranking.join() === String(eliminated) && s.turn === afterEliminated, 'finished seat is skipped without changing turn progression');
 
+  // ---------- result semantics + focus after Replay and confirmed Restart ----------
+  const replayPlayers = s.players.slice(), replayMode = s.mode, winner = replayPlayers[0];
+  await edit('st.phase="over"; st.turn=' + winner + '; st.ranking=' + JSON.stringify(replayPlayers) + '; st.queue=[]; st.moves=[]; st.pieces.forEach(function (pieces) { if (pieces) pieces.fill(57); });');
+  await waitFor(() => { const r = document.getElementById('result'); return r && !r.classList.contains('hidden'); }, 5000, 'synthetic winner result');
+  ok(await ev(() => {
+    const title = document.getElementById('r-title'), rank = document.getElementById('r-rank'), rows = [...rank.children];
+    const replay = document.getElementById('btn-r-again');
+    return title.tagName === 'H2' && title.textContent === rows[0].querySelector('.pdot').nextSibling.textContent.trim() + ' wins!' &&
+      rank.tagName === 'OL' && rows.length === 4 && rows[0].querySelector('.medal').textContent === '1' &&
+      replay.tagName === 'BUTTON' && replay.textContent.trim() === 'Play again';
+  }), 'winner heading, ordered ranking, and native Replay button label are clear in the DOM');
+  const firstSeat = replayPlayers[0];
+  await page.focus('#btn-r-again'); await page.keyboard.press('Enter');
+  await waitFor((players, mode, seat) => {
+    const c = window.__cf, die = document.querySelector('.pod[data-seat="' + seat + '"] .pdice');
+    return c.game.st.phase === 'roll' && c.game.st.players.join() === players && c.game.st.mode === mode &&
+      c.game.st.turn === seat && die && !die.disabled && document.activeElement === die;
+  }, 5000, 'Replay returns focus to the new match’s enabled human die', replayPlayers.join(), replayMode, firstSeat);
+  ok(await ev(() => {
+    const c = window.__cf, status = document.getElementById('hint');
+    return c.game.st.phase === 'roll' && c.game.st.ranking.length === 0 && c.game.st.pieces[0].every(p => p === -1) &&
+      status.getAttribute('role') === 'status' && status.getAttribute('aria-live') === 'polite' && /Tap your die to roll/.test(status.textContent);
+  }), 'Replay starts a fresh match with polite roll guidance in the status region');
+
+  await page.tap('#btn-home'); await sleep(150);
+  ok(await ev(() => { const b = document.getElementById('btn-m-restart'); return b.tagName === 'BUTTON' && b.textContent.trim() === 'Restart with same players'; }), 'Restart is a native button with a clear label');
+  await page.focus('#btn-m-restart'); await page.keyboard.press('Enter');
+  await waitFor(() => { const c = document.getElementById('confirm'); return c && !c.classList.contains('hidden'); }, 1500, 'restart confirmation');
+  ok(await ev(() => { const b = document.getElementById('confirm-yes'); return b.tagName === 'BUTTON' && b.textContent.trim() === 'Restart'; }), 'confirmed Restart action has a clear native button label');
+  await page.focus('#confirm-yes'); await page.keyboard.press('Enter');
+  await waitFor((players, mode, seat) => {
+    const c = window.__cf, die = document.querySelector('.pod[data-seat="' + seat + '"] .pdice');
+    return c.game.st.phase === 'roll' && c.game.st.players.join() === players && c.game.st.mode === mode &&
+      c.game.st.turn === seat && die && !die.disabled && document.activeElement === die;
+  }, 5000, 'confirmed Restart returns focus to the new match’s enabled human die', replayPlayers.join(), replayMode, firstSeat);
+  ok(await ev(() => {
+    const c = window.__cf, status = document.getElementById('hint');
+    return c.game.st.phase === 'roll' && c.game.st.ranking.length === 0 && c.game.st.pieces[0].every(p => p === -1) &&
+      status.getAttribute('role') === 'status' && status.getAttribute('aria-live') === 'polite' && /Tap your die to roll/.test(status.textContent);
+  }), 'confirmed Restart preserves the same players and starts a fresh turn with polite status guidance');
+
   ok(errors.length === 0, 'no console errors / failed requests' + (errors.length ? ': ' + errors.join(' | ') : ''));
   console.log(`\n${n} checks passed`);
   await browser.close();

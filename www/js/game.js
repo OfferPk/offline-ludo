@@ -846,6 +846,7 @@
     save.game = G; persist();
     spins = [0, 0, 0, 0];
     showGame();
+    focusTurnControl();
   }
   function finishMatch() {
     if (!G || G.st.phase !== 'over') return;
