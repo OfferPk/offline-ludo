@@ -50,6 +50,7 @@
     roll: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; for (var i = 0; i < 7; i++) tick(t + i * 0.055 + Math.random() * 0.02, 1400 + Math.random() * 1600, 0.22 - i * 0.02, 0.035); },
     land: function (six) { if (!enabled || !ac()) return; var t = ctx.currentTime; thud(t, 0.3); tick(t, 1800, 0.2, 0.04); if (six) { ting(t + 0.05, 1175, 0.14, 0.5); ting(t + 0.12, 1568, 0.12, 0.6); } },
     step: function (i) { if (!enabled || !ac()) return; tick(ctx.currentTime, 1100 + (i || 0) % 6 * 120, 0.2, 0.03); },
+    crystal: function (i) { if (!enabled || !ac()) return; ting(ctx.currentTime, 1760 + (i || 0) % 3 * 110, 0.035, 0.14); },
     leave: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; ting(t, 660, 0.14, 0.4); ting(t + 0.06, 990, 0.12, 0.45); },
     capture: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; thud(t, 0.5); tick(t + 0.02, 600, 0.3, 0.12); ting(t + 0.05, 330, 0.16, 0.5); },
     captured: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [440, 370, 294].forEach(function (f, i) { ting(t + i * 0.08, f, 0.12, 0.5); }); },
