@@ -7,6 +7,7 @@
   "scripts": {
     "serve": "npx --yes http-server www -p 8080 -c-1",
     "test": "node test/logic.test.js && node test/lucky.test.js && node test/save-store.test.js && node test/adgate.test.js",
+    "test:spotlight": "node test/spotlight.test.js",
     "sync": "npx cap sync android"
   },
   "dependencies": {

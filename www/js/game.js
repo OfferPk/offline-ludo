@@ -1004,20 +1004,40 @@
     }
     showResult();
   }
+  function spotlightWinner(seat) {
+    var layer = $('winner-confetti');
+    if (!layer) return;
+    layer.textContent = '';
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var colors = [seatColor(seat), seatColor(seat), '#f4b740', '#ffffff'];
+    for (var i = 0; i < 28; i++) {
+      var piece = document.createElement('i');
+      var spread = 44 + (i * 37 % 150);
+      piece.className = 'confetti-piece';
+      piece.style.setProperty('--confetti-color', colors[i % colors.length]);
+      piece.style.setProperty('--confetti-x', (i % 2 ? spread : -spread) + 'px');
+      piece.style.setProperty('--confetti-y', (62 + i * 29 % 152) + 'px');
+      piece.style.setProperty('--confetti-spin', ((i * 71 % 720) - 360) + 'deg');
+      piece.style.setProperty('--confetti-delay', (i % 4 * 24) + 'ms');
+      layer.appendChild(piece);
+    }
+  }
   function showResult() {
     var st = G.st, hs = humans(st), single = hs.length === 1, winner = st.ranking[0];
+    var entering = !isOpen('result');
     $('r-title').textContent = single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
     $('r-kicker').textContent = (st.mode === 'mystery' ? 'MYSTERY TILES · ' : st.mode === 'lucky' ? 'LUCKY CHAOS LUDO · ' : '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
     $('r-rank').innerHTML = st.ranking.map(function (s, k) {
-      return '<li class="' + (isHuman(s) ? 'me' : '') + '"><span class="medal m' + (k + 1) + '">' + (k + 1) + '</span><span class="pdot" style="background:' + seatColor(s) + '"></span>' + nameOf(s) +
+      return '<li class="' + (isHuman(s) ? 'me ' : '') + (k === 0 ? 'winner' : '') + '" style="--winner-color:' + seatColor(s) + '"><span class="medal m' + (k + 1) + '">' + (k + 1) + '</span><span class="pdot" style="background:' + seatColor(s) + '"></span>' + nameOf(s) +
         '<small>' + levelOf(s) + (st.seats[s].type === 'ai' ? ' AI' : '') + ' · ' + st.pieces[s].filter(function (p) { return p === L.HOME; }).length + '/4 home</small></li>';
     }).join('');
     $('r-coins').textContent = '+' + (G.coins * (G.doubled ? 2 : 1));
     $('r-xp').textContent = '+' + G.xp;
     var lv = L.levelFromXp(save.xp); $('r-lvl').textContent = 'Level ' + lv.level; $('r-lvl-fill').style.width = Math.round(lv.into / lv.need * 100) + '%';
     $('btn-r-double').classList.toggle('hidden', !G.coins || G.doubled);
-    if (!isOpen('result')) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
+    if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
     render(); setCoins(); setLevel(); show('result');
+    if (entering) spotlightWinner(winner);
   }
   /** The ONLY place an interstitial may appear: leaving the result screen after a finished match. */
   function leaveResult(dest) {
