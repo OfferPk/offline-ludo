@@ -556,10 +556,15 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   // computers use the meter/powers on their own
   await edit('st.lk.charge=[5,5,5,0];');
   await ev(() => window.__cf.force([4])); await roll(3); await idleHuman('move', 3); await waitUndoGone();
+  await edit('st.tiles.forEach(function(t){ t.until = st.turnCount + 99; });');
+  await ev(() => { window.__cf.force([1,1,1,1,1]); window.__cf.forceMega(['guard','turn2','guard']); });
   await tapPiece(3, (await st()).moves[0].piece);
   await waitFor(() => { const g = window.__cf.game; return g.st.turn !== 3; }, 10000, 'computers take turns');
-  await waitFor(() => { const g = window.__cf.game; return g.st.turn === 3 && !window.__cf.busy; }, 40000, 'back to the human');
+  await waitFor(() => { const g = window.__cf.game; return g.st.turn === 1 && g.st.bonus === 2; }, 12000, 'AI Mega Double Turn bonus');
+  ok(true, 'AI receives both bonus rolls from the forced Mega Double Turn');
+  await waitFor(() => { const c = window.__cf; const g = c.game; return g.st.turn === 3 && c.idle; }, 40000, 'back to a settled human turn');
   s = await st();
+  ok(s.turn === 3 && s.bonus === 0, 'AI bonus rolls are consumed before the human handoff');
   ok(s.lk.charge[0] < 5 && s.lk.charge[1] < 5 && s.lk.charge[2] < 5, 'computer players spent their Mega Wheels');
   await page.tap('#btn-home'); await sleep(200);
   await page.tap('#btn-m-home'); await sleep(300);
