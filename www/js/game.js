@@ -370,23 +370,21 @@
         var el = document.createElement('button'); el.type = 'button'; el.className = 'pc';
         el.innerHTML = '<svg class="gem-token" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
           '<defs><linearGradient id="gem-body-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--pcl)" stop-opacity=".92"/><stop offset=".48" stop-color="var(--pcd)" stop-opacity=".94"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity=".98"/></linearGradient>' +
-          '<radialGradient id="gem-core-' + s + '-' + i + '"><stop offset="0" stop-color="var(--pccore)" stop-opacity=".98"/><stop offset=".72" stop-color="var(--pccore)" stop-opacity=".62"/><stop offset="1" stop-color="var(--pccore)" stop-opacity=".04"/></radialGradient></defs>' +
+          '<radialGradient id="gem-core-' + s + '-' + i + '" cx="50%" cy="46%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".2" stop-color="var(--pccore)" stop-opacity=".98"/><stop offset=".58" stop-color="var(--pccore)" stop-opacity=".78"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient></defs>' +
           '<ellipse class="gem-ground" cx="12" cy="20" rx="10" ry="3.1"/>' +
-          '<rect class="gem-pad" x="2" y="16" width="20" height="7" rx="1.5"/>' +
-          '<ellipse class="gem-shadow" cx="12" cy="21.2" rx="8.5" ry="1.4"/>' +
-          '<path class="gem-body" style="fill:url(#gem-body-' + s + '-' + i + ')" d="M12 1.1 18.6 4.8 19.1 11.9 14.8 18.1 9.2 18.1 4.9 11.9 5.4 4.8Z"/>' +
-          '<path class="gem-facet gem-facet-light" d="M12 1.1 12 14.1 6.1 12.4 5.4 4.8Z"/>' +
-          '<path class="gem-facet gem-facet-dark" d="M12 1.1 18.6 4.8 17.9 12.4 12 14.1Z"/>' +
-          '<path class="gem-facet gem-facet-side" d="M6.1 12.4 12 14.1 9.2 18.1Z"/>' +
-          '<ellipse class="gem-core" style="fill:url(#gem-core-' + s + '-' + i + ')" cx="12" cy="9.2" rx="2.8" ry="4.1"/>' +
-          '<path class="gem-glint" d="m7.1 5.2 3.5-2.4-.5 9.1-3.6-.9Z"/>' +
+          '<path class="gem-pad" d="M5.2 17.1 18.8 17.1 17.2 22.5 6.8 22.5Z"/>' +
+          '<ellipse class="gem-shadow" cx="12" cy="21.1" rx="7.8" ry="1.5"/>' +
+          '<path class="gem-body" style="fill:url(#gem-body-' + s + '-' + i + ')" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
+          '<path class="gem-facet gem-facet-light" d="M12 1.1 12 13.6 7 12.6 4.8 5Z"/>' +
+          '<path class="gem-facet gem-facet-dark" d="M12 1.1 19.2 5 17 12.6 12 13.6Z"/>' +
+          '<path class="gem-facet gem-facet-side" d="M7 12.6 12 13.6 9.5 16.3Z"/>' +
+          '<path class="gem-facet gem-facet-base" d="M7 12.6 12 13.6 17 12.6 12 18.7Z"/>' +
+          '<ellipse class="gem-core" style="fill:url(#gem-core-' + s + '-' + i + ')" cx="12" cy="9.2" rx="3.1" ry="4.1"/>' +
+          '<path class="gem-glint" d="M6.1 5.2 10.4 2.8 8.2 6.8 6.8 7.5Z"/>' +
           '<circle class="gem-shield" cx="12" cy="10.2" r="9.3"/>' +
           '<path class="gem-shield-glint" d="M6.1 8.2c1.2-3.4 4-5.1 7.3-5.3"/>' +
-          '<path class="gem-frost-wash" d="M12 1.1 18.6 4.8 19.1 11.9 14.8 18.1 9.2 18.1 4.9 11.9 5.4 4.8Z"/>' +
+          '<path class="gem-frost-wash" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
           '<path class="gem-frost-crack" d="m14.4 4.6-2 3.2 1.5 1.6-2.2 2.3 1.2 2.6-2.1 2.1"/>' +
-          '<ellipse class="gem-base-side" cx="12" cy="18.3" rx="8" ry="3.1"/>' +
-          '<ellipse class="gem-base-top" cx="12" cy="17.5" rx="6.6" ry="2.1"/>' +
-          '<path class="gem-base-glint" d="M7.6 17.1c2-1.8 6.7-1.9 8.8-.1"/>' +
           '</svg><i class="crown">' + ART.icon('crown', 16) + '</i>';
         el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45)); el.style.setProperty('--pccore', CORE_LIGHTS[s]);
         el.dataset.seat = s; el.dataset.piece = i;

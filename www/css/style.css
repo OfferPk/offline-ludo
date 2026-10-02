@@ -166,18 +166,19 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc::after { content: ""; position: absolute; left: 2%; bottom: -8%; width: 96%; height: 24%; border: 1px solid var(--pc); border-radius: 50%; opacity: 0; transform: scale(.68); pointer-events: none; }
 .pc.land::after { animation: gem-ripple .4s ease-out both; }
 @keyframes gem-ripple { from { opacity: .62; transform: scale(.68); box-shadow: 0 0 4px var(--pc); } to { opacity: 0; transform: scale(1.3); box-shadow: 0 0 9px var(--pc); } }
-.pc .gem-token { position: absolute; inset: -8%; width: 116%; height: 116%; overflow: visible; pointer-events: none; filter: drop-shadow(0 1px 1px rgba(0,0,0,.55)) drop-shadow(0 0 2px var(--pc)); }
+.pc .gem-token { position: absolute; inset: -8%; width: 116%; height: 116%; overflow: visible; pointer-events: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.3)) drop-shadow(0 0 2px var(--pc)); }
 .pc .gem-ground { fill: var(--pc); opacity: .22; filter: blur(1.2px); }
-.pc .gem-pad { fill: var(--pc); fill-opacity: .2; stroke: var(--pc); stroke-opacity: .72; stroke-width: .8; }
-.pc .gem-shadow { fill: rgba(0,0,0,.5); }
+.pc .gem-pad { fill: var(--pc); fill-opacity: .16; stroke: var(--pc); stroke-opacity: .6; stroke-width: .7; stroke-linejoin: bevel; }
+.pc .gem-shadow { fill: rgba(0,0,0,.28); opacity: .82; filter: blur(1.6px); }
 .pc .gem-body { fill: var(--pcd); fill-opacity: .98; stroke: rgba(255,255,255,.9); stroke-opacity: .72; stroke-width: .55; stroke-linejoin: round; }
-.pc .gem-facet-light { fill: var(--pcl); fill-opacity: .9; }
+.pc .gem-facet-light { fill: var(--pcl); fill-opacity: .88; }
 .pc .gem-facet-dark { fill: var(--pcdd); fill-opacity: .8; }
-.pc .gem-facet-side { fill: var(--pcd); fill-opacity: .78; }
-.pc .gem-core { fill: var(--pccore); opacity: .5; filter: drop-shadow(0 0 2px var(--pccore)); }
+.pc .gem-facet-side { fill: var(--pcd); fill-opacity: .72; }
+.pc .gem-facet-base { fill: var(--pcdd); fill-opacity: .62; }
+.pc .gem-core { fill: var(--pccore); opacity: .86; filter: drop-shadow(0 0 3px var(--pccore)) drop-shadow(0 0 5px rgba(255,255,255,.28)); }
 .pc.is-turn .gem-core { animation: gem-core-breathe 1.7s ease-in-out infinite; }
-@keyframes gem-core-breathe { 0%, 100% { opacity: .38; } 50% { opacity: .95; } }
-.pc .gem-glint { fill: rgba(255,255,255,.72); }
+@keyframes gem-core-breathe { 0%, 100% { opacity: .62; } 50% { opacity: 1; } }
+.pc .gem-glint { fill: rgba(255,255,255,.96); filter: drop-shadow(0 0 1px rgba(255,255,255,.72)); }
 .pc .gem-shield { fill: #c9f2ff; fill-opacity: .16; stroke: #c9f2ff; stroke-opacity: .8; stroke-width: .7; opacity: 0; transition: opacity .16s; }
 .pc .gem-shield-glint { fill: none; stroke: rgba(255,255,255,.84); stroke-width: .75; stroke-linecap: round; opacity: 0; }
 .pc.is-shielded .gem-shield, .pc.is-shielded .gem-shield-glint { opacity: 1; }
@@ -187,9 +188,6 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc.is-frozen .gem-token { filter: grayscale(.55) saturate(.45) brightness(.9) drop-shadow(0 0 2px #bfe9ff); }
 .pc.is-frozen .gem-core { opacity: .05; filter: none; animation: none; }
 .pc.is-frozen .gem-frost-wash, .pc.is-frozen .gem-frost-crack { opacity: 1; }
-.pc .gem-base-side { fill: var(--pcd); stroke: rgba(255,255,255,.8); stroke-opacity: .7; stroke-width: .55; }
-.pc .gem-base-top { fill: var(--pc); fill-opacity: .94; stroke: rgba(255,255,255,.82); stroke-opacity: .85; stroke-width: .5; }
-.pc .gem-base-glint { fill: none; stroke: rgba(255,255,255,.78); stroke-width: .65; stroke-linecap: round; }
 .pc.hop { transition-timing-function: cubic-bezier(.2,.9,.3,1.3); z-index: 6; }
 .pc.can { pointer-events: auto; cursor: pointer; z-index: 5; }
 .pc:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; z-index: 8; }
