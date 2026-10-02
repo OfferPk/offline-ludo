@@ -121,7 +121,7 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .chip-v.sel { box-shadow: inset 0 -2px 0 var(--d-edge), 0 0 0 2px var(--accent); transform: translateY(-2px); }
 .chip-v.dim { opacity: .45; }
 .chip-v.dbl { background: linear-gradient(135deg, #2a86e0, #18b3b8); color: #fff; box-shadow: none; }
-.pdice { width: 44px; height: 44px; perspective: 300px; flex: none; position: relative; border-radius: 11px; }
+.pdice { width: 44px; height: 44px; perspective: 300px; flex: none; position: relative; border-radius: 11px; touch-action: none; }
 .pdice:disabled { cursor: default; }
 .pdice .cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform .7s cubic-bezier(.2,.8,.25,1); }
 .pdice .face { position: absolute; inset: 0; border-radius: 11px; background: var(--d-face); box-shadow: inset 0 -3px 0 var(--d-edge); display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 7px; backface-visibility: hidden; }
@@ -139,7 +139,7 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pdice.ready::before { content: ""; position: absolute; inset: -5px; border-radius: 14px; border: 2.5px solid var(--pc); animation: pulse 1.1s ease-in-out infinite; }
 .pdice.rolling { animation: toss .5s ease-out; }
 @keyframes nudge { 0%, 70%, 100% { transform: translateY(0); } 80% { transform: translateY(-5px); } 90% { transform: translateY(0); } }
-@keyframes toss { 0% { transform: translateY(0) scale(1); } 40% { transform: translateY(-9px) scale(1.08); } 100% { transform: translateY(0) scale(1); } }
+@keyframes toss { 0% { transform: translateY(0) scale(.96) rotate(-3deg); } 34% { transform: translateY(-12px) scale(1.1) rotate(5deg); } 62% { transform: translateY(1px) scale(.98) rotate(-2deg); } 82% { transform: translateY(-3px) scale(1.02) rotate(1deg); } 100% { transform: translateY(0) scale(1) rotate(0); } }
 .boost-tag { position: absolute; top: -8px; right: -8px; font-style: normal; font-size: 9.5px; font-weight: 900; padding: 1px 5px; border-radius: 7px; background: linear-gradient(135deg, #2a86e0, #18b3b8); color: #fff; z-index: 3; }
 .bubble { position: absolute; z-index: 25; left: 6px; max-width: 170px; padding: 7px 11px; border-radius: 14px; background: #fff; color: #1b1e25; font-weight: 700; font-size: 13px; box-shadow: 0 8px 20px rgba(0,0,0,.35); pointer-events: none; white-space: nowrap; }
 .bubble.emo { padding: 4px; background: rgba(255,255,255,.95); }
@@ -247,6 +247,7 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .confetti-piece:nth-child(3n) { width: 5px; height: 5px; border-radius: 50%; }
 @keyframes winner-confetti { 0% { opacity: 0; transform: translate3d(0,0,0) rotate(0) scale(.7); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate3d(var(--confetti-x),var(--confetti-y),0) rotate(var(--confetti-spin)) scale(.75); } }
 @media (prefers-reduced-motion: reduce) {
+  .pdice, .pdice::before, .pdice .cube { animation: none !important; transition: none !important; }
   #winner-confetti { display: none !important; }
   #r-rank li.winner, .confetti-piece { animation: none !important; }
 }

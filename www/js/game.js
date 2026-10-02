@@ -204,9 +204,11 @@
     var Hp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
     if (!Hp) return;
     try {
-      if (kind === 'success') Hp.notification({ type: 'SUCCESS' });
-      else if (kind === 'warn') Hp.notification({ type: 'WARNING' });
-      else Hp.impact({ style: kind === 'heavy' ? 'HEAVY' : kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
+      var task;
+      if (kind === 'success') task = Hp.notification({ type: 'SUCCESS' });
+      else if (kind === 'warn') task = Hp.notification({ type: 'WARNING' });
+      else task = Hp.impact({ style: kind === 'heavy' ? 'HEAVY' : kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
+      if (task && typeof task.catch === 'function') task.catch(function () {});
     } catch (e) {}
   }
   var toastTimer = null;
@@ -321,9 +323,16 @@
       el.innerHTML = '<div class="avatar"><svg class="tring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/></svg><span class="av">' + ART.avatar(pl.type) + '</span>' +
         (pl.type === 'ai' ? '<span class="lvtag">' + LEVEL_NAMES[pl.level].charAt(0) + '</span>' : '') + '<span class="lkb"></span></div>' +
         '<div class="pmeta"><b class="pname"></b><small class="plvl"></small><div class="chips"></div></div>' +
-        '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + '">' + cubeHTML() + '<em class="boost-tag hidden"></em></button>' +
+        '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + ' (tap or swipe)">' + cubeHTML() + '<em class="boost-tag hidden"></em></button>' +
         '<div class="bubble hidden"></div>';
-      el.querySelector('.pdice').addEventListener('click', function (e) { SFX.unlock(); if (G && G.st.turn === s && isHuman(s)) { keyboardRoll = e.detail === 0; doRoll(); } });
+      var die = el.querySelector('.pdice');
+      window.DiceGesture.bind(die, function (e) {
+        SFX.unlock();
+        if (G && G.st.turn === s && isHuman(s)) { keyboardRoll = e.detail === 0; doRoll(); }
+      }, function () {
+        SFX.unlock(); keyboardRoll = false;
+        if (G && G.st.turn === s && isHuman(s)) doRoll();
+      });
       setDiceFace(s, G.st.faces ? G.st.faces[s] : 1, true);
     });
   }
@@ -504,7 +513,7 @@
     var hint = '';
     if (!over && st.phase === 'choose') hint = isHuman(st.turn) ? 'Make your choice' : NAMES[st.turn] + ' is choosing…';
     else if (!over && isHuman(s) && !busy) {
-      if (st.phase === 'roll') hint = L.mustChoose(st) ? 'Tap your die and pick a number' : st.queue.length ? 'Six! Roll again' : (st.bonus || st.sixes) ? 'Roll again' : 'Tap your die to roll';
+      if (st.phase === 'roll') hint = L.mustChoose(st) ? 'Tap your die and pick a number' : st.queue.length ? 'Six! Roll again' : (st.bonus || st.sixes) ? 'Roll again' : 'Tap your die to roll or swipe it';
       else if (st.phase === 'move') hint = st.queue.length > 1 ? 'Pick a chip, then a token' : 'Pick a token';
     } else if (!over && !isHuman(s)) hint = NAMES[s] + ' is thinking…';
     $('hint').textContent = hint;
@@ -587,10 +596,11 @@
     if (instant) cube.style.transitionDuration = '0ms';
     cube.style.transform = 'rotateX(' + (f[0] + 720 * spins[s]) + 'deg) rotateY(' + (f[1] + 360 * spins[s]) + 'deg)';
   }
+  function prefersReducedMotion() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
   function animateDice(s, v, cb) {
-    var cube = cubeOf(s), dur = save.settings.fast ? 420 : 700;
+    var cube = cubeOf(s), reduced = prefersReducedMotion(), dur = reduced ? 0 : save.settings.fast ? 420 : 700;
     spins[s]++;
-    if (cube) { cube.style.transitionDuration = dur + 'ms'; setDiceFace(s, v); var pd = cube.parentNode; pd.classList.remove('rolling'); void pd.offsetWidth; pd.classList.add('rolling'); }
+    if (cube) { cube.style.transitionDuration = dur + 'ms'; setDiceFace(s, v); var pd = cube.parentNode; pd.classList.remove('rolling'); if (!reduced) { void pd.offsetWidth; pd.classList.add('rolling'); } }
     SFX.roll();
     later(function () { SFX.land(v === 6); haptic('light'); cb(); }, dur);
   }
@@ -1322,6 +1332,7 @@
 
   window.__cf = {
     get game() { return G; }, get save() { return save; }, get loadStatus() { return loadResult.status; }, logic: L, gate: gate,
+    native: native, haptic: haptic,
     persist: persist, isValidGame: validGame, isValidSave: validSave, get lastSaveError() { return lastSaveError; },
     get busy() { return busy; }, get paused() { return paused; }, get idle() { return !busy && timers.length === 0 && !isOpen('wheel') && !isOpen('choice'); },
     get undoActive() { return undoActive(); },

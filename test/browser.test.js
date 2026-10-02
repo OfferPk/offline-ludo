@@ -32,6 +32,15 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   const idleHuman = (phase, seat) => waitFor((ph, se) => { const c = window.__cf, g = c.game; return g && !c.busy && !c.paused && g.st.turn === (se == null ? g.st.turn : se) && g.st.seats[g.st.turn].type === 'human' && g.st.phase === ph && !document.querySelector('#wheel:not(.hidden)'); }, 20000, 'human ' + phase, phase, seat);
   const st = () => ev(() => { const g = window.__cf.game; return g ? JSON.parse(JSON.stringify(g.st)) : null; });
   async function tapPiece(seat, i) { const p = await ev((s, k) => window.__cf.piecePoint(s, k), seat, i); await page.touchscreen.tap(p.x, p.y); }
+  async function dicePoint(seat) { return ev(s => { const r = document.querySelector('.pod[data-seat="' + s + '"] .pdice').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, seat); }
+  async function swipeDice(seat) {
+    const p = await dicePoint(seat), cdp = await page.target().createCDPSession();
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1, radiusX: 1, radiusY: 1, force: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: p.x + 34, y: p.y + 6, id: 1, radiusX: 1, radiusY: 1, force: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+  }
+  async function tapDice(seat) { const p = await dicePoint(seat); await page.touchscreen.tap(p.x, p.y); }
   const roll = seat => ev(s => document.querySelector('.pod[data-seat="' + s + '"] .pdice').click(), seat);
   const chip = (seat, v) => ev((s, x) => document.querySelector('.pod[data-seat="' + s + '"] .chip-v[data-v="' + x + '"]').click(), seat, v);
   const chips = seat => ev(s => [...document.querySelectorAll('.pod[data-seat="' + s + '"] .chip-v')].map(c => +c.dataset.v), seat);
@@ -123,13 +132,40 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   }), 'v2 save migration preserves progression, settings and match state in a validated v3 snapshot');
   await page.tap('#btn-continue'); await sleep(150);
   ok(await visible('#game') && (await st()).rng === v2.rng && (await st()).mode === v2.mode, 'Continue restores the same on-device match after reload');
-  const expectedAfterRoll = await ev(() => {
+  const beforeSwipe = await st();
+  const expectedAfterSwipe = await ev(() => {
     const c = window.__cf, expected = c.logic.clone(c.game.st), result = c.logic.roll(expected);
-    return { state: expected, value: result.value };
+    return { state: expected, raw: result.raw, value: result.value };
   });
-  await roll(0);
-  await waitFor(() => { const c = window.__cf; return !c.busy && c.game.st.turn === 0 && (c.game.st.phase === 'roll' || c.game.st.phase === 'move'); }, 8000, 'human roll after restored match');
-  ok(JSON.stringify(await st()) === JSON.stringify(expectedAfterRoll.state), 'post-reload roll and state exactly match deterministic RNG continuation');
+  await swipeDice(0);
+  await waitFor(() => { const c = window.__cf; return !c.busy && c.game.st.turn === 0 && (c.game.st.phase === 'roll' || c.game.st.phase === 'move'); }, 8000, 'human swipe roll after restored match');
+  const afterSwipe = await st();
+  ok(afterSwipe.rolls === beforeSwipe.rolls + 1 && afterSwipe.faces[0] === expectedAfterSwipe.raw && JSON.stringify(afterSwipe) === JSON.stringify(expectedAfterSwipe.state), 'a real touch swipe triggers exactly one roll and preserves the deterministic RNG/result');
+  ok(await ev(() => getComputedStyle(document.querySelector('.pod[data-seat="0"] .pdice')).animationName.includes('toss')), 'normal-motion swipe shows the brief dice bounce');
+  ok(await ev(() => /tap or swipe/i.test(document.querySelector('.pod[data-seat="0"] .pdice').getAttribute('aria-label'))), 'the focused dice button advertises swipe while retaining an accessible tap action');
+  ok(await ev(() => {
+    const c = window.__cf, old = window.Capacitor; let calls = 0, threw = false;
+    window.Capacitor = { Plugins: { Haptics: { impact() { calls++; } } } };
+    try { c.save.settings.haptics = true; c.haptic('light'); } catch (e) { threw = true; }
+    window.Capacitor = old;
+    return !c.native && calls === 0 && !threw;
+  }), 'unsupported browser haptics safely no-op without calling an unavailable native plugin');
+
+  await ev(() => window.__cf.edit(st => { st.phase = 'roll'; st.queue = []; st.moves = []; st.sixes = 0; st.bonus = 0; st.rollAgain = false; }));
+  await idleHuman('roll', 0);
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  const beforeTap = await st();
+  const expectedAfterTap = await ev(() => {
+    const c = window.__cf, expected = c.logic.clone(c.game.st), result = c.logic.roll(expected);
+    return { state: expected, raw: result.raw };
+  });
+  await tapDice(0);
+  await waitFor(() => { const c = window.__cf; return !c.busy && c.game.st.turn === 0 && (c.game.st.phase === 'roll' || c.game.st.phase === 'move'); }, 8000, 'reduced-motion tap fallback roll');
+  const afterTap = await st();
+  ok(afterTap.rolls === beforeTap.rolls + 1 && afterTap.faces[0] === expectedAfterTap.raw && JSON.stringify(afterTap) === JSON.stringify(expectedAfterTap.state), 'tapping the dice button still rolls exactly once with the same RNG results');
+  ok(await ev(() => matchMedia('(prefers-reduced-motion: reduce)').matches && getComputedStyle(document.querySelector('.pod[data-seat="0"] .pdice')).animationName === 'none' && getComputedStyle(document.querySelector('.pod[data-seat="0"] .cube')).transitionDuration === '0s'), 'reduced motion removes dice animation and rotation transition');
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+
   await edit('st.phase="over"; st.ranking=st.players.slice(); st.queue=[]; st.moves=[]; st.pieces.forEach(function (p) { if (p) p.fill(57); });');
   await waitFor(() => !document.getElementById('result').classList.contains('hidden'), 5000, 'migrated match result before fixture cleanup');
   await page.tap('#btn-r-home'); await waitFor(() => { const h = document.getElementById('home'); return h && !h.classList.contains('hidden'); }, 5000, 'migrated match cleared through normal result flow');
@@ -513,6 +549,32 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
     return c.game.st.phase === 'roll' && c.game.st.ranking.length === 0 && c.game.st.pieces[0].every(p => p === -1) &&
       status.getAttribute('role') === 'status' && status.getAttribute('aria-live') === 'polite' && /Tap your die to roll/.test(status.textContent);
   }), 'confirmed Restart preserves the same players and starts a fresh turn with polite status guidance');
+
+  const hapticsPage = await browser.newPage(), hapticErrors = [];
+  hapticsPage.on('pageerror', e => hapticErrors.push('pageerror: ' + e.message));
+  hapticsPage.on('console', m => { if (m.type() === 'error') hapticErrors.push('console: ' + m.text()); });
+  await hapticsPage.evaluateOnNewDocument(() => { window.Capacitor = { isNativePlatform: () => true, Plugins: {} }; });
+  await hapticsPage.goto(URL, { waitUntil: 'networkidle0' });
+  await hapticsPage.waitForFunction(() => window.__cf && window.__cf.game !== undefined, { timeout: 8000 });
+  const hapticChecks = await hapticsPage.evaluate(async () => {
+    const c = window.__cf;
+    let missingPluginSafe = true;
+    try { c.save.settings.haptics = true; c.haptic('light'); } catch (e) { missingPluginSafe = false; }
+    let calls = 0;
+    window.Capacitor.Plugins.Haptics = {
+      impact() { calls++; return Promise.reject(new Error('native haptics unavailable')); },
+      notification() { calls++; return Promise.reject(new Error('native haptics unavailable')); }
+    };
+    c.save.settings.haptics = false; c.haptic('light');
+    const disabledSettingBlocks = calls === 0;
+    c.save.settings.haptics = true; c.haptic('light');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    return { native: c.native, missingPluginSafe, disabledSettingBlocks, calls };
+  });
+  await sleep(30);
+  ok(hapticChecks.native && hapticChecks.missingPluginSafe && hapticChecks.disabledSettingBlocks && hapticChecks.calls === 1 && hapticErrors.length === 0,
+    'missing or rejecting native haptics fail gracefully, while the haptics setting blocks calls when disabled');
+  await hapticsPage.close();
 
   ok(errors.length === 0, 'no console errors / failed requests' + (errors.length ? ': ' + errors.join(' | ') : ''));
   console.log(`\n${n} checks passed`);
