@@ -38,7 +38,7 @@ Full rules: **[RULES.md](RULES.md)** (also in the game under **Rules**). In shor
 - **Three AI levels** (`chooseMove()` in `www/js/logic.js`): Easy (mostly random), Normal (simple priorities), Hard (scores captures, safety vs. stacked-6 threats, escaping, blocks, mystery tiles and event targets; uses Pick-a-number sensibly). In the test suite Hard beats Easy ~93% and Normal ~87% of 1 v 1 games.
 - **Quick chat & emotes:** preset phrases and 8 original drawn emoji faces shown as bubbles at the player's corner; computer players react now and then (toggle). Everything is local and cosmetic: there is no online chat.
 - **Feel:** 3D dice per player, tokens stepping square by square, capture bursts with a board shake, animated event wheels, zap/freeze/shield effects, **WebAudio** synthesized sounds (no audio files), **haptics** via `@capacitor/haptics`. Sound, haptics, auto-move, undo, timer, computer chat and fast animations are toggles in Settings.
-- **Save & resume:** the whole match (including the dice RNG state) is saved after every roll and move. v1.0 saves (coins, skins, stats, settings) are migrated.
+- **Save & resume:** a validated, versioned local snapshot keeps the whole match (including dice RNG state), profile/progression, settings and statistics on this device. A last-known-good checkpoint supports recovery; failed writes are shown in the app. v2 saves migrate with match progress, and v1 profile/settings/statistics migrate without treating their incompatible match format as resumable. There is no account, sync or network-play service.
 - **Skins:** boards Graphite and Linen (free), Walnut and Aurora; dice Ivory (free), Onyx, Brass, Frost and Ember.
 - **Stats:** level/XP, matches, wins, win rate, captures, tokens home, sixes, wins vs each AI level, Mystery and Lucky Chaos wins, 1 v 1 and 4-player wins, events triggered. Result screen ranks all players 1st–4th.
 - Original art and name: flat board with muted jewel colours (Coral, Jade, Saffron, Cobalt), simple robot/person avatars and drawn emoji faces, no mascots. It doesn't use the names, logos, art or designs of other Ludo apps.
@@ -49,7 +49,8 @@ Full rules: **[RULES.md](RULES.md)** (also in the game under **Rules**). In shor
 www/                  ← the whole game (also the Capacitor webDir & the Pages site)
   index.html, css/style.css, privacy.html, icon.png
   js/logic.js         ← pure rules engine v2: geometry, stacked rolls, captures, safe squares, blocks, Mystery Tiles events, AI, simulator
-  js/game.js          ← canvas board, player pods & dice, chips, wheel, animations, turn flow, undo roll, chat, persistence, skins, settings
+  js/game.js          ← canvas board, player pods & dice, chips, wheel, animations, turn flow, undo roll, chat, skins, settings
+  js/save-store.js    ← local-only versioned snapshot boundary, migration and last-known-good recovery
   js/art.js           ← original SVG emotes, event icons and avatars
   js/sound.js         ← WebAudio SFX
   js/themes.js        ← cosmetic board and dice skins
@@ -59,7 +60,7 @@ www/                  ← the whole game (also the Capacitor webDir & the Pages 
 android/              ← Capacitor Android project (committed)
 assets/               ← icon/splash generator (make_icon.py) + 512 px store icon
 store/                ← Google Play listing kit (graphics, text, answers, checklist, capture scripts)
-test/                 ← logic + ad-gate tests (Node) and a headless-Chrome play test
+test/                  ← logic, save-store + ad-gate tests (Node) and a headless-Chrome play test
 .github/workflows/    ← android.yml (signed AAB/APK + Releases), pages.yml (web demo)
 ```
 
@@ -68,11 +69,11 @@ test/                 ← logic + ad-gate tests (Node) and a headless-Chrome pla
 ```bash
 npm install
 npm run serve          # http://localhost:8080
-npm test               # stacked 6s, triple-6 forfeit, capture/home bonus, safe squares, exact home, blocks, every Mystery event, every Lucky Chaos effect/cooldown/streak/revenge/charge/Mega/King/power rule + balance sims (≥1000 games per player count), AI legality & strength, 1000 simulated games (all modes, 2–4 players, rule combos), ad pacing
+npm test               # rules/simulations, save migration/validation/recovery/determinism, and ad pacing
 GAMES=200 node test/logic.test.js   # quicker run
 ```
 
-Headless phone-size (360x740) play test through the UI: pods and per-player dice positions, stacked 6,6,3 chips, undo dice roll, chip + token moves, emote bubble, triple-6 forfeit, exact home and ranked result, Mystery Tiles 4-player with Boost and Chaos wheel events, Lucky Chaos Ludo (How to play, Danger tile wheel, Revenge choice, decision-window auto-pick, stored power, Mega Wheel, King crown, computers spending Mega spins), pass & play with the Classic rule; it fails on any console error:
+Headless phone-size (360x740) play test through the UI: local v1/v2 migration, save-failure warning, reload/resume with deterministic continuation, plus pods and per-player dice positions, stacked 6,6,3 chips, undo dice roll, chip + token moves, emote bubble, triple-6 forfeit, exact home and ranked result, Mystery Tiles 4-player with Boost and Chaos wheel events, Lucky Chaos Ludo (How to play, Danger tile wheel, Revenge choice, decision-window auto-pick, stored power, Mega Wheel, King crown, computers spending Mega spins), and pass & play with the Classic rule; it fails on any console error:
 
 ```bash
 npm i --no-save puppeteer-core

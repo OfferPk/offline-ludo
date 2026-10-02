@@ -52,6 +52,89 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(await visible('#btn-mystery'), 'Mystery Tiles mode on home screen');
   ok((await ev(() => window.__cf.gate.state.sessions)) === 1, 'first session counted');
   ok(/1\.2\.0/.test(await ev(() => document.body.innerText + document.documentElement.innerHTML)), 'version 1.2.0 in page');
+
+  const failedSave = await ev(() => {
+    const proto = Storage.prototype, original = proto.setItem;
+    proto.setItem = function (key, value) {
+      if (key === 'crossfour.save.v3') throw new DOMException('quota exceeded', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+    window.__cf.persist();
+    const warned = !document.getElementById('save-warning').classList.contains('hidden');
+    proto.setItem = original; window.__cf.persist();
+    return { warned, cleared: document.getElementById('save-warning').classList.contains('hidden') };
+  });
+  ok(failedSave.warned && failedSave.cleared, 'failed local save shows a persistent warning that clears after storage recovers');
+
+  await ev(() => {
+    const primary = JSON.parse(localStorage.getItem('crossfour.save.v3'));
+    const checkpoint = JSON.parse(JSON.stringify(primary)); checkpoint.payload.coins = 41;
+    primary.payload.coins = -1;
+    localStorage.setItem('crossfour.save.checkpoint.v3', JSON.stringify(checkpoint));
+    localStorage.setItem('crossfour.save.v3', JSON.stringify(primary));
+  });
+  await page.reload({ waitUntil: 'networkidle0' }); await sleep(200);
+  ok(await ev(() => window.__cf.loadStatus === 'recovered' && window.__cf.save.coins === 41 && /last safe save/i.test(document.getElementById('toast').textContent)),
+    'checkpoint recovery resumes known-good progress and warns that recent moves may be missing');
+
+  await ev(() => {
+    localStorage.clear();
+    localStorage.setItem('crossfour.save.v1', JSON.stringify({ coins: 77, xp: 123, owned: { boards: ['linen'], dice: ['brass'] }, board: 'linen', dice: 'brass',
+      settings: { sound: false, fast: true }, stats: { played: 4, won: 2 }, ad: { matchesCompleted: 7 }, setup: { rules: { safeSquares: false, extraOnCapture: false } } }));
+  });
+  await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+  ok(await ev(() => {
+    const c = window.__cf;
+    return c.save.coins === 77 && c.save.xp === 123 && c.save.stats.played === 4 && c.save.settings.sound === false &&
+      c.save.rules.safeSquares === false && c.save.rules.bonusOnCapture === false && c.save.game === null && c.save.ad.matchesCompleted === 7;
+  }), 'v1 migration preserves profile, settings, stats, ad pacing and compatible house rules');
+  ok(!(await visible('#btn-continue')), 'incompatible legacy v1 match format is not resumed as if it were a current game');
+  await page.tap('#btn-settings'); await sleep(120); await page.tap('#btn-reset'); await sleep(120);
+  if (await visible('#confirm')) {
+    const resetNavigation = page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 5000 }).catch(() => null);
+    await page.tap('#confirm-yes'); await resetNavigation;
+  }
+  await sleep(200);
+  ok(await ev(() => {
+    const c = window.__cf, checkpoint = JSON.parse(localStorage.getItem('crossfour.save.checkpoint.v3'));
+    return c.save.coins === 0 && c.save.xp === 0 && c.save.stats.played === 0 && c.save.ad.matchesCompleted === 7 &&
+      !localStorage.getItem('crossfour.save.v1') && !localStorage.getItem('crossfour.save.v2') && checkpoint.payload.coins === 0;
+  }), 'confirmed Reset progress clears stale snapshots/legacy keys while retaining ad pacing');
+  await ev(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+
+  const v2 = await ev(() => {
+    const c = window.__cf, seats = [{ type: 'human' }, { type: 'human' }, null, null];
+    const st = c.logic.newGame(seats, {}, 123456, 'mystery');
+    st.turn = 0; st.phase = 'roll'; st.queue = []; st.moves = []; st.pieces[0] = [0, -1, -1, -1]; st.pieces[1] = [4, -1, -1, -1]; st.rng = 991723;
+    const legacy = JSON.parse(JSON.stringify(c.save));
+    legacy.coins = 321; legacy.xp = 654; legacy.board = 'linen'; legacy.settings.fast = true; legacy.settings.auto = false;
+    legacy.stats.played = 9; legacy.stats.won = 4;
+    legacy.game = { st, seats, mode: st.mode, view: 3, undoLeft: 2, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now() };
+    ['crossfour.save.v3', 'crossfour.save.checkpoint.v3', 'crossfour.save.v1', 'crossfour.save.v2'].forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('crossfour.save.v2', JSON.stringify(legacy));
+    return { rng: st.rng, turn: st.turn, pieces: st.pieces[0].slice(), mode: st.mode };
+  });
+  await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+  ok(await visible('#btn-continue'), 'migrated v2 match is offered from the home screen');
+  ok(await ev(() => {
+    const c = window.__cf, snap = JSON.parse(localStorage.getItem('crossfour.save.v3'));
+    return c.save.coins === 321 && c.save.xp === 654 && c.save.stats.played === 9 && c.save.settings.fast &&
+      c.save.game.st.rng === 991723 && c.save.game.st.pieces[0][0] === 0 && snap.schemaVersion === 3 && !!snap.savedAt;
+  }), 'v2 save migration preserves progression, settings and match state in a validated v3 snapshot');
+  await page.tap('#btn-continue'); await sleep(150);
+  ok(await visible('#game') && (await st()).rng === v2.rng && (await st()).mode === v2.mode, 'Continue restores the same on-device match after reload');
+  const expectedAfterRoll = await ev(() => {
+    const c = window.__cf, expected = c.logic.clone(c.game.st), result = c.logic.roll(expected);
+    return { state: expected, value: result.value };
+  });
+  await roll(0);
+  await waitFor(() => { const c = window.__cf; return !c.busy && c.game.st.turn === 0 && (c.game.st.phase === 'roll' || c.game.st.phase === 'move'); }, 8000, 'human roll after restored match');
+  ok(JSON.stringify(await st()) === JSON.stringify(expectedAfterRoll.state), 'post-reload roll and state exactly match deterministic RNG continuation');
+  await edit('st.phase="over"; st.ranking=st.players.slice(); st.queue=[]; st.moves=[]; st.pieces.forEach(function (p) { if (p) p.fill(57); });');
+  await waitFor(() => !document.getElementById('result').classList.contains('hidden'), 5000, 'migrated match result before fixture cleanup');
+  await page.tap('#btn-r-home'); await waitFor(() => { const h = document.getElementById('home'); return h && !h.classList.contains('hidden'); }, 5000, 'migrated match cleared through normal result flow');
+  await ev(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+  ok(await visible('#home') && !(await visible('#btn-continue')) && (await ev(() => window.__cf.gate.state.sessions)) === 1, 'clean browser fixture restored after migration tests');
   await page.screenshot({ path: OUT + '/cf-home.png' });
 
   // ---------- rules & settings ----------
@@ -358,7 +441,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(s.players.every(p => s.seats[p].type === 'human') && s.rules.rollStyle === 'classic', 'pass & play: all human seats, classic rules');
   await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
   ok(s.players.join() === '1,3', '1v1 pass & play seats Jade and Cobalt');
-  await edit('st.pieces=[[-1,-1,-1,-1],[5,-1,-1,-1],[-1,-1,-1,-1],[5,-1,-1,-1]]; st.queue=[]; st.moves=[]; st.phase="roll"; st.turn=3; st.sixes=0; st.bonus=0; st.rollAgain=false;');
+  await edit('st.pieces=[null,[-1,-1,-1,-1],null,[5,-1,-1,-1]]; st.queue=[]; st.moves=[]; st.phase="roll"; st.turn=3; st.sixes=0; st.bonus=0; st.rollAgain=false;');
   await idleHuman('roll', 3);
   const duelRolls = s.rolls, duelTurns = s.turnCount;
   await keyboardMoveToHandoff(3, 1, 'Cobalt to Jade');
@@ -435,4 +518,4 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   console.log(`\n${n} checks passed`);
   await browser.close();
   global.__dbg = async () => {};
-})().catch(async e => { console.error(e.message || e); if (process.env.DEBUG && global.__page) { try { console.error(JSON.stringify(await global.__page.evaluate(() => { const g = window.__cf.game; return g && { st: { turn: g.st.turn, phase: g.st.phase, queue: g.st.queue, pieces: g.st.pieces, tiles: g.st.tiles, turnCount: g.st.turnCount }, busy: window.__cf.busy }; }))); await global.__page.screenshot({ path: '/tmp/cf-fail.png' }); } catch (x) {} } process.exit(1); });
+})().catch(async e => { console.error(e.stack || e.message || e); if (process.env.DEBUG && global.__page) { try { console.error(JSON.stringify(await global.__page.evaluate(() => { const c = window.__cf, g = c.game; return g && { st: { turn: g.st.turn, phase: g.st.phase, queue: g.st.queue, pieces: g.st.pieces, tiles: g.st.tiles, turnCount: g.st.turnCount }, busy: c.busy, validGame: c.isValidGame(g), validSave: c.isValidSave(c.save), lastSaveError: c.lastSaveError }; }))); await global.__page.screenshot({ path: '/tmp/cf-fail.png' }); } catch (x) {} } process.exit(1); });

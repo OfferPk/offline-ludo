@@ -6,7 +6,8 @@
   var $ = function (id) { return document.getElementById(id); };
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
   var native = !!(Ads && Ads.isNative());
-  var SAVE_KEY = 'crossfour.save.v2', OLD_KEY = 'crossfour.save.v1';
+  var SAVE_KEY = 'crossfour.save.v3', CHECKPOINT_KEY = 'crossfour.save.checkpoint.v3';
+  var V2_KEY = 'crossfour.save.v2', OLD_KEY = 'crossfour.save.v1';
   var NAMES = SK.SEAT_NAMES;
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
   var ACCENT = { graphite: ['#f4b740', '#1c1504'], linen: ['#2b3140', '#ffffff'], walnut: ['#e0a232', '#231605'], aurora: ['#27e0b3', '#03261d'] };
@@ -28,38 +29,171 @@
       game: null, ad: {}
     };
   }
-  function load() {
-    var d = defaults(), s = null, old = null;
-    try { s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { s = null; }
-    if (!s) { try { old = JSON.parse(localStorage.getItem(OLD_KEY) || 'null'); } catch (e) { old = null; } }
-    if (!s && old && typeof old === 'object') {
-      // v1.0 save: keep coins, skins, settings, stats and ad pacing; the old match format is not resumable
-      s = { coins: old.coins, owned: old.owned, board: old.board, dice: old.dice, settings: old.settings, stats: old.stats, ad: old.ad };
-      if (old.setup && old.setup.rules) s.rules = { safeSquares: old.setup.rules.safeSquares !== false, bonusOnCapture: old.setup.rules.extraOnCapture !== false };
+  function isRecord(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
+  function isInt(x, min, max) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x && x >= min && x <= max; }
+  function isCount(x) { return isInt(x, 0, 9007199254740991); }
+  function validSeatList(a) {
+    return Array.isArray(a) && a.length === 4 && a.every(function (x) {
+      return x === null || (isRecord(x) && (x.type === 'human' || (x.type === 'ai' && ['easy', 'medium', 'hard'].indexOf(x.level) >= 0)));
+    });
+  }
+  function sameSeats(a, b) {
+    return a.every(function (x, i) { return x === null ? b[i] === null : !!b[i] && x.type === b[i].type && (x.type !== 'ai' || x.level === b[i].level); });
+  }
+  function validGame(g) {
+    if (!isRecord(g) || !isRecord(g.st)) return false;
+    var st = g.st, modes = ['classic', 'mystery', 'lucky'];
+    if (st.v !== 2 || modes.indexOf(st.mode) < 0 || g.mode !== st.mode || !validSeatList(st.seats) || !validSeatList(g.seats) || !sameSeats(g.seats, st.seats)) return false;
+    if (!Array.isArray(st.players) || st.players.length < 2 || st.players.length > 4 || !Array.isArray(st.pieces) || st.pieces.length !== 4 ||
+        !Array.isArray(st.stats) || st.stats.length !== 4 || !Array.isArray(st.ranking) || !Array.isArray(st.queue) || !Array.isArray(st.moves) ||
+        !Array.isArray(st.faces) || st.faces.length !== 4 || !Array.isArray(st.capd) || st.capd.length !== 4 || !Array.isArray(st.boost) || st.boost.length !== 4 ||
+        !Array.isArray(st.effects) || !Array.isArray(st.tiles) || !isRecord(st.rules) || !isInt(st.turn, 0, 3) || !isInt(st.rng, 0, 4294967295) ||
+        !isCount(st.rolls) || !isCount(st.turnCount) || !isInt(st.sixes, 0, 3) || !isCount(st.bonus) || typeof st.rollAgain !== 'boolean' ||
+        ['roll', 'move', 'over', 'choose'].indexOf(st.phase) < 0 || !st.seats[st.turn]) return false;
+    if (st.players.length !== st.seats.filter(Boolean).length || !st.players.every(function (s, i) { return isInt(s, 0, 3) && !!st.seats[s] && st.players.indexOf(s) === i; }) || st.players.indexOf(st.turn) < 0) return false;
+    if (!st.ranking.every(function (s, i) { return isInt(s, 0, 3) && st.players.indexOf(s) >= 0 && st.ranking.indexOf(s) === i; })) return false;
+    if (!st.queue.every(function (v) { return isInt(v, 1, 6); }) || !st.faces.every(function (v) { return isInt(v, 1, 6); }) ||
+        !st.capd.every(function (v) { return typeof v === 'boolean'; }) || !st.boost.every(function (v) { return v === null || v === 'double' || v === 'choose'; })) return false;
+    if (!st.pieces.every(function (pieces, s) {
+      if (!st.seats[s]) return pieces === null && st.stats[s] === null;
+      return Array.isArray(pieces) && pieces.length === 4 && pieces.every(function (p) { return isInt(p, -1, L.HOME); }) &&
+        isRecord(st.stats[s]) && ['captures', 'captured', 'sixes', 'home', 'rolls', 'events'].every(function (k) { return isCount(st.stats[s][k]); });
+    })) return false;
+    var ruleKeys = Object.keys(L.normRules({}));
+    if (!ruleKeys.every(function (k) { return k === 'rollStyle' ? (st.rules[k] === 'star' || st.rules[k] === 'classic') : typeof st.rules[k] === 'boolean'; })) return false;
+    if (!st.effects.every(function (e) { return isRecord(e) && ['shield', 'freeze'].indexOf(e.type) >= 0 && isInt(e.seat, 0, 3) && isInt(e.piece, 0, 3) && isCount(e.at); })) return false;
+    if (!st.tiles.every(function (t) { return isRecord(t) && isInt(t.abs, 0, 51) && ['boost', 'chaos', 'danger'].indexOf(t.kind) >= 0 && isCount(t.until); })) return false;
+    if (st.phase === 'choose' && (!isRecord(st.pending) || ['revenge', 'swap', 'wild'].indexOf(st.pending.type) < 0 || !isInt(st.pending.seat, 0, 3) || !Array.isArray(st.pending.options))) return false;
+    if (st.phase !== 'choose' && st.pending != null) return false;
+    if (st.mode === 'lucky') {
+      var lk = st.lk;
+      if (!isRecord(lk) || !Array.isArray(lk.charge) || lk.charge.length !== 4 || !lk.charge.every(function (x) { return isInt(x, 0, 5); }) ||
+          !Array.isArray(lk.streak) || lk.streak.length !== 4 || !lk.streak.every(function (x) { return isInt(x, 0, 3); }) ||
+          !Array.isArray(lk.revenge) || lk.revenge.length !== 4 || !lk.revenge.every(function (x) { return typeof x === 'boolean'; }) ||
+          !Array.isArray(lk.powers) || lk.powers.length !== 4 || !lk.powers.every(function (x) { return Array.isArray(x) && x.length <= 2 && x.every(function (id) { return ['dbl', 'six', 'escape'].indexOf(id) >= 0; }); }) ||
+          !Array.isArray(lk.kills) || lk.kills.length !== 4 || !lk.kills.every(function (x) { return Array.isArray(x) && x.length === 4 && x.every(function (n) { return isInt(n, 0, 1); }); }) ||
+          !Array.isArray(lk.kings) || !lk.kings.every(function (k) { return isRecord(k) && isInt(k.seat, 0, 3) && isInt(k.piece, 0, 3) && isInt(k.left, 1, 3) && isCount(k.at); }) ||
+          !(lk.used === null || ['dbl', 'six', 'escape'].indexOf(lk.used) >= 0) || typeof lk.forceSix !== 'boolean' || typeof lk.tg !== 'boolean') return false;
+    } else if (st.lk !== null) return false;
+    if (!isInt(g.view, 0, 3) || !isInt(g.undoLeft, 0, 3) || !isCount(g.coins) || !isCount(g.xp) ||
+        typeof g.doubled !== 'boolean' || typeof g.counted !== 'boolean' || !isCount(g.started)) return false;
+    return true;
+  }
+  function normalizeSeat(x) {
+    if (!isRecord(x)) return null;
+    if (x.type === 'human') return { type: 'human' };
+    if (x.type === 'ai') return { type: 'ai', level: ['easy', 'medium', 'hard'].indexOf(x.level) >= 0 ? x.level : 'medium' };
+    return null;
+  }
+  function normalizeSeats(a, fallback) {
+    if (!Array.isArray(a) || a.length !== 4) return fallback.map(function (x) { return x ? normalizeSeat(x) : null; });
+    return a.map(function (x) { return x === null ? null : normalizeSeat(x); });
+  }
+  function safeCounter(x, fallback) { return isCount(x) ? x : fallback; }
+  function normalizeSave(raw) {
+    if (!isRecord(raw)) return null;
+    var d = defaults(), s = d;
+    s.coins = safeCounter(raw.coins, d.coins); s.xp = safeCounter(raw.xp, d.xp);
+    if (isRecord(raw.owned)) {
+      ['boards', 'dice'].forEach(function (kind) {
+        if (Array.isArray(raw.owned[kind])) {
+          var ids = raw.owned[kind].filter(function (id) { return typeof id === 'string' && id.length <= 32; });
+          d.owned[kind].forEach(function (id) { if (ids.indexOf(id) < 0) ids.unshift(id); });
+          s.owned[kind] = ids.slice(0, 32);
+        }
+      });
     }
-    if (!s || typeof s !== 'object') return d;
-    Object.keys(d).forEach(function (k) { if (s[k] === undefined || (s[k] === null && k !== 'game')) s[k] = d[k]; });
-    ['settings', 'stats'].forEach(function (k) { if (typeof s[k] !== 'object') s[k] = d[k]; Object.keys(d[k]).forEach(function (j) { if (s[k][j] === undefined) s[k][j] = d[k][j]; }); });
-    s.rules = L.normRules(s.rules);
-    if (!s.setup || !Array.isArray(s.setup.ai) || !Array.isArray(s.setup.pass)) s.setup = d.setup;
-    if (!s.setup.mode) s.setup.mode = d.setup.mode;
-    if (!s.owned || !Array.isArray(s.owned.boards) || !Array.isArray(s.owned.dice)) s.owned = d.owned;
-    ['coins', 'xp'].forEach(function (k) { if (typeof s[k] !== 'number' || !isFinite(s[k]) || s[k] < 0) s[k] = 0; });
+    s.board = SK.BOARDS.some(function (x) { return x.id === raw.board; }) ? raw.board : d.board;
+    s.dice = SK.DICE.some(function (x) { return x.id === raw.dice; }) ? raw.dice : d.dice;
+    if (isRecord(raw.settings)) Object.keys(d.settings).forEach(function (k) { s.settings[k] = typeof raw.settings[k] === 'boolean' ? raw.settings[k] : d.settings[k]; });
+    if (isRecord(raw.rules)) Object.keys(d.rules).forEach(function (k) {
+      s.rules[k] = k === 'rollStyle' ? (raw.rules[k] === 'classic' || raw.rules[k] === 'star' ? raw.rules[k] : d.rules[k]) :
+        (typeof raw.rules[k] === 'boolean' ? raw.rules[k] : d.rules[k]);
+    });
+    if (isRecord(raw.setup)) {
+      s.setup.ai = normalizeSeats(raw.setup.ai, d.setup.ai); s.setup.pass = normalizeSeats(raw.setup.pass, d.setup.pass);
+      if (isRecord(raw.setup.mode)) ['ai', 'pass'].forEach(function (k) { s.setup.mode[k] = ['classic', 'mystery', 'lucky'].indexOf(raw.setup.mode[k]) >= 0 ? raw.setup.mode[k] : d.setup.mode[k]; });
+    }
+    if (isRecord(raw.stats)) {
+      Object.keys(d.stats).forEach(function (k) {
+        if (k === 'vs') {
+          if (isRecord(raw.stats.vs)) Object.keys(d.stats.vs).forEach(function (level) {
+            var pair = raw.stats.vs[level]; if (Array.isArray(pair) && pair.length === 2) s.stats.vs[level] = [safeCounter(pair[0], 0), safeCounter(pair[1], 0)];
+          });
+        } else if (['mystery', 'lucky', 'duel', 'four'].indexOf(k) >= 0) {
+          var p = raw.stats[k]; if (Array.isArray(p) && p.length === 2) s.stats[k] = [safeCounter(p[0], 0), safeCounter(p[1], 0)];
+        } else s.stats[k] = safeCounter(raw.stats[k], d.stats[k]);
+      });
+    }
+    if (isRecord(raw.ad)) ['sessions', 'matchesSince', 'lastTs', 'playMs', 'matchesCompleted'].forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(raw.ad, k)) s.ad[k] = safeCounter(raw.ad[k], 0);
+    });
+    if (validGame(raw.game)) {
+      s.game = JSON.parse(JSON.stringify(raw.game));
+      delete s.game.timerTk; delete s.game.actor; s.game.undo = null; s.game.sel = null;
+      s.game.st.moves = s.game.st.phase === 'move' ? L.queueMoves(s.game.st) : [];
+    } else s.game = null;
     return s;
   }
-  var save = load();
-  function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+  function validSave(s) {
+    if (!isRecord(s) || !Object.prototype.hasOwnProperty.call(s, 'game') || !isCount(s.coins) || !isCount(s.xp) || !isRecord(s.owned) || !Array.isArray(s.owned.boards) || !Array.isArray(s.owned.dice) ||
+        !s.owned.boards.every(function (id) { return typeof id === 'string' && id.length <= 32; }) || !s.owned.dice.every(function (id) { return typeof id === 'string' && id.length <= 32; }) ||
+        !SK.BOARDS.some(function (x) { return x.id === s.board; }) || !SK.DICE.some(function (x) { return x.id === s.dice; }) || !isRecord(s.settings) ||
+        !isRecord(s.rules) || !isRecord(s.setup) || !isRecord(s.stats) || !isRecord(s.ad) || !(s.game === null || validGame(s.game))) return false;
+    if (!Object.keys(defaults().settings).every(function (k) { return typeof s.settings[k] === 'boolean'; })) return false;
+    if (!Object.keys(defaults().rules).every(function (k) { return k === 'rollStyle' ? ['star', 'classic'].indexOf(s.rules[k]) >= 0 : typeof s.rules[k] === 'boolean'; })) return false;
+    if (!validSeatList(s.setup.ai) || !validSeatList(s.setup.pass) || !isRecord(s.setup.mode) || !['ai', 'pass'].every(function (k) { return ['classic', 'mystery', 'lucky'].indexOf(s.setup.mode[k]) >= 0; })) return false;
+    var ds = defaults().stats;
+    if (!Object.keys(ds).every(function (k) {
+      if (k === 'vs') return isRecord(s.stats.vs) && Object.keys(ds.vs).every(function (level) { return Array.isArray(s.stats.vs[level]) && s.stats.vs[level].length === 2 && s.stats.vs[level].every(isCount); });
+      if (['mystery', 'lucky', 'duel', 'four'].indexOf(k) >= 0) return Array.isArray(s.stats[k]) && s.stats[k].length === 2 && s.stats[k].every(isCount);
+      return isCount(s.stats[k]);
+    })) return false;
+    return ['sessions', 'matchesSince', 'lastTs', 'playMs', 'matchesCompleted'].every(function (k) { return s.ad[k] === undefined || isCount(s.ad[k]); });
+  }
+  var saveStore = window.SaveStore.create(function () { return window.localStorage; }, {
+    key: SAVE_KEY, checkpointKey: CHECKPOINT_KEY, legacyV2Key: V2_KEY, legacyV1Key: OLD_KEY,
+    defaults: defaults, normalize: normalizeSave, validate: validSave
+  });
+  var loadResult = saveStore.load();
+  var save = loadResult.data;
+  var saveWriteFailed = false;
+  var lastSaveError = null;
+  function persist() {
+    var result;
+    try {
+      var snapshotData = JSON.parse(JSON.stringify(save));
+      if (snapshotData.game) { delete snapshotData.game.timerTk; delete snapshotData.game.actor; snapshotData.game.undo = null; snapshotData.game.sel = null; }
+      result = saveStore.save(snapshotData);
+    } catch (e) { result = { ok: false, reason: 'invalid-snapshot' }; }
+    if (!result.ok) {
+      lastSaveError = { reason: result.reason, stage: result.stage };
+      if (!saveWriteFailed) {
+        var warning = $('save-warning');
+        warning.textContent = 'Save failed. Your latest progress may not be saved on this device. Keep the app open and check device storage.';
+        warning.classList.remove('hidden');
+      }
+      saveWriteFailed = true;
+      return false;
+    }
+    lastSaveError = null;
+    if (saveWriteFailed) {
+      saveWriteFailed = false;
+      $('save-warning').classList.add('hidden');
+      if (typeof toast === 'function') toast('Saving has resumed', 1800);
+    }
+    return true;
+  }
   var gate = window.AdGate.create(CFG, save.ad); save.ad = gate.state;
   gate.sessionStarted();
   persist();
 
-  function validGame(g) {
-    return g && g.st && g.st.v === 2 && Array.isArray(g.st.pieces) && g.st.pieces.length === 4 && Array.isArray(g.st.players) && g.st.players.length >= 2 &&
-      ['roll', 'move', 'over', 'choose'].indexOf(g.st.phase) >= 0 && (g.st.phase !== 'choose' || !!g.st.pending) && (g.st.mode !== 'lucky' || !!g.st.lk) && g.st.seats && g.st.seats[g.st.turn];
-  }
   var G = validGame(save.game) ? save.game : null;
   if (!G) save.game = null;
-  if (G) G.undo = null;
+  if (G) {
+    G.undo = null; G.sel = null; delete G.timerTk; delete G.actor;
+    G.st.moves = G.st.phase === 'move' ? L.queueMoves(G.st) : [];
+  }
 
   // ---------------- helpers ----------------
   function hex2rgb(h) { h = h.replace('#', ''); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
@@ -1117,7 +1251,19 @@
   $('btn-reset').addEventListener('click', function () {
     hide('settings');
     askConfirm('Reset progress?', 'Coins, XP, skins, statistics and the saved match will be deleted.', 'Reset', function () {
-      var ad = save.ad; save = defaults(); save.ad = ad; persist(); location.reload();
+      var resetData = defaults(); resetData.ad = save.ad;
+      var resetResult = saveStore.reset(resetData);
+      if (!resetResult.ok) {
+        lastSaveError = { reason: resetResult.reason, stage: resetResult.stage };
+        saveWriteFailed = true;
+        var warning = $('save-warning');
+        warning.textContent = 'Reset failed. Your existing progress was not cleared. Check device storage and try again.';
+        warning.classList.remove('hidden');
+        toast('Progress was not reset', 2400);
+        return;
+      }
+      save = resetData;
+      location.reload();
     });
   });
   document.addEventListener('keydown', function (e) {
@@ -1150,11 +1296,13 @@
   // ---------------- boot ----------------
   SFX.setEnabled(save.settings.sound);
   applySkin(); setCoins(); setLevel(); updateHome(); buildChat(); buildRulesEvents();
+  if (loadResult.status === 'recovered') toast('Recovered your last safe save. Some recent moves may be missing.', 5000);
   // consent + SDK init only: no interstitial is ever shown on launch; the banner sits on the menu / game screens
   if (Ads) Ads.init().then(function () { syncSettingsUI(); Ads.showBanner(); });
 
   window.__cf = {
-    get game() { return G; }, get save() { return save; }, logic: L, gate: gate,
+    get game() { return G; }, get save() { return save; }, get loadStatus() { return loadResult.status; }, logic: L, gate: gate,
+    persist: persist, isValidGame: validGame, isValidSave: validSave, get lastSaveError() { return lastSaveError; },
     get busy() { return busy; }, get paused() { return paused; }, get idle() { return !busy && timers.length === 0 && !isOpen('wheel') && !isOpen('choice'); },
     get undoActive() { return undoActive(); },
     force: function (vals) { forced = vals.slice(); },
