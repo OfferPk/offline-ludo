@@ -5,10 +5,13 @@
 h1{color:#12151b}h2{color:#2a3139;margin-top:1.8em;border-bottom:2px solid #f4b740;padding-bottom:4px}a{color:#2f5fd0}.back{display:inline-block;margin-bottom:12px}code{background:#e6e8ec;padding:1px 4px;border-radius:4px}</style></head>
 <body><a class="back" href="./">← Back to the game</a>
 <h1>Privacy Policy – Crossfour: Offline Ludo</h1>
-<p><em>Last updated: September 28, 2026</em></p>
+<p><em>Last updated: October 3, 2026</em></p>
 <p>Crossfour: Offline Ludo ("the app") is developed by <strong>OfferPk</strong>. This policy explains what information is handled when you use the app on Android or play the web version.</p>
 <h2>Information we collect</h2>
-<p><strong>The app itself does not collect, store on a server, or transmit any personal information.</strong> There are no accounts, no sign-in, no in-app purchases and no analytics run by us. Your game progress (the match in progress, your player and rule choices, statistics, coins, unlocked cosmetic board and dice skins and settings such as sound on/off) is stored <strong>only on your device</strong> (in local storage) and is never sent to us. Uninstalling the app or clearing its data deletes it. Coins are a virtual in-game currency earned by finishing matches and used only to unlock cosmetic board and dice skins; they cannot be bought, sold, bet, wagered or exchanged for money. The app has no online play, no online chat and no accounts: all matches are played on your device against computer players or with people passing the same phone. The quick-chat phrases and emoji are preset, cosmetic and shown only on your own screen; nothing you tap is sent anywhere.</p>
+<p>Offline play does not require an account or a network connection. Your local match, settings, offline coins, unlocked cosmetics and recovery checkpoint remain on your device and are not uploaded by the offline save system. Existing offline coins are not automatically copied into an online wallet.</p>
+<p>An optional online account/lobby feature is being added, but it is not active until its Supabase project and social providers are configured. If enabled and you choose to sign in with Google or Facebook, Supabase Auth processes your login and provider account information (which may include your email address). The app stores an online display name and generated player handle, server-side coin and diamond balances, room membership/readiness, invite-room records and match-history status. Room codes and player names are visible to participants in that room; balances and currency transaction history are restricted to the account owner. The online feature does not currently synchronize the Ludo board or turns, and this version does not provide a client-callable way to create or spend online currency. Do not treat local coins and online balances as interchangeable.</p>
+<p>Online data is transmitted to the Supabase-hosted backend selected for the project. Supabase processes connection data such as IP address as part of providing the service and applies its own <a href="https://supabase.com/privacy" rel="noopener">privacy and security terms</a>. Google and Facebook process sign-in according to their own <a href="https://policies.google.com/privacy" rel="noopener">privacy policies</a>. You can continue to play offline without signing in. No analytics service is added by the online lobby.</p>
+<p>Coins and diamonds are virtual, non-purchasable and non-transferable in this implementation; they cannot be bought, sold, bet, wagered or exchanged for money. The local quick-chat phrases and emoji remain on-device and are not sent to other players.</p>
 <h2>Advertising (Google AdMob)</h2>
 <p>The Android app shows ads using <strong>Google AdMob</strong> (Google Mobile Ads SDK), a service provided by Google LLC. To serve and measure ads (including personalized ads, where you have consented), and for analytics and fraud prevention, the SDK automatically collects and shares with Google:</p>
 <ul>
@@ -24,13 +27,13 @@ h1{color:#12151b}h2{color:#2a3139;margin-top:1.8em;border-bottom:2px solid #f4b7
 <li>Google Mobile Ads SDK data disclosure: <a href="https://developers.google.com/admob/android/privacy/play-data-disclosure" rel="noopener">https://developers.google.com/admob/android/privacy/play-data-disclosure</a></li>
 </ul>
 <p>Users in the EEA, UK and Switzerland (and other regions where it is required) are asked for consent through Google's <strong>User Messaging Platform (UMP)</strong> consent message before personalized ads are shown. You can change your choice at any time from <strong>Settings → Ad privacy options</strong> in the app (shown where applicable). You can also reset or delete your advertising ID, or opt out of personalized ads, in <strong>Android Settings → Google → Ads</strong> (or <strong>Settings → Privacy → Ads</strong> on newer devices).</p>
-<p>The web version at offerpk.github.io does not show ads and does not use cookies.</p>
+<p>The web version at offerpk.github.io does not show ads. The optional Supabase Auth client stores a sign-in session in browser/app storage when you sign in; without sign-in, the online feature is not used.</p>
 <h2>Haptics</h2>
 <p>The app may use your device's vibration motor for light haptic feedback (Android <code>VIBRATE</code> permission). No data is collected for this, and you can turn it off in Settings.</p>
 <h2>Children</h2>
 <p>The app is a general-audience board game intended for users aged 13 and over and is <strong>not directed at children under 13</strong>. We do not knowingly collect personal information from children.</p>
 <h2>Security</h2>
-<p>Because we do not collect personal data, we do not store any personal data on our servers.</p>
+<p>Online account data is protected by database row-level access controls. Currency balances cannot be changed directly by the app client; trusted server-side operations are required for transactions. Never share a password, provider token or authentication code with another player.</p>
 <h2>Changes</h2>
 <p>We may update this policy from time to time. Changes will be posted on this page with a new "Last updated" date.</p>
 <h2>Contact</h2>

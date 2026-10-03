@@ -53,6 +53,9 @@
           <span class="community-launch-copy"><b>Leaderboard &amp; referrals</b><small>Weekly crystal rewards · invite friends</small></span>
           <span class="community-launch-arrow" aria-hidden="true">›</span>
         </button>
+        <button id="btn-online" class="online-launch" type="button">
+          <span><b>Online rooms</b><small>Sign in · invite friends · find a table</small></span><span aria-hidden="true">›</span>
+        </button>
         <a class="home-link" href="privacy.html">Privacy policy</a>
       </div>
     </section>
@@ -160,6 +163,46 @@
           <p id="community-claim-note" class="community-claim-note">Claim unavailable in demo. This non-submitting preview does not check, send, or save your number.</p>
           <p id="community-claim-status" class="community-claim-status hidden" role="status" aria-live="polite"></p>
           <div class="panel-actions"><button id="community-claim-cancel" class="btn plate" type="button">Close preview</button><button id="community-claim-preview" class="btn primary" type="button">Preview only</button></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Optional online account and realtime room lobby -->
+    <section id="online" class="screen online-screen hidden" aria-labelledby="online-title">
+      <header class="online-topbar">
+        <button id="online-back" class="icon-btn" type="button" aria-label="Back to home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5 8 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div><h1 id="online-title">Online rooms</h1><small>Cloud profile · live lobby</small></div>
+        <span class="online-live-dot" aria-hidden="true"></span>
+      </header>
+      <div class="online-body">
+        <p id="online-status" class="online-status" role="status" aria-live="polite">Checking online services…</p>
+        <p class="online-limit-note"><b>Lobby preview:</b> profiles, cloud balances, room invites and readiness sync are separate from offline saves. The shared Ludo board and turn-by-turn online gameplay are not enabled in this build.</p>
+        <section id="online-auth-panel" class="online-card" aria-labelledby="online-auth-title">
+          <span class="online-eyebrow">OPTIONAL ACCOUNT</span><h2 id="online-auth-title">Sign in to play online</h2>
+          <p id="online-config-note">Sign in with a configured social provider.</p>
+          <div class="online-provider-actions"><button id="online-google" class="btn plate" type="button">Continue with Google</button><button id="online-facebook" class="btn plate" type="button">Continue with Facebook</button></div>
+        </section>
+        <section id="online-account-panel" class="online-card hidden" aria-labelledby="online-account-title">
+          <div class="online-card-head"><div><span class="online-eyebrow">CLOUD PROFILE</span><h2 id="online-account-title">Your account</h2><small id="online-profile-handle">Loading profile…</small></div><button id="online-signout" class="btn plate online-signout" type="button">Sign out</button></div>
+          <form id="online-profile-form" class="online-profile-form"><label for="online-profile-name">Display name</label><div><input id="online-profile-name" maxlength="32" autocomplete="nickname" required><button class="btn primary" type="submit">Save</button></div></form>
+          <div class="online-wallet" aria-label="Cloud-synced balance"><span><b id="online-wallet-coins">—</b><small>Coins</small></span><span><b id="online-wallet-diamonds">—</b><small>Diamonds</small></span></div>
+          <p class="online-wallet-note">These balances are server-owned. Offline coins are not uploaded, and the app cannot mint or spend cloud currency directly.</p>
+        </section>
+        <section id="online-room-panel" class="online-card hidden" aria-labelledby="online-lobby-title">
+          <span class="online-eyebrow">MATCHMAKING · INVITES</span><h2 id="online-lobby-title">Find or host a table</h2>
+          <div class="online-room-options"><label>Mode<select id="online-mode"><option value="classic">Classic</option><option value="mystery">Mystery</option><option value="lucky">Lucky Chaos</option></select></label><label>Seats<select id="online-capacity"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label></div>
+          <div class="online-provider-actions"><button id="online-quick-match" class="btn primary" type="button">Find a table</button><button id="online-create-room" class="btn plate" type="button">Create invite room</button></div>
+          <div class="online-join-row"><label for="online-join-code">Join with invite code</label><div><input id="online-join-code" maxlength="16" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="16-character code"><button id="online-join-room" class="btn plate" type="button">Join</button></div></div>
+          <section id="online-room-card" class="online-room-card hidden" aria-labelledby="online-room-heading">
+            <div class="online-card-head"><div><span class="online-eyebrow">TABLE</span><h3 id="online-room-heading">Your room</h3><small id="online-room-mode"></small></div><button id="online-leave-room" class="btn plate online-signout" type="button">Leave</button></div>
+            <p id="online-room-status" class="online-room-state" role="status" aria-live="polite"></p>
+            <label class="online-invite-label" for="online-invite-code">Invite code</label><div class="online-invite-row"><input id="online-invite-code" readonly><button id="online-copy-invite" class="btn plate" type="button">Copy link</button></div>
+            <h4>Players</h4><ul id="online-room-roster" class="online-room-roster"></ul>
+            <div class="online-provider-actions"><button id="online-ready" class="btn plate" type="button" aria-pressed="false">Ready</button><button id="online-start-room" class="btn primary hidden" type="button">Start table</button></div>
+          </section>
+        </section>
+        <section class="online-card" aria-labelledby="online-history-heading">
+          <span class="online-eyebrow">RECENT TABLES</span><h2 id="online-history-heading">Match history</h2><p id="online-history-empty">Your started online tables will appear here.</p><ol id="online-history-list" class="online-history-list"></ol>
         </section>
       </div>
     </section>
@@ -438,5 +481,7 @@
   <script src="js/game.js"></script>
   <script src="js/community-fixtures.js"></script>
   <script src="js/community.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/online.js"></script>
 </body>
 </html>
