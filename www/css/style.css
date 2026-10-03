@@ -250,6 +250,30 @@ body.light .seg { background: rgba(0,0,0,.06); }
 @keyframes pop { from { transform: scale(.94); opacity: 0; } }
 .panel h2 { margin: 2px 0 10px; font-size: 26px; text-align: center; }
 .panel h3 { margin: 0 0 8px; font-size: 19px; }
+.tutorial-intro-card { position: relative; overflow: hidden; width: min(350px, 100%); padding: 26px 22px 18px; border-color: rgba(244,183,64,.3); background: radial-gradient(130% 100% at 50% 0%, rgba(244,183,64,.12), transparent 58%), var(--page); text-align: center; }
+.tutorial-die { width: 58px; height: 58px; margin: 0 auto 12px; display: grid; place-items: center; border-radius: 16px; color: #1b1e25; background: linear-gradient(145deg, #fffefa, #e9e4d8); box-shadow: inset 0 -4px 0 rgba(30,32,37,.14), 0 8px 22px rgba(244,183,64,.18); font-size: 27px; font-weight: 900; }
+.tutorial-kicker { display: block; color: var(--accent); font-size: 10px; line-height: 1.35; font-weight: 850; letter-spacing: .14em; }
+.tutorial-intro-card h2 { margin: 7px 0 8px; font-size: 25px; }
+.tutorial-intro-copy { max-width: 280px; margin: 0 auto; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.tutorial-actions { display: grid; gap: 8px; margin-top: 20px; }
+.tutorial-actions .btn { min-height: 46px; padding: 10px 14px; flex-direction: row; }
+.tutorial-local-note { margin: 14px 0 0; color: var(--muted); font-size: 10.5px; }
+.tutorial-coach { position: fixed; inset: 0; z-index: 49; pointer-events: none; }
+.tutorial-card { position: absolute; width: min(320px, calc(100vw - 24px)); padding: 13px 14px 12px; border: 1px solid rgba(244,183,64,.5); border-radius: 16px; color: var(--ink); background: linear-gradient(145deg, rgba(35,40,49,.98), rgba(22,26,33,.98)); box-shadow: 0 14px 36px rgba(0,0,0,.42), 0 0 0 3px rgba(244,183,64,.12); pointer-events: none; }
+body.light .tutorial-card { background: rgba(250,249,245,.98); }
+.tutorial-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tutorial-card-head .tutorial-kicker { min-width: 0; font-size: 9px; }
+.tutorial-skip { flex: none; padding: 5px 8px; border-radius: 8px; color: var(--muted); font-size: 11px; font-weight: 700; }
+.tutorial-card button { pointer-events: auto; }
+.tutorial-skip:hover, .tutorial-skip:focus-visible { color: var(--ink); background: var(--surface); }
+.tutorial-card h2 { margin: 4px 0 3px; font-size: 16px; line-height: 1.25; }
+.tutorial-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.tutorial-progress { display: flex; gap: 5px; margin-top: 10px; }
+.tutorial-progress i { width: 20px; height: 3px; border-radius: 4px; background: rgba(138,147,163,.3); }
+.tutorial-progress i.on { background: var(--accent); }
+.tutorial-done { min-height: 36px; margin-top: 10px; padding: 7px 13px; flex-direction: row; font-size: 12px; }
+.tutorial-target { position: relative !important; z-index: 52 !important; outline: 3px solid #fff !important; outline-offset: 4px; box-shadow: 0 0 0 7px rgba(244,183,64,.42), 0 0 22px rgba(244,183,64,.75) !important; }
+.tutorial-card button:focus-visible, .tutorial-actions button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .panel-head h3 { margin: 0; flex: 1; }
 .panel-actions { display: flex; gap: 10px; margin-top: 14px; }
@@ -273,6 +297,7 @@ body.light .seg { background: rgba(0,0,0,.06); }
   .pdice, .pdice::before, .pdice .cube { animation: none !important; transition: none !important; }
   #winner-confetti { display: none !important; }
   #r-rank li.winner, .confetti-piece { animation: none !important; }
+  .tutorial-card, .tutorial-intro-card { animation: none !important; transition: none !important; }
 }
 .r-coins { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 22px; margin: 4px 0 10px; }
 .r-coins small { font-size: 12px; color: var(--muted); }

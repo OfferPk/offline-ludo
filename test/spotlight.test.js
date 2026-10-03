@@ -27,7 +27,7 @@ function ok(condition, message) {
 
   for (const scenario of scenarios) {
     await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: scenario.reduced ? 'reduce' : 'no-preference' }]);
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); });
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('#home:not(.hidden)');
     await page.click(scenario.entry);

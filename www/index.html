@@ -220,6 +220,33 @@
       <div id="banner-slot" aria-hidden="true"></div>
     </section>
 
+    <!-- FIRST-MATCH TUTORIAL -->
+    <div id="tutorial-intro" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="tutorial-intro-title" aria-describedby="tutorial-intro-copy">
+      <div class="panel tutorial-intro-card">
+        <div class="tutorial-die" aria-hidden="true">6</div>
+        <p class="tutorial-kicker">A QUICK START GUIDE</p>
+        <h2 id="tutorial-intro-title">Your first match</h2>
+        <p id="tutorial-intro-copy" class="tutorial-intro-copy">Learn the die, your tokens, and your first move as you play. The guide stays out of your way, and you can skip it whenever you like.</p>
+        <div class="tutorial-actions">
+          <button id="tutorial-start" class="btn primary" type="button">Let’s play</button>
+          <button id="tutorial-intro-skip" class="btn plate" type="button">Skip tutorial</button>
+        </div>
+        <p class="tutorial-local-note">Classic Ludo · saved on this device</p>
+      </div>
+    </div>
+    <aside id="tutorial-coach" class="tutorial-coach hidden" role="region" aria-labelledby="tutorial-title">
+      <div class="tutorial-card">
+        <div class="tutorial-card-head">
+          <span id="tutorial-kicker" class="tutorial-kicker">FIRST MATCH · STEP 1 OF 2</span>
+          <button id="tutorial-skip" class="tutorial-skip" type="button">Skip</button>
+        </div>
+        <h2 id="tutorial-title" aria-live="polite" aria-atomic="true">Roll your die</h2>
+        <p id="tutorial-copy" aria-live="polite" aria-atomic="true"></p>
+        <div class="tutorial-progress" aria-hidden="true"><i></i><i></i><i></i></div>
+        <button id="tutorial-done" class="btn primary tutorial-done hidden" type="button">Got it</button>
+      </div>
+    </aside>
+
     <!-- RESULT -->
     <div id="result" class="overlay hidden">
       <div id="winner-confetti" aria-hidden="true"></div>

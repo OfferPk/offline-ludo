@@ -8,6 +8,8 @@
   var native = !!(Ads && Ads.isNative());
   var SAVE_KEY = 'crossfour.save.v3', CHECKPOINT_KEY = 'crossfour.save.checkpoint.v3';
   var V2_KEY = 'crossfour.save.v2', OLD_KEY = 'crossfour.save.v1';
+  var TUTORIAL_KEY = 'crossfour.tutorial.v1';
+  var tutorial = { active: false, intro: false, firstMove: false };
   var NAMES = SK.SEAT_NAMES;
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
   var ACCENT = { graphite: ['#f4b740', '#1c1504'], linen: ['#2b3140', '#ffffff'], walnut: ['#e0a232', '#231605'], aurora: ['#27e0b3', '#03261d'] };
@@ -464,6 +466,81 @@
     G.sel = null;
     for (var i = 0; i < st.queue.length; i++) if (chipMoves(st.queue[i]).length) { G.sel = st.queue[i]; break; }
   }
+  function tutorialSeen() {
+    try { return window.localStorage.getItem(TUTORIAL_KEY) === '1'; }
+    catch (e) { return false; }
+  }
+  function markTutorialSeen() {
+    try { window.localStorage.setItem(TUTORIAL_KEY, '1'); }
+    catch (e) { /* The tutorial still works if device storage is unavailable. */ }
+  }
+  function updateTutorial() {
+    var intro = $('tutorial-intro'), coach = $('tutorial-coach');
+    if (!tutorial.active || !G || G.mode !== 'classic' || $('game').classList.contains('hidden')) {
+      intro.classList.add('hidden'); coach.classList.add('hidden');
+      each(document.querySelectorAll('.tutorial-target'), function (el) { el.classList.remove('tutorial-target'); });
+      return;
+    }
+    if (tutorial.intro) { intro.classList.remove('hidden'); coach.classList.add('hidden'); return; }
+    intro.classList.add('hidden');
+    var st = G.st;
+    var stage = tutorial.firstMove || st.phase === 'over' ? 'finish' : !isHuman(st.turn) ? 'wait' : st.phase === 'move' ? 'move' : 'roll';
+    var title, copy, kicker, progress;
+    if (stage === 'wait') {
+      kicker = 'FIRST MATCH · GET READY'; title = 'Your turn is coming up';
+      copy = 'Watch the board. When it’s your turn, tap or swipe the highlighted die. You need a 6 to bring a token out of base.';
+      progress = 1;
+    } else if (stage === 'roll') {
+      kicker = 'FIRST MATCH · STEP 1 OF 2'; title = 'Roll your die';
+      if (st.queue.length || st.sixes || st.bonus) copy = save.rules.rollStyle === 'star' ? 'A 6 earns another roll. Your dice stay as chips in your corner until it’s time to move.' : 'Roll again when you’re ready. A 6 gives you another roll after you move it.';
+      else copy = 'Tap or swipe the die in your corner. You need a 6 to bring a token out of base.';
+      progress = 1;
+    } else if (stage === 'move') {
+      kicker = 'FIRST MATCH · STEP 2 OF 2'; title = 'Choose a move';
+      copy = save.settings.auto ? 'Tap a dice chip, then a glowing token. If only one move is possible, Auto-move may play it for you.' : 'Tap a dice chip, then tap one of your glowing tokens to move it.';
+      progress = 2;
+    } else {
+      kicker = 'FIRST MATCH · ALL SET'; title = 'Nice first move!';
+      var bonusCopy = save.rules.bonusOnCapture && save.rules.bonusOnHome ? ' Captures and reaching home each earn a bonus roll.' :
+        save.rules.bonusOnCapture ? ' Captures earn a bonus roll.' : save.rules.bonusOnHome ? ' Reaching home earns a bonus roll.' : '';
+      copy = 'Roll a 6 to launch tokens and move clockwise.' + bonusCopy + ' You need an exact roll to reach home; first to bring all 4 tokens home wins.';
+      progress = 3;
+    }
+    $('tutorial-kicker').textContent = kicker;
+    $('tutorial-title').textContent = title;
+    $('tutorial-copy').textContent = copy;
+    $('tutorial-done').classList.toggle('hidden', stage !== 'finish');
+    each(document.querySelectorAll('.tutorial-progress i'), function (el, i) { el.classList.toggle('on', i < progress); });
+    coach.classList.remove('hidden');
+    each(document.querySelectorAll('.tutorial-target'), function (el) { el.classList.remove('tutorial-target'); });
+    var target = null, anchorTarget = null, pod = podEl(st.turn);
+    if (stage === 'roll' && pod) target = pod.querySelector('.pdice');
+    else if (stage === 'move' && pod) {
+      target = pod.querySelector('.chip-v:not(.dim)') || document.querySelector('#pieces .pc.can');
+      anchorTarget = document.querySelector('#pieces .pc.can') || target;
+    } else target = $('turn-label');
+    if (!anchorTarget) anchorTarget = target;
+    if (target) target.classList.add('tutorial-target');
+    var card = coach.querySelector('.tutorial-card'), anchor = anchorTarget && anchorTarget.getBoundingClientRect();
+    if (!anchor || !anchor.width) anchor = $('turn-label').getBoundingClientRect();
+    var cardRect = card.getBoundingClientRect(), pad = 12, minTop = Math.max(58, (window.visualViewport ? window.visualViewport.offsetTop : 0) + 8);
+    var left = Math.max(pad, Math.min(window.innerWidth - cardRect.width - pad, anchor.left + anchor.width / 2 - cardRect.width / 2));
+    var top = anchor.top < window.innerHeight / 2 ? anchor.bottom + 12 : anchor.top - cardRect.height - 12;
+    top = Math.max(minTop, Math.min(window.innerHeight - cardRect.height - pad, top));
+    card.style.left = left + 'px'; card.style.top = top + 'px';
+  }
+  function closeTutorial() {
+    markTutorialSeen(); tutorial.active = false; tutorial.intro = false; tutorial.firstMove = false;
+    $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
+    each(document.querySelectorAll('.tutorial-target'), function (el) { el.classList.remove('tutorial-target'); });
+    if (G && !$('game').classList.contains('hidden') && !paused) { render(); advance(); }
+  }
+  function beginTutorial() {
+    if (!tutorial.active || !tutorial.intro) return;
+    markTutorialSeen(); tutorial.intro = false;
+    $('tutorial-intro').classList.add('hidden'); updateTutorial();
+    advance(); focusTurnControl();
+  }
   // ---- Lucky Chaos pod widgets: charge meter, streak, revenge, stored powers, Mega button ----
   var POWER_NAMES = { dbl: 'Double Roll', six: 'Lucky 6', escape: 'Safe Escape' };
   function luckyMeter(st, s) {
@@ -543,6 +620,7 @@
     u.disabled = !act; u.classList.toggle('live', act);
     $('undo-label').textContent = G.undoLeft > 0 ? 'Undo (' + G.undoLeft + ')' : 'Undo';
     $('undo-ad').classList.toggle('hidden', G.undoLeft > 0);
+    updateTutorial();
   }
   function clearHighlights() { each(document.querySelectorAll('.pc.can'), function (e) { e.classList.remove('can'); }); }
   function highlight() {
@@ -591,7 +669,7 @@
     var st = G.st;
     render(); persist();
     if (st.phase === 'over') { later(finishMatch, 800); return; }
-    if (paused || !gameVisible() || busy) return;
+    if (paused || tutorial.intro || !gameVisible() || busy) return;
     if (undoActive() && !isHuman(st.turn)) return; // waiting for the undo window after a human roll that passed the turn
     var s = st.turn, pl = st.seats[s];
     highlight();
@@ -786,6 +864,7 @@
       if (res.kingCaptured) { pause = Math.max(pause, 900); toast(nameOf(s) + ' toppled a King! Mega Wheel charged (5/5)', 1600); later(function () { SFX.mega(); }, 300); }
       if (res.crowned) { pause = Math.max(pause, 900); later(function () { crownFx(res.crowned); }, res.captures.length ? 420 : 0); }
       var done = function () {
+        if (human && tutorial.active && !tutorial.intro) tutorial.firstMove = true;
         layoutPieces(); busy = false; G.actor = null;
         if (human && !res.over && st.turn === s && st.phase === 'roll') toast(st.boost[s] === 'choose' ? 'Pick a number for your next roll' : 'Bonus roll!', 1000);
         render();
@@ -1031,14 +1110,16 @@
   }
 
   // ---------------- match lifecycle ----------------
-  function startMatch(seats, mode) {
+  function startMatch(seats, mode, offerTutorial) {
     cancelFlow();
+    tutorial.active = offerTutorial === true && mode === 'classic' && !tutorialSeen();
+    tutorial.intro = tutorial.active; tutorial.firstMove = false;
     var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
     G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now() };
     save.game = G; persist();
     spins = [0, 0, 0, 0];
     showGame();
-    focusTurnControl();
+    if (tutorial.intro) $('tutorial-start').focus(); else focusTurnControl();
   }
   function finishMatch() {
     if (!G || G.st.phase !== 'over') return;
@@ -1128,6 +1209,7 @@
   function showHome() {
     cancelFlow(); stopTimer(); paused = false;
     ['result', 'menu', 'chat'].forEach(hide);
+    $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
     screen('home'); updateHome(); setCoins(); setLevel();
   }
   function updateHome() {
@@ -1315,10 +1397,15 @@
   $('btn-start').addEventListener('click', function () {
     SFX.unlock(); SFX.click();
     var seats = save.setup[setupKind].map(function (x) { return x ? { type: x.type, level: x.level } : null; }), mode = setupMode;
+    var offerTutorial = mode === 'classic' && !tutorialSeen();
     save.setup.mode[setupKind] = mode;
-    if (G && G.st.phase !== 'over') askConfirm('Start a new match?', 'Your saved match will be replaced.', 'Start', function () { startMatch(seats, mode); });
-    else startMatch(seats, mode);
+    if (G && G.st.phase !== 'over') askConfirm('Start a new match?', 'Your saved match will be replaced.', 'Start', function () { startMatch(seats, mode, offerTutorial); });
+    else startMatch(seats, mode, offerTutorial);
   });
+  $('tutorial-start').addEventListener('click', function () { SFX.click(); beginTutorial(); });
+  $('tutorial-intro-skip').addEventListener('click', function () { SFX.click(); closeTutorial(); });
+  $('tutorial-skip').addEventListener('click', function () { SFX.click(); closeTutorial(); });
+  $('tutorial-done').addEventListener('click', function () { SFX.click(); closeTutorial(); });
   // chips: pick which value to move next
   $('stage').addEventListener('click', function (e) {
     var c = e.target.closest ? e.target.closest('.chip-v') : null;
@@ -1383,10 +1470,20 @@
         return;
       }
       save = resetData;
+      try { window.localStorage.removeItem(TUTORIAL_KEY); } catch (e) { /* The main progress reset succeeded. */ }
       location.reload();
     });
   });
   document.addEventListener('keydown', function (e) {
+    if (tutorial.intro && e.key === 'Escape') { e.preventDefault(); closeTutorial(); return; }
+    if (tutorial.intro && e.key === 'Tab') {
+      var dialogButtons = document.querySelectorAll('#tutorial-intro button:not([disabled])');
+      if (!dialogButtons.length) return;
+      var firstDialogButton = dialogButtons[0], lastDialogButton = dialogButtons[dialogButtons.length - 1];
+      if (e.shiftKey && document.activeElement === firstDialogButton) { e.preventDefault(); lastDialogButton.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastDialogButton) { e.preventDefault(); firstDialogButton.focus(); }
+      return;
+    }
     if (!G || $('game').classList.contains('hidden') || paused) return;
     if (e.key === ' ' || e.key === 'Enter') {
       if (e.target && e.target.closest && e.target.closest('button, a, input, select, textarea')) return;
