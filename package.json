@@ -6,8 +6,10 @@
   "license": "MIT",
   "scripts": {
     "serve": "npx --yes http-server www -p 8080 -c-1",
-    "test": "node test/logic.test.js && node test/lucky.test.js && node test/save-store.test.js && node test/adgate.test.js && node test/dice-gesture.test.js && node test/path-animation.test.js && node test/sound.test.js",
+    "test": "node test/logic.test.js && node test/lucky.test.js && node test/save-store.test.js && node test/adgate.test.js && node test/dice-gesture.test.js && node test/path-animation.test.js && node test/sound.test.js && node test/skins.test.js",
     "test:spotlight": "node test/spotlight.test.js",
+    "test:community": "node test/community.test.js",
+    "test:skins:browser": "node test/skins.browser.test.js",
     "sync": "npx cap sync android"
   },
   "dependencies": {
@@ -17,7 +19,8 @@
     "@capacitor/haptics": "^8.0.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.5.2"
+    "@capacitor/cli": "^8.5.2",
+    "puppeteer-core": "^25.12.0"
   },
   "engines": {
     "node": ">=22"
