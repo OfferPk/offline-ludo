@@ -26,8 +26,8 @@
         pass: [null, { type: 'human' }, null, { type: 'human' }],
         mode: { ai: 'classic', pass: 'classic' }
       },
-      stats: { played: 0, won: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], duel: [0, 0], four: [0, 0] },
-      game: null, ad: {}
+      stats: { played: 0, won: 0, streak: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], duel: [0, 0], four: [0, 0] },
+      flags: { diamondCollection: false }, game: null, ad: {}
     };
   }
   function isRecord(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
@@ -96,13 +96,7 @@
     var d = defaults(), s = d;
     s.coins = safeCounter(raw.coins, d.coins); s.xp = safeCounter(raw.xp, d.xp);
     if (isRecord(raw.owned)) {
-      ['boards', 'dice'].forEach(function (kind) {
-        if (Array.isArray(raw.owned[kind])) {
-          var ids = raw.owned[kind].filter(function (id) { return typeof id === 'string' && id.length <= 32; });
-          d.owned[kind].forEach(function (id) { if (ids.indexOf(id) < 0) ids.unshift(id); });
-          s.owned[kind] = ids.slice(0, 32);
-        }
-      });
+      ['boards', 'dice'].forEach(function (kind) { s.owned[kind] = window.SkinShop.normalizeOwned(raw.owned[kind], d.owned[kind]); });
     }
     s.board = SK.BOARDS.some(function (x) { return x.id === raw.board; }) ? raw.board : d.board;
     s.dice = SK.DICE.some(function (x) { return x.id === raw.dice; }) ? raw.dice : d.dice;
@@ -126,6 +120,7 @@
         } else s.stats[k] = safeCounter(raw.stats[k], d.stats[k]);
       });
     }
+    if (isRecord(raw.flags)) Object.keys(d.flags).forEach(function (k) { s.flags[k] = raw.flags[k] === true; });
     if (isRecord(raw.ad)) ['sessions', 'matchesSince', 'lastTs', 'playMs', 'matchesCompleted'].forEach(function (k) {
       if (Object.prototype.hasOwnProperty.call(raw.ad, k)) s.ad[k] = safeCounter(raw.ad[k], 0);
     });
@@ -142,10 +137,12 @@
         !SK.BOARDS.some(function (x) { return x.id === s.board; }) || !SK.DICE.some(function (x) { return x.id === s.dice; }) || !isRecord(s.settings) ||
         !isRecord(s.rules) || !isRecord(s.setup) || !isRecord(s.stats) || !isRecord(s.ad) || !(s.game === null || validGame(s.game))) return false;
     if (!Object.keys(defaults().settings).every(function (k) { return typeof s.settings[k] === 'boolean'; })) return false;
+    if (s.flags !== undefined && (!isRecord(s.flags) || !Object.keys(s.flags).every(function (k) { return typeof s.flags[k] === 'boolean'; }))) return false;
     if (!Object.keys(defaults().rules).every(function (k) { return k === 'rollStyle' ? ['star', 'classic'].indexOf(s.rules[k]) >= 0 : typeof s.rules[k] === 'boolean'; })) return false;
     if (!validSeatList(s.setup.ai) || !validSeatList(s.setup.pass) || !isRecord(s.setup.mode) || !['ai', 'pass'].every(function (k) { return ['classic', 'mystery', 'lucky'].indexOf(s.setup.mode[k]) >= 0; })) return false;
     var ds = defaults().stats;
     if (!Object.keys(ds).every(function (k) {
+      if (k === 'streak') return s.stats.streak === undefined || isCount(s.stats.streak);
       if (k === 'vs') return isRecord(s.stats.vs) && Object.keys(ds.vs).every(function (level) { return Array.isArray(s.stats.vs[level]) && s.stats.vs[level].length === 2 && s.stats.vs[level].every(isCount); });
       if (['mystery', 'lucky', 'duel', 'four'].indexOf(k) >= 0) return Array.isArray(s.stats[k]) && s.stats[k].length === 2 && s.stats[k].every(isCount);
       return isCount(s.stats[k]);
@@ -157,7 +154,8 @@
     defaults: defaults, normalize: normalizeSave, validate: validSave
   });
   var loadResult = saveStore.load();
-  var save = loadResult.data;
+  var save = normalizeSave(loadResult.data) || defaults();
+  loadResult.data = save;
   var saveWriteFailed = false;
   var lastSaveError = null;
   function persist() {
@@ -1052,13 +1050,20 @@
       var ai = st.players.filter(function (s) { return st.seats[s].type === 'ai'; }).map(function (s) { return st.seats[s].level; });
       G.place = best; G.coins = L.coinsFor(best, st.players.length, ai, st.mode); G.xp = L.xpFor(best, st.players.length);
       save.coins += G.coins; save.xp += G.xp;
-      var S = save.stats; S.played++; if (best === 1) S.won++;
+      var S = save.stats; S.played++;
+      if (best === 1) { S.won++; S.streak = safeCounter(S.streak, 0) + 1; } else S.streak = 0;
       if (ai.length) { var top = ai.indexOf('hard') >= 0 ? 'hard' : ai.indexOf('medium') >= 0 ? 'medium' : 'easy'; S.vs[top][0]++; if (best === 1) S.vs[top][1]++; } else S.pass++;
       if (st.mode === 'mystery') { S.mystery[0]++; if (best === 1) S.mystery[1]++; }
       if (st.mode === 'lucky') { S.lucky[0]++; if (best === 1) S.lucky[1]++; }
       if (st.players.length === 2) { S.duel[0]++; if (best === 1) S.duel[1]++; } else if (st.players.length === 4) { S.four[0]++; if (best === 1) S.four[1]++; }
+      var previousBoards = save.owned.boards.slice(), previousDice = save.owned.dice.slice();
+      var newlyUnlocked = window.SkinShop.collectEligible(save, SK);
       gate.matchCompleted();
-      persist();
+      if (!persist()) {
+        save.owned.boards = previousBoards; save.owned.dice = previousDice;
+      } else if (newlyUnlocked.length) {
+        toast('Achievement unlocked: ' + newlyUnlocked.map(function (x) { return x.name; }).join(', '), 3000);
+      }
       if (!isHuman(st.ranking[0])) aiReact('win', st.ranking[0]);
       if (gate.canShow(Date.now())) Ads.prepareInterstitial();
     }
@@ -1205,24 +1210,59 @@
     $('stats-body').innerHTML = cells.map(function (c) { return '<div><b>' + c[1] + '</b><span>' + c[0] + '</span></div>'; }).join('');
   }
   var skinTab = 'boards';
+  function skinRequirement(it) {
+    if (it.unlock === 'wins') return 'Unlock at ' + it.threshold + ' lifetime wins';
+    if (it.unlock === 'streak') return 'Unlock with ' + it.threshold + ' consecutive wins';
+    if (it.unlock === 'event') return 'Future event reward · not available yet';
+    if (!it.price) return it.id === 'classic-white' ? 'Free option · Ivory remains unchanged' : 'Included';
+    return 'Earn ' + it.price.toLocaleString('en-US') + ' coins in matches';
+  }
+  function skinLockedLabel(it) {
+    if (it.unlock === 'event') return 'Locked · future event';
+    if (it.unlock === 'streak') return 'Locked · ' + it.threshold + '-win streak';
+    if (it.unlock === 'wins') return 'Locked · ' + it.threshold + ' wins';
+    return 'Locked';
+  }
   function renderSkins() {
     setCoins();
     each($('skin-tabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === skinTab); });
     var grid = $('skin-grid'); grid.innerHTML = '';
-    var list = skinTab === 'boards' ? SK.BOARDS : SK.DICE, owned = save.owned[skinTab], cur = skinTab === 'boards' ? save.board : save.dice;
+    var list = skinTab === 'boards' ? SK.BOARDS : SK.DICE;
     list.forEach(function (it) {
-      var el = document.createElement('div'); el.className = 'skin' + (it.id === cur ? ' on' : ''); el.dataset.id = it.id;
-      if (skinTab === 'boards') { var cv = document.createElement('canvas'); el.appendChild(cv); drawBoard(cv, 150, it, L.DEFAULT_RULES); }
-      else { var dp = document.createElement('div'); dp.className = 'dprev'; dp.style.background = it.face; dp.style.boxShadow = 'inset 0 -4px 0 ' + it.edge; dp.innerHTML = '<i></i><i></i><i></i>'; each(dp.children, function (i) { i.style.background = it.pip; }); el.appendChild(dp); }
+      var state = window.SkinShop.state(it, save, skinTab);
+      var el = document.createElement('div');
+      el.className = 'skin' + (state.selected ? ' on' : '') + (!state.owned && !state.meetsCondition ? ' is-locked' : '');
+      el.dataset.id = it.id; el.dataset.skinPreview = it.id;
+      if (skinTab === 'boards') {
+        var cv = document.createElement('canvas'); cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', it.name + ' board preview');
+        el.appendChild(cv); drawBoard(cv, 150, it, L.DEFAULT_RULES);
+      } else {
+        var dp = document.createElement('div'); dp.className = 'dprev'; dp.setAttribute('role', 'img'); dp.setAttribute('aria-label', it.name + ' dice preview');
+        dp.style.background = it.face; dp.style.boxShadow = 'inset 0 -4px 0 ' + it.edge;
+        dp.innerHTML = '<i></i><i></i><i></i>'; each(dp.children, function (pip) { pip.style.background = it.pip; }); el.appendChild(dp);
+      }
       var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = it.name + (it.dark === false ? ' (light)' : ''); el.appendChild(nm);
-      var b = document.createElement('button'); b.className = 'btn ' + (it.id === cur ? 'plate' : owned.indexOf(it.id) >= 0 ? 'primary' : 'plate');
-      if (it.id === cur) { b.textContent = 'In use'; b.disabled = true; }
-      else if (owned.indexOf(it.id) >= 0) b.textContent = 'Use';
-      else { b.innerHTML = '<span class="coin-ico"></span>' + it.price; if (save.coins < it.price) b.disabled = true; }
+      var note = document.createElement('small'); note.className = 'skin-note'; note.textContent = skinRequirement(it); el.appendChild(note);
+      var b = document.createElement('button');
+      b.className = 'btn ' + (state.selected ? 'plate' : state.owned || state.canUnlock ? 'primary' : 'plate');
+      if (state.selected) { b.textContent = 'In use'; b.disabled = true; }
+      else if (state.owned) b.textContent = 'Use';
+      else if (!state.meetsCondition) { b.textContent = skinLockedLabel(it); b.disabled = true; }
+      else if (!state.affordable) { b.textContent = 'Need ' + state.price.toLocaleString('en-US') + ' coins'; b.disabled = true; }
+      else if (it.unlock) b.textContent = 'Unlock reward';
+      else if (!state.price) b.textContent = 'Get free';
+      else b.textContent = 'Unlock · ' + state.price.toLocaleString('en-US') + ' coins';
+      b.setAttribute('aria-label', it.name + ': ' + b.textContent);
       b.addEventListener('click', function () {
-        if (owned.indexOf(it.id) < 0) { if (save.coins < it.price) return; save.coins -= it.price; owned.push(it.id); SFX.coin(); } else SFX.click();
-        if (skinTab === 'boards') save.board = it.id; else save.dice = it.id;
-        persist(); applySkin(); renderSkins(); setCoins();
+        var result = window.SkinShop.act(save, skinTab, it, persist);
+        if (!result.ok) {
+          if (result.reason === 'save-failed') toast('Skin not unlocked. Check device storage and try again.', 2600);
+          else if (result.reason === 'insufficient-coins') toast('Not enough coins for ' + it.name + '.', 2000);
+          else if (result.reason === 'event-locked') toast('Diamond skins are reserved for a future event.', 2400);
+          return;
+        }
+        if (result.newlyOwned && result.price > 0) SFX.coin(); else SFX.click();
+        applySkin(); renderSkins(); setCoins();
         if (!$('game').classList.contains('hidden')) { buildPods(); buildTiles(); buildPieces(); layout(); render(); }
       });
       el.appendChild(b); grid.appendChild(el);
