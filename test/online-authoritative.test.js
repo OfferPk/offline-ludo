@@ -1,0 +1,47 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const migrations = fs.readdirSync(path.join(root, 'supabase/migrations'));
+const migrationName = migrations.find(name => /_online_authoritative_match\.sql$/.test(name));
+assert.ok(migrationName, 'authoritative match migration exists');
+const migration = read('supabase/migrations/' + migrationName);
+const online = read('www/js/online.js');
+const html = read('www/index.html');
+const logic = read('www/js/logic.js');
+const game = read('www/js/game.js');
+let checks = 0;
+function ok(value, message) { assert.ok(value, message); checks++; console.log('  ok -', message); }
+
+ok(/create table if not exists public\.match_states[\s\S]*?enable row level security/i.test(migration), 'authoritative state table has RLS enabled');
+ok(/pg_catalog\.pg_policies[\s\S]*?Room members can read authoritative match state[\s\S]*?room_members[\s\S]*?auth\.uid\(\)/i.test(migration), 'state policy is member-scoped and safe to create after a partial retry');
+ok(/revoke all on public\.match_states from anon, authenticated[\s\S]*?grant select on public\.match_states to authenticated/i.test(migration), 'clients have read-only table access and cannot write state directly');
+ok(/create table if not exists private\.online_match_actions[\s\S]*?primary key \(room_id, action_id\)[\s\S]*?enable row level security/i.test(migration), 'private action ledger has RLS and action IDs are unique per room');
+for (const rpc of ['roll_match', 'move_match']) {
+  const start = migration.indexOf('create or replace function public.' + rpc + '(');
+  const end = migration.indexOf('$$;', start);
+  const body = migration.slice(start, end);
+  ok(body.indexOf('public.rooms as r') < body.indexOf('public.match_states as ms') && body.indexOf('public.match_states as ms') < body.indexOf('private.online_match_actions as a'), rpc + ' serializes room/state transitions before duplicate-action lookup');
+}
+ok(/extensions\.gen_random_bytes\(4\)[\s\S]*?4294967292/i.test(migration), 'the server draws unbiased die values using cryptographic bytes');
+ok(/function public\.roll_match\(p_room_id uuid, p_expected_version bigint, p_action_id uuid\)/i.test(migration), 'roll RPC has no client-supplied die face parameter');
+ok(/function public\.move_match\(p_room_id uuid, p_expected_version bigint, p_action_id uuid, p_piece integer, p_queue_index integer\)/i.test(migration), 'move RPC accepts only a server queue index rather than an arbitrary die value');
+ok(/if p_expected_version <> v_version then raise exception 'Match state is stale/i.test(migration), 'each turn transition checks the expected state version');
+ok(/v_existing\.actor_id <> v_user or v_existing\.request <> v_request/i.test(migration), 'duplicate action IDs are actor- and payload-bound');
+ok(/v_state->>'turn'\)::integer <> v_member_seat/i.test(migration) && /You are not a member of this room/i.test(migration), 'membership and server-assigned seat ownership are checked before a transition');
+ok(/v_state->>'phase' <> 'move'/i.test(migration) && /online_ludo_can_move\(v_state, v_member_seat, p_piece, v_die\)/i.test(migration), 'server validates phase, selected queued die and legal token movement');
+ok(/three consecutive 6s forfeit/i.test(migration) && /v_sixes >= 3/i.test(migration) && /online_ludo_finish_queue/i.test(migration), 'default Star-style stacked-six and queue exhaustion rules are represented');
+ok(/safe squares/i.test(migration) && /v_target_abs <> all\(array\[0, 8, 13, 21, 26, 34, 39, 47\]\)/i.test(migration), 'server protects the existing start/star safe squares from captures');
+ok(/grant execute on function public\.roll_match\(uuid, bigint, uuid\) to authenticated/i.test(migration) && /grant execute on function public\.move_match\(uuid, bigint, uuid, integer, integer\) to authenticated/i.test(migration), 'only authenticated callers can invoke the gameplay RPCs');
+ok(/create policy "Room members can read authoritative match state"/i.test(migration) && /alter publication supabase_realtime add table public\.match_states/i.test(migration), 'state is member-readable and added to Realtime');
+ok(/state\.rules,[\s\S]*?window\.LudoLogic\.queueMoves\(localView\)/i.test(online), 'move hints are derived from the existing local rules engine');
+ok(/table: 'match_states'/i.test(online) && /window\.addEventListener\('online'/i.test(online) && /document\.addEventListener\('visibilitychange'/i.test(online), 'state updates subscribe live and refresh after connection/visibility recovery');
+ok(/pending\.args/i.test(online) && /Retry uses the same action ID/i.test(online), 'the client can safely retry the identical action request after a lost response');
+ok(/p_action_id: makeActionId\(\)/i.test(online) && /p_die|p_value/.test(online) === false, 'the browser generates an idempotency key and never submits a dice face');
+ok(/Online gameplay currently supports Classic rooms only/i.test(migration) && /Mystery and Lucky Chaos remain available in offline play only/i.test(html), 'online scope is explicitly Classic-only while local variants remain available');
+ok(/function roll\(st, value\)/i.test(logic) && /L\.roll\(st/i.test(game), 'offline gameplay continues to use the unchanged local rules engine');
+ok(!/match_states/.test(read('www/js/save-store.js')), 'authoritative cloud state is not added to local save storage');
+ok(!/service_role|serviceKey|sb_secret_/i.test(online + html), 'browser code contains no service-role or secret key');
+console.log('\nOnline authoritative match static validation passed (' + checks + ' checks).');

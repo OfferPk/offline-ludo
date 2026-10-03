@@ -884,3 +884,78 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 @media (min-width: 1200px) {
   .seat .seat-options button { font-size: 10px; }
 }
+
+/* ---------------- optional online lobby ---------------- */
+.online-launch { width: min(440px, 100%); min-height: 54px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid rgba(105,205,255,.28); border-radius: 15px; text-align: left; color: var(--ink); background: linear-gradient(110deg, rgba(53,153,220,.12), rgba(129,99,222,.08)); }
+.online-launch b, .online-launch small { display: block; }
+.online-launch b { font-size: 14px; }
+.online-launch small { margin-top: 3px; color: var(--muted); font-size: 11px; }
+.online-launch > span:last-child { color: #9ad9ff; font-size: 24px; }
+.online-launch:focus-visible, .online-screen button:focus-visible, .online-screen input:focus-visible, .online-screen select:focus-visible { outline: 3px solid #9ad9ff; outline-offset: 2px; }
+.online-screen { padding-inline: 14px; }
+.online-topbar { min-height: 54px; display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--surface-edge); }
+.online-topbar h1 { margin: 0; font-size: 18px; }
+.online-topbar small { color: var(--muted); font-size: 11px; }
+.online-live-dot { width: 9px; height: 9px; margin-left: auto; border-radius: 50%; background: #73e0b0; box-shadow: 0 0 12px rgba(115,224,176,.65); }
+.online-body { width: min(100%, 720px); flex: 1; align-self: center; overflow-y: auto; overscroll-behavior: contain; padding: 12px 2px calc(var(--sab) + 20px); }
+.online-status { min-height: 20px; margin: 2px 4px 10px; color: #9ad9ff; font-size: 13px; }
+.online-status.is-error { color: #ff9c8f; }
+.online-limit-note, .online-wallet-note { margin: 0 2px 12px; padding: 10px 12px; border: 1px solid rgba(244,183,64,.24); border-radius: 12px; color: var(--muted); background: rgba(244,183,64,.055); font-size: 12px; line-height: 1.45; }
+.online-limit-note b { color: var(--ink); }
+.online-card { margin: 10px 0; padding: 15px; border: 1px solid var(--surface-edge); border-radius: 16px; background: linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)); box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+.online-card h2 { margin: 3px 0 6px; font-size: 18px; }
+.online-card p { color: var(--muted); font-size: 13px; line-height: 1.45; }
+.online-eyebrow { color: #a8e2ff; font-size: 9px; font-weight: 800; letter-spacing: .16em; }
+.online-provider-actions { display: flex; gap: 8px; margin-top: 12px; }
+.online-provider-actions > * { flex: 1; min-width: 0; min-height: 42px; padding: 9px; font-size: 13px; }
+.online-auth-form { display: grid; gap: 10px; margin-top: 12px; }
+.online-auth-form label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+.online-auth-actions { display: flex; gap: 8px; margin-top: 2px; }
+.online-auth-actions > * { flex: 1; min-width: 0; min-height: 42px; padding: 9px; font-size: 13px; }
+.online-auth-link { justify-self: end; border: 0; padding: 4px 0; color: #9ad9ff; background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+.online-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.online-card-head small { color: var(--muted); font-size: 11px; }
+.online-signout { flex: none !important; min-height: 36px !important; padding: 6px 10px !important; font-size: 11px !important; }
+.online-profile-form { display: grid; gap: 6px; margin-top: 12px; }
+.online-profile-form label, .online-join-row label, .online-invite-label, .online-room-options label { color: var(--muted); font-size: 12px; }
+.online-profile-form > div, .online-join-row > div, .online-invite-row { display: flex; gap: 7px; }
+.online-screen input, .online-screen select { width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid var(--surface-edge); border-radius: 10px; outline: none; color: var(--ink); background: rgba(0,0,0,.2); font: inherit; font-size: 13px; }
+.online-screen select option { color: #111; }
+.online-profile-form button, .online-join-row button, .online-invite-row button { flex: none; min-height: 40px; padding: 8px 12px; font-size: 12px; }
+.online-wallet { display: flex; gap: 10px; margin-top: 12px; }
+.online-wallet > span { flex: 1; padding: 10px 12px; border: 1px solid var(--surface-edge); border-radius: 12px; background: var(--surface); }
+.online-wallet b, .online-wallet small { display: block; }
+.online-wallet b { font-size: 17px; }
+.online-wallet small { margin-top: 2px; color: var(--muted); font-size: 10px; }
+.online-wallet-note { margin: 10px 0 0; padding: 0; border: 0; background: none; font-size: 11px; }
+.online-room-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+.online-room-options label { display: grid; gap: 5px; }
+.online-join-row { margin-top: 14px; }
+.online-join-row label, .online-invite-label { display: block; margin-bottom: 6px; }
+.online-room-card { margin-top: 16px; padding: 12px; border: 1px solid rgba(105,205,255,.22); border-radius: 14px; background: rgba(53,153,220,.055); }
+.online-room-card h3 { margin: 3px 0; font-size: 16px; }
+.online-room-card h4 { margin: 14px 0 6px; font-size: 12px; }
+.online-room-state { color: var(--muted); font-size: 12px !important; }
+.online-invite-row input { font-family: ui-monospace, monospace; letter-spacing: .12em; }
+.online-room-roster, .online-history-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.online-room-roster li, .online-history-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface); font-size: 12px; }
+.online-room-roster small, .online-history-list small { color: var(--muted); font-size: 10px; text-align: right; }
+.online-history-list li { align-items: flex-start; flex-direction: column; }
+.online-history-list small { text-align: left; }
+.online-mode-note { margin: 6px 1px 10px; font-size: 11px !important; }
+.online-match-panel { margin-top: 14px; padding: 12px; border: 1px solid rgba(115,224,176,.24); border-radius: 12px; background: rgba(115,224,176,.045); }
+.online-match-panel h4 { margin: 3px 0 !important; font-size: 14px !important; }
+.online-match-version { color: var(--muted); font-size: 10px; }
+.online-match-dice { margin: 5px 0 10px; color: var(--ink) !important; font-size: 12px !important; }
+.online-match-pieces { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.online-match-pieces li { display: grid; gap: 4px; padding: 8px 9px; border-radius: 9px; background: var(--surface); font-size: 11px; }
+.online-match-pieces small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.online-match-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 9px; color: var(--muted); font-size: 11px; }
+.online-match-moves button { min-height: 38px; padding: 6px; font-size: 10px; }
+.online-match-panel > .online-mode-note { margin-bottom: 0; }
+@media (max-width: 370px) {
+  .online-screen { padding-inline: 10px; }
+  .online-card { padding: 12px; }
+  .online-provider-actions { gap: 6px; }
+  .online-provider-actions > * { padding-inline: 6px; font-size: 11px; }
+}

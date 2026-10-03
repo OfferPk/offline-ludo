@@ -1,4 +1,4 @@
-# Crossfour: Offline Ludo — Rules (v1.2)
+# Online Ludo — Rules for local modes (v1.2)
 
 The same rules are shown in the game (**Rules** on the home screen or in the match menu). The rules engine is
 `www/js/logic.js` and every rule below is covered by `test/logic.test.js`.

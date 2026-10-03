@@ -1,12 +1,18 @@
-# Privacy Policy – Crossfour: Offline Ludo
+# Privacy Policy – Online Ludo
 
-_Last updated: September 28, 2026_
+_Last updated: October 4, 2026_
 
-Crossfour: Offline Ludo ("the app") is developed by **OfferPk**. This policy explains what information is handled when you use the app on Android or play the web version.
+Online Ludo ("the app") is developed by **OfferPk**. This policy explains what information is handled when you use the app on Android or play the web version.
 
 ## Information we collect
 
-**The app itself does not collect, store on a server, or transmit any personal information.** There are no accounts, no sign-in, no in-app purchases and no analytics run by us. Your game progress (the match in progress, your player and rule choices, statistics, coins, unlocked cosmetic board and dice skins, settings such as sound on/off, and a local recovery checkpoint) is stored **only on your device** (in local storage) and is never sent to us. Uninstalling the app or clearing its data deletes it. Coins are a virtual in-game currency earned by finishing matches and used only to unlock cosmetic board and dice skins; they cannot be bought, sold, bet, wagered or exchanged for money. The app has no online play, no online chat and no accounts: all matches are played on your device against computer players or with people passing the same phone. The quick-chat phrases and emoji are preset, cosmetic and shown only on your own screen; nothing you tap is sent anywhere.
+Offline play does not require an account or a network connection. Your local match, settings, offline coins, unlocked cosmetics and recovery checkpoint remain on your device and are not uploaded by the offline save system. Existing offline coins are not automatically copied into an online wallet.
+
+The optional online account and match service uses email/password authentication through Supabase Auth. When you sign in or create an account, the email address and password you enter are sent to Supabase Auth for authentication; the app does not hardcode the address or save the raw password in local game data. The app can then store an online display name and generated player handle, server-side coin and diamond balances, room membership/readiness, invite-room records, match-history status and (for Online Classic rooms) shared token positions, server-generated dice outcomes and validated moves. Those match details are visible to authenticated participants in that room. Balances and currency transaction history are restricted to the account owner. Email confirmation is disabled, so new email/password accounts are confirmed and signed in immediately without a confirmation link or OTP. Gmail SMTP remains configured for password-reset emails, but reset delivery has not yet been live-tested. Supabase Auth currently limits email to 2 messages per hour and a 60-second per-user resend interval. Mystery and Lucky Chaos remain offline-only in this slice. The app has no client-callable way to create or spend online currency. Do not treat local coins and online balances as interchangeable.
+
+When online sign-in is used, account and match data is transmitted to the Supabase-hosted backend selected for the project. Supabase processes connection data such as IP address as part of providing the service and applies its own privacy and security terms: <https://supabase.com/privacy>. You can continue to play offline without signing in. No analytics service is added by online play.
+
+Coins and diamonds are virtual, non-purchasable and non-transferable in this implementation; they cannot be bought, sold, bet, wagered or exchanged for money. The local quick-chat phrases and emoji remain on-device and are not sent to other players.
 
 ## Advertising (Google AdMob)
 
@@ -25,7 +31,7 @@ This data is encrypted in transit and is processed by Google under Google's own 
 
 Users in the EEA, UK and Switzerland (and other regions where it is required) are asked for consent through Google's **User Messaging Platform (UMP)** consent message before personalized ads are shown. You can change your choice at any time from **Settings → Ad privacy options** in the app (shown where applicable). You can also reset or delete your advertising ID, or opt out of personalized ads, in **Android Settings → Google → Ads** (or **Settings → Privacy → Ads** on newer devices).
 
-The web version at offerpk.github.io does not show ads and does not use cookies.
+The web version at offerpk.github.io does not show ads. The optional Supabase Auth client stores a sign-in session in browser/app storage when you sign in. Password fields are cleared after submission and passwords are not written to local game saves; without signing in, the online feature is not used.
 
 ## Haptics
 
@@ -37,7 +43,7 @@ The app is a general-audience board game intended for users aged 13 and over and
 
 ## Security
 
-Because we do not collect personal data, we do not store any personal data on our servers.
+Online account data is protected by database row-level access controls. Currency balances cannot be changed directly by the app client; trusted server-side operations are required for transactions. Never share your password or an email-confirmation/password-reset link with another player.
 
 ## Changes
 
