@@ -26,6 +26,9 @@ body.has-banner .screen { padding-bottom: calc(var(--sab) + max(var(--banner-h),
 #banner-slot { display: none; }
 
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px 4px; min-height: 52px; }
+.topbar-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.topbar-actions .icon-btn { flex: none; }
+#game .turn-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
 .topbar h2 { margin: 0; font-size: 18px; font-weight: 700; }
 .icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; color: var(--ink); }
 .icon-btn svg { width: 22px; height: 22px; }
@@ -234,10 +237,12 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .toolbar { width: var(--bs); height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
 .tool { min-width: 64px; height: 42px; padding: 0 10px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--muted); position: relative; border-radius: 12px; background: var(--surface); border: 1px solid var(--surface-edge); overflow: visible; }
 .tool svg { width: 20px; height: 20px; color: var(--ink); }
-.tool.exit-match { min-width: 0; width: 68px; padding: 0 6px; gap: 4px; border-color: rgba(140,205,247,.24); color: #c9efff; background: linear-gradient(135deg, rgba(93,178,220,.16), rgba(128,111,211,.12)), rgba(255,255,255,.035); box-shadow: inset 0 1px 0 rgba(255,255,255,.11), 0 5px 16px rgba(0,0,0,.12); backdrop-filter: blur(12px) saturate(1.1); }
-.tool.exit-match svg { width: 18px; height: 18px; color: #a8e3ff; }
-.tool.exit-match span { font-size: 10.5px; }
-.tool.exit-match:active { border-color: rgba(157,223,255,.48); box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 0 14px rgba(96,191,236,.18); }
+.exit-match { flex: none; width: 64px; min-width: 64px; height: 40px; padding: 0 7px; display: flex; align-items: center; justify-content: center; gap: 4px; border: 1px solid rgba(140,205,247,.3); border-radius: 12px; color: #c9efff; background: linear-gradient(135deg, rgba(93,178,220,.19), rgba(128,111,211,.15)), rgba(255,255,255,.04); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 5px 16px rgba(0,0,0,.14); backdrop-filter: blur(12px) saturate(1.1); font-size: 10.5px; font-weight: 750; white-space: nowrap; }
+.exit-match svg { flex: none; width: 16px; height: 16px; color: #a8e3ff; }
+.exit-match:focus-visible { outline: 3px solid #9ad9ff; outline-offset: 2px; }
+.exit-match:hover { border-color: rgba(157,223,255,.48); background: linear-gradient(135deg, rgba(93,178,220,.25), rgba(128,111,211,.2)), rgba(255,255,255,.06); }
+.exit-match:active { border-color: rgba(157,223,255,.58); box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 0 14px rgba(96,191,236,.18); }
+body.light .exit-match { color: #28536b; border-color: rgba(53,120,154,.3); background: linear-gradient(135deg, rgba(93,178,220,.2), rgba(128,111,211,.14)), rgba(255,255,255,.58); }
 .tool:disabled { opacity: .35; }
 .tool.live { color: var(--ink); border-color: var(--accent); }
 .tool .ad-badge { position: absolute; top: -8px; right: -4px; font-style: normal; font-size: 9px; font-weight: 800; background: var(--accent); color: var(--accent-ink); padding: 1px 5px; border-radius: 6px; }
