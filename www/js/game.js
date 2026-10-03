@@ -8,11 +8,13 @@
   var native = !!(Ads && Ads.isNative());
   var SAVE_KEY = 'crossfour.save.v3', CHECKPOINT_KEY = 'crossfour.save.checkpoint.v3';
   var V2_KEY = 'crossfour.save.v2', OLD_KEY = 'crossfour.save.v1';
+  var TUTORIAL_KEY = 'crossfour.tutorial.v1';
+  var tutorial = { active: false, intro: false, firstMove: false };
   var NAMES = SK.SEAT_NAMES;
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
   var ACCENT = { graphite: ['#f4b740', '#1c1504'], linen: ['#2b3140', '#ffffff'], walnut: ['#e0a232', '#231605'], aurora: ['#27e0b3', '#03261d'] };
   var CORE_LIGHTS = ['#ffd0c1', '#a0ffd2', '#ffe7a3', '#a9ddff'];
-  var UNDO_MS = 2200, TIMER_MS = 20000, FREE_UNDOS = 3;
+  var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, FREE_UNDOS = 3;
   var PHRASES = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!'];
 
   // ---------------- save ----------------
@@ -323,7 +325,7 @@
       el.innerHTML = '<div class="avatar"><svg class="tring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/></svg><span class="av">' + ART.avatar(pl.type) + '</span>' +
         (pl.type === 'ai' ? '<span class="lvtag">' + LEVEL_NAMES[pl.level].charAt(0) + '</span>' : '') + '<span class="lkb"></span></div>' +
         '<div class="pmeta"><b class="pname"></b><small class="plvl"></small><div class="chips"></div></div>' +
-        '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + ' (tap or swipe)">' + cubeHTML() + '<em class="boost-tag hidden"></em></button>' +
+        '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + ' (tap or swipe)">' + cubeHTML() + '<i class="roll-countdown" aria-hidden="true"></i><em class="boost-tag hidden"></em></button>' +
         '<div class="bubble hidden"></div>';
       var die = el.querySelector('.pdice');
       window.DiceGesture.bind(die, function (e) {
@@ -445,8 +447,9 @@
 
   // ---------------- flow control ----------------
   var runToken = 0, timers = [], busy = false, paused = false, keyboardRoll = false;
+  var autoRollTk = null, autoRollKey = null, autoRollDeadline = 0, autoRollRemaining = null;
   function later(fn, ms) { var tk = runToken; var id = setTimeout(function () { var k = timers.indexOf(id); if (k >= 0) timers.splice(k, 1); if (tk === runToken) fn(); }, ms); timers.push(id); return id; }
-  function cancelFlow() { runToken++; timers.forEach(clearTimeout); timers = []; Object.keys(activeMotions).forEach(function (id) { var motion = activeMotions[id]; if (motion && motion.cancel) motion.cancel(); }); activeMotions = {}; moving = {}; busy = false; keyboardRoll = false; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
+  function cancelFlow() { stopAutoRollTimer(false); runToken++; timers.forEach(clearTimeout); timers = []; Object.keys(activeMotions).forEach(function (id) { var motion = activeMotions[id]; if (motion && motion.cancel) motion.cancel(); }); activeMotions = {}; moving = {}; busy = false; keyboardRoll = false; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
   function gameVisible() { return !$('game').classList.contains('hidden') && document.visibilityState === 'visible'; }
   function humans(st) { return st.players.filter(function (s) { return st.seats[s].type === 'human'; }); }
   function hasAI(st) { return st.players.some(function (s) { return st.seats[s].type === 'ai'; }); }
@@ -463,6 +466,81 @@
     if (G.sel != null && chipMoves(G.sel).length) return;
     G.sel = null;
     for (var i = 0; i < st.queue.length; i++) if (chipMoves(st.queue[i]).length) { G.sel = st.queue[i]; break; }
+  }
+  function tutorialSeen() {
+    try { return window.localStorage.getItem(TUTORIAL_KEY) === '1'; }
+    catch (e) { return false; }
+  }
+  function markTutorialSeen() {
+    try { window.localStorage.setItem(TUTORIAL_KEY, '1'); }
+    catch (e) { /* The tutorial still works if device storage is unavailable. */ }
+  }
+  function updateTutorial() {
+    var intro = $('tutorial-intro'), coach = $('tutorial-coach');
+    if (!tutorial.active || !G || G.mode !== 'classic' || $('game').classList.contains('hidden')) {
+      intro.classList.add('hidden'); coach.classList.add('hidden');
+      each(document.querySelectorAll('.tutorial-target'), function (el) { el.classList.remove('tutorial-target'); });
+      return;
+    }
+    if (tutorial.intro) { intro.classList.remove('hidden'); coach.classList.add('hidden'); return; }
+    intro.classList.add('hidden');
+    var st = G.st;
+    var stage = tutorial.firstMove || st.phase === 'over' ? 'finish' : !isHuman(st.turn) ? 'wait' : st.phase === 'move' ? 'move' : 'roll';
+    var title, copy, kicker, progress;
+    if (stage === 'wait') {
+      kicker = 'FIRST MATCH · GET READY'; title = 'Your turn is coming up';
+      copy = 'Watch the board. When it’s your turn, tap or swipe the highlighted die. You need a 6 to bring a token out of base.';
+      progress = 1;
+    } else if (stage === 'roll') {
+      kicker = 'FIRST MATCH · STEP 1 OF 2'; title = 'Roll your die';
+      if (st.queue.length || st.sixes || st.bonus) copy = save.rules.rollStyle === 'star' ? 'A 6 earns another roll. Your dice stay as chips in your corner until it’s time to move.' : 'Roll again when you’re ready. A 6 gives you another roll after you move it.';
+      else copy = 'Tap or swipe the die in your corner. You need a 6 to bring a token out of base.';
+      progress = 1;
+    } else if (stage === 'move') {
+      kicker = 'FIRST MATCH · STEP 2 OF 2'; title = 'Choose a move';
+      copy = save.settings.auto ? 'Tap a dice chip, then a glowing token. If only one move is possible, Auto-move may play it for you.' : 'Tap a dice chip, then tap one of your glowing tokens to move it.';
+      progress = 2;
+    } else {
+      kicker = 'FIRST MATCH · ALL SET'; title = 'Nice first move!';
+      var bonusCopy = save.rules.bonusOnCapture && save.rules.bonusOnHome ? ' Captures and reaching home each earn a bonus roll.' :
+        save.rules.bonusOnCapture ? ' Captures earn a bonus roll.' : save.rules.bonusOnHome ? ' Reaching home earns a bonus roll.' : '';
+      copy = 'Roll a 6 to launch tokens and move clockwise.' + bonusCopy + ' You need an exact roll to reach home; first to bring all 4 tokens home wins.';
+      progress = 3;
+    }
+    $('tutorial-kicker').textContent = kicker;
+    $('tutorial-title').textContent = title;
+    $('tutorial-copy').textContent = copy;
+    $('tutorial-done').classList.toggle('hidden', stage !== 'finish');
+    each(document.querySelectorAll('.tutorial-progress i'), function (el, i) { el.classList.toggle('on', i < progress); });
+    coach.classList.remove('hidden');
+    each(document.querySelectorAll('.tutorial-target'), function (el) { el.classList.remove('tutorial-target'); });
+    var target = null, anchorTarget = null, pod = podEl(st.turn);
+    if (stage === 'roll' && pod) target = pod.querySelector('.pdice');
+    else if (stage === 'move' && pod) {
+      target = pod.querySelector('.chip-v:not(.dim)') || document.querySelector('#pieces .pc.can');
+      anchorTarget = document.querySelector('#pieces .pc.can') || target;
+    } else target = $('turn-label');
+    if (!anchorTarget) anchorTarget = target;
+    if (target) target.classList.add('tutorial-target');
+    var card = coach.querySelector('.tutorial-card'), anchor = anchorTarget && anchorTarget.getBoundingClientRect();
+    if (!anchor || !anchor.width) anchor = $('turn-label').getBoundingClientRect();
+    var cardRect = card.getBoundingClientRect(), pad = 12, minTop = Math.max(58, (window.visualViewport ? window.visualViewport.offsetTop : 0) + 8);
+    var left = Math.max(pad, Math.min(window.innerWidth - cardRect.width - pad, anchor.left + anchor.width / 2 - cardRect.width / 2));
+    var top = anchor.top < window.innerHeight / 2 ? anchor.bottom + 12 : anchor.top - cardRect.height - 12;
+    top = Math.max(minTop, Math.min(window.innerHeight - cardRect.height - pad, top));
+    card.style.left = left + 'px'; card.style.top = top + 'px';
+  }
+  function closeTutorial() {
+    markTutorialSeen(); tutorial.active = false; tutorial.intro = false; tutorial.firstMove = false;
+    $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
+    each(document.querySelectorAll('.tutorial-target'), function (el) { el.classList.remove('tutorial-target'); });
+    if (G && !$('game').classList.contains('hidden') && !paused) { render(); advance(); }
+  }
+  function beginTutorial() {
+    if (!tutorial.active || !tutorial.intro) return;
+    markTutorialSeen(); tutorial.intro = false;
+    $('tutorial-intro').classList.add('hidden'); updateTutorial();
+    advance(); focusTurnControl();
   }
   // ---- Lucky Chaos pod widgets: charge meter, streak, revenge, stored powers, Mega button ----
   var POWER_NAMES = { dbl: 'Double Roll', six: 'Lucky 6', escape: 'Safe Escape' };
@@ -543,6 +621,7 @@
     u.disabled = !act; u.classList.toggle('live', act);
     $('undo-label').textContent = G.undoLeft > 0 ? 'Undo (' + G.undoLeft + ')' : 'Undo';
     $('undo-ad').classList.toggle('hidden', G.undoLeft > 0);
+    updateTutorial();
   }
   function clearHighlights() { each(document.querySelectorAll('.pc.can'), function (e) { e.classList.remove('can'); }); }
   function highlight() {
@@ -571,14 +650,13 @@
   function startTimer() {
     var st = G.st, s = st.turn, el = podEl(s);
     stopTimer();
-    if (!save.settings.timer || !isHuman(s) || st.phase === 'over' || !el) return;
+    if (!save.settings.timer || !isHuman(s) || st.phase !== 'move' || !el) return;
     el.style.setProperty('--tdur', TIMER_MS + 'ms'); void el.offsetWidth; el.classList.add('timing');
     G.timerTk = later(function () {
       G.timerTk = null;
-      if (!G || busy || G.st.turn !== s || !isHuman(s)) return;
+      if (!G || busy || G.st.turn !== s || G.st.phase !== 'move' || !isHuman(s)) return;
       toast('Time is up: playing for you', 1200);
-      if (G.st.phase === 'roll') doRoll(L.mustChoose(G.st) ? L.chooseDieValue(G.st, s, 'medium') : undefined);
-      else if (G.st.phase === 'move') { var c = L.chooseMove(G.st, 'medium'); if (c) doMove(c.piece, c.v); }
+      var c = L.chooseMove(G.st, 'medium'); if (c) doMove(c.piece, c.v);
     }, TIMER_MS);
   }
   function stopTimer() {
@@ -586,12 +664,45 @@
     if (G && G.timerTk) { clearTimeout(G.timerTk); var k = timers.indexOf(G.timerTk); if (k >= 0) timers.splice(k, 1); G.timerTk = null; }
   }
 
+  function clearAutoRollVisual() {
+    each(document.querySelectorAll('.pdice.counting'), function (die) { die.classList.remove('counting'); });
+  }
+  function stopAutoRollTimer(preserveRemaining) {
+    if (autoRollTk) {
+      if (preserveRemaining) autoRollRemaining = Math.max(0, autoRollDeadline - Date.now());
+      clearTimeout(autoRollTk);
+      var k = timers.indexOf(autoRollTk); if (k >= 0) timers.splice(k, 1);
+      autoRollTk = null;
+    }
+    clearAutoRollVisual();
+    if (!preserveRemaining) { autoRollKey = null; autoRollDeadline = 0; autoRollRemaining = null; }
+  }
+  function startAutoRollTimer() {
+    var st = G && G.st;
+    if (!st || st.phase !== 'roll' || !isHuman(st.turn) || busy || paused || tutorial.intro || !gameVisible() || isOpen('confirm')) {
+      if (autoRollTk) stopAutoRollTimer(true);
+      return;
+    }
+    var s = st.turn, key = s + ':' + st.rolls + ':' + st.turnCount;
+    if (autoRollKey !== key) { stopAutoRollTimer(false); autoRollKey = key; autoRollRemaining = AUTO_ROLL_MS; }
+    if (autoRollTk) return;
+    if (autoRollRemaining == null) autoRollRemaining = AUTO_ROLL_MS;
+    var duration = Math.max(0, autoRollRemaining), diePod = podEl(s), die = diePod && diePod.querySelector('.pdice');
+    autoRollDeadline = Date.now() + duration;
+    if (die) { die.style.setProperty('--roll-countdown-ms', duration + 'ms'); die.classList.remove('counting'); void die.offsetWidth; die.classList.add('counting'); }
+    autoRollTk = later(function () {
+      autoRollTk = null; autoRollKey = null; autoRollDeadline = 0; autoRollRemaining = null; clearAutoRollVisual();
+      if (!G || busy || paused || !gameVisible() || isOpen('confirm') || G.st.turn !== s || G.st.phase !== 'roll' || !isHuman(s)) return;
+      doRoll(L.mustChoose(G.st) ? L.chooseDieValue(G.st, s, G.st.seats[s].level) : undefined);
+    }, duration);
+  }
+
   function advance() {
     if (!G) return;
     var st = G.st;
     render(); persist();
     if (st.phase === 'over') { later(finishMatch, 800); return; }
-    if (paused || !gameVisible() || busy) return;
+    if (paused || tutorial.intro || !gameVisible() || busy) return;
     if (undoActive() && !isHuman(st.turn)) return; // waiting for the undo window after a human roll that passed the turn
     var s = st.turn, pl = st.seats[s];
     highlight();
@@ -603,7 +714,7 @@
       }, aiDelay());
       else later(aiMove, aiDelay() * 0.6);
     } else if (st.phase === 'move') offerMoves();
-    else startTimer();
+    else startAutoRollTimer();
   }
   function aiMove() { if (!G || busy || G.st.phase !== 'move') return; var c = L.chooseMove(G.st, G.st.seats[G.st.turn].level); if (c) doMove(c.piece, c.v); }
 
@@ -638,6 +749,7 @@
   function doRoll(chosen) {
     if (!G || busy || G.st.phase !== 'roll' || paused) return;
     var st = G.st, s = st.turn, human = isHuman(s);
+    stopAutoRollTimer(false);
     if (L.mustChoose(st) && chosen == null) {
       if (human) { stopTimer(); openPicker(); return; }
       chosen = L.chooseDieValue(st, s, st.seats[s].level);
@@ -769,7 +881,7 @@
     if (!G || busy || G.st.phase !== 'move' || paused) return;
     var st = G.st, s = st.turn, human = isHuman(s);
     if (!st.moves.some(function (m) { return m.piece === piece && (v == null || m.v === v); })) return;
-    busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); hide('chat');
+    busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); stopAutoRollTimer(false); hide('chat');
     var res = L.move(st, piece, v, forcedEvents.length ? forcedEvents.shift() : undefined);
     if (human) { save.stats.captures += res.captures.length; if (res.finish) save.stats.home++; if (res.event) save.stats.events++; }
     G.sel = null;
@@ -786,6 +898,7 @@
       if (res.kingCaptured) { pause = Math.max(pause, 900); toast(nameOf(s) + ' toppled a King! Mega Wheel charged (5/5)', 1600); later(function () { SFX.mega(); }, 300); }
       if (res.crowned) { pause = Math.max(pause, 900); later(function () { crownFx(res.crowned); }, res.captures.length ? 420 : 0); }
       var done = function () {
+        if (human && tutorial.active && !tutorial.intro) tutorial.firstMove = true;
         layoutPieces(); busy = false; G.actor = null;
         if (human && !res.over && st.turn === s && st.phase === 'roll') toast(st.boost[s] === 'choose' ? 'Pick a number for your next roll' : 'Bonus roll!', 1000);
         render();
@@ -1031,14 +1144,16 @@
   }
 
   // ---------------- match lifecycle ----------------
-  function startMatch(seats, mode) {
+  function startMatch(seats, mode, offerTutorial) {
     cancelFlow();
+    tutorial.active = offerTutorial === true && mode === 'classic' && !tutorialSeen();
+    tutorial.intro = tutorial.active; tutorial.firstMove = false;
     var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
     G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now() };
     save.game = G; persist();
     spins = [0, 0, 0, 0];
     showGame();
-    focusTurnControl();
+    if (tutorial.intro) $('tutorial-start').focus(); else focusTurnControl();
   }
   function finishMatch() {
     if (!G || G.st.phase !== 'over') return;
@@ -1128,6 +1243,7 @@
   function showHome() {
     cancelFlow(); stopTimer(); paused = false;
     ['result', 'menu', 'chat'].forEach(hide);
+    $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
     screen('home'); updateHome(); setCoins(); setLevel();
   }
   function updateHome() {
@@ -1148,35 +1264,48 @@
     if (r.blocks) out.push('blocks');
     if (!r.bonusOnCapture) out.push('no capture bonus');
     if (!r.bonusOnHome) out.push('no home bonus');
-    return out.join(' · ');
+    return out;
   }
   function renderSetup() {
     var seats = save.setup[setupKind], list = $('seat-list'); list.innerHTML = '';
-    each($('mode-seg').children, function (b) { b.classList.toggle('on', b.dataset.mode === setupMode); });
+    each($('mode-seg').children, function (b) { var selected = b.dataset.mode === setupMode; b.classList.toggle('on', selected); b.setAttribute('aria-pressed', selected ? 'true' : 'false'); });
     $('mode-note').textContent = setupMode === 'mystery' ? 'Mystery Tiles: ? and ! tiles on the track spin a wheel of events (shield, jump, swap, zap, freeze…). No stakes: every match is free.' :
       setupMode === 'lucky' ? 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.' : 'Classic Ludo on a clean board.';
     $('btn-howto').classList.toggle('hidden', setupMode !== 'lucky');
     var order = [0, 1, 3, 2], pos = ['top left', 'top right', 'bottom right', 'bottom left'];
     order.forEach(function (s) {
       var x = seats[s], cur = !x ? 'off' : x.type === 'human' ? 'human' : x.level;
-      var row = document.createElement('div'); row.className = 'seat';
-      row.innerHTML = '<span class="sw-dot" style="background:' + seatColor(s) + '"></span><span class="sname">' + NAMES[s] + '<br><small>' + pos[s] + '</small></span><div class="seg"></div>';
-      var seg = row.querySelector('.seg');
+      var row = document.createElement('div'); row.className = 'seat'; row.dataset.seat = s;
+      row.setAttribute('role', 'group'); row.setAttribute('aria-label', NAMES[s] + ' seat, ' + pos[s]);
+      var head = document.createElement('div'); head.className = 'seat-head';
+      var dot = document.createElement('span'); dot.className = 'sw-dot'; dot.style.background = seatColor(s); dot.setAttribute('aria-hidden', 'true');
+      var name = document.createElement('span'); name.className = 'sname'; name.textContent = NAMES[s];
+      var position = document.createElement('small'); position.textContent = pos[s]; name.appendChild(position); head.appendChild(dot); head.appendChild(name); row.appendChild(head);
+      var seg = document.createElement('div'); seg.className = 'seg seat-options'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', NAMES[s] + ' player type');
       [['off', 'Off'], ['human', 'Human'], ['easy', 'Easy'], ['medium', 'Normal'], ['hard', 'Hard']].forEach(function (o) {
-        var b = document.createElement('button'); b.textContent = o[1]; b.dataset.v = o[0]; b.dataset.seat = s; if (o[0] === cur) b.className = 'on';
-        b.addEventListener('click', function () {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = o[1]; b.dataset.v = o[0]; b.dataset.seat = s;
+        var selected = o[0] === cur; b.setAttribute('aria-pressed', selected ? 'true' : 'false'); if (selected) b.className = 'on';
+        b.addEventListener('click', function (e) {
+          var keyboard = e.detail === 0;
           SFX.click();
           seats[s] = o[0] === 'off' ? null : o[0] === 'human' ? { type: 'human' } : { type: 'ai', level: o[0] };
           persist(); renderSetup();
+          if (keyboard) {
+            var next = list.querySelector('.seat-options button[data-seat="' + s + '"][data-v="' + o[0] + '"]');
+            if (next) next.focus({ preventScroll: true });
+          }
         });
         seg.appendChild(b);
       });
+      row.appendChild(seg);
       list.appendChild(row);
     });
     var n = seats.filter(Boolean).length, h = seats.filter(function (x) { return x && x.type === 'human'; }).length;
     var msg = n < 2 ? 'Choose at least 2 players.' : h < 1 ? 'At least one player must be human.' : '';
     $('setup-msg').textContent = msg; $('btn-start').disabled = !!msg;
-    $('rules-sum').textContent = rulesSummary();
+    each($('presets').children, function (b) { var selected = (b.dataset.p === '1v1' && n === 2) || (b.dataset.p === '3' && n === 3) || (b.dataset.p === '4' && n === 4); b.setAttribute('aria-pressed', selected ? 'true' : 'false'); });
+    var summary = $('rules-sum'); summary.innerHTML = '';
+    rulesSummary().forEach(function (text) { var chip = document.createElement('span'); chip.className = 'rule-chip'; chip.textContent = text; summary.appendChild(chip); });
   }
   function applyPreset(p) {
     var seats = save.setup[setupKind], lvl = 'medium';
@@ -1195,10 +1324,27 @@
   }
   function openMenu() { if (!G) return; cancelFlow(); stopTimer(); paused = true; layoutPieces(true); render(); persist(); show('menu'); }
   function resumeFromMenu() { hide('menu'); paused = false; layoutPieces(true); advance(); }
-  function askConfirm(title, text, yes, onYes) {
+  function askConfirm(title, text, yes, onYes, onNo) {
     $('confirm-title').textContent = title; $('confirm-text').textContent = text; $('confirm-yes').textContent = yes;
+    $('confirm').classList.toggle('exit-confirm', title === 'Exit match?');
     $('confirm-yes').onclick = function () { hide('confirm'); onYes(); };
+    $('confirm-no').onclick = function () {
+      SFX.click(); hide('confirm');
+      if (onNo) { onNo(); return; }
+      if (G && !$('game').classList.contains('hidden') && paused) show('menu');
+    };
     show('confirm');
+  }
+  function openExitConfirmation() {
+    if (!G || G.st.phase === 'over') return;
+    cancelFlow(); stopTimer(); paused = true; hide('chat');
+    layoutPieces(true); render(); persist();
+    askConfirm('Exit match?', 'Are you sure you want to exit the match? Progress will be lost.', 'Exit', function () {
+      cancelFlow(); stopTimer(); G = null; save.game = null; persist(); showHome();
+    }, function () {
+      hide('menu'); paused = false;
+      if (G) { buildPods(); buildTiles(); buildPieces(); layout(); render(); advance(); }
+    });
   }
 
   // ---------------- stats / skins / settings / rules ----------------
@@ -1315,10 +1461,15 @@
   $('btn-start').addEventListener('click', function () {
     SFX.unlock(); SFX.click();
     var seats = save.setup[setupKind].map(function (x) { return x ? { type: x.type, level: x.level } : null; }), mode = setupMode;
+    var offerTutorial = mode === 'classic' && !tutorialSeen();
     save.setup.mode[setupKind] = mode;
-    if (G && G.st.phase !== 'over') askConfirm('Start a new match?', 'Your saved match will be replaced.', 'Start', function () { startMatch(seats, mode); });
-    else startMatch(seats, mode);
+    if (G && G.st.phase !== 'over') askConfirm('Start a new match?', 'Your saved match will be replaced.', 'Start', function () { startMatch(seats, mode, offerTutorial); });
+    else startMatch(seats, mode, offerTutorial);
   });
+  $('tutorial-start').addEventListener('click', function () { SFX.click(); beginTutorial(); });
+  $('tutorial-intro-skip').addEventListener('click', function () { SFX.click(); closeTutorial(); });
+  $('tutorial-skip').addEventListener('click', function () { SFX.click(); closeTutorial(); });
+  $('tutorial-done').addEventListener('click', function () { SFX.click(); closeTutorial(); });
   // chips: pick which value to move next
   $('stage').addEventListener('click', function (e) {
     var c = e.target.closest ? e.target.closest('.chip-v') : null;
@@ -1346,7 +1497,7 @@
   $('btn-r-again').addEventListener('click', function () { leaveResult('again'); });
   $('btn-r-home').addEventListener('click', function () { leaveResult('home'); });
   $('btn-r-double').addEventListener('click', doubleCoins);
-  $('confirm-no').addEventListener('click', function () { SFX.click(); hide('confirm'); if (G && !$('game').classList.contains('hidden') && paused) show('menu'); });
+  $('btn-exit-match').addEventListener('click', function () { SFX.click(); openExitConfirmation(); });
   $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); show('stats'); });
   $('btn-skins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   $('btn-rules').addEventListener('click', function () { SFX.unlock(); SFX.click(); openRules('basics'); });
@@ -1383,10 +1534,20 @@
         return;
       }
       save = resetData;
+      try { window.localStorage.removeItem(TUTORIAL_KEY); } catch (e) { /* The main progress reset succeeded. */ }
       location.reload();
     });
   });
   document.addEventListener('keydown', function (e) {
+    if (tutorial.intro && e.key === 'Escape') { e.preventDefault(); closeTutorial(); return; }
+    if (tutorial.intro && e.key === 'Tab') {
+      var dialogButtons = document.querySelectorAll('#tutorial-intro button:not([disabled])');
+      if (!dialogButtons.length) return;
+      var firstDialogButton = dialogButtons[0], lastDialogButton = dialogButtons[dialogButtons.length - 1];
+      if (e.shiftKey && document.activeElement === firstDialogButton) { e.preventDefault(); lastDialogButton.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastDialogButton) { e.preventDefault(); firstDialogButton.focus(); }
+      return;
+    }
     if (!G || $('game').classList.contains('hidden') || paused) return;
     if (e.key === ' ' || e.key === 'Enter') {
       if (e.target && e.target.closest && e.target.closest('button, a, input, select, textarea')) return;

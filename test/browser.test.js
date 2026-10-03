@@ -56,7 +56,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   }
 
   await page.goto(URL, { waitUntil: 'networkidle0' });
-  await ev(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle0' }); await sleep(300);
+  await ev(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await page.reload({ waitUntil: 'networkidle0' }); await sleep(300);
   ok(await visible('#home') && !(await visible('#btn-continue')), 'home on launch, nothing to continue');
   ok(await visible('#btn-mystery'), 'Mystery Tiles mode on home screen');
   ok((await ev(() => window.__cf.gate.state.sessions)) === 1, 'first session counted');
@@ -88,6 +88,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
 
   await ev(() => {
     localStorage.clear();
+    localStorage.setItem('crossfour.tutorial.v1', '1');
     localStorage.setItem('crossfour.save.v1', JSON.stringify({ coins: 77, xp: 123, owned: { boards: ['linen'], dice: ['brass'] }, board: 'linen', dice: 'brass',
       settings: { sound: false, fast: true }, stats: { played: 4, won: 2 }, ad: { matchesCompleted: 7 }, setup: { rules: { safeSquares: false, extraOnCapture: false } } }));
   });
@@ -106,10 +107,10 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await sleep(200);
   ok(await ev(() => {
     const c = window.__cf, checkpoint = JSON.parse(localStorage.getItem('crossfour.save.checkpoint.v3'));
-    return c.save.coins === 0 && c.save.xp === 0 && c.save.stats.played === 0 && c.save.ad.matchesCompleted === 7 &&
+    return c.save.coins === 0 && c.save.xp === 0 && c.save.stats.played === 0 && c.save.ad.matchesCompleted === 7 && !localStorage.getItem('crossfour.tutorial.v1') &&
       !localStorage.getItem('crossfour.save.v1') && !localStorage.getItem('crossfour.save.v2') && checkpoint.payload.coins === 0;
   }), 'confirmed Reset progress clears stale snapshots/legacy keys while retaining ad pacing');
-  await ev(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+  await ev(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
 
   const v2 = await ev(() => {
     const c = window.__cf, seats = [{ type: 'human' }, { type: 'human' }, null, null];
@@ -190,7 +191,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await edit('st.phase="over"; st.ranking=st.players.slice(); st.queue=[]; st.moves=[]; st.pieces.forEach(function (p) { if (p) p.fill(57); });');
   await waitFor(() => !document.getElementById('result').classList.contains('hidden'), 5000, 'migrated match result before fixture cleanup');
   await page.tap('#btn-r-home'); await waitFor(() => { const h = document.getElementById('home'); return h && !h.classList.contains('hidden'); }, 5000, 'migrated match cleared through normal result flow');
-  await ev(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+  await ev(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
   ok(await visible('#home') && !(await visible('#btn-continue')) && (await ev(() => window.__cf.gate.state.sessions)) === 1, 'clean browser fixture restored after migration tests');
   await page.screenshot({ path: OUT + '/cf-home.png' });
 

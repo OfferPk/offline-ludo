@@ -26,14 +26,14 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
   await page.setRequestInterception(true);
   const reload = async () => { await page.reload({ waitUntil: 'networkidle0' }); await sleep(120); };
   const seedSave = async (key, value) => {
-    await page.evaluate((k, v) => { localStorage.clear(); localStorage.setItem(k, JSON.stringify(v)); }, key, value);
+    await page.evaluate((k, v) => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); localStorage.setItem(k, JSON.stringify(v)); }, key, value);
     await reload();
   };
 
   try {
     console.log('Testing', URL, 'at 320px; screenshots:', OUT);
     await page.goto(URL, { waitUntil: 'networkidle0' });
-    await page.evaluate(() => localStorage.clear()); await reload();
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await reload();
 
     // v1 and v2 are migrated, while v3 primary/checkpoint snapshots are normalized in place.
     const v1 = { coins: 77, xp: 123, owned: { boards: ['linen'], dice: ['brass'] }, board: 'linen', dice: 'brass',
@@ -60,7 +60,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
       return { schemaVersion: 3, savedAt: 1700000000000, payload: s };
     });
     await page.evaluate(snapshot => {
-      localStorage.clear(); localStorage.setItem('crossfour.save.v3', JSON.stringify(snapshot));
+      localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); localStorage.setItem('crossfour.save.v3', JSON.stringify(snapshot));
       localStorage.setItem('crossfour.save.checkpoint.v3', JSON.stringify(snapshot));
     }, legacyV3);
     await reload();
@@ -69,7 +69,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === false, 'old v3 primary/checkpoint are normalized without schema loss');
 
     // Start shop tests from a clean local-only profile.
-    await page.evaluate(() => localStorage.clear()); await reload();
+    await page.evaluate(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await reload();
     await page.click('#btn-skins'); await page.waitForSelector('#skins:not(.hidden) #skin-grid [data-id="graphite"]');
     ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === 20, 'real Boards tab renders all 20 boards');
     ok(await page.evaluate(() => {
