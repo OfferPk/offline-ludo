@@ -24,7 +24,7 @@ The live Auth URL configuration is:
 - `http://localhost:8080/` and `http://localhost:8080/**`
 - `com.offerpk.offlineludo://auth-callback` for Android email-confirmation/password-reset deep links
 
-No custom SMTP host, account, or password is configured. Consequently, successful email confirmation and password-reset delivery has not been verified; if messages do not arrive, a custom SMTP sender must be configured in Supabase Auth. Do not turn off confirmation merely to avoid configuring email delivery. The user enters their own password in the portal; no password is needed in source control or chat.
+Custom SMTP setup is intentionally deferred; no SMTP host, account, or password is configured. Supabase's default Auth sender only delivers to addresses in the project's team, currently limits sends to 2 messages per hour, and has no delivery SLA. As a result, signup-confirmation and password-reset mail may not reach an external user address until custom SMTP is configured. To enable external delivery later, configure an SMTP host, port, username, password, verified sender email, and sender display name in Supabase Auth; see the [official SMTP guide](https://supabase.com/docs/guides/auth/auth-smtp). Do not turn off email confirmation as a workaround. The user enters their own password in the portal; no password is needed in source control or chat.
 
 ## What the online client supports
 
@@ -36,4 +36,4 @@ These online account/lobby functions remain separate from offline play. Existing
 
 ## Verification boundary
 
-The deployed schema, RLS, table grants, RPC grants, migration history, Auth email-provider/signup flags, Site URL, and redirect allowlist were checked on the target project. Unit tests and a deterministic browser test exercise the email/password UI, errors, confirmation/reset paths, mocked profiles/wallets/Realtime/matchmaking, sign-out, and offline fallback without creating real accounts or rooms. A real account sign-in was not performed; the user enters their own credentials in the portal. Email-confirmation and password-reset delivery still depend on SMTP readiness.
+The deployed schema, RLS, table grants, RPC grants, migration history, Auth email-provider/signup flags, Site URL, and redirect allowlist were checked on the target project. Unit tests and a deterministic browser test exercise the email/password UI, errors, confirmation/reset paths, mocked profiles/wallets/Realtime/matchmaking, sign-out, and offline fallback without creating real accounts or rooms. A real account sign-in was not performed; the user enters their own credentials in the portal. SMTP remains intentionally deferred, and confirmation/reset delivery to addresses outside the Supabase project team is not expected until a custom SMTP sender is configured.

@@ -99,7 +99,7 @@
     } else if (!emailPasswordEnabled()) {
       $('online-config-note').textContent = 'Email/password sign-in is disabled for this project. Offline play remains available.';
     } else {
-      $('online-config-note').textContent = 'Sign in with email and password or create an account. Email confirmation may be required.';
+      $('online-config-note').textContent = 'Sign in with email/password or create an account. Confirmation is required; without custom SMTP, Supabase email is limited to project-team addresses.';
     }
     if (recovering) {
       $('online-wallet-coins').textContent = '—';
@@ -164,7 +164,7 @@
         announce('Account created and signed in.');
         return refreshAccount();
       }
-      announce('Account created. Check your email for a confirmation link before signing in. If no message arrives, email delivery may need configuration.');
+      announce('Account created. Check your email for a confirmation link before signing in. Supabase default email only reaches project-team addresses; if this address is not on the team, the link will not arrive until custom SMTP is configured.');
     }).catch(function (error) { announce('Account creation failed: ' + errorText(error), true); });
   }
   function requestPasswordReset() {
@@ -174,7 +174,7 @@
     announce('Requesting a password reset…');
     client.auth.resetPasswordForEmail(emailField.value.trim(), { redirectTo: authRedirectUrl() }).then(function (result) {
       if (result.error) throw result.error;
-      announce('If an account exists for that address, a reset link will be sent. If no message arrives, email delivery may need configuration.');
+      announce('If an account exists for that address, a reset link will be sent. Supabase default email only reaches project-team addresses; if this address is not on the team, the link will not arrive until custom SMTP is configured.');
     }).catch(function (error) { announce('Password reset could not be requested: ' + errorText(error), true); });
   }
   function updateRecoveredPassword(event) {

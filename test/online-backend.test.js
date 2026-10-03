@@ -62,7 +62,8 @@ ok(/online-lobby\.browser\.test\.js/.test(read('package.json')), 'browser integr
 ok(/com\.offerpk\.offlineludo/.test(manifest) && /auth-callback/.test(manifest), 'Android retains the email confirmation/reset deep link');
 ok(/Shared board state, dice and turn-by-turn gameplay are not enabled/.test(html), 'online UI discloses the current lobby-only gameplay boundary');
 ok(/Do not treat local coins and online balances as interchangeable/i.test(privacy) && /does not hardcode the address or save the raw password/i.test(privacy), 'privacy notice separates local balances and passwords from local saves');
-ok(/exggyvbsqhoasrqgzerf/.test(setup) && /email\/password provider is enabled/i.test(setup) && /no custom SMTP/i.test(setup), 'setup guide records the verified email-auth and mail-delivery status');
+ok(/exggyvbsqhoasrqgzerf/.test(setup) && /email\/password provider is enabled/i.test(setup) && /SMTP setup is intentionally deferred/i.test(setup), 'setup guide records the verified email-auth and mail-delivery status');
+ok(/project-team addresses/i.test(app) && /only delivers to addresses in the project's team/i.test(setup) && /intentionally deferred/i.test(setup), 'UI and setup guide disclose team-only default email delivery and deferred SMTP');
 ok(/existing local game modes and saves retained/i.test(read('README.md')), 'product docs preserve offline play and saves');
 ok(/signUp\(|resetPasswordForEmail\(|PASSWORD_RECOVERY/.test(read('test/online-lobby.browser.test.js')), 'browser suite covers signup and email/password recovery paths');
 console.log('\nOnline backend static validation passed (' + checks + ' checks).');
