@@ -138,6 +138,11 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pdice.ready { animation: nudge 1.4s ease-in-out infinite; }
 .pdice.ready::before { content: ""; position: absolute; inset: -5px; border-radius: 14px; border: 2.5px solid var(--pc); animation: pulse 1.1s ease-in-out infinite; }
 .pdice.rolling { animation: toss .5s ease-out; }
+.roll-countdown { position: absolute; left: 4px; right: 4px; bottom: -6px; height: 3px; border-radius: 4px; overflow: hidden; background: rgba(255,255,255,.14); opacity: 0; pointer-events: none; }
+.roll-countdown::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: var(--pc); box-shadow: 0 0 7px var(--pc); transform-origin: left center; transform: scaleX(1); }
+.pdice.counting .roll-countdown { opacity: .9; }
+.pdice.counting .roll-countdown::after { animation: roll-countdown var(--roll-countdown-ms, 4s) linear forwards; }
+@keyframes roll-countdown { to { transform: scaleX(0); } }
 @keyframes nudge { 0%, 70%, 100% { transform: translateY(0); } 80% { transform: translateY(-5px); } 90% { transform: translateY(0); } }
 @keyframes toss { 0% { transform: translateY(0) scale(.96) rotate(-3deg); } 34% { transform: translateY(-12px) scale(1.1) rotate(5deg); } 62% { transform: translateY(1px) scale(.98) rotate(-2deg); } 82% { transform: translateY(-3px) scale(1.02) rotate(1deg); } 100% { transform: translateY(0) scale(1) rotate(0); } }
 .boost-tag { position: absolute; top: -8px; right: -8px; font-style: normal; font-size: 9.5px; font-weight: 900; padding: 1px 5px; border-radius: 7px; background: linear-gradient(135deg, #2a86e0, #18b3b8); color: #fff; z-index: 3; }
@@ -229,6 +234,10 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .toolbar { width: var(--bs); height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; }
 .tool { min-width: 64px; height: 42px; padding: 0 10px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12.5px; font-weight: 700; color: var(--muted); position: relative; border-radius: 12px; background: var(--surface); border: 1px solid var(--surface-edge); overflow: visible; }
 .tool svg { width: 20px; height: 20px; color: var(--ink); }
+.tool.exit-match { min-width: 0; width: 68px; padding: 0 6px; gap: 4px; border-color: rgba(140,205,247,.24); color: #c9efff; background: linear-gradient(135deg, rgba(93,178,220,.16), rgba(128,111,211,.12)), rgba(255,255,255,.035); box-shadow: inset 0 1px 0 rgba(255,255,255,.11), 0 5px 16px rgba(0,0,0,.12); backdrop-filter: blur(12px) saturate(1.1); }
+.tool.exit-match svg { width: 18px; height: 18px; color: #a8e3ff; }
+.tool.exit-match span { font-size: 10.5px; }
+.tool.exit-match:active { border-color: rgba(157,223,255,.48); box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 0 14px rgba(96,191,236,.18); }
 .tool:disabled { opacity: .35; }
 .tool.live { color: var(--ink); border-color: var(--accent); }
 .tool .ad-badge { position: absolute; top: -8px; right: -4px; font-style: normal; font-size: 9px; font-weight: 800; background: var(--accent); color: var(--accent-ink); padding: 1px 5px; border-radius: 6px; }
@@ -244,6 +253,10 @@ body.light .seg { background: rgba(0,0,0,.06); }
 
 /* ---------------- overlays ---------------- */
 .overlay { position: absolute; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; animation: fade .18s; backdrop-filter: blur(2px); }
+.overlay.exit-confirm { background: rgba(4,8,14,.68); backdrop-filter: blur(8px) saturate(1.1); }
+.overlay.exit-confirm .panel { border-color: rgba(144,211,247,.25); background: linear-gradient(140deg, rgba(67,117,151,.18), rgba(100,83,155,.14)), rgba(24,31,41,.94); box-shadow: inset 0 1px 0 rgba(255,255,255,.11), 0 22px 60px rgba(0,0,0,.5), 0 0 28px rgba(100,177,218,.08); backdrop-filter: blur(20px) saturate(1.15); }
+.overlay.exit-confirm .panel h3 { color: #ecf6ff; }
+.overlay.exit-confirm .panel p { line-height: 1.5; }
 @keyframes fade { from { opacity: 0; } }
 .panel { width: min(360px, 100%); max-height: calc(100% - 20px); overflow-y: auto; background: var(--page); border: 1px solid var(--surface-edge); border-radius: 20px; padding: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.45); animation: pop .22s cubic-bezier(.2,.9,.3,1.2); }
 .panel.wide { width: min(420px, 100%); }

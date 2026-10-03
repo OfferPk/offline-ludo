@@ -9,6 +9,7 @@
     "test": "node test/logic.test.js && node test/lucky.test.js && node test/save-store.test.js && node test/adgate.test.js && node test/dice-gesture.test.js && node test/path-animation.test.js && node test/sound.test.js && node test/skins.test.js",
     "test:tutorial": "node test/tutorial.browser.test.js",
     "test:spotlight": "node test/spotlight.test.js",
+    "test:turn-controls": "node test/turn-controls.browser.test.js",
     "test:community": "node test/community.test.js",
     "test:skins:browser": "node test/skins.browser.test.js",
     "sync": "npx cap sync android"

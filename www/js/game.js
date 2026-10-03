@@ -14,7 +14,7 @@
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
   var ACCENT = { graphite: ['#f4b740', '#1c1504'], linen: ['#2b3140', '#ffffff'], walnut: ['#e0a232', '#231605'], aurora: ['#27e0b3', '#03261d'] };
   var CORE_LIGHTS = ['#ffd0c1', '#a0ffd2', '#ffe7a3', '#a9ddff'];
-  var UNDO_MS = 2200, TIMER_MS = 20000, FREE_UNDOS = 3;
+  var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, FREE_UNDOS = 3;
   var PHRASES = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!'];
 
   // ---------------- save ----------------
@@ -325,7 +325,7 @@
       el.innerHTML = '<div class="avatar"><svg class="tring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/></svg><span class="av">' + ART.avatar(pl.type) + '</span>' +
         (pl.type === 'ai' ? '<span class="lvtag">' + LEVEL_NAMES[pl.level].charAt(0) + '</span>' : '') + '<span class="lkb"></span></div>' +
         '<div class="pmeta"><b class="pname"></b><small class="plvl"></small><div class="chips"></div></div>' +
-        '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + ' (tap or swipe)">' + cubeHTML() + '<em class="boost-tag hidden"></em></button>' +
+        '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + ' (tap or swipe)">' + cubeHTML() + '<i class="roll-countdown" aria-hidden="true"></i><em class="boost-tag hidden"></em></button>' +
         '<div class="bubble hidden"></div>';
       var die = el.querySelector('.pdice');
       window.DiceGesture.bind(die, function (e) {
@@ -447,8 +447,9 @@
 
   // ---------------- flow control ----------------
   var runToken = 0, timers = [], busy = false, paused = false, keyboardRoll = false;
+  var autoRollTk = null, autoRollKey = null, autoRollDeadline = 0, autoRollRemaining = null;
   function later(fn, ms) { var tk = runToken; var id = setTimeout(function () { var k = timers.indexOf(id); if (k >= 0) timers.splice(k, 1); if (tk === runToken) fn(); }, ms); timers.push(id); return id; }
-  function cancelFlow() { runToken++; timers.forEach(clearTimeout); timers = []; Object.keys(activeMotions).forEach(function (id) { var motion = activeMotions[id]; if (motion && motion.cancel) motion.cancel(); }); activeMotions = {}; moving = {}; busy = false; keyboardRoll = false; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
+  function cancelFlow() { stopAutoRollTimer(false); runToken++; timers.forEach(clearTimeout); timers = []; Object.keys(activeMotions).forEach(function (id) { var motion = activeMotions[id]; if (motion && motion.cancel) motion.cancel(); }); activeMotions = {}; moving = {}; busy = false; keyboardRoll = false; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
   function gameVisible() { return !$('game').classList.contains('hidden') && document.visibilityState === 'visible'; }
   function humans(st) { return st.players.filter(function (s) { return st.seats[s].type === 'human'; }); }
   function hasAI(st) { return st.players.some(function (s) { return st.seats[s].type === 'ai'; }); }
@@ -649,19 +650,51 @@
   function startTimer() {
     var st = G.st, s = st.turn, el = podEl(s);
     stopTimer();
-    if (!save.settings.timer || !isHuman(s) || st.phase === 'over' || !el) return;
+    if (!save.settings.timer || !isHuman(s) || st.phase !== 'move' || !el) return;
     el.style.setProperty('--tdur', TIMER_MS + 'ms'); void el.offsetWidth; el.classList.add('timing');
     G.timerTk = later(function () {
       G.timerTk = null;
-      if (!G || busy || G.st.turn !== s || !isHuman(s)) return;
+      if (!G || busy || G.st.turn !== s || G.st.phase !== 'move' || !isHuman(s)) return;
       toast('Time is up: playing for you', 1200);
-      if (G.st.phase === 'roll') doRoll(L.mustChoose(G.st) ? L.chooseDieValue(G.st, s, 'medium') : undefined);
-      else if (G.st.phase === 'move') { var c = L.chooseMove(G.st, 'medium'); if (c) doMove(c.piece, c.v); }
+      var c = L.chooseMove(G.st, 'medium'); if (c) doMove(c.piece, c.v);
     }, TIMER_MS);
   }
   function stopTimer() {
     each(document.querySelectorAll('.pod.timing'), function (e) { e.classList.remove('timing'); });
     if (G && G.timerTk) { clearTimeout(G.timerTk); var k = timers.indexOf(G.timerTk); if (k >= 0) timers.splice(k, 1); G.timerTk = null; }
+  }
+
+  function clearAutoRollVisual() {
+    each(document.querySelectorAll('.pdice.counting'), function (die) { die.classList.remove('counting'); });
+  }
+  function stopAutoRollTimer(preserveRemaining) {
+    if (autoRollTk) {
+      if (preserveRemaining) autoRollRemaining = Math.max(0, autoRollDeadline - Date.now());
+      clearTimeout(autoRollTk);
+      var k = timers.indexOf(autoRollTk); if (k >= 0) timers.splice(k, 1);
+      autoRollTk = null;
+    }
+    clearAutoRollVisual();
+    if (!preserveRemaining) { autoRollKey = null; autoRollDeadline = 0; autoRollRemaining = null; }
+  }
+  function startAutoRollTimer() {
+    var st = G && G.st;
+    if (!st || st.phase !== 'roll' || !isHuman(st.turn) || busy || paused || tutorial.intro || !gameVisible() || isOpen('confirm')) {
+      if (autoRollTk) stopAutoRollTimer(true);
+      return;
+    }
+    var s = st.turn, key = s + ':' + st.rolls + ':' + st.turnCount;
+    if (autoRollKey !== key) { stopAutoRollTimer(false); autoRollKey = key; autoRollRemaining = AUTO_ROLL_MS; }
+    if (autoRollTk) return;
+    if (autoRollRemaining == null) autoRollRemaining = AUTO_ROLL_MS;
+    var duration = Math.max(0, autoRollRemaining), diePod = podEl(s), die = diePod && diePod.querySelector('.pdice');
+    autoRollDeadline = Date.now() + duration;
+    if (die) { die.style.setProperty('--roll-countdown-ms', duration + 'ms'); die.classList.remove('counting'); void die.offsetWidth; die.classList.add('counting'); }
+    autoRollTk = later(function () {
+      autoRollTk = null; autoRollKey = null; autoRollDeadline = 0; autoRollRemaining = null; clearAutoRollVisual();
+      if (!G || busy || paused || !gameVisible() || isOpen('confirm') || G.st.turn !== s || G.st.phase !== 'roll' || !isHuman(s)) return;
+      doRoll(L.mustChoose(G.st) ? L.chooseDieValue(G.st, s, G.st.seats[s].level) : undefined);
+    }, duration);
   }
 
   function advance() {
@@ -681,7 +714,7 @@
       }, aiDelay());
       else later(aiMove, aiDelay() * 0.6);
     } else if (st.phase === 'move') offerMoves();
-    else startTimer();
+    else startAutoRollTimer();
   }
   function aiMove() { if (!G || busy || G.st.phase !== 'move') return; var c = L.chooseMove(G.st, G.st.seats[G.st.turn].level); if (c) doMove(c.piece, c.v); }
 
@@ -716,6 +749,7 @@
   function doRoll(chosen) {
     if (!G || busy || G.st.phase !== 'roll' || paused) return;
     var st = G.st, s = st.turn, human = isHuman(s);
+    stopAutoRollTimer(false);
     if (L.mustChoose(st) && chosen == null) {
       if (human) { stopTimer(); openPicker(); return; }
       chosen = L.chooseDieValue(st, s, st.seats[s].level);
@@ -847,7 +881,7 @@
     if (!G || busy || G.st.phase !== 'move' || paused) return;
     var st = G.st, s = st.turn, human = isHuman(s);
     if (!st.moves.some(function (m) { return m.piece === piece && (v == null || m.v === v); })) return;
-    busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); hide('chat');
+    busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); stopAutoRollTimer(false); hide('chat');
     var res = L.move(st, piece, v, forcedEvents.length ? forcedEvents.shift() : undefined);
     if (human) { save.stats.captures += res.captures.length; if (res.finish) save.stats.home++; if (res.event) save.stats.events++; }
     G.sel = null;
@@ -1277,10 +1311,27 @@
   }
   function openMenu() { if (!G) return; cancelFlow(); stopTimer(); paused = true; layoutPieces(true); render(); persist(); show('menu'); }
   function resumeFromMenu() { hide('menu'); paused = false; layoutPieces(true); advance(); }
-  function askConfirm(title, text, yes, onYes) {
+  function askConfirm(title, text, yes, onYes, onNo) {
     $('confirm-title').textContent = title; $('confirm-text').textContent = text; $('confirm-yes').textContent = yes;
+    $('confirm').classList.toggle('exit-confirm', title === 'Exit match?');
     $('confirm-yes').onclick = function () { hide('confirm'); onYes(); };
+    $('confirm-no').onclick = function () {
+      SFX.click(); hide('confirm');
+      if (onNo) { onNo(); return; }
+      if (G && !$('game').classList.contains('hidden') && paused) show('menu');
+    };
     show('confirm');
+  }
+  function openExitConfirmation() {
+    if (!G || G.st.phase === 'over') return;
+    cancelFlow(); stopTimer(); paused = true; hide('chat');
+    layoutPieces(true); render(); persist();
+    askConfirm('Exit match?', 'Are you sure you want to exit the match? Progress will be lost.', 'Exit', function () {
+      cancelFlow(); stopTimer(); G = null; save.game = null; persist(); showHome();
+    }, function () {
+      hide('menu'); paused = false;
+      if (G) { buildPods(); buildTiles(); buildPieces(); layout(); render(); advance(); }
+    });
   }
 
   // ---------------- stats / skins / settings / rules ----------------
@@ -1433,7 +1484,7 @@
   $('btn-r-again').addEventListener('click', function () { leaveResult('again'); });
   $('btn-r-home').addEventListener('click', function () { leaveResult('home'); });
   $('btn-r-double').addEventListener('click', doubleCoins);
-  $('confirm-no').addEventListener('click', function () { SFX.click(); hide('confirm'); if (G && !$('game').classList.contains('hidden') && paused) show('menu'); });
+  $('btn-exit-match').addEventListener('click', function () { SFX.click(); openExitConfirmation(); });
   $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); show('stats'); });
   $('btn-skins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   $('btn-rules').addEventListener('click', function () { SFX.unlock(); SFX.click(); openRules('basics'); });
