@@ -68,13 +68,14 @@ function startLocalServer() {
       const state = window.__mockBackend = {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
         removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: null,
+        actionResponses: {}, rollCount: 0,
         tables: {
           profiles: [
             { id: 'user-one', handle: 'alice123', display_name: 'Alice' },
             { id: 'user-two', handle: 'bob123', display_name: 'Bob' }
           ],
           wallets: [{ user_id: 'user-one', coins: 1250, diamonds: 7 }],
-          rooms: [], room_members: [], room_invites: [], match_history: []
+          rooms: [], room_members: [], room_invites: [], match_history: [], match_states: []
         }
       };
       function ensureRoom(id, owner, mode, capacity) {
@@ -181,9 +182,11 @@ function startLocalServer() {
                 return Promise.resolve({ data: { user: state.session.user, session: state.session }, error: null });
               },
               signUp(credentials) {
-                state.authCalls.push({ method: 'signUp', email: credentials.email, passwordLength: credentials.password.length, redirectTo: credentials.options.emailRedirectTo });
+                state.authCalls.push({ method: 'signUp', email: credentials.email, passwordLength: credentials.password.length });
                 if (state.failAuth === 'signUp') return Promise.resolve({ data: null, error: { message: 'Unable to create account' } });
-                return Promise.resolve({ data: { user: { id: 'pending-user', email: credentials.email }, session: null }, error: null });
+                state.session = { user: { id: 'user-one', email: credentials.email } };
+                state.authListeners.forEach(callback => callback('SIGNED_IN', state.session));
+                return Promise.resolve({ data: { user: state.session.user, session: state.session }, error: null });
               },
               resetPasswordForEmail(email, options) {
                 state.authCalls.push({ method: 'resetPasswordForEmail', email, redirectTo: options.redirectTo });
@@ -236,7 +239,47 @@ function startLocalServer() {
                 if (!state.tables.match_history.some(row => row.id === 'history-one')) {
                   state.tables.match_history.push({ id: 'history-one', mode: room ? room.mode : 'classic', status: 'started', winner_id: null, started_at: '2026-10-03T12:30:00.000Z', finished_at: null });
                 }
+                const match = {
+                  room_id: args.p_room_id, version: 0,
+                  state: { protocol: 1, mode: 'classic', roll_style: 'star', players: [0, 1], pieces: [[-1, -1, -1, -1], [-1, -1, -1, -1], null, null], rules: { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true }, turn: 0, phase: 'roll', queue: [], sixes: 0, bonus: 0, ranking: [], turn_count: 0, last_roll: null, last_action: null }
+                };
+                state.tables.match_states = state.tables.match_states.filter(row => row.room_id !== args.p_room_id);
+                state.tables.match_states.push(match);
+                state.emit('match_states', { event: 'INSERT', new: match });
                 data = { started: true };
+              } else if (name === 'roll_match') {
+                const match = state.tables.match_states.find(row => row.room_id === args.p_room_id);
+                if (state.actionResponses[args.p_action_id]) {
+                  data = Object.assign({}, state.actionResponses[args.p_action_id], { duplicate: true });
+                } else {
+                  const face = state.rollCount++ === 0 ? 6 : 3;
+                  const nextState = Object.assign({}, match.state, {
+                    last_roll: { seat: match.state.turn, face },
+                    last_action: { type: 'roll', seat: match.state.turn, face },
+                    queue: match.state.queue.concat([face]),
+                    phase: face === 6 ? 'roll' : 'move',
+                    sixes: face === 6 ? match.state.sixes + 1 : match.state.sixes
+                  });
+                  match.version++;
+                  match.state = nextState;
+                  data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
+                  state.actionResponses[args.p_action_id] = data;
+                  state.emit('match_states', { event: 'UPDATE', new: match });
+                }
+              } else if (name === 'move_match') {
+                const match = state.tables.match_states.find(row => row.room_id === args.p_room_id);
+                const nextState = JSON.parse(JSON.stringify(match.state));
+                const die = nextState.queue[args.p_queue_index];
+                nextState.pieces[nextState.turn][args.p_piece] = 0;
+                nextState.queue = [];
+                nextState.turn = 1;
+                nextState.phase = 'roll';
+                nextState.sixes = 0;
+                nextState.last_action = { type: 'move', seat: 0, piece: args.p_piece, die, from: -1, to: 0, captures: [], finish: false };
+                match.version++;
+                match.state = nextState;
+                data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
+                state.emit('match_states', { event: 'UPDATE', new: match });
               } else if (name === 'leave_room') {
                 state.tables.room_members = state.tables.room_members.filter(row => !(row.room_id === args.p_room_id && row.user_id === 'user-one'));
                 state.activeRoomId = null;
@@ -259,6 +302,7 @@ function startLocalServer() {
     await page.click('#btn-online');
     await page.waitForSelector('#online:not(.hidden)');
     await page.waitForFunction(() => window.__mockBackend.clientCalls.length === 1);
+    assert.match(await page.$eval('#online-auth-panel', el => el.textContent), /sign in immediately; no confirmation link is required/i);
     assert.equal(await page.$eval('#online-email', el => el.value), '', 'email is not prefilled or hardcoded in the portal');
     assert.equal(await page.$eval('#online-signin', el => el.disabled), false, 'verified email/password auth enables sign-in');
     assert.equal(await page.$eval('#online-signup', el => el.disabled), false, 'enabled project signup enables account creation');
@@ -320,9 +364,29 @@ function startLocalServer() {
     await page.click('#online-ready');
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     await page.click('#online-start-room');
-    await page.waitForFunction(() => document.querySelector('#online-room-status').textContent.includes('board and turn sync are not enabled'));
-    await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · started'));
-    await page.evaluate(() => window.__mockBackend.emit('match_history', { event: 'INSERT', new: { id: 'history-one', user_id: 'user-one' } }));
+      await page.waitForFunction(() => document.querySelector('#online-room-status').textContent.includes('validated by the server'));
+      await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · started'));
+      await page.waitForFunction(() => !document.querySelector('#online-match-panel').classList.contains('hidden') && document.querySelector('#online-match-version').textContent === 'Version 0');
+      await page.evaluate(() => { window.__mockBackend.failRpc = 'roll_match'; });
+      await page.click('#online-roll');
+      await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Retry uses the same action ID.'));
+      const firstRollId = await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'roll_match').args.p_action_id);
+      await page.evaluate(() => { window.__mockBackend.failRpc = null; });
+      await page.click('#online-match-retry');
+      await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 1' && document.querySelector('#online-match-dice').textContent.includes('rolled 6'));
+      await page.click('#online-roll');
+      await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 2' && document.querySelector('#online-match-turn').textContent.includes('choose a legal token move'));
+      await page.waitForSelector('#online-match-moves button');
+      assert.match(await page.$eval('#online-match-moves button', el => el.textContent), /Use 6 to move token 1/, 'local rules engine supplies legal move choices for server dice');
+      await page.click('#online-match-moves button');
+      await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 3' && document.querySelector('#online-match-pieces').textContent.includes('T1 track 0'));
+      const matchCalls = await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => ['roll_match', 'move_match'].includes(call.name)));
+      assert.equal(matchCalls[0].args.p_action_id, firstRollId, 'retry sends the same idempotency key after a dropped action');
+      assert.equal(Object.hasOwn(matchCalls[0].args, 'p_die'), false, 'client cannot pass a dice face into the server roll RPC');
+      assert.equal(Object.hasOwn(matchCalls[2].args, 'p_die'), false, 'move RPC receives only a server queue index, not a forged die face');
+      await page.waitForFunction(() => document.querySelector('#online-match-turn').textContent.includes('Bobby Live · waiting for their turn'));
+      assert.ok((await page.evaluate(() => window.__mockBackend.snapshot())).channels.some(channel => channel.tables.includes('match_states')), 'live match-state changes are subscribed and re-read after reconnect');
+      await page.evaluate(() => window.__mockBackend.emit('match_history', { event: 'INSERT', new: { id: 'history-one', user_id: 'user-one' } }));
 
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
@@ -347,11 +411,15 @@ function startLocalServer() {
     await page.evaluate(() => { window.__mockBackend.failAuth = null; });
     await page.$eval('#online-password', el => { el.value = 'synthetic-signup-password'; });
     await page.click('#online-signup');
-    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Check your email for a confirmation link'));
+    await page.waitForFunction(() => !document.querySelector('#online-account-panel').classList.contains('hidden') && document.querySelector('#online-status').textContent.includes('Account created and signed in.'));
     assert.equal(await page.$eval('#online-password', el => el.value), '', 'password field is cleared after account creation');
     const signupCall = await page.evaluate(() => window.__mockBackend.authCalls.find(call => call.method === 'signUp'));
-    assert.equal(signupCall.redirectTo, origin + '/', 'account confirmation returns to the current approved page');
+    assert.equal(signupCall.redirectTo, undefined, 'signup does not request a confirmation-email redirect');
     assert.equal(Object.hasOwn(signupCall, 'password'), false, 'signup mock records no password value');
+    assert.equal(await page.evaluate(() => window.__mockBackend.session.user.email), 'new-player@example.test', 'mocked signup returns an immediate signed-in session');
+    assert.deepEqual(sdkRequests, [], 'mocked signup sends no email, OTP, or live Auth API request');
+    await page.click('#online-signout');
+    await page.waitForFunction(() => document.querySelector('#online-account-panel').classList.contains('hidden') && !document.querySelector('#online-auth-panel').classList.contains('hidden'));
     await page.evaluate(() => { window.__mockBackend.failAuth = 'resetPasswordForEmail'; });
     await page.click('#online-reset-request');
     await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Password reset could not be requested: Email service unavailable'));
@@ -383,7 +451,7 @@ function startLocalServer() {
     await page.waitForSelector('#setup:not(.hidden)');
     assert.equal(await page.$eval('#btn-online', el => !!el), true, 'offline game setup remains reachable after online sign-out');
     assert.deepEqual(errors, [], 'page has no uncaught JavaScript errors');
-    console.log('Online Ludo browser integration test passed (email/password auth, recovery, Realtime lobby and offline fallback).');
+    console.log('Online Ludo deterministic browser test passed (mocked Auth, no email/user creation, Classic match controls, Realtime lobby and offline fallback).');
   } finally {
     await browser.close();
     if (localServer) await new Promise(resolve => localServer.server.close(resolve));

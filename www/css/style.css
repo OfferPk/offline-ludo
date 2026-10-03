@@ -942,6 +942,17 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-room-roster small, .online-history-list small { color: var(--muted); font-size: 10px; text-align: right; }
 .online-history-list li { align-items: flex-start; flex-direction: column; }
 .online-history-list small { text-align: left; }
+.online-mode-note { margin: 6px 1px 10px; font-size: 11px !important; }
+.online-match-panel { margin-top: 14px; padding: 12px; border: 1px solid rgba(115,224,176,.24); border-radius: 12px; background: rgba(115,224,176,.045); }
+.online-match-panel h4 { margin: 3px 0 !important; font-size: 14px !important; }
+.online-match-version { color: var(--muted); font-size: 10px; }
+.online-match-dice { margin: 5px 0 10px; color: var(--ink) !important; font-size: 12px !important; }
+.online-match-pieces { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.online-match-pieces li { display: grid; gap: 4px; padding: 8px 9px; border-radius: 9px; background: var(--surface); font-size: 11px; }
+.online-match-pieces small { color: var(--muted); font-size: 10px; line-height: 1.4; }
+.online-match-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 9px; color: var(--muted); font-size: 11px; }
+.online-match-moves button { min-height: 38px; padding: 6px; font-size: 10px; }
+.online-match-panel > .online-mode-note { margin-bottom: 0; }
 @media (max-width: 370px) {
   .online-screen { padding-inline: 10px; }
   .online-card { padding: 12px; }

@@ -13,6 +13,7 @@
   var currentRoomId = sessionStorage.getItem('crossfour.online.room') || '';
   var currentRoom = null;
   var currentUser = null;
+  var pendingMatchAction = null;
   var recoveryMode = false;
   var roomChannel = null;
   var walletChannel = null;
@@ -24,6 +25,7 @@
   var pendingInvite = new URLSearchParams(window.location.search).get('room') || sessionStorage.getItem('crossfour.online.pending-invite') || '';
   var handlingPendingInvite = false;
   if (pendingInvite) sessionStorage.setItem('crossfour.online.pending-invite', pendingInvite);
+  try { pendingMatchAction = JSON.parse(sessionStorage.getItem('crossfour.online.pending-match-action') || 'null'); } catch (_) { pendingMatchAction = null; }
 
   function $(id) { return document.getElementById(id); }
   function isNative() {
@@ -99,7 +101,7 @@
     } else if (!emailPasswordEnabled()) {
       $('online-config-note').textContent = 'Email/password sign-in is disabled for this project. Offline play remains available.';
     } else {
-      $('online-config-note').textContent = 'Sign in with email/password or create an account. Confirmation is required; without custom SMTP, Supabase email is limited to project-team addresses.';
+      $('online-config-note').textContent = 'Sign in with email/password or create an account for immediate access. Password-reset email is available if you need it.';
     }
     if (recovering) {
       $('online-wallet-coins').textContent = '—';
@@ -151,11 +153,7 @@
     var credentials = readCredentials();
     if (!credentials) return;
     announce('Creating your account…');
-    client.auth.signUp({
-      email: credentials.email,
-      password: credentials.password,
-      options: { emailRedirectTo: authRedirectUrl() }
-    }).then(function (result) {
+    client.auth.signUp({ email: credentials.email, password: credentials.password }).then(function (result) {
       if (result.error) throw result.error;
       var session = result.data && result.data.session;
       if (session && session.user) {
@@ -164,7 +162,7 @@
         announce('Account created and signed in.');
         return refreshAccount();
       }
-      announce('Account created. Check your email for a confirmation link before signing in. Supabase default email only reaches project-team addresses; if this address is not on the team, the link will not arrive until custom SMTP is configured.');
+      announce('Account created, but automatic sign-in did not start. Sign in with the same email and password.', true);
     }).catch(function (error) { announce('Account creation failed: ' + errorText(error), true); });
   }
   function requestPasswordReset() {
@@ -249,7 +247,7 @@
     if (!room) return;
     $('online-room-mode').textContent = room.mode.charAt(0).toUpperCase() + room.mode.slice(1) + ' · ' + room.capacity + ' seats';
     $('online-room-status').textContent = room.status === 'active'
-      ? 'Table started. The online Ludo board and turn sync are not enabled in this build.'
+      ? (room.matchState ? 'Online Classic match is active. Dice and moves are validated by the server.' : 'This table predates the Online Classic gameplay update. Create a new table to play online.')
       : room.status === 'cancelled' ? 'This table was cancelled.' : 'Waiting for players to join and ready up.';
     $('online-invite-code').value = room.inviteCode || '';
     $('online-start-room').classList.toggle('hidden', room.status !== 'waiting' || room.created_by !== (currentUser && currentUser.id));
@@ -266,18 +264,84 @@
       item.append(playerName, playerState);
       $('online-room-roster').appendChild(item);
     });
+    renderMatch();
+  }
+  function renderMatch() {
+    var room = currentRoom;
+    var panel = $('online-match-panel');
+    var record = room && room.matchState;
+    var show = !!(room && room.status === 'active' && record && record.state);
+    panel.classList.toggle('hidden', !show);
+    if (!show) return;
+    var state = record.state;
+    var myMember = room.roster.find(function (member) { return member.user_id === (currentUser && currentUser.id); });
+    var turnMember = room.roster.find(function (member) { return member.seat === Number(state.turn); });
+    var isMyTurn = !!(myMember && myMember.seat === Number(state.turn));
+    $('online-match-version').textContent = 'Version ' + record.version;
+    $('online-match-heading').textContent = state.phase === 'over' ? 'Match complete' : 'Turn ' + ((state.turn_count || 0) + 1);
+    $('online-match-turn').textContent = state.phase === 'over'
+      ? 'Match complete. Winner: ' + ((room.roster.find(function (member) { return member.seat === Number((state.ranking || [])[0]); }) || {}).displayName || '—')
+      : (turnMember ? turnMember.displayName || turnMember.handle || 'Player' : 'Player') + (isMyTurn ? ' · your turn' : ' · waiting for their turn') + (state.phase === 'move' ? ' · choose a legal token move' : ' · roll phase');
+    var lastRoll = state.last_roll;
+    var queue = Array.isArray(state.queue) ? state.queue : [];
+    $('online-match-dice').textContent = (lastRoll ? 'Last server die: seat ' + (Number(lastRoll.seat) + 1) + ' rolled ' + lastRoll.face + '. ' : '') +
+      (queue.length ? 'Dice to use: ' + queue.join(' · ') : state.phase === 'over' ? 'No pending dice.' : 'No pending dice.');
+
+    var pieces = $('online-match-pieces');
+    pieces.replaceChildren();
+    (state.players || []).forEach(function (seat) {
+      var member = room.roster.find(function (candidate) { return candidate.seat === Number(seat); });
+      var values = (state.pieces && state.pieces[seat]) || [];
+      var item = document.createElement('li');
+      var name = document.createElement('b');
+      name.textContent = 'Seat ' + (Number(seat) + 1) + ' · ' + ((member && (member.displayName || member.handle)) || 'Player');
+      var positions = document.createElement('small');
+      positions.textContent = values.map(function (position, index) {
+        return 'T' + (index + 1) + ' ' + (position < 0 ? 'base' : position === 57 ? 'home' : position >= 52 ? 'home lane ' + (position - 51) : 'track ' + position);
+      }).join(' · ');
+      item.append(name, positions);
+      pieces.appendChild(item);
+    });
+
+    var moves = $('online-match-moves');
+    moves.replaceChildren();
+    $('online-roll').classList.toggle('hidden', !(isMyTurn && state.phase === 'roll' && !pendingMatchAction));
+    $('online-match-retry').classList.toggle('hidden', !pendingMatchAction || pendingMatchAction.room_id !== currentRoomId);
+    if (isMyTurn && state.phase === 'move' && !pendingMatchAction && window.LudoLogic && typeof window.LudoLogic.queueMoves === 'function') {
+      var localView = {
+        mode: 'classic', players: state.players, pieces: state.pieces, rules: state.rules,
+        turn: Number(state.turn), phase: 'move', queue: queue, ranking: state.ranking || [],
+        effects: [], capd: [false, false, false, false], lk: null
+      };
+      window.LudoLogic.queueMoves(localView).forEach(function (move) {
+        var action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'btn plate';
+        action.textContent = 'Use ' + move.v + ' to move token ' + (move.piece + 1);
+        action.addEventListener('click', function () {
+          submitMatchAction('move_match', { p_piece: move.piece, p_queue_index: queue.indexOf(move.v) });
+        });
+        moves.appendChild(action);
+      });
+      if (!moves.childElementCount) moves.textContent = 'No legal moves are available; the server will pass the turn.';
+    }
+    if (pendingMatchAction && pendingMatchAction.room_id === currentRoomId) {
+      moves.textContent = 'A match action is awaiting confirmation. Retry the same request safely if your connection dropped.';
+    }
   }
   function refreshRoom() {
     if (!client || !currentRoomId || !currentUser) return Promise.resolve();
     return Promise.all([
       client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').eq('id', currentRoomId).maybeSingle(),
       client.from('room_members').select('user_id,seat,role,ready').eq('room_id', currentRoomId),
-      client.from('room_invites').select('invite_code').eq('room_id', currentRoomId).limit(1).maybeSingle()
+      client.from('room_invites').select('invite_code').eq('room_id', currentRoomId).limit(1).maybeSingle(),
+      client.from('match_states').select('room_id,version,state,updated_at').eq('room_id', currentRoomId).maybeSingle()
     ]).then(function (results) {
       if (results[0].error) throw results[0].error;
       if (!results[0].data) throw new Error('You no longer have access to this room.');
       if (results[1].error) throw results[1].error;
       if (results[2].error) throw results[2].error;
+      if (results[3].error) throw results[3].error;
       var roster = results[1].data || [];
       var ids = roster.map(function (member) { return member.user_id; });
       return client.from('profiles').select('id,display_name,handle').in('id', ids).then(function (profileResult) {
@@ -285,7 +349,8 @@
         var profiles = {};
         (profileResult.data || []).forEach(function (profile) { profiles[profile.id] = profile; });
         currentRoom = Object.assign({}, results[0].data, {
-          inviteCode: results[2].data ? results[2].data.invite_code : '',
+        inviteCode: results[2].data ? results[2].data.invite_code : '',
+        matchState: results[3].data || null,
           roster: roster.map(function (member) {
             var profile = profiles[member.user_id] || {};
             return Object.assign({}, member, { displayName: profile.display_name, handle: profile.handle });
@@ -310,9 +375,54 @@
     roomChannel = client.channel('crossfour-room-' + currentRoomId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + currentRoomId }, refreshRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: 'room_id=eq.' + currentRoomId }, refreshRoom)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_states', filter: 'room_id=eq.' + currentRoomId }, refreshRoom)
       .subscribe(function (state) {
         if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') announce('Live room updates are reconnecting.', true);
+        else if (state === 'SUBSCRIBED') refreshRoom();
       });
+  }
+  function makeActionId() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    if (!window.crypto || typeof window.crypto.getRandomValues !== 'function') throw new Error('Secure action IDs are unavailable in this browser.');
+    return Array.from(window.crypto.getRandomValues(new Uint8Array(16))).map(function (value) { return value.toString(16).padStart(2, '0'); }).join('');
+  }
+  function submitMatchAction(rpc, values) {
+    if (!currentRoomId || !currentRoom || !currentRoom.matchState || pendingMatchAction) return;
+    try {
+      pendingMatchAction = {
+        room_id: currentRoomId,
+        rpc: rpc,
+        args: Object.assign({ p_room_id: currentRoomId, p_expected_version: currentRoom.matchState.version, p_action_id: makeActionId() }, values)
+      };
+      sessionStorage.setItem('crossfour.online.pending-match-action', JSON.stringify(pendingMatchAction));
+      renderMatch();
+      runPendingMatchAction();
+    } catch (error) { announce('Online action could not start: ' + errorText(error), true); }
+  }
+  function runPendingMatchAction() {
+    var pending = pendingMatchAction;
+    if (!client || !pending || pending.room_id !== currentRoomId) return;
+    announce('Sending the validated match action…');
+    callRpc(pending.rpc, pending.args).then(function (result) {
+      if (pendingMatchAction !== pending) return;
+      pendingMatchAction = null;
+      sessionStorage.removeItem('crossfour.online.pending-match-action');
+      if (currentRoomId === pending.room_id && currentRoom && (!currentRoom.matchState || result.version >= currentRoom.matchState.version)) {
+        currentRoom.matchState = { room_id: pending.room_id, version: result.version, state: result.state };
+        renderMatch();
+      }
+      announce(result.duplicate ? 'The server confirmed this was already applied.' : 'Match state updated by the server.');
+      return refreshRoom();
+    }).catch(function (error) {
+      refreshRoom();
+      var code = error && error.code;
+      if (code && ['40001', '22023', '42501', '55000', 'P0002', '23505'].indexOf(code) >= 0) {
+        pendingMatchAction = null;
+        sessionStorage.removeItem('crossfour.online.pending-match-action');
+      }
+      renderMatch();
+      announce('Match action was not confirmed: ' + errorText(error) + (pendingMatchAction ? ' Retry uses the same action ID.' : ' Refresh the state and try again.'), true);
+    });
   }
   function subscribeWallet() {
     if (!client || !currentUser) return;
@@ -356,6 +466,10 @@
   }
   function attachRoom(result) {
     if (!result.room_id) throw new Error('The server did not return a room ID.');
+    if (pendingMatchAction && pendingMatchAction.room_id !== result.room_id) {
+      pendingMatchAction = null;
+      sessionStorage.removeItem('crossfour.online.pending-match-action');
+    }
     currentRoomId = result.room_id;
     currentRoom = null;
     sessionStorage.setItem('crossfour.online.room', currentRoomId);
@@ -420,6 +534,8 @@
         historyChannel = null;
         currentRoomId = '';
         currentRoom = null;
+        pendingMatchAction = null;
+        sessionStorage.removeItem('crossfour.online.pending-match-action');
         sessionStorage.removeItem('crossfour.online.room');
         renderRoom();
       }).catch(function (error) { announce('Sign-out failed: ' + errorText(error), true); });
@@ -474,11 +590,13 @@
       if (!currentRoomId) return;
       callRpc('start_room', { p_room_id: currentRoomId })
         .then(function () {
-          announce('Table started. This repository currently syncs the lobby only; online Ludo turns and board state are not enabled.');
+          announce('Online Classic table started. The server owns dice, turn validation and match state.');
           return refreshRoom();
         })
         .catch(function (error) { announce('Table could not be started: ' + errorText(error), true); });
     });
+    $('online-roll').addEventListener('click', function () { submitMatchAction('roll_match', {}); });
+    $('online-match-retry').addEventListener('click', runPendingMatchAction);
     $('online-leave-room').addEventListener('click', function () {
       if (!currentRoomId) return;
       callRpc('leave_room', { p_room_id: currentRoomId })
@@ -487,12 +605,22 @@
           roomChannel = null;
           currentRoomId = '';
           currentRoom = null;
+          pendingMatchAction = null;
+          sessionStorage.removeItem('crossfour.online.pending-match-action');
           sessionStorage.removeItem('crossfour.online.room');
           renderRoom();
           announce('You left the room.');
           return refreshHistory();
         })
         .catch(function (error) { announce('Could not leave room: ' + errorText(error), true); });
+    });
+    function refreshAfterReconnect() {
+      if (currentRoomId && currentUser && !screen.classList.contains('hidden')) refreshRoom();
+    }
+    window.addEventListener('online', refreshAfterReconnect);
+    window.addEventListener('focus', refreshAfterReconnect);
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) refreshAfterReconnect();
     });
   }
   function configureNativeCallback() {
@@ -531,6 +659,8 @@
         profileChannel = null;
         historyChannel = null;
         currentRoomId = '';
+        pendingMatchAction = null;
+        sessionStorage.removeItem('crossfour.online.pending-match-action');
         sessionStorage.removeItem('crossfour.online.room');
         currentRoom = null;
         renderRoom();

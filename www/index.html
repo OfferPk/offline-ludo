@@ -176,10 +176,11 @@
       </header>
       <div class="online-body">
         <p id="online-status" class="online-status" role="status" aria-live="polite">Checking online services…</p>
-        <p class="online-limit-note"><b>Current online scope:</b> cloud profiles, server-owned balances, room invites, matchmaking and lobby status sync are separate from offline saves. Offline modes remain available. Shared board state, dice and turn-by-turn gameplay are not enabled in this build.</p>
+        <p class="online-limit-note"><b>Online vs offline:</b> Online Classic rooms use server-generated dice, validated moves and synchronized match state. Mystery and Lucky Chaos remain available in offline play only for this slice. Offline saves and balances stay separate.</p>
         <section id="online-auth-panel" class="online-card" aria-labelledby="online-auth-title">
           <span class="online-eyebrow">OPTIONAL ACCOUNT</span><h2 id="online-auth-title">Sign in with email</h2>
           <p id="online-config-note">Use an email address and password for online rooms.</p>
+          <p class="online-mode-note">New email/password accounts sign in immediately; no confirmation link is required. Gmail SMTP remains configured for password resets, but reset-email delivery has not yet been tested.</p>
           <form id="online-auth-form" class="online-auth-form">
             <label for="online-email">Email address<input id="online-email" type="email" autocomplete="email" maxlength="254" required></label>
             <label for="online-password">Password<input id="online-password" type="password" autocomplete="current-password" required></label>
@@ -202,7 +203,8 @@
         </section>
         <section id="online-room-panel" class="online-card hidden" aria-labelledby="online-lobby-title">
           <span class="online-eyebrow">MATCHMAKING · INVITES</span><h2 id="online-lobby-title">Find or host a table</h2>
-          <div class="online-room-options"><label>Mode<select id="online-mode"><option value="classic">Classic</option><option value="mystery">Mystery</option><option value="lucky">Lucky Chaos</option></select></label><label>Seats<select id="online-capacity"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label></div>
+          <div class="online-room-options"><label>Online mode<select id="online-mode"><option value="classic">Classic · server-authoritative</option></select></label><label>Seats<select id="online-capacity"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label></div>
+          <p class="online-mode-note">This online gameplay slice supports Classic only. Mystery and Lucky Chaos are unchanged in offline games.</p>
           <div class="online-provider-actions"><button id="online-quick-match" class="btn primary" type="button">Find a table</button><button id="online-create-room" class="btn plate" type="button">Create invite room</button></div>
           <div class="online-join-row"><label for="online-join-code">Join with invite code</label><div><input id="online-join-code" maxlength="16" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="16-character code"><button id="online-join-room" class="btn plate" type="button">Join</button></div></div>
           <section id="online-room-card" class="online-room-card hidden" aria-labelledby="online-room-heading">
@@ -211,6 +213,15 @@
             <label class="online-invite-label" for="online-invite-code">Invite code</label><div class="online-invite-row"><input id="online-invite-code" readonly><button id="online-copy-invite" class="btn plate" type="button">Copy link</button></div>
             <h4>Players</h4><ul id="online-room-roster" class="online-room-roster"></ul>
             <div class="online-provider-actions"><button id="online-ready" class="btn plate" type="button" aria-pressed="false">Ready</button><button id="online-start-room" class="btn primary hidden" type="button">Start table</button></div>
+            <section id="online-match-panel" class="online-match-panel hidden" aria-label="Server-authoritative online match">
+              <div class="online-card-head"><div><span class="online-eyebrow">ONLINE CLASSIC · LIVE STATE</span><h4 id="online-match-heading">Match state</h4></div><span id="online-match-version" class="online-match-version"></span></div>
+              <p id="online-match-turn" class="online-room-state" role="status" aria-live="polite"></p>
+              <p id="online-match-dice" class="online-match-dice"></p>
+              <ol id="online-match-pieces" class="online-match-pieces" aria-label="Authoritative token positions"></ol>
+              <div id="online-match-moves" class="online-match-moves"></div>
+              <div class="online-provider-actions"><button id="online-roll" class="btn primary hidden" type="button">Roll server die</button><button id="online-match-retry" class="btn plate hidden" type="button">Retry pending action</button></div>
+              <p class="online-mode-note">Dice are generated on the server. The server checks turn, die, token move, room membership and state version; only the room participants can read live state.</p>
+            </section>
           </section>
         </section>
         <section class="online-card" aria-labelledby="online-history-heading">
