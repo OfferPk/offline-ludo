@@ -1264,35 +1264,48 @@
     if (r.blocks) out.push('blocks');
     if (!r.bonusOnCapture) out.push('no capture bonus');
     if (!r.bonusOnHome) out.push('no home bonus');
-    return out.join(' · ');
+    return out;
   }
   function renderSetup() {
     var seats = save.setup[setupKind], list = $('seat-list'); list.innerHTML = '';
-    each($('mode-seg').children, function (b) { b.classList.toggle('on', b.dataset.mode === setupMode); });
+    each($('mode-seg').children, function (b) { var selected = b.dataset.mode === setupMode; b.classList.toggle('on', selected); b.setAttribute('aria-pressed', selected ? 'true' : 'false'); });
     $('mode-note').textContent = setupMode === 'mystery' ? 'Mystery Tiles: ? and ! tiles on the track spin a wheel of events (shield, jump, swap, zap, freeze…). No stakes: every match is free.' :
       setupMode === 'lucky' ? 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.' : 'Classic Ludo on a clean board.';
     $('btn-howto').classList.toggle('hidden', setupMode !== 'lucky');
     var order = [0, 1, 3, 2], pos = ['top left', 'top right', 'bottom right', 'bottom left'];
     order.forEach(function (s) {
       var x = seats[s], cur = !x ? 'off' : x.type === 'human' ? 'human' : x.level;
-      var row = document.createElement('div'); row.className = 'seat';
-      row.innerHTML = '<span class="sw-dot" style="background:' + seatColor(s) + '"></span><span class="sname">' + NAMES[s] + '<br><small>' + pos[s] + '</small></span><div class="seg"></div>';
-      var seg = row.querySelector('.seg');
+      var row = document.createElement('div'); row.className = 'seat'; row.dataset.seat = s;
+      row.setAttribute('role', 'group'); row.setAttribute('aria-label', NAMES[s] + ' seat, ' + pos[s]);
+      var head = document.createElement('div'); head.className = 'seat-head';
+      var dot = document.createElement('span'); dot.className = 'sw-dot'; dot.style.background = seatColor(s); dot.setAttribute('aria-hidden', 'true');
+      var name = document.createElement('span'); name.className = 'sname'; name.textContent = NAMES[s];
+      var position = document.createElement('small'); position.textContent = pos[s]; name.appendChild(position); head.appendChild(dot); head.appendChild(name); row.appendChild(head);
+      var seg = document.createElement('div'); seg.className = 'seg seat-options'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', NAMES[s] + ' player type');
       [['off', 'Off'], ['human', 'Human'], ['easy', 'Easy'], ['medium', 'Normal'], ['hard', 'Hard']].forEach(function (o) {
-        var b = document.createElement('button'); b.textContent = o[1]; b.dataset.v = o[0]; b.dataset.seat = s; if (o[0] === cur) b.className = 'on';
-        b.addEventListener('click', function () {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = o[1]; b.dataset.v = o[0]; b.dataset.seat = s;
+        var selected = o[0] === cur; b.setAttribute('aria-pressed', selected ? 'true' : 'false'); if (selected) b.className = 'on';
+        b.addEventListener('click', function (e) {
+          var keyboard = e.detail === 0;
           SFX.click();
           seats[s] = o[0] === 'off' ? null : o[0] === 'human' ? { type: 'human' } : { type: 'ai', level: o[0] };
           persist(); renderSetup();
+          if (keyboard) {
+            var next = list.querySelector('.seat-options button[data-seat="' + s + '"][data-v="' + o[0] + '"]');
+            if (next) next.focus({ preventScroll: true });
+          }
         });
         seg.appendChild(b);
       });
+      row.appendChild(seg);
       list.appendChild(row);
     });
     var n = seats.filter(Boolean).length, h = seats.filter(function (x) { return x && x.type === 'human'; }).length;
     var msg = n < 2 ? 'Choose at least 2 players.' : h < 1 ? 'At least one player must be human.' : '';
     $('setup-msg').textContent = msg; $('btn-start').disabled = !!msg;
-    $('rules-sum').textContent = rulesSummary();
+    each($('presets').children, function (b) { var selected = (b.dataset.p === '1v1' && n === 2) || (b.dataset.p === '3' && n === 3) || (b.dataset.p === '4' && n === 4); b.setAttribute('aria-pressed', selected ? 'true' : 'false'); });
+    var summary = $('rules-sum'); summary.innerHTML = '';
+    rulesSummary().forEach(function (text) { var chip = document.createElement('span'); chip.className = 'rule-chip'; chip.textContent = text; summary.appendChild(chip); });
   }
   function applyPreset(p) {
     var seats = save.setup[setupKind], lvl = 'medium';

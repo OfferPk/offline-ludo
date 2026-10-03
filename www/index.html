@@ -173,16 +173,16 @@
       </header>
       <div class="setup-body">
         <div class="sect">Mode</div>
-        <div class="seg big-seg" id="mode-seg"><button data-mode="classic">Classic</button><button data-mode="mystery">Mystery</button><button data-mode="lucky">Lucky Chaos</button></div>
+        <div class="seg big-seg setup-mode-pills" id="mode-seg" role="group" aria-label="Choose a game mode"><button type="button" data-mode="classic" aria-pressed="false">Classic</button><button type="button" data-mode="mystery" aria-pressed="false">Mystery</button><button type="button" data-mode="lucky" aria-pressed="false">Lucky Chaos</button></div>
         <p class="note" id="mode-note"></p>
-        <button id="btn-howto" class="btn plate small-btn hidden">How to play Lucky Chaos Ludo</button>
+        <button id="btn-howto" class="btn plate small-btn hidden" type="button">How to play Lucky Chaos Ludo</button>
         <div class="sect">Players</div>
-        <div class="presets" id="presets"><button data-p="1v1">1 v 1</button><button data-p="3">3 players</button><button data-p="4">4 players</button></div>
+        <div class="presets" id="presets" role="group" aria-label="Choose player count"><button type="button" data-p="1v1" aria-pressed="false">1 v 1</button><button type="button" data-p="3" aria-pressed="false">3 players</button><button type="button" data-p="4" aria-pressed="false">4 players</button></div>
         <div id="seat-list" class="seat-list"></div>
-        <p id="setup-msg" class="setup-msg"></p>
+        <p id="setup-msg" class="setup-msg" role="status" aria-live="polite"></p>
         <div class="sect">House rules</div>
-        <div class="rules-sum" id="rules-sum"></div>
-        <button id="btn-edit-rules" class="btn plate small-btn">Change house rules</button>
+        <div class="rules-sum" id="rules-sum" role="group" aria-label="Current house rules"></div>
+        <button id="btn-edit-rules" class="btn plate small-btn" type="button">Change house rules</button>
       </div>
       <div class="setup-foot"><button id="btn-start" class="btn primary big"><span>Start match</span></button></div>
     </section>
