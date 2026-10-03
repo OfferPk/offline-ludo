@@ -1,41 +1,39 @@
-# Online backend setup and current scope
+# Online Ludo backend setup and current scope
 
-## Current status
+## Verified project
 
-This branch contains an unconfigured Supabase schema/client integration. The approved new project could not be created because the `Shahdara Fiber Net` organization currently has two active free projects, its project limit. The existing projects were not changed. The frontend therefore keeps a placeholder URL and publishable key in `www/js/supabase-config.js`; no migration has been applied and no login or backend flow has been live-tested.
+The dedicated Supabase project is named **Online Ludo**, is active in `ap-southeast-1`, and has reference `exggyvbsqhoasrqgzerf`. Its project URL and public publishable key are configured in `www/js/supabase-config.js`; no service-role or secret key is included in the frontend. Billing was not changed, and neither of the two older Supabase projects was modified.
 
-The current scope is accounts, profiles, private cloud balances (read on sign-in and refreshed through an owner-filtered Realtime channel), invite/quick-match rooms, participant readiness, realtime lobby roster/status and a match-history row when a host starts a table. It does **not** synchronize the Ludo board, dice, moves or turns, and it does not produce verified winners or playable online matches. The lobby says this in the UI. Offline matches, local saves and local coins remain unchanged.
+Two additive migrations are applied to this project only:
 
-## Project and database
+- `20261003182237_online_backend.sql` — the seven-table schema, RLS policies, room RPCs, server-only wallet/match functions, and initial Realtime publication entries. Supabase records version `20261003182237` with migration name `20261003213000_online_backend`.
+- `20261003183133_profiles_realtime.sql` — adds member-visible profile rows to the Realtime publication for live profile and roster refresh.
 
-Once organization project capacity is available, create the new project named **Offline Ludo** in `Shahdara Fiber Net`, region `ap-south-1`, at the previously confirmed `$0/month` quote. Do not modify the two existing projects. Then replace only the URL and **publishable** key in `www/js/supabase-config.js`; never put a `service_role` or secret key in frontend code.
+The live checks confirmed that `profiles`, `wallets`, `currency_ledger`, `rooms`, `room_members`, `room_invites` and `match_history` exist with RLS enabled. `anon` has no table privileges; `authenticated` can read through table policies and can update only `profiles.display_name`. Lobby RPCs are available to authenticated users, while `post_currency_transaction` and `finalize_match` are executable only by `service_role`. No client-side coin or diamond mint/spend path is enabled.
 
-Apply `supabase/migrations/20261003213000_online_backend.sql` to the new project, then verify that all seven tables have RLS enabled, the authenticated role has only the required reads/profile-name update and RPC permissions, and the service-only currency/match functions remain unavailable to `anon` and `authenticated`. The `post_currency_transaction` function is atomic, non-negative and idempotent, but there is intentionally no client-callable currency operation. A trusted server must validate the game result and invoke privileged functions before any online reward or spend flow can exist.
+## Email/password authentication
 
-## Auth URLs and credentials
+Supabase Auth's email/password provider is enabled and public signup is allowed. Email confirmation is required (`mailer_autoconfirm` is off). Google and Facebook providers remain disabled and are not part of this portal flow.
 
-The project's exact Supabase provider callback cannot be known until the new project has a project reference. Google and Facebook each use the callback shown in Supabase Authentication → Providers, with this documented form:
+The portal accepts an email address and password typed by the user. It uses Supabase Auth's `signInWithPassword`, `signUp`, `resetPasswordForEmail`, and `updateUser` flows. Signup-confirmation and password-reset return URLs are passed to Supabase Auth; the app clears password fields after submission and does not write passwords to local game saves or source/config files. The account email is not prefilled or hardcoded.
 
-`https://<new-project-ref>.supabase.co/auth/v1/callback`
+The live Auth URL configuration is:
 
-Add the production app return URL below to Supabase Auth → URL Configuration (site URL/allow list):
+- **Site URL:** `https://offerpk.github.io/offline-ludo/`
+- `https://offerpk.github.io/offline-ludo/` and `https://offerpk.github.io/offline-ludo/**`
+- `http://localhost:8080/` and `http://localhost:8080/**`
+- `com.offerpk.offlineludo://auth-callback` for Android email-confirmation/password-reset deep links
 
-- `https://offerpk.github.io/offline-ludo/`
-- `https://offerpk.github.io/offline-ludo/**` (for path-based redirects)
-- `http://localhost:8080/` and `http://localhost:8080/**` for local testing
-- `com.offerpk.offlineludo://auth-callback` for Android OAuth return
+No custom SMTP host, account, or password is configured. Consequently, successful email confirmation and password-reset delivery has not been verified; if messages do not arrive, a custom SMTP sender must be configured in Supabase Auth. Do not turn off confirmation merely to avoid configuring email delivery. The user enters their own password in the portal; no password is needed in source control or chat.
 
-The Android scheme/host is already registered in `AndroidManifest.xml`; Capacitor App and Browser plugins handle the system-browser OAuth return. The browser bundle uses the same web redirect base, and the online page preserves an invite code through login.
+## What the online client supports
 
-Required provider-held credentials (enter them in the provider/Supabase dashboards or a secure credential form, not a source file or ordinary chat):
+After email/password sign-in, the client can read the user's cloud profile and server-owned coin/diamond balances. Profile, wallet, room roster/readiness, and participant-visible match-history changes use RLS-protected Realtime subscriptions. The lobby supports quick matchmaking, invite rooms, join-by-code, ready status, host start, leave, and sign-out flows. Errors are shown in the screen status area.
 
-- **Google:** OAuth Web Client ID and client secret; authorize `https://offerpk.github.io` and `http://localhost:8080` as JavaScript origins; add the Supabase callback above as an Authorized redirect URI. Enable Google in Supabase Auth and request `openid`, `email` and `profile`.
-- **Facebook:** Meta App ID and App Secret; enable Facebook Login and the `public_profile` and `email` permissions; add the same Supabase callback URI to Valid OAuth Redirect URIs; enable Facebook in Supabase Auth. Facebook test users need the appropriate app role while the app is in development mode.
+These online account/lobby functions remain separate from offline play. Existing local game modes, saves, offline coins, and local progression stay on the device and are not copied to cloud wallets. The Android application ID and deep-link scheme remain `com.offerpk.offlineludo` to preserve installation/update and email-auth return compatibility; local save keys are unchanged.
 
-Google provider setup: [Supabase Google OAuth guide](https://supabase.com/docs/guides/auth/social-login/auth-google). Facebook provider setup: [Supabase Facebook OAuth guide](https://supabase.com/docs/guides/auth/social-login/auth-facebook). Redirect allow-list behavior: [Supabase redirect URL guide](https://supabase.com/docs/guides/auth/redirect-urls). Android return handling follows [Supabase native deep-link guidance](https://supabase.com/docs/guides/auth/native-mobile-deep-linking).
+**This is still a lobby, not synchronized online Ludo gameplay.** The backend does not run authoritative dice rolls or moves, replicate board state or turns, verify winners, or award/spend online currency. A trusted match runtime and a defined reward/economy policy are future work. Do not treat local coins and cloud balances as interchangeable.
 
-## Security boundary and unfinished gameplay work
+## Verification boundary
 
-The client can read only its own wallet/ledger, update only its own display name, and call validated room-lobby RPCs. It cannot insert/update wallets, post ledger entries, directly change room membership/readiness/status or finalize results. Room records and realtime events are member-scoped by RLS. The 16-character invite token is only readable by current room members and is exchanged through the join RPC.
-
-To ship actual online competition, add a trusted match runtime that runs the Ludo rules authoritatively (or verifies a deterministic move/event history), streams accepted state to participants, finalizes match results and only then posts any configured coin/diamond transaction. Decide the economy/rewards before adding a trusted award path; this branch does not invent rates. The existing client-side offline coin balance must not be uploaded as an initial cloud balance because it is user-editable local state.
+The deployed schema, RLS, table grants, RPC grants, migration history, Auth email-provider/signup flags, Site URL, and redirect allowlist were checked on the target project. Unit tests and a deterministic browser test exercise the email/password UI, errors, confirmation/reset paths, mocked profiles/wallets/Realtime/matchmaking, sign-out, and offline fallback without creating real accounts or rooms. A real account sign-in was not performed; the user enters their own credentials in the portal. Email-confirmation and password-reset delivery still depend on SMTP readiness.

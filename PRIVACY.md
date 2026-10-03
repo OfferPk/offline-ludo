@@ -1,16 +1,16 @@
-# Privacy Policy – Crossfour: Offline Ludo
+# Privacy Policy – Online Ludo
 
 _Last updated: October 3, 2026_
 
-Crossfour: Offline Ludo ("the app") is developed by **OfferPk**. This policy explains what information is handled when you use the app on Android or play the web version.
+Online Ludo ("the app") is developed by **OfferPk**. This policy explains what information is handled when you use the app on Android or play the web version.
 
 ## Information we collect
 
 Offline play does not require an account or a network connection. Your local match, settings, offline coins, unlocked cosmetics and recovery checkpoint remain on your device and are not uploaded by the offline save system. Existing offline coins are not automatically copied into an online wallet.
 
-An optional online account/lobby feature is being added, but it is not active until its Supabase project and social providers are configured. If enabled and you choose to sign in with Google or Facebook, Supabase Auth processes your login and provider account information (which may include your email address). The app stores an online display name and generated player handle, server-side coin and diamond balances, room membership/readiness, invite-room records and match-history status. Room codes and player names are visible to participants in that room; balances and currency transaction history are restricted to the account owner. The online feature does not currently synchronize the Ludo board or turns, and this version does not provide a client-callable way to create or spend online currency. Do not treat local coins and online balances as interchangeable.
+The optional online account and lobby service uses email/password authentication through Supabase Auth. When you sign in or create an account, the email address and password you enter are sent to Supabase Auth for authentication; the app does not hardcode the address or save the raw password in local game data. The app can then store an online display name and generated player handle, server-side coin and diamond balances, room membership/readiness, invite-room records and match-history status. Room codes and player names are visible to participants in that room; balances and currency transaction history are restricted to the account owner. New accounts require email confirmation. Password reset and confirmation messages are sent through the project's email service; no custom SMTP sender is configured yet, so delivery has not been verified. Google and Facebook sign-in are not used. The online lobby does not synchronize the Ludo board, dice or turns, and the app has no client-callable way to create or spend online currency. Do not treat local coins and online balances as interchangeable.
 
-Online data is transmitted to the Supabase-hosted backend selected for the project. Supabase processes connection data such as IP address as part of providing the service and applies its own privacy and security terms: <https://supabase.com/privacy>. Google and Facebook process sign-in according to their own privacy policies: <https://policies.google.com/privacy> and <https://www.facebook.com/privacy/policy/>. You can continue to play offline without signing in. No analytics service is added by the online lobby.
+When online sign-in is used, account and lobby data is transmitted to the Supabase-hosted backend selected for the project. Supabase processes connection data such as IP address as part of providing the service and applies its own privacy and security terms: <https://supabase.com/privacy>. You can continue to play offline without signing in. No analytics service is added by the online lobby.
 
 Coins and diamonds are virtual, non-purchasable and non-transferable in this implementation; they cannot be bought, sold, bet, wagered or exchanged for money. The local quick-chat phrases and emoji remain on-device and are not sent to other players.
 
@@ -31,7 +31,7 @@ This data is encrypted in transit and is processed by Google under Google's own 
 
 Users in the EEA, UK and Switzerland (and other regions where it is required) are asked for consent through Google's **User Messaging Platform (UMP)** consent message before personalized ads are shown. You can change your choice at any time from **Settings → Ad privacy options** in the app (shown where applicable). You can also reset or delete your advertising ID, or opt out of personalized ads, in **Android Settings → Google → Ads** (or **Settings → Privacy → Ads** on newer devices).
 
-The web version at offerpk.github.io does not show ads. The optional Supabase Auth client stores a sign-in session in browser/app storage when you sign in; without sign-in, the online feature is not used.
+The web version at offerpk.github.io does not show ads. The optional Supabase Auth client stores a sign-in session in browser/app storage when you sign in. Password fields are cleared after submission and passwords are not written to local game saves; without signing in, the online feature is not used.
 
 ## Haptics
 
@@ -43,7 +43,7 @@ The app is a general-audience board game intended for users aged 13 and over and
 
 ## Security
 
-Online account data is protected by database row-level access controls. Currency balances cannot be changed directly by the app client; trusted server-side operations are required for transactions. Never share a password, provider token or authentication code with another player.
+Online account data is protected by database row-level access controls. Currency balances cannot be changed directly by the app client; trusted server-side operations are required for transactions. Never share your password or an email-confirmation/password-reset link with another player.
 
 ## Changes
 

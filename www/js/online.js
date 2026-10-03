@@ -7,13 +7,17 @@
   var screen = document.getElementById('online');
   var statusLine = document.getElementById('online-status');
   var authPanel = document.getElementById('online-auth-panel');
+  var recoveryPanel = document.getElementById('online-recovery-panel');
   var accountPanel = document.getElementById('online-account-panel');
   var roomPanel = document.getElementById('online-room-panel');
   var currentRoomId = sessionStorage.getItem('crossfour.online.room') || '';
   var currentRoom = null;
   var currentUser = null;
+  var recoveryMode = false;
   var roomChannel = null;
   var walletChannel = null;
+  var profileChannel = null;
+  var historyChannel = null;
   var client = null;
   var sdkLoading = null;
   var nativeCallbackConfigured = false;
@@ -32,6 +36,10 @@
     return typeof config.url === 'string' && /^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(config.url) &&
       typeof config.publishableKey === 'string' && config.publishableKey.length > 20 &&
       config.publishableKey.indexOf('YOUR_') !== 0;
+  }
+  function emailPasswordEnabled() { return config.emailPasswordEnabled === true; }
+  function authRedirectUrl() {
+    return isNative() ? 'com.offerpk.offlineludo://auth-callback' : window.location.origin + window.location.pathname;
   }
   function announce(message, isError) {
     if (!statusLine) return;
@@ -76,29 +84,116 @@
   }
   function renderAccount() {
     var signedIn = !!currentUser;
-    authPanel.classList.toggle('hidden', signedIn);
-    accountPanel.classList.toggle('hidden', !signedIn);
-    roomPanel.classList.toggle('hidden', !signedIn);
+    var recovering = !!recoveryMode;
+    authPanel.classList.toggle('hidden', signedIn || recovering);
+    recoveryPanel.classList.toggle('hidden', !recovering);
+    accountPanel.classList.toggle('hidden', !signedIn || recovering);
+    roomPanel.classList.toggle('hidden', !signedIn || recovering);
     $('online-signout').disabled = !signedIn;
-    if (!client) {
-      $('online-google').disabled = true;
-      $('online-facebook').disabled = true;
-      $('online-config-note').textContent = isConfigured()
-        ? 'Open Online to connect securely to the configured service. Offline play remains available.'
-        : 'Waiting for the new Supabase project URL and publishable key. Offline play remains available.';
+    ['online-signin', 'online-signup', 'online-reset-request'].forEach(function (id) {
+      $(id).disabled = !client || !emailPasswordEnabled();
+    });
+    $('online-recovery-submit').disabled = !client || !recovering;
+    if (!isConfigured()) {
+      $('online-config-note').textContent = 'Waiting for the Online Ludo Supabase URL and publishable key. Offline play remains available.';
+    } else if (!emailPasswordEnabled()) {
+      $('online-config-note').textContent = 'Email/password sign-in is disabled for this project. Offline play remains available.';
     } else {
-      $('online-google').disabled = false;
-      $('online-facebook').disabled = false;
-      $('online-config-note').textContent = 'Sign in with Google or Facebook to use cloud profiles and rooms.';
+      $('online-config-note').textContent = 'Sign in with email and password or create an account. Email confirmation may be required.';
+    }
+    if (recovering) {
+      $('online-wallet-coins').textContent = '—';
+      $('online-wallet-diamonds').textContent = '—';
+      announce('Choose a new password to finish account recovery.');
+      return;
     }
     if (!signedIn) {
       $('online-wallet-coins').textContent = '—';
       $('online-wallet-diamonds').textContent = '—';
-      if (client) announce('Sign in to create or join online rooms.');
+      if (client && emailPasswordEnabled()) announce('Sign in to create or join online rooms.');
+      else if (client) announce('Online Ludo email/password authentication is not enabled.', true);
       return;
     }
     $('online-profile-name').value = '';
     $('online-profile-handle').textContent = 'Loading profile…';
+  }
+  function readCredentials() {
+    var emailField = $('online-email');
+    var passwordField = $('online-password');
+    if (!emailField.checkValidity()) { emailField.reportValidity(); return null; }
+    if (!passwordField.value) {
+      passwordField.focus();
+      announce('Enter your password to continue.', true);
+      return null;
+    }
+    var credentials = { email: emailField.value.trim(), password: passwordField.value };
+    passwordField.value = '';
+    return credentials;
+  }
+  function signInWithPassword() {
+    if (!client || !emailPasswordEnabled()) return announce('Email/password sign-in is unavailable.', true);
+    var credentials = readCredentials();
+    if (!credentials) return;
+    announce('Signing in…');
+    client.auth.signInWithPassword(credentials).then(function (result) {
+      if (result.error) throw result.error;
+      var session = result.data && result.data.session;
+      if (!session || !session.user) return announce('Sign-in could not start a session. Please try again.', true);
+      recoveryMode = false;
+      currentUser = session.user;
+      renderAccount();
+      announce('Signed in. Your online account is ready.');
+      return refreshAccount();
+    }).catch(function (error) { announce('Sign-in failed: ' + errorText(error), true); });
+  }
+  function signUpWithPassword() {
+    if (!client || !emailPasswordEnabled()) return announce('Email/password account creation is unavailable.', true);
+    var credentials = readCredentials();
+    if (!credentials) return;
+    announce('Creating your account…');
+    client.auth.signUp({
+      email: credentials.email,
+      password: credentials.password,
+      options: { emailRedirectTo: authRedirectUrl() }
+    }).then(function (result) {
+      if (result.error) throw result.error;
+      var session = result.data && result.data.session;
+      if (session && session.user) {
+        currentUser = session.user;
+        renderAccount();
+        announce('Account created and signed in.');
+        return refreshAccount();
+      }
+      announce('Account created. Check your email for a confirmation link before signing in. If no message arrives, email delivery may need configuration.');
+    }).catch(function (error) { announce('Account creation failed: ' + errorText(error), true); });
+  }
+  function requestPasswordReset() {
+    if (!client || !emailPasswordEnabled()) return announce('Password reset is unavailable.', true);
+    var emailField = $('online-email');
+    if (!emailField.checkValidity()) { emailField.reportValidity(); return; }
+    announce('Requesting a password reset…');
+    client.auth.resetPasswordForEmail(emailField.value.trim(), { redirectTo: authRedirectUrl() }).then(function (result) {
+      if (result.error) throw result.error;
+      announce('If an account exists for that address, a reset link will be sent. If no message arrives, email delivery may need configuration.');
+    }).catch(function (error) { announce('Password reset could not be requested: ' + errorText(error), true); });
+  }
+  function updateRecoveredPassword(event) {
+    event.preventDefault();
+    if (!client || !recoveryMode) return;
+    var passwordField = $('online-new-password');
+    if (!passwordField.value) { passwordField.focus(); return announce('Enter a new password.', true); }
+    var password = passwordField.value;
+    passwordField.value = '';
+    $('online-recovery-submit').disabled = true;
+    announce('Updating your password…');
+    client.auth.updateUser({ password: password }).then(function (result) {
+      if (result.error) throw result.error;
+      recoveryMode = false;
+      renderAccount();
+      announce('Password updated. You are signed in.');
+      return refreshAccount();
+    }).catch(function (error) { announce('Password could not be updated: ' + errorText(error), true); })
+      .finally(function () { $('online-recovery-submit').disabled = !client || !recoveryMode; });
   }
   function refreshAccount() {
     if (!client || !currentUser) return Promise.resolve();
@@ -140,11 +235,11 @@
           var detail = document.createElement('small');
           detail.textContent = new Date(match.started_at).toLocaleString();
           item.append(title, detail);
-          list.appendChild(item);
-        });
-        $('online-history-empty').classList.toggle('hidden', !!(result.data && result.data.length));
+        list.appendChild(item);
+      });
+      $('online-history-empty').classList.toggle('hidden', !!(result.data && result.data.length));
       }).catch(function () {
-        // An empty history is expected until the first table is started.
+        announce('Match history could not be refreshed. Try again when your connection is stable.', true);
       });
   }
   function renderRoom() {
@@ -230,6 +325,35 @@
       });
     walletChannel.userId = currentUser.id;
   }
+  function subscribeProfile() {
+    if (!client || !currentUser) return;
+    if (profileChannel && profileChannel.userId === currentUser.id) return;
+    if (profileChannel) client.removeChannel(profileChannel);
+    var userId = currentUser.id;
+    profileChannel = client.channel('crossfour-profile-' + userId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, function (change) {
+        if (!currentUser || currentUser.id !== userId) return;
+        var row = change && (change.new || change.old) || {};
+        if (row.id === userId) refreshAccount();
+        if (currentRoom && currentRoom.roster.some(function (member) { return member.user_id === row.id; })) refreshRoom();
+      })
+      .subscribe(function (state) {
+        if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') announce('Live profile updates are reconnecting.', true);
+      });
+    profileChannel.userId = userId;
+  }
+  function subscribeHistory() {
+    if (!client || !currentUser) return;
+    if (historyChannel && historyChannel.userId === currentUser.id) return;
+    if (historyChannel) client.removeChannel(historyChannel);
+    var userId = currentUser.id;
+    historyChannel = client.channel('crossfour-history-' + userId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_history' }, refreshHistory)
+      .subscribe(function (state) {
+        if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') announce('Live match-history updates are reconnecting.', true);
+      });
+    historyChannel.userId = userId;
+  }
   function attachRoom(result) {
     if (!result.room_id) throw new Error('The server did not return a room ID.');
     currentRoomId = result.room_id;
@@ -248,57 +372,52 @@
       .then(attachRoom)
       .catch(function (error) { announce('Could not join room: ' + errorText(error), true); });
   }
-  function doOAuth(provider) {
-    if (!client) return announce('Online services are not configured yet.', true);
-    var native = isNative();
-    var redirectTo = native ? 'com.offerpk.offlineludo://auth-callback' : window.location.origin + window.location.pathname;
-    client.auth.signInWithOAuth({
-      provider: provider,
-      options: { redirectTo: redirectTo, skipBrowserRedirect: native }
-    }).then(function (result) {
-      if (result.error) throw result.error;
-      if (!native) return;
-      if (!result.data || !result.data.url) throw new Error('The provider did not return an authorization URL.');
-      var browser = plugin('Browser');
-      if (!browser || typeof browser.open !== 'function') throw new Error('The Android browser plugin is unavailable. Rebuild the app with the current dependencies.');
-      return browser.open({ url: result.data.url });
-    }).catch(function (error) {
-      announce('Sign-in could not start: ' + errorText(error), true);
-    });
-  }
   function handleNativeCallback(url) {
     if (!url) return Promise.resolve();
     var parsed;
     try { parsed = new URL(url); } catch (_) { return Promise.resolve(); }
     if (parsed.protocol !== 'com.offerpk.offlineludo:' || parsed.host !== 'auth-callback') return Promise.resolve();
     var code = parsed.searchParams.get('code');
+    var isRecovery = parsed.searchParams.get('type') === 'recovery';
     var authError = parsed.searchParams.get('error_description') || parsed.searchParams.get('error');
     if (authError) {
-      announce('Sign-in was cancelled or rejected by the provider.', true);
+      announce('This email confirmation or password-reset link was rejected or expired.', true);
       return Promise.resolve();
     }
     if (!code) return Promise.resolve();
     return ensureClient().then(function () { return client.auth.exchangeCodeForSession(code); }).then(function (result) {
       if (result.error) throw result.error;
-      var browser = plugin('Browser');
-      if (browser && typeof browser.close === 'function') return browser.close();
+      if (isRecovery) {
+        recoveryMode = true;
+        renderAccount();
+        announce('Choose a new password to finish account recovery.');
+      }
     }).catch(function (error) {
-      announce('Could not finish sign-in: ' + errorText(error), true);
+      announce('Could not finish email authentication: ' + errorText(error), true);
     });
   }
   function bindEvents() {
     $('btn-online').addEventListener('click', openOnline);
     $('online-back').addEventListener('click', closeOnline);
-    $('online-google').addEventListener('click', function () { doOAuth('google'); });
-    $('online-facebook').addEventListener('click', function () { doOAuth('facebook'); });
+    $('online-auth-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      signInWithPassword();
+    });
+    $('online-signup').addEventListener('click', signUpWithPassword);
+    $('online-reset-request').addEventListener('click', requestPasswordReset);
+    $('online-recovery-form').addEventListener('submit', updateRecoveredPassword);
     $('online-signout').addEventListener('click', function () {
       if (!client) return;
       client.auth.signOut().then(function (result) {
         if (result.error) throw result.error;
         if (roomChannel) client.removeChannel(roomChannel);
         if (walletChannel) client.removeChannel(walletChannel);
+        if (profileChannel) client.removeChannel(profileChannel);
+        if (historyChannel) client.removeChannel(historyChannel);
         roomChannel = null;
         walletChannel = null;
+        profileChannel = null;
+        historyChannel = null;
         currentRoomId = '';
         currentRoom = null;
         sessionStorage.removeItem('crossfour.online.room');
@@ -314,7 +433,7 @@
         .then(function (result) {
           if (result.error) throw result.error;
           announce('Display name saved to your online profile.');
-          refreshRoom();
+          return refreshAccount().then(function () { return refreshRoom(); });
         }).catch(function (error) { announce('Profile update failed: ' + errorText(error), true); });
     });
     $('online-create-room').addEventListener('click', function () {
@@ -397,21 +516,32 @@
       auth: { flowType: 'pkce', autoRefreshToken: true, persistSession: true, detectSessionInUrl: !isNative() }
     });
     renderAccount();
-    client.auth.onAuthStateChange(function (_event, session) {
+    client.auth.onAuthStateChange(function (event, session) {
+      if (event === 'PASSWORD_RECOVERY') recoveryMode = true;
+      else if (event === 'SIGNED_OUT') recoveryMode = false;
       currentUser = session && session.user ? session.user : null;
       if (!currentUser) {
+        recoveryMode = false;
         if (roomChannel) client.removeChannel(roomChannel);
         if (walletChannel) client.removeChannel(walletChannel);
+        if (profileChannel) client.removeChannel(profileChannel);
+        if (historyChannel) client.removeChannel(historyChannel);
         roomChannel = null;
         walletChannel = null;
+        profileChannel = null;
+        historyChannel = null;
+        currentRoomId = '';
+        sessionStorage.removeItem('crossfour.online.room');
         currentRoom = null;
         renderRoom();
       }
       renderAccount();
-      if (currentUser) {
+      if (currentUser && !recoveryMode) {
         window.setTimeout(function () {
           refreshAccount();
           subscribeWallet();
+          subscribeProfile();
+          subscribeHistory();
           if (currentRoomId) { subscribeRoom(); refreshRoom(); }
           if (pendingInvite && !handlingPendingInvite) {
             handlingPendingInvite = true;
@@ -424,9 +554,11 @@
       if (result.error) throw result.error;
       currentUser = result.data.session && result.data.session.user ? result.data.session.user : null;
       renderAccount();
-      if (currentUser) {
+      if (currentUser && !recoveryMode) {
         refreshAccount();
         subscribeWallet();
+        subscribeProfile();
+        subscribeHistory();
         if (currentRoomId) { subscribeRoom(); refreshRoom(); }
         if (pendingInvite) joinInvite(pendingInvite);
       }
@@ -463,7 +595,7 @@
     if (!isConfigured()) {
       $('online-config-note').textContent = 'Online rooms and cloud balances are inactive until the approved Supabase project is configured.';
     } else {
-      announce('Online services are configured. Open this screen to connect.');
+      announce('Online Ludo backend is configured. Open Online rooms to sign in with email and password.');
     }
   }
 

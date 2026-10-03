@@ -1,6 +1,8 @@
-# ◆ Crossfour: Offline Ludo
+# ◆ Online Ludo
 
-A modern, **offline-first Ludo** for 2–4 players. Play against computer players (**Easy, Normal, Hard**), pass one phone around with friends, or mix both. v1.2 adds the new **Lucky Chaos Ludo** mode (Boost/Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens). v1.1 added **per-player dice in each corner**, the **Star-style stacked-sixes roll system**, the **Mystery Tiles** mode, **Undo dice roll**, quick chat & emotes, levels/XP and ranked results. Optional Supabase account/lobby code is in an unconfigured review stage; this is not a playable online Ludo mode yet. The game is written in vanilla HTML/CSS/JavaScript (the board is drawn on a canvas) and ships as an **Android app** (Capacitor 8 + Google AdMob) that **GitHub Actions** builds and signs automatically.
+Online Ludo is being developed online-first, with the existing local game modes and saves retained. This branch connects the client to a dedicated Supabase backend for email/password accounts, cloud profiles, server-owned balances and lobby matchmaking. Email/password authentication is enabled; the portal accepts credentials from the user and does not hardcode or save passwords in local game data. Email confirmation is required for new accounts, but custom SMTP is not configured, so confirmation and password-reset delivery still needs verification. Google and Facebook sign-in are not used. The current online scope is lobby/profile/wallet sync only: the shared board, dice, turns and verified results are not synchronized. Offline coins remain local and are never copied to cloud wallets.
+
+Local modes include computer players (**Easy, Normal, Hard**), pass & play for 2–4 players, **Lucky Chaos Ludo** (Boost/Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens), per-player dice, stacked sixes, Mystery Tiles, Undo dice roll, quick chat, cosmetics, levels/XP and ranked local results. The app is written in vanilla HTML/CSS/JavaScript and ships as an **Android app** (Capacitor 8 + Google AdMob) built and signed by **GitHub Actions**.
 
 **▶ Play the live demo:** https://offerpk.github.io/offline-ludo/
 **Privacy policy:** https://offerpk.github.io/offline-ludo/privacy.html
@@ -45,7 +47,7 @@ Full rules: **[RULES.md](RULES.md)** (also in the game under **Rules**). In shor
 
 ## Online backend status
 
-The review branch adds a least-privilege Supabase schema, an optional Google/Facebook sign-in and room-lobby UI, realtime roster/status subscriptions, and Android OAuth deep-link plumbing. The project is not provisioned and the client has a placeholder URL/key, so these controls are inactive in the current build. A created room can track players, readiness and a started-table history record, but this branch does **not** sync the Ludo board, turns or match results. Cloud wallets start at zero and are read-only from the client; local coins are not copied over. See [online backend setup](docs/online-backend-setup.md) for OAuth credentials and remaining setup.
+The live project is **Online Ludo** (`exggyvbsqhoasrqgzerf`, `ap-southeast-1`); the frontend uses its public publishable key, and the additive schema/RLS migrations have been applied and checked. The portal supports email/password sign-in, account creation, confirmation and reset-return flows, cloud profile and read-only wallet sync, room invites, quick matchmaking, readiness, roster/profile updates and participant-visible history refreshes. The project's email provider and signup are enabled; email confirmation is required, and no custom SMTP sender is configured yet. Google and Facebook sign-in remain disabled and are not used. A started table is still only a lobby record: there is no shared board, dice/turn synchronization, verified winner flow or client-callable currency change. Offline play, saves, progression and coins remain local. See [Online Ludo backend setup](docs/online-backend-setup.md) for exact project and authentication status.
 
 ## Project layout
 
@@ -110,7 +112,7 @@ Then bump the version, commit and tag. CI builds a new signed AAB. In AdMob, als
 
 ## Android build
 
-- Capacitor 8, appId **`com.offerpk.offlineludo`**, name **Crossfour Ludo** (launcher label), plugins `@capacitor-community/admob` 8.1.0 and `@capacitor/haptics` 8.
+- Capacitor 8, appId **`com.offerpk.offlineludo`** (retained for Android update and email-confirmation/password-reset deep-link compatibility), name **Online Ludo** (launcher label), plugins `@capacitor-community/admob` 8.1.0 and `@capacitor/haptics` 8.
 - `compileSdk`/`targetSdk` **36**, `minSdk` **24**, versionCode **2**, versionName **1.1.0** (in `android/app/build.gradle` / `android/variables.gradle`).
 - Permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, `AD_ID` (AdMob) and `VIBRATE` (haptics). No billing: the game has no purchases.
 
