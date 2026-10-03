@@ -49,9 +49,23 @@ body.has-banner .screen { padding-bottom: calc(var(--sab) + max(var(--banner-h),
 .logo-mark .q3 { background: var(--s3); border-bottom-left-radius: 22px; } .logo-mark .q2 { background: var(--s2); border-bottom-right-radius: 22px; }
 .logo h1 { margin: 10px 0 0; font-size: 40px; font-weight: 800; letter-spacing: -.01em; }
 .logo .tag { margin: 2px 0 0; color: var(--muted); letter-spacing: .34em; font-size: 12px; text-transform: uppercase; font-weight: 600; }
-.home-actions { display: flex; flex-direction: column; gap: 10px; width: min(340px, 100%); }
-.home-row { display: flex; gap: 8px; width: min(340px, 100%); }
-.home-row .btn { flex: 1; padding: 11px 6px; font-size: 14px; }
+.home-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: min(440px, 100%); }
+#btn-continue { grid-column: 1 / -1; }
+.mode-card { min-width: 0; min-height: 108px; padding: 12px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 8px; border: 1px solid rgba(145,202,239,.19); border-radius: 16px; color: var(--ink); text-align: left; background: linear-gradient(145deg, rgba(85,151,194,.13), rgba(119,100,184,.09) 58%, rgba(255,255,255,.035)); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 8px 22px rgba(0,0,0,.12); backdrop-filter: blur(13px) saturate(1.08); transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease; }
+.mode-card:hover { border-color: rgba(155,218,255,.4); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 10px 24px rgba(0,0,0,.17), 0 0 18px rgba(94,177,223,.07); transform: translateY(-1px); }
+.mode-card:active { transform: scale(.985); }
+.mode-card:focus-visible, .home-row .btn:focus-visible { outline: 3px solid #9ad9ff; outline-offset: 3px; }
+.mode-card-icon { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.11); border-radius: 11px; color: #a8e2ff; background: linear-gradient(145deg, rgba(84,180,255,.2), rgba(117,93,221,.12)); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
+.mode-card-icon svg { width: 21px; height: 21px; display: block; }
+.mode-computer .mode-card-icon { color: #a8e2ff; background: linear-gradient(145deg, rgba(64,169,226,.23), rgba(67,113,201,.14)); }
+.mode-lucky .mode-card-icon { color: #ffd383; background: linear-gradient(145deg, rgba(244,183,64,.23), rgba(226,87,133,.13)); }
+.mode-mystery .mode-card-icon { color: #d8bbff; background: linear-gradient(145deg, rgba(142,89,222,.23), rgba(54,184,240,.12)); }
+.mode-pass .mode-card-icon { color: #9fe4c9; background: linear-gradient(145deg, rgba(47,196,157,.22), rgba(54,132,202,.13)); }
+.mode-card-copy { min-width: 0; width: 100%; display: flex; flex-direction: column; gap: 3px; }
+.mode-card-title { display: block; color: var(--ink); font-size: 14px; font-weight: 800; line-height: 1.15; letter-spacing: -.015em; }
+.mode-card-subtitle { display: block; color: var(--muted); font-size: 10px; font-weight: 500; line-height: 1.25; }
+.home-row { display: flex; gap: 8px; width: min(440px, 100%); }
+.home-row .btn { flex: 1; min-height: 40px; padding: 8px 6px; border-radius: 12px; border-color: rgba(145,202,239,.14); background: rgba(255,255,255,.035); backdrop-filter: blur(10px); font-size: 12.5px; }
 .home-link { color: var(--muted); font-size: 13px; text-decoration: none; }
 
 /* ---------------- buttons ---------------- */
@@ -446,7 +460,7 @@ body.light .toast { background: rgba(35,38,44,.92); }
 
 /* ---------------- Crystal League community preview (frontend-only) ---------------- */
 .community-launch {
-  width: min(340px, 100%);
+  width: min(440px, 100%);
   min-height: 56px;
   display: flex;
   align-items: center;
@@ -655,6 +669,13 @@ body.light .community-dialog .panel-head h2 { color: #273345; }
   #home .logo-mark { width: 64px; height: 64px; margin-bottom: 7px; }
   #home .logo h1 { font-size: 34px; }
   #home .home-actions .btn.big { min-height: 53px; padding-top: 9px; padding-bottom: 9px; }
+  #home .home-actions { gap: 8px; }
+  #home .mode-card { min-height: 96px; padding: 10px; gap: 6px; }
+  #home .mode-card-icon { width: 28px; height: 28px; border-radius: 9px; }
+  #home .mode-card-icon svg { width: 19px; height: 19px; }
+  #home .mode-card-title { font-size: 13px; }
+  #home .mode-card-subtitle { font-size: 9px; }
+  #home .home-row .btn { min-height: 36px; padding: 7px 4px; }
   #home .community-launch { min-height: 49px; }
   .community-intro { min-height: 73px; padding-top: 8px; padding-bottom: 6px; }
   .community-footer { min-height: 64px; }
