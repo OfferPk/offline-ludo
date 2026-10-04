@@ -115,14 +115,19 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await page.click('#btn-skins'); await page.waitForSelector('[data-id="galaxy"]');
 
     await page.click('#skin-tabs button[data-tab="dice"]');
-    ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === 17, 'real Dice tab renders all 17 dice styles');
+    ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === 20, 'real Dice tab renders all 20 dice styles');
     ok(await page.evaluate(() => {
       const box = document.getElementById('skins').querySelector('.panel'), grid = document.getElementById('skin-grid');
       return document.documentElement.scrollWidth <= innerWidth && box.scrollWidth <= box.clientWidth + 1 && grid.scrollWidth <= grid.clientWidth + 1;
     }), 'expanded Dice shop and long coin labels fit at 320px without horizontal overflow');
     await page.screenshot({ path: path.join(OUT, 'skins-dice-mobile.png') });
-    await page.$eval('[data-id="crystal-dice"]', el => el.scrollIntoView({ block: 'center' }));
+    await page.$eval('[data-id="markhor-dice"]', el => el.scrollIntoView({ block: 'center' }));
     await page.screenshot({ path: path.join(OUT, 'skins-dice-new-rows.png') });
+    for (const [id, name, icon] of [['floral-dice', 'Floral Dice', 'dice-flower.svg'], ['honeycomb-bee', 'Bee & Honeycomb', 'dice-bee.svg'], ['markhor-dice', 'Markhor Dice', 'dice-markhor.svg']]) {
+      ok(await page.$eval('[data-id="' + id + '"] .dprev', (preview, expected) => preview.getAttribute('aria-label') === expected + ' dice preview' && preview.dataset.skin === preview.closest('.skin').dataset.id, name), name + ' preview has an accessible name and skin ID');
+      ok(await page.$eval('[data-id="' + id + '"] .dprev', (preview, file) => getComputedStyle(preview, '::before').backgroundImage.includes(file), icon), name + ' watermark renders locally');
+      ok(await page.$eval('[data-id="' + id + '"] button', (button, expected) => button.getAttribute('aria-label').startsWith(expected + ':'), name), name + ' unlock action has an accessible name');
+    }
     const rainbowDice = await page.$('[data-id="rainbow-dice"] .dprev');
     await rainbowDice.screenshot({ path: path.join(OUT, 'skin-preview-rainbow-dice.png') });
     ok(await page.$eval('[data-id="ivory"] button', button => /In use/i.test(button.textContent)), 'original Ivory dice remain the unchanged starter selection');
@@ -134,6 +139,19 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     ok(await page.evaluate(() => window.__cf.save.dice === 'graphite-dice' && window.__cf.save.coins === 1750), 'Graphite Dice costs exactly 150 coins and equips');
     await page.reload({ waitUntil: 'networkidle0' }); await sleep(120);
     ok(await page.evaluate(() => window.__cf.save.dice === 'graphite-dice' && window.__cf.save.coins === 1750), 'equipped Dice style and balance survive reload');
+
+    await page.evaluate(() => { window.__cf.save.coins = 3000; window.__testDiceBalance = 3000; window.__cf.persist(); });
+    await page.click('#btn-skins'); await page.waitForSelector('#skins:not(.hidden) #skin-grid [data-id="graphite"]');
+    await page.click('#skin-tabs button[data-tab="dice"]');
+    await page.waitForSelector('#skins:not(.hidden) #skin-grid [data-id="ivory"]');
+    for (const [id, price] of [['floral-dice', 550], ['honeycomb-bee', 650], ['markhor-dice', 850]]) {
+      await page.waitForFunction(skinId => !document.querySelector('[data-id="' + skinId + '"] button').disabled, {}, id);
+      await page.$eval('[data-id="' + id + '"] button', button => button.click());
+      ok(await page.evaluate((skinId, cost) => window.__cf.save.dice === skinId && window.__cf.save.coins === window.__testDiceBalance - cost, id, price), id + ' unlocks and equips at its listed price');
+      await page.evaluate((cost) => { window.__testDiceBalance -= cost; }, price);
+    }
+    ok(await page.evaluate(() => window.__cf.save.coins === 950 && ['floral-dice', 'honeycomb-bee', 'markhor-dice'].every(id => window.__cf.save.owned.dice.includes(id))), 'all three motif cosmetics persist ownership through the existing shop');
+    await page.click('#skins [data-close="skins"]');
 
     // One synthetic, local match settlement checks the actual game-to-achievement integration.
     await page.evaluate(() => {
@@ -159,6 +177,34 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await page.waitForFunction(() => window.__cf.save.stats.streak === 0, { timeout: 5000 });
     ok(await page.evaluate(() => window.__cf.save.stats.won === 50 && window.__cf.save.stats.streak === 0), 'a settled non-win resets the consecutive-win counter without changing lifetime wins');
 
+    await page.waitForSelector('#result:not(.hidden) #btn-r-home');
+    await page.click('#btn-r-home'); await page.waitForSelector('#home:not(.hidden)');
+    await page.click('#btn-skins'); await page.waitForSelector('#skins:not(.hidden)');
+    await page.click('#skin-tabs button[data-tab="boards"]');
+    await page.$eval('[data-id="aurora"] button', button => button.click());
+    await page.click('#skin-tabs button[data-tab="dice"]');
+    await page.$eval('[data-id="floral-dice"] button', button => button.click());
+    await page.evaluate(() => {
+      const c = window.__cf;
+      c.save.setup.ai = [{ type: 'human' }, { type: 'ai', level: 'easy' }, null, null];
+      c.persist();
+    });
+    await page.click('#skins [data-close="skins"]');
+    await page.click('#btn-vs-ai'); await page.click('#btn-start'); await page.waitForSelector('#game:not(.hidden)');
+    await page.waitForFunction(() => document.querySelectorAll('#game .pdice').length >= 2);
+    const equippedDiceCheck = await page.evaluate(() => {
+      const die = document.querySelector('#game .pdice');
+      const pipCounts = [...die.querySelectorAll('.face')].map(face => face.querySelectorAll('i').length);
+      return { skin: document.body.dataset.diceSkin, label: die.getAttribute('aria-label'), pipCounts: pipCounts };
+    });
+    ok(equippedDiceCheck.skin === 'floral-dice' && /Floral Dice/.test(equippedDiceCheck.label) && equippedDiceCheck.pipCounts.join(',') === '1,2,3,4,5,6', 'equipped floral game die exposes its skin accessibly and preserves all six pip layouts: ' + JSON.stringify(equippedDiceCheck));
+    ok(await page.evaluate(() => {
+      const rect = element => { const r = element.getBoundingClientRect(); return [r.left, r.top, r.width, r.height].map(Math.round).join(','); };
+      const wrap = document.getElementById('board-wrap'), canvas = document.getElementById('board'), pieces = document.getElementById('pieces');
+      return rect(wrap) === rect(canvas) && rect(canvas) === rect(pieces) && getComputedStyle(wrap, '::after').pointerEvents === 'none' && getComputedStyle(wrap, '::before').pointerEvents === 'none';
+    }), 'board polish leaves the canvas/token hitbox geometry unchanged and decorative layers non-interactive');
+    await page.evaluate(() => document.getElementById('toast').classList.add('hidden'));
+    await page.screenshot({ path: path.join(OUT, 'board-mobile-preview.png') });
     ok(remoteRequests.length === 0, 'all browser interactions stayed local with no backend or external requests');
     ok(errors.length === 0, 'no browser JavaScript, console or network errors');
     console.log(`\n${checks} skin browser checks passed. Screenshots: ${OUT}`);

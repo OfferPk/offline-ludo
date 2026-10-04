@@ -91,7 +91,16 @@
     { id: 'royal-dice', name: 'Royal Dice', price: 1000, face: '#514069', edge: '#d0ad58', pip: '#fff5d2' },
     { id: 'rainbow-dice', name: 'Rainbow Dice', price: 500, face: 'linear-gradient(135deg, #ffb3b3, #ffe49b 35%, #b9f0ca 67%, #bacdff)', edge: '#8795b9', pip: '#252544' },
     { id: 'emerald-dice', name: 'Emerald Dice', price: 450, face: '#17815d', edge: '#0b4e39', pip: '#fff6d8' },
-    { id: 'diamond-dice', name: 'Diamond Dice', price: 0, unlock: 'event', flag: 'diamondCollection', face: '#b9edff', edge: '#6ca9c8', pip: '#173d5b' }
+    { id: 'diamond-dice', name: 'Diamond Dice', price: 0, unlock: 'event', flag: 'diamondCollection', face: '#b9edff', edge: '#6ca9c8', pip: '#173d5b' },
+    { id: 'floral-dice', name: 'Floral Dice', price: 550,
+      face: 'radial-gradient(circle at 50% 50%, rgba(242,146,181,.46) 0 11%, transparent 12%), repeating-conic-gradient(from -10deg at 50% 50%, rgba(207,102,149,.18) 0deg 14deg, transparent 14deg 45deg), #fff7f5',
+      edge: '#d995b2', pip: '#452039' },
+    { id: 'honeycomb-bee', name: 'Bee & Honeycomb', price: 650,
+      face: 'repeating-linear-gradient(0deg, rgba(130,86,12,.16) 0 1px, transparent 1px 10px), repeating-linear-gradient(60deg, rgba(130,86,12,.16) 0 1px, transparent 1px 10px), repeating-linear-gradient(120deg, rgba(130,86,12,.16) 0 1px, transparent 1px 10px), #fff0b8',
+      edge: '#c29333', pip: '#32220a' },
+    { id: 'markhor-dice', name: 'Markhor Dice', price: 850,
+      face: 'radial-gradient(ellipse at 50% 12%, rgba(220,246,225,.16) 0 20%, transparent 21%), repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 1px, transparent 1px 7px), #214a3d',
+      edge: '#0e2c26', pip: '#fff7d9' }
   ];
   return { BOARDS: BOARDS, DICE: DICE, SEAT_NAMES: SEAT_NAMES };
 });

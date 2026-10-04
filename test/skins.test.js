@@ -40,9 +40,9 @@ test('contains exactly the 12 priced boards with approved prices and four specia
   assert.deepStrictEqual(SK.BOARDS.find(x => x.unlock === 'streak') && [SK.BOARDS.find(x => x.unlock === 'streak').id, SK.BOARDS.find(x => x.unlock === 'streak').threshold], ['streak-master', 10]);
   assert.strictEqual(SK.BOARDS.find(x => x.id === 'diamond').flag, 'diamondCollection');
 });
-test('keeps all original dice unchanged and adds exactly the 12 named styles/prices', () => {
+test('keeps all original dice unchanged and adds exactly the 15 named styles/prices', () => {
   const originals = { ivory: ['Ivory', 0, '#fbfaf6'], onyx: ['Onyx', 150, '#23272f'], brass: ['Brass', 300, '#e3b857'], frost: ['Frost', 450, '#cfe6ff'], ember: ['Ember', 600, '#d9463b'] };
-  assert.strictEqual(SK.DICE.length, 17);
+  assert.strictEqual(SK.DICE.length, 20);
   for (const [id, expected] of Object.entries(originals)) {
     const item = SK.DICE.find(x => x.id === id);
     assert.ok(item, id); assert.deepStrictEqual([item.name, item.price, item.face], expected);
@@ -51,12 +51,32 @@ test('keeps all original dice unchanged and adds exactly the 12 named styles/pri
     'classic-white': ['Classic White', 0], 'graphite-dice': ['Graphite Dice', 150], 'gold-dice': ['Gold Dice', 300],
     'crystal-dice': ['Crystal Dice', 750], 'neon-dice': ['Neon Dice', 900], 'galaxy-dice': ['Galaxy Dice', 600],
     'fire-dice': ['Fire Dice', 800], 'ice-dice': ['Ice Dice', 700], 'royal-dice': ['Royal Dice', 1000],
-    'rainbow-dice': ['Rainbow Dice', 500], 'emerald-dice': ['Emerald Dice', 450], 'diamond-dice': ['Diamond Dice', 0]
+    'rainbow-dice': ['Rainbow Dice', 500], 'emerald-dice': ['Emerald Dice', 450], 'diamond-dice': ['Diamond Dice', 0],
+    'floral-dice': ['Floral Dice', 550], 'honeycomb-bee': ['Bee & Honeycomb', 650], 'markhor-dice': ['Markhor Dice', 850]
   };
-  assert.strictEqual(Object.keys(expected).length, 12);
+  assert.strictEqual(Object.keys(expected).length, 15);
   for (const [id, value] of Object.entries(expected)) assert.deepStrictEqual([SK.DICE.find(x => x.id === id).name, SK.DICE.find(x => x.id === id).price], value);
   assert.strictEqual(SK.DICE.find(x => x.id === 'classic-white').price, 0, 'free secondary option leaves Ivory as the starter');
   assert.strictEqual(SK.DICE.find(x => x.id === 'diamond-dice').flag, 'diamondCollection');
+});
+test('new floral, bee/honeycomb and markhor dice use high-contrast pips and the existing coin shop', () => {
+  const added = [['floral-dice', 550], ['honeycomb-bee', 650], ['markhor-dice', 850]];
+  function channel(v) { v /= 255; return v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }
+  function luminance(hex) { const rgb = [1, 3, 5].map(i => channel(parseInt(hex.slice(i, i + 2), 16))); return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2]; }
+  for (const [id, price] of added) {
+    const item = SK.DICE.find(x => x.id === id);
+    assert.ok(item, id); assert.strictEqual(item.price, price);
+    const base = item.face.match(/#[0-9a-f]{6}(?!.*#[0-9a-f]{6})/i)[0];
+    const contrast = (Math.max(luminance(base), luminance(item.pip)) + .05) / (Math.min(luminance(base), luminance(item.pip)) + .05);
+    assert.ok(contrast >= 4.5, id + ' pip contrast ' + contrast.toFixed(2));
+  }
+  const save = freshSave(); save.coins = 2600;
+  for (const [id, price] of added) {
+    const result = action(save, 'dice', id);
+    assert.deepStrictEqual(result, { ok: true, newlyOwned: true, price, id });
+    assert.strictEqual(save.dice, id); assert.ok(save.owned.dice.includes(id));
+  }
+  assert.strictEqual(save.coins, 550, 'all three motif dice unlock only through earned offline coins');
 });
 test('uses distinct, legible board palettes with red, green, yellow and blue player homes', () => {
   function rgb(hex) { return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)]; }

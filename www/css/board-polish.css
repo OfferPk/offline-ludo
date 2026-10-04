@@ -1,0 +1,100 @@
+/* Decorative-only board and dice finish. Keep all game geometry and hit targets in style.css unchanged. */
+#board-wrap {
+  isolation: isolate;
+}
+
+#board-wrap::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -6px;
+  border: 1px solid rgba(205, 235, 255, .24);
+  border-radius: 22px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.025) 34%, rgba(9,18,32,.12) 78%),
+    linear-gradient(120deg, rgba(107,210,255,.16), rgba(255,255,255,.015) 48%, rgba(255,202,111,.12));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.22),
+    0 20px 44px -18px rgba(0,0,0,.68),
+    0 0 26px rgba(95,185,255,.12);
+  pointer-events: none;
+}
+
+#board {
+  z-index: 0;
+  box-shadow: inset 0 0 0 1px rgba(235,248,255,.24), 0 16px 36px -14px var(--shadow);
+}
+
+#board-wrap::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border-radius: 16px;
+  background: url("../assets/board-ornament.svg") center / 100% 100% no-repeat;
+  opacity: .47;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+#tiles { z-index: 2; }
+#pieces { z-index: 3; }
+#fx { z-index: 4; }
+
+/* Fine, low-contrast texture sits behind—not on top of—the six readable pips. */
+.pdice .face i,
+.skin .dprev i {
+  position: relative;
+  z-index: 1;
+}
+
+.skin .dprev {
+  position: relative;
+  isolation: isolate;
+  border: 1px solid rgba(255,255,255,.48);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.65), inset 0 -4px 0 var(--d-edge), 0 8px 18px rgba(0,0,0,.2) !important;
+}
+
+.pdice .face {
+  border: 1px solid rgba(255,255,255,.38);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.62), inset 0 -3px 0 var(--d-edge), 0 4px 10px rgba(0,0,0,.16);
+}
+
+.pdice .face::before,
+.skin .dprev::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  top: 2px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  transform: translateX(-50%);
+  background: center / contain no-repeat;
+  opacity: .88;
+  pointer-events: none;
+}
+
+body[data-dice-skin="floral-dice"] .pdice .face::before,
+.skin .dprev[data-skin="floral-dice"]::before {
+  background-image: url("../assets/dice-flower.svg");
+}
+
+body[data-dice-skin="honeycomb-bee"] .pdice .face::before,
+.skin .dprev[data-skin="honeycomb-bee"]::before {
+  background-image: url("../assets/dice-bee.svg");
+}
+
+body[data-dice-skin="markhor-dice"] .pdice .face::before,
+.skin .dprev[data-skin="markhor-dice"]::before {
+  background-image: url("../assets/dice-markhor.svg");
+}
+
+@media (max-width: 370px) {
+  #board-wrap::before { inset: -4px; border-radius: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #board-wrap::before,
+  #board-wrap::after { scroll-behavior: auto; }
+}
