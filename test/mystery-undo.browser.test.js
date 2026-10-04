@@ -1,5 +1,5 @@
-// Mystery Tiles undo limits in a real local browser. No rewarded ad is completed or simulated.
-// Run: node test/mystery-undo.browser.test.js [chrome-path]
+// Mystery Tiles undo limits and soft-wallet payment in a real local browser.
+// No rewarded ad is completed or simulated. Run: node test/mystery-undo.browser.test.js [chrome-path]
 const assert = require('assert');
 const fs = require('fs');
 const http = require('http');
@@ -20,7 +20,6 @@ const server = http.createServer((req, res) => {
 });
 let checks = 0;
 function ok(value, message) { assert.ok(value, message); checks++; console.log('  ok - ' + message); }
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const browser = await puppeteer.launch({ executablePath: process.argv[2] || process.env.CHROME || '/usr/bin/chromium', headless: 'new', args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
@@ -40,14 +39,20 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     await page.evaluate(() => { window.__cf.save.settings.auto = false; window.__cf.save.settings.fast = true; window.__cf.persist(); });
     ok(await page.evaluate(() => {
       const g = window.__cf.game, saved = JSON.parse(localStorage.getItem('crossfour.save.v3')).payload.game;
-      return g.mysteryUndo.total === 0 && g.mysteryUndo.turn === 0 && g.mysteryUndo.ad === 0 && saved.mysteryUndo.total === 0;
-    }), 'new Mystery Tiles match initializes and saves zeroed counters');
+      return g.mysteryUndo.total === 0 && g.mysteryUndo.turn === 0 && g.mysteryUndo.ad === 0 && g.undoLeft === 0 && saved.mysteryUndo.total === 0 && saved.undoLeft === 0;
+    }), 'new Mystery match starts with zero counters and no free undo credits');
     ok(await page.evaluate(() => {
       const note = document.getElementById('undo-limit-note'), button = document.getElementById('btn-undo');
-      return !note.classList.contains('hidden') && /Match total: 6\/6/.test(note.textContent) && /This turn: 2\/2/.test(note.textContent) && /Ad claims: 2\/2/.test(note.textContent) && button.getAttribute('aria-describedby') === 'undo-limit-note';
-    }), 'visible in-game counts and accessible undo description expose all three Mystery limits');
+      return !note.classList.contains('hidden') && note.scrollHeight <= note.clientHeight && /25 coins/.test(note.textContent) && /Match 6 left/.test(note.textContent) && /Turn 2 left/.test(note.textContent) && /Ads 2 left/.test(note.textContent) && button.getAttribute('aria-describedby') === 'undo-limit-note';
+    }), 'visible in-game price and remaining caps are associated with the accessible undo control');
 
-    async function rollCurrentTurn(value) {
+    async function setWallet(coins) {
+      await page.evaluate(value => {
+        const c = window.__cf; c.save.coins = value; c.persist();
+        document.querySelectorAll('.coins-val').forEach(el => { el.textContent = value; });
+      }, coins);
+    }
+    async function rollCurrentTurn(value = 1) {
       await page.evaluate(v => {
         const c = window.__cf, seat = c.game.st.turn;
         c.force([v]);
@@ -58,63 +63,119 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
         throw new Error('roll did not expose undo: ' + JSON.stringify(state));
       });
     }
+    async function openChoice() {
+      await page.evaluate(() => document.getElementById('btn-undo').click());
+      await page.waitForSelector('#undo-choice:not(.hidden)');
+    }
+    async function commitCoinUndo() {
+      await openChoice();
+      await page.waitForFunction(() => !document.getElementById('btn-undo-coins').disabled);
+      await page.evaluate(() => document.getElementById('btn-undo-coins').click());
+    }
     async function waitForCounts(total, turn, label) {
       await page.waitForFunction((t, u) => window.__cf.game.mysteryUndo.total === t && window.__cf.game.mysteryUndo.turn === u, {}, total, turn);
       ok(await page.evaluate((t, u) => window.__cf.game.mysteryUndo.total === t && window.__cf.game.mysteryUndo.turn === u, total, turn), label);
     }
-    async function commitFreeUndo() {
-      await page.evaluate(() => document.getElementById('btn-undo').click());
+    async function waitForTurnReset(turnId, label) {
+      await page.waitForFunction(id => {
+        const g = window.__cf.game;
+        return g.st.turnCount === id && g.mysteryUndo.turnId === id && g.mysteryUndo.turn === 0 && !window.__cf.undoActive;
+      }, { timeout: 9000 }, turnId);
+      ok(true, label);
     }
 
+    await setWallet(200);
     await rollCurrentTurn(1);
-    await commitFreeUndo();
-    await waitForCounts(1, 1, 'only a successfully committed first undo increments match and turn totals');
-    ok(await page.evaluate(() => window.__cf.game.undoLeft === 2), 'successful free undo consumes one existing free allowance');
-    const savedOnce = await page.evaluate(() => JSON.parse(localStorage.getItem('crossfour.save.v3')).payload.game.mysteryUndo);
-    ok(savedOnce.total === 1 && savedOnce.turn === 1 && savedOnce.ad === 0, 'committed undo is immediately persisted with the match');
+    await commitCoinUndo();
+    await waitForCounts(1, 1, 'a committed 25-coin undo increments match and turn counts once');
+    ok(await page.evaluate(() => window.__cf.save.coins === 175), 'coin undo deducts exactly 25 from the existing offline soft wallet');
+    ok(await page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem('crossfour.save.v3')).payload;
+      return saved.coins === 175 && saved.game.mysteryUndo.total === 1 && saved.game.mysteryUndo.turn === 1;
+    }), 'wallet deduction and undo counters persist together in one match save');
+    await page.evaluate(() => document.getElementById('btn-undo-coins').click());
+    ok(await page.evaluate(() => window.__cf.save.coins === 175 && window.__cf.game.mysteryUndo.total === 1), 'retrying the consumed coin-choice callback cannot double-charge or duplicate the undo');
 
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('#btn-continue:not(.hidden)');
     await page.click('#btn-continue');
     await page.waitForFunction(() => window.__cf.game && window.__cf.game.mode === 'mystery' && !document.querySelector('#game').classList.contains('hidden'));
-    ok(await page.evaluate(() => window.__cf.game.mysteryUndo.total === 1 && window.__cf.game.mysteryUndo.turn === 1 && window.__cf.game.mysteryUndo.ad === 0), 'reload and Continue preserve all saved undo counters');
+    ok(await page.evaluate(() => window.__cf.game.mysteryUndo.total === 1 && window.__cf.game.mysteryUndo.turn === 1 && window.__cf.game.undoLeft === 0 && window.__cf.save.coins === 175), 'reload and Continue preserve counters, wallet balance, and Mystery no-free-undo policy');
 
     await rollCurrentTurn(1);
-    await commitFreeUndo();
-    await waitForCounts(2, 2, 'undo rewind does not reset the per-turn counter');
+    await commitCoinUndo();
+    await waitForCounts(2, 2, 'a second coin undo in the same turn consumes the shared allowance');
+    ok(await page.evaluate(() => window.__cf.save.coins === 150), 'second successful coin undo charges another exact 25 coins');
     await rollCurrentTurn(1);
     ok(await page.evaluate(() => {
       const button = document.getElementById('btn-undo'), note = document.getElementById('undo-limit-note');
       return button.disabled && /at most 2 successful undos in a single turn/.test(note.textContent) && /Undo limited/.test(document.getElementById('undo-label').textContent);
-    }), 'third same-turn undo is disabled with a clear accessible reason');
+    }), 'third same-turn undo is disabled with an accessible shared-cap explanation');
     await page.evaluate(() => document.getElementById('btn-undo').click());
-    ok(await page.evaluate(() => window.__cf.game.mysteryUndo.total === 2 && window.__cf.game.mysteryUndo.turn === 2), 'blocked undo does not consume a counter');
-    await page.waitForFunction(() => !window.__cf.undoActive && window.__cf.game.st.turnCount === 1 && window.__cf.game.mysteryUndo.turn === 0, { timeout: 6000 });
-    ok(await page.evaluate(() => window.__cf.game.mysteryUndo.total === 2 && window.__cf.game.mysteryUndo.turn === 0 && window.__cf.game.mysteryUndo.turnId === 1), 'per-turn counter resets only after the non-undone game turn advances');
+    ok(await page.evaluate(() => window.__cf.game.mysteryUndo.total === 2 && window.__cf.game.mysteryUndo.turn === 2 && window.__cf.save.coins === 150), 'blocked third undo consumes neither coins nor counters');
+    await waitForTurnReset(1, 'per-turn counter resets only after the non-undone turn advances');
 
     await rollCurrentTurn(1);
-    await commitFreeUndo();
-    await waitForCounts(3, 1, 'next actual turn gets a fresh allowance while match total remains');
+    await commitCoinUndo();
+    await waitForCounts(3, 1, 'next actual turn receives a fresh allowance while match total remains');
+    await rollCurrentTurn(1);
+    await waitForTurnReset(2, 'another actual turn advance resets only per-turn usage');
+
+    await setWallet(24);
+    await rollCurrentTurn(1);
+    await openChoice();
+    ok(await page.evaluate(() => {
+      const coin = document.getElementById('btn-undo-coins'), ad = document.getElementById('btn-undo-ad-choice'), detail = document.getElementById('undo-choice-status').textContent;
+      return coin.disabled && /25 coins/.test(coin.getAttribute('aria-label')) && /current balance is 24/.test(detail) && !ad.disabled;
+    }), 'insufficient balance disables the coin route accessibly while the free-ad alternative remains available');
+    await page.evaluate(() => document.getElementById('btn-undo-coins').click());
+    ok(await page.evaluate(() => window.__cf.save.coins === 24 && window.__cf.game.mysteryUndo.total === 3 && window.__cf.game.mysteryUndo.turn === 0), 'insufficient-balance attempt is atomic and consumes nothing');
+    await page.click('#btn-undo-cancel');
+    await waitForTurnReset(3, 'canceling the route choice does not itself reset or spend undo allowance');
+
     await page.evaluate(() => {
       const g = window.__cf.game;
-      g.mysteryUndo.ad = 2; // Seed an already-used persisted ad allowance; no ad flow is invoked.
-      g.mysteryUndo.total = 3;
+      g.mysteryUndo.ad = 2; // Seed used ad claims; no ad flow is invoked.
       window.__cf.persist();
     });
     await rollCurrentTurn(1);
     ok(await page.evaluate(() => {
       const b = document.getElementById('btn-undo'), note = document.getElementById('undo-limit-note');
-      return b.disabled && document.getElementById('undo-ad').classList.contains('hidden') && /at most 2 ad-based undo claims per match/.test(note.textContent);
-    }), 'ad redemption is blocked at its cap without invoking or simulating ad completion');
+      return b.disabled && note.scrollHeight <= note.clientHeight && /Need 25 coins; current balance is 24/.test(note.textContent) && /at most 2 ad-based undo claims per match/.test(note.textContent) && document.getElementById('undo-ad').classList.contains('hidden');
+    }), 'no coins plus a capped ad route disables undo and explains both blockers');
+    await page.evaluate(() => document.getElementById('btn-undo').click());
+    ok(await page.evaluate(() => window.__cf.game.mysteryUndo.total === 3 && window.__cf.game.mysteryUndo.ad === 2 && window.__cf.save.coins === 24), 'blocked coin/ad routes do not invoke an ad or alter wallet/counters');
+    await waitForTurnReset(4, 'a later non-undone game turn advances after routes are unavailable');
 
-    await page.evaluate(() => { window.__cf.game.mysteryUndo.total = 6; window.__cf.persist(); });
+    await setWallet(25);
+    await rollCurrentTurn(1);
+    await openChoice();
+    ok(await page.evaluate(() => !document.getElementById('btn-undo-coins').disabled && document.getElementById('btn-undo-ad-choice').disabled && /2 ad-based undo claims/.test(document.getElementById('btn-undo-ad-choice').title)), 'ad cap disables only ad redemption while a 25-coin route remains enabled');
+    await page.evaluate(() => document.getElementById('btn-undo-coins').click());
+    await waitForCounts(4, 1, 'coin-paid undo remains commit-able after both ad claims are used');
+    ok(await page.evaluate(() => window.__cf.save.coins === 0 && window.__cf.game.mysteryUndo.ad === 2), 'coin route reaches zero exactly and leaves ad counter unchanged');
+
+    await rollCurrentTurn(1);
+    await waitForTurnReset(5, 'a committed-coin match can advance to another actual turn');
+    await setWallet(25);
+    await rollCurrentTurn(1);
+    await commitCoinUndo();
+    await waitForCounts(5, 1, 'fifth successful undo commits on a later turn');
+    ok(await page.evaluate(() => window.__cf.save.coins === 0), 'fifth undo cannot overdraw a 25-coin wallet');
+
+    await rollCurrentTurn(1);
+    await waitForTurnReset(6, 'actual turn advancement still resets usage before the final undo');
+    await setWallet(25);
+    await rollCurrentTurn(1);
+    await commitCoinUndo();
+    await waitForCounts(6, 1, 'sixth successful undo reaches the match cap');
     await rollCurrentTurn(1);
     ok(await page.evaluate(() => {
       const b = document.getElementById('btn-undo'), note = document.getElementById('undo-limit-note');
       return b.disabled && /at most 6 successful undos per match/.test(note.textContent);
-    }), 'match-total cap blocks further undo after a committed total of six');
-    const atTotalCap = await page.evaluate(() => JSON.parse(localStorage.getItem('crossfour.save.v3')).payload.game.mysteryUndo);
-    ok(atTotalCap.total === 6 && atTotalCap.ad === 2, 'reload snapshot preserves the total and separate ad cap state');
+    }), 'match cap disables all further undo routes even with coins available');
+    const atTotalCap = await page.evaluate(() => JSON.parse(localStorage.getItem('crossfour.save.v3')).payload);
+    ok(atTotalCap.coins === 0 && atTotalCap.game.mysteryUndo.total === 6 && atTotalCap.game.mysteryUndo.ad === 2, 'total cap, ad cap and wallet balance persist together after reload');
 
     async function finishMatchForFlowTest() {
       await page.evaluate(() => window.__cf.edit(st => {
@@ -125,8 +186,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     }
     await finishMatchForFlowTest();
     await page.click('#btn-r-again');
-    await page.waitForFunction(() => window.__cf.game && window.__cf.game.mode === 'mystery' && window.__cf.game.mysteryUndo.total === 0 && window.__cf.game.mysteryUndo.turn === 0 && window.__cf.game.mysteryUndo.ad === 0, { timeout: 8000 });
-    ok(true, 'Replay starts a genuinely new Mystery match with fresh counters');
+    await page.waitForFunction(() => window.__cf.game && window.__cf.game.mode === 'mystery' && window.__cf.game.mysteryUndo.total === 0 && window.__cf.game.mysteryUndo.turn === 0 && window.__cf.game.mysteryUndo.ad === 0 && window.__cf.game.undoLeft === 0, { timeout: 8000 });
+    ok(true, 'Replay starts a genuinely new Mystery match with fresh paid-route counters');
 
     await finishMatchForFlowTest();
     await page.click('#btn-r-home');
@@ -135,7 +196,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     await page.click('#presets [data-p="1v1"]');
     await page.click('#btn-start');
     await page.waitForFunction(() => window.__cf.game && window.__cf.game.mode === 'classic');
-    ok(await page.evaluate(() => window.__cf.game.mysteryUndo === undefined && document.getElementById('undo-limit-note').classList.contains('hidden') && document.getElementById('undo-label').textContent === 'Undo (3)'), 'Classic retains its existing undo allowance and no Mystery feedback/counters');
+    ok(await page.evaluate(() => window.__cf.game.mysteryUndo === undefined && document.getElementById('undo-limit-note').classList.contains('hidden') && document.getElementById('undo-label').textContent === 'Undo (3)'), 'Classic keeps its existing free allowance and no Mystery wallet rules');
 
     await finishMatchForFlowTest();
     await page.click('#btn-r-home');
@@ -145,7 +206,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     await page.click('#presets [data-p="1v1"]');
     await page.click('#btn-start');
     await page.waitForFunction(() => window.__cf.game && window.__cf.game.mode === 'lucky');
-    ok(await page.evaluate(() => window.__cf.game.mysteryUndo === undefined && document.getElementById('undo-limit-note').classList.contains('hidden') && document.getElementById('undo-label').textContent === 'Undo (3)'), 'Lucky Chaos retains its existing undo allowance and no Mystery feedback/counters');
+    ok(await page.evaluate(() => window.__cf.game.mysteryUndo === undefined && document.getElementById('undo-limit-note').classList.contains('hidden') && document.getElementById('undo-label').textContent === 'Undo (3)'), 'Lucky Chaos keeps its existing free allowance and no Mystery wallet rules');
     ok(errors.length === 0, 'no browser JavaScript errors: ' + (errors.join(' | ') || 'none'));
     console.log('\n' + checks + ' Mystery undo browser checks passed');
   } finally {

@@ -989,7 +989,7 @@
     return out.filter(function (m, i) { return !out.some(function (o, j) { return j < i && o.from === m.from && o.to === m.to; }); });
   }
 
-  /** Coins for the best-placed human (cosmetic currency only). */
+  /** Offline soft coins for the best-placed human; Mystery Tiles also uses them for undo. */
   function coinsFor(place, nPlayers, aiLevels, mode) {
     var base = [0, 40, 20, 12, 6][place] || 0;
     if (nPlayers === 2 && place === 2) base = 10;

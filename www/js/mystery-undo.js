@@ -1,4 +1,4 @@
-/* Mystery Tiles-only undo limits. Counters live beside the match, never inside an undo snapshot. */
+/* Mystery Tiles-only undo limits and soft-wallet transaction planning. Counters live beside the match, never inside an undo snapshot. */
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module.exports) module.exports = api;
@@ -6,8 +6,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
   var LIMITS = Object.freeze({ total: 6, perTurn: 2, ad: 2 });
+  var COIN_COST = 25;
   function isCount(value) {
-    return typeof value === 'number' && isFinite(value) && Math.floor(value) === value && value >= 0;
+    return typeof value === 'number' && isFinite(value) && Math.floor(value) === value && value >= 0 && value <= 9007199254740991;
   }
   function create(turnId) {
     return { total: 0, turn: 0, ad: 0, turnId: isCount(turnId) ? turnId : 0 };
@@ -44,6 +45,14 @@
     if (adBased && counters.ad >= LIMITS.ad) return 'Mystery Tiles allows at most 2 ad-based undo claims per match.';
     return '';
   }
+  // Returns a new counter/wallet pair only when the selected route can commit. Inputs are never mutated.
+  function commit(counters, turnId, source, walletCoins) {
+    if (source !== 'coins' && source !== 'ad') return null;
+    if (source === 'coins' && (!isCount(walletCoins) || walletCoins < COIN_COST)) return null;
+    var next = committed(counters, turnId, source === 'ad');
+    if (!next) return null;
+    return { counters: next, coins: source === 'coins' ? walletCoins - COIN_COST : walletCoins };
+  }
   // Returns a new counter object only when the undo can be committed; never mutates on rejection.
   function committed(counters, turnId, adBased) {
     if (reason(counters, turnId, !!adBased)) return null;
@@ -65,6 +74,6 @@
       adUsed: counters.ad
     };
   }
-  return { LIMITS: LIMITS, create: create, valid: valid, normalize: normalize, advance: advance,
-    usedThisTurn: usedThisTurn, reason: reason, committed: committed, remaining: remaining };
+  return { LIMITS: LIMITS, COIN_COST: COIN_COST, create: create, valid: valid, normalize: normalize, advance: advance,
+    usedThisTurn: usedThisTurn, reason: reason, committed: committed, commit: commit, remaining: remaining };
 });
