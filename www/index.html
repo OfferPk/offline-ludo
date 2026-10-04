@@ -208,7 +208,7 @@
           <div class="online-provider-actions"><button id="online-quick-match" class="btn primary" type="button">Find a table</button><button id="online-create-room" class="btn plate" type="button">Create invite room</button></div>
           <div class="online-join-row"><label for="online-join-code">Join with invite code</label><div><input id="online-join-code" maxlength="16" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="16-character code"><button id="online-join-room" class="btn plate" type="button">Join</button></div></div>
           <section id="online-room-card" class="online-room-card hidden" aria-labelledby="online-room-heading">
-            <div class="online-card-head"><div><span class="online-eyebrow">TABLE</span><h3 id="online-room-heading">Your room</h3><small id="online-room-mode"></small></div><button id="online-leave-room" class="btn plate online-signout" type="button">Leave</button></div>
+            <div class="online-card-head"><div><span class="online-eyebrow">TABLE</span><h3 id="online-room-heading">Your room</h3><small id="online-room-mode"></small></div><div class="online-room-actions"><button id="online-chess-resume" class="btn primary hidden" type="button">Open chess board</button><button id="online-leave-room" class="btn plate online-signout" type="button">Leave room</button></div></div>
             <p id="online-room-status" class="online-room-state" role="status" aria-live="polite"></p>
             <p id="online-room-connection" class="online-room-connection" role="status" aria-live="polite" data-state="idle"></p>
             <label class="online-invite-label" for="online-invite-code">Invite code</label><div class="online-invite-row"><input id="online-invite-code" readonly><button id="online-copy-invite" class="btn plate" type="button">Copy link</button></div>
@@ -220,15 +220,29 @@
               <p id="online-match-dice" class="online-match-dice"></p>
               <ol id="online-match-pieces" class="online-match-pieces" aria-label="Authoritative token positions"></ol>
               <div id="online-match-moves" class="online-match-moves"></div>
-              <div class="online-provider-actions"><button id="online-roll" class="btn primary hidden" type="button">Roll server die</button><button id="online-match-retry" class="btn plate hidden" type="button">Retry pending action</button></div>
+              <div id="online-match-actions" class="online-provider-actions"><button id="online-roll" class="btn primary hidden" type="button">Roll server die</button><button id="online-match-retry" class="btn plate hidden" type="button">Retry pending action</button></div>
               <p id="online-classic-note" class="online-mode-note">Dice are generated on the server. The server checks turn, die, token move, room membership and state version; only the room participants can read live state.</p>
               <section id="online-chess-play" class="online-chess-play hidden" aria-label="Playable Ludo Chess board">
-                <div class="online-chess-sides"><span id="online-chess-red" class="chess-side red"><i aria-hidden="true"></i><b>Red</b><small>White pieces</small></span><span id="online-chess-blue" class="chess-side blue"><i aria-hidden="true"></i><b>Blue</b><small>Black pieces</small></span></div>
-                <p id="online-chess-status" class="online-room-state" role="status" aria-live="polite"></p>
-                <div id="online-chess-promotion" class="online-chess-promotion hidden" role="group" aria-label="Choose a promotion piece"><span>Promote pawn to</span><button type="button" data-promotion="q" aria-label="Queen">♛ Queen</button><button type="button" data-promotion="r" aria-label="Rook">♜ Rook</button><button type="button" data-promotion="b" aria-label="Bishop">♝ Bishop</button><button type="button" data-promotion="n" aria-label="Knight">♞ Knight</button></div>
-                <div id="online-chess-board" class="online-chess-board" role="grid" aria-label="Ludo Chess board"></div>
-                <div class="online-chess-actions"><button id="online-chess-claim-draw" class="btn plate hidden" type="button">Claim draw</button><button id="online-chess-resign" class="btn plate danger hidden" type="button">Resign</button></div>
-                <p id="online-chess-result" class="online-mode-note">Red moves first. Chess rules are standard; colored tokens mark each side.</p>
+                <div class="online-chess-stage">
+                  <div class="online-chess-board-column">
+                    <article id="online-chess-blue" class="chess-player blue" aria-label="Blue player">
+                      <div class="chess-player-main"><span class="chess-player-mark" aria-hidden="true">B</span><span class="chess-player-copy"><b id="online-chess-blue-name">Blue</b><small id="online-chess-blue-role">Blue pieces · opponent</small></span><span id="online-chess-blue-clock" class="chess-clock" aria-label="Blue clock: untimed">Untimed</span></div>
+                      <div class="chess-captured-row"><span>Captured</span><span id="online-chess-blue-captured" class="chess-captured-pieces" aria-label="No captured red pieces yet">—</span></div>
+                    </article>
+                    <div class="online-chess-board-frame"><div id="online-chess-board" class="online-chess-board" role="grid" aria-label="Ludo Chess board, Red side at bottom"></div></div>
+                    <article id="online-chess-red" class="chess-player red" aria-label="Red player">
+                      <div class="chess-player-main"><span class="chess-player-mark" aria-hidden="true">R</span><span class="chess-player-copy"><b id="online-chess-red-name">Red</b><small id="online-chess-red-role">Red pieces · you</small></span><span id="online-chess-red-clock" class="chess-clock" aria-label="Red clock: untimed">Untimed</span></div>
+                      <div class="chess-captured-row"><span>Captured</span><span id="online-chess-red-captured" class="chess-captured-pieces" aria-label="No captured blue pieces yet">—</span></div>
+                    </article>
+                    <div id="online-chess-promotion" class="online-chess-promotion hidden" role="group" aria-label="Choose a promotion piece"><span>Promote pawn to</span><button type="button" data-promotion="q" aria-label="Queen">♛ Queen</button><button type="button" data-promotion="r" aria-label="Rook">♜ Rook</button><button type="button" data-promotion="b" aria-label="Bishop">♝ Bishop</button><button type="button" data-promotion="n" aria-label="Knight">♞ Knight</button></div>
+                  </div>
+                  <aside class="online-chess-info" aria-label="Game information and controls">
+                    <section class="chess-live-status" aria-labelledby="online-chess-status-label"><span id="online-chess-status-label" class="chess-info-label">MATCH STATUS</span><p id="online-chess-status" class="online-room-state" role="status" aria-live="polite"></p></section>
+                    <div id="online-chess-actions" class="online-chess-actions"><button id="online-chess-claim-draw" class="btn plate hidden" type="button">Claim draw</button><button id="online-chess-resign" class="btn plate danger hidden" type="button">Resign</button></div>
+                    <section class="chess-move-section" aria-labelledby="online-chess-move-heading"><div class="chess-info-heading"><div><h5 id="online-chess-move-heading">Move history</h5><small>Coordinate notation</small></div><span id="online-chess-move-count">0 moves</span></div><ol id="online-chess-move-list" class="online-chess-move-list" aria-label="Server position history in coordinate notation"></ol><p id="online-chess-move-empty" class="chess-history-empty">No moves yet. Red makes the first move.</p></section>
+                    <p id="online-chess-result" class="online-mode-note">Standard chess rules · moves and match state are validated by the server.</p>
+                  </aside>
+                </div>
               </section>
             </section>
           </section>
@@ -237,6 +251,13 @@
           <span class="online-eyebrow">RECENT TABLES</span><h2 id="online-history-heading">Match history</h2><p id="online-history-empty">Your started online tables will appear here.</p><ol id="online-history-list" class="online-history-list"></ol>
         </section>
       </div>
+      <section id="online-chess-screen" class="online-chess-screen hidden" role="region" aria-labelledby="online-chess-screen-title" aria-hidden="true" tabindex="-1">
+        <header class="online-chess-header">
+          <div class="online-chess-brand"><span aria-hidden="true">♞</span><div><h2 id="online-chess-screen-title" tabindex="-1">Ludo Chess</h2><small>Live room · Red moves first</small></div></div>
+          <div id="online-chess-network" class="online-chess-network" aria-label="Room connection status"></div>
+          <div id="online-chess-header-actions" class="online-chess-header-actions"><button id="online-chess-back" class="btn plate" type="button">Room details</button></div>
+        </header>
+      </section>
     </section>
 
     <!-- SETUP -->

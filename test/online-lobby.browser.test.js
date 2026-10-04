@@ -432,11 +432,26 @@ function startLocalServer() {
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     await page.click('#online-start-room');
     await page.waitForFunction(() => !document.querySelector('#online-chess-play').classList.contains('hidden') && document.querySelectorAll('#online-chess-board [data-square]').length === 64);
+    assert.equal(await page.$eval('#online-chess-screen', el => !el.classList.contains('hidden') && el.getAttribute('aria-hidden') === 'false'), true, 'an active Chess room opens the dedicated accessible play screen');
+    assert.equal(await page.$eval('#online-match-panel', el => el.parentElement.id), 'online-chess-screen', 'the Chess match panel is moved into the focused screen without duplicating state');
+    assert.equal(await page.$eval('#online-chess-red-clock', el => el.textContent.trim()), 'Untimed', 'the UI does not invent a clock absent from server match state');
+    assert.equal(await page.$eval('#online-chess-resign', el => !el.classList.contains('hidden')), true, 'the active player sees the existing resignation control');
+    assert.equal(await page.$eval('#online-chess-screen-title', el => el.textContent), 'Ludo Chess', 'the play screen has a clear accessible title');
+    assert.equal(await page.$$eval('#online-chess-board [data-square][tabindex="0"]', cells => cells.length), 1, 'the chess grid uses a single roving keyboard tab stop');
+    await page.focus('#online-chess-board [data-square="52"]');
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.square), '53', 'arrow keys move keyboard focus across board squares');
+    const mobileBoard = await page.evaluate(() => ({ board: document.querySelector('#online-chess-board').getBoundingClientRect().width, viewport: innerWidth, square: document.querySelector('#online-chess-board [data-square]').getBoundingClientRect().width, overflow: document.documentElement.scrollWidth > innerWidth }));
+    assert.equal(mobileBoard.overflow, false, 'the Chess screen has no horizontal overflow on a phone viewport');
+    assert.ok(mobileBoard.board <= mobileBoard.viewport && mobileBoard.square >= 35, 'the mobile board fits the screen with practical touch targets');
     assert.equal(await page.$eval('#online-chess-board [data-square="52"] .online-chess-piece', el => el.classList.contains('red-piece')), true, 'seat zero is rendered as Red Ludo-colored pieces');
     await page.click('#online-chess-board [data-square="52"]');
     await page.waitForSelector('#online-chess-board [data-square="36"].is-legal');
     await page.click('#online-chess-board [data-square="36"]');
     await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 1' && document.querySelector('#online-match-turn').textContent.includes('Blue · Bobby Live'));
+    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /e2–e4/, 'the coordinate move list is reconstructed from server position history');
+    assert.equal(await page.$eval('#online-chess-board [data-square="52"]', el => el.classList.contains('last-from')), true, 'the board marks the origin square of the latest move');
+    assert.equal(await page.$eval('#online-chess-board [data-square="36"]', el => el.classList.contains('last-to')), true, 'the board marks the destination square of the latest move');
     const chessCall = await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'ludo_chess_move'));
     assert.equal(chessCall.args.p_from, 52, 'Chess RPC receives the selected source square');
     assert.equal(chessCall.args.p_to, 36, 'Chess RPC receives a locally legal destination square');
@@ -605,8 +620,36 @@ function startLocalServer() {
 
     await seedAndReload('ludo_chess', false);
     await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats' && document.querySelector('#online-match-version').textContent === 'Version 4');
-    assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.room')), 'resume-ludo_chess', 'room recovery discovers an active Chess match when no room ID was persisted');
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.room')), 'resume-ludo_chess', 'room recovery discovers an active Chess room when no room ID was persisted');
     assert.equal(await page.$eval('#online-room-connection', el => el.dataset.state), 'connected', 'discovered Chess room synchronizes its authoritative state');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const match = state.tables.ludo_chess_matches[0];
+      let position = match.state;
+      position = window.LudoChess.applyMove(position, { from: 52, to: 36, promotion: null });
+      position = window.LudoChess.applyMove(position, { from: 11, to: 27, promotion: null });
+      position = window.LudoChess.applyMove(position, { from: 36, to: 27, promotion: null });
+      match.version = 5;
+      match.state = position;
+      state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 5' && document.querySelector('#online-chess-move-list').textContent.includes('e4×d5'));
+    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /e2–e4[\s\S]*d7–d5[\s\S]*e4×d5/, 'history reconstructs both sides from synchronized position snapshots');
+    assert.equal(await page.$eval('#online-chess-red-captured', el => el.getAttribute('aria-label')), '1 captured pieces', 'capture tray counts the exact captured piece from match history');
+    const previewDir = path.resolve(__dirname, '../../artifacts/ludo-chess-play');
+    fs.mkdirSync(previewDir, { recursive: true });
+    await page.screenshot({ path: path.join(previewDir, 'mobile.png') });
+    await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+    await page.waitForFunction(() => innerWidth >= 901 && getComputedStyle(document.querySelector('.online-chess-stage')).gridTemplateColumns.trim().split(/\s+/).length === 2);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'the Chess screen has no horizontal overflow on desktop');
+    await page.screenshot({ path: path.join(previewDir, 'desktop.png') });
+    await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    await page.click('#online-chess-back');
+    await page.waitForFunction(() => document.querySelector('#online-chess-screen').classList.contains('hidden') && !document.querySelector('#online-chess-resume').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online-match-panel', el => el.parentElement.id), 'online-room-card', 'Room details returns the same live panel to the lobby without leaving the game');
+    await page.click('#online-chess-resume');
+    await page.waitForFunction(() => !document.querySelector('#online-chess-screen').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online-match-panel', el => el.parentElement.id), 'online-chess-screen', 'the same match can be resumed from the lobby');
     await page.evaluate(() => {
       const state = window.__mockBackend;
       const channel = state.channels.find(item => item.name === 'crossfour-room-resume-ludo_chess' && !item.removed);
@@ -615,11 +658,11 @@ function startLocalServer() {
     await page.waitForFunction(() => document.querySelector('#online-room-connection').dataset.state === 'reconnecting');
     await page.evaluate(() => {
       const state = window.__mockBackend;
-      state.tables.ludo_chess_matches[0].version = 5;
+      state.tables.ludo_chess_matches[0].version = 6;
       const channel = state.channels.find(item => item.name === 'crossfour-room-resume-ludo_chess' && !item.removed);
       channel.statusCallback('SUBSCRIBED');
     });
-    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 5' && document.querySelector('#online-room-connection').dataset.state === 'connected');
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 6' && document.querySelector('#online-room-connection').dataset.state === 'connected');
     assert.equal(await page.evaluate(() => window.__mockBackend.channels.filter(channel => channel.name === 'crossfour-room-resume-ludo_chess' && !channel.removed).length), 1, 'Chess reconnect rejoins the same single room channel');
 
     await page.evaluate(() => {
