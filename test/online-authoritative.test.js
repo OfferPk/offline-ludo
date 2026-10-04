@@ -8,13 +8,20 @@ const migrations = fs.readdirSync(path.join(root, 'supabase/migrations'));
 const migrationName = migrations.find(name => /_online_authoritative_match\.sql$/.test(name));
 assert.ok(migrationName, 'authoritative match migration exists');
 const migration = read('supabase/migrations/' + migrationName);
+const forwardMigrationName = migrations.find(name => /_classic_turn_continuation\.sql$/.test(name));
+assert.ok(forwardMigrationName, 'a forward-only Classic continuation migration exists');
+assert.ok(forwardMigrationName > migrationName, 'the correction uses a newer migration timestamp');
+const forwardMigration = read('supabase/migrations/' + forwardMigrationName);
 const online = read('www/js/online.js');
 const html = read('www/index.html');
 const logic = read('www/js/logic.js');
 const game = read('www/js/game.js');
-const moveStart = migration.indexOf('create or replace function public.move_match(');
-const moveEnd = migration.indexOf('$$;', moveStart);
-const moveBody = migration.slice(moveStart, moveEnd);
+const historicalMoveStart = migration.indexOf('create or replace function public.move_match(');
+const historicalMoveEnd = migration.indexOf('$$;', historicalMoveStart);
+const historicalMoveBody = migration.slice(historicalMoveStart, historicalMoveEnd);
+const moveStart = forwardMigration.indexOf('create or replace function public.move_match(');
+const moveEnd = forwardMigration.indexOf('$$;', moveStart);
+const moveBody = forwardMigration.slice(moveStart, moveEnd);
 let checks = 0;
 function ok(value, message) { assert.ok(value, message); checks++; console.log('  ok -', message); }
 
@@ -37,6 +44,8 @@ ok(/v_state->>'turn'\)::integer <> v_member_seat/i.test(migration) && /You are n
 ok(/v_state->>'phase' <> 'move'/i.test(migration) && /online_ludo_can_move\(v_state, v_member_seat, p_piece, v_die\)/i.test(migration), 'server validates phase, selected queued die and legal token movement');
 ok(/three consecutive 6s forfeit/i.test(migration) && /v_sixes >= 3/i.test(migration) && /online_ludo_finish_queue/i.test(migration), 'default Star-style stacked-six and queue exhaustion rules are represented');
 ok(/v_all_home boolean := false;/i.test(moveBody) && /if v_destination = 57 then\s+v_all_home := true;\s+for v_i in 0\.\.3 loop[\s\S]*?<> 57 then v_all_home := false; end if;[\s\S]*?end if;/i.test(moveBody) && /if v_all_home then\s+v_state := private\.online_ludo_next_turn\(v_state\);\s+elsif not private\.online_ludo_has_move/i.test(moveBody), 'a Classic turn advances for all-home only after a home move leaves all four tokens home');
+ok(/v_all_home boolean := true;/i.test(historicalMoveBody) && !/if v_destination = 57 then\s+v_all_home := true;/i.test(historicalMoveBody), 'the previously applied migration remains compatible and is not edited in place');
+ok(/create or replace function public\.move_match\(p_room_id uuid, p_expected_version bigint, p_action_id uuid, p_piece integer, p_queue_index integer\)[\s\S]*?security definer[\s\S]*?set search_path = ''/i.test(forwardMigration) && /revoke all on function public\.move_match\(uuid, bigint, uuid, integer, integer\) from public, anon/i.test(forwardMigration) && /grant execute on function public\.move_match\(uuid, bigint, uuid, integer, integer\) to authenticated/i.test(forwardMigration), 'the additive replacement preserves the RPC signature, fixed-search-path security boundary, and authenticated-only grant');
 ok(/safe squares/i.test(migration) && /v_target_abs <> all\(array\[0, 8, 13, 21, 26, 34, 39, 47\]\)/i.test(migration), 'server protects the existing start/star safe squares from captures');
 ok(/grant execute on function public\.roll_match\(uuid, bigint, uuid\) to authenticated/i.test(migration) && /grant execute on function public\.move_match\(uuid, bigint, uuid, integer, integer\) to authenticated/i.test(migration), 'only authenticated callers can invoke the gameplay RPCs');
 ok(/create policy "Room members can read authoritative match state"/i.test(migration) && /alter publication supabase_realtime add table public\.match_states/i.test(migration), 'state is member-readable and added to Realtime');

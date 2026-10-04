@@ -397,7 +397,7 @@ declare
   v_other_position integer;
   v_captures jsonb := '[]'::jsonb;
   v_bonus integer;
-  v_all_home boolean := false;
+  v_all_home boolean := true;
   v_i integer;
   v_player integer;
   v_winner_seat integer;
@@ -460,7 +460,6 @@ begin
   end if;
 
   if v_destination = 57 then
-    v_all_home := true;
     for v_i in 0..3 loop
       if (v_state #>> array['pieces', v_member_seat::text, v_i::text])::integer <> 57 then v_all_home := false; end if;
     end loop;
