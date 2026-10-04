@@ -75,7 +75,7 @@ function startLocalServer() {
             { id: 'user-two', handle: 'bob123', display_name: 'Bob' }
           ],
           wallets: [{ user_id: 'user-one', coins: 1250, diamonds: 7 }],
-          rooms: [], room_members: [], room_invites: [], match_history: [], match_states: []
+          rooms: [], room_members: [], room_invites: [], match_history: [], match_states: [], ludo_chess_matches: []
         }
       };
       function ensureRoom(id, owner, mode, capacity) {
@@ -212,17 +212,19 @@ function startLocalServer() {
               if (state.failRpc === name) return Promise.resolve({ data: null, error: { message: 'The matching service is unavailable.' } });
               let data = {};
               if (name === 'quick_match') {
-                ensureRoom('quick-room', 'user-two', args.p_mode, args.p_capacity);
-                ensureMember('quick-room', 'user-one', 1, 'member', false);
-                ensureMember('quick-room', 'user-two', 0, 'host', true);
-                state.activeRoomId = 'quick-room';
-                data = { room_id: 'quick-room', status: 'waiting' };
+                const roomId = args.p_mode === 'ludo_chess' ? 'quick-chess-room' : 'quick-room';
+                ensureRoom(roomId, 'user-two', args.p_mode, args.p_capacity);
+                ensureMember(roomId, 'user-one', 1, 'member', false);
+                ensureMember(roomId, 'user-two', 0, 'host', true);
+                state.activeRoomId = roomId;
+                data = { room_id: roomId, status: 'waiting' };
               } else if (name === 'create_room') {
-                ensureRoom('host-room', 'user-one', args.p_mode, args.p_capacity);
-                ensureMember('host-room', 'user-one', 0, 'host', false);
-                ensureMember('host-room', 'user-two', 1, 'member', true);
-                state.activeRoomId = 'host-room';
-                data = { room_id: 'host-room', status: 'waiting' };
+                const roomId = args.p_mode === 'ludo_chess' ? 'chess-room' : 'host-room';
+                ensureRoom(roomId, 'user-one', args.p_mode, args.p_capacity);
+                ensureMember(roomId, 'user-one', 0, 'host', false);
+                ensureMember(roomId, 'user-two', 1, 'member', true);
+                state.activeRoomId = roomId;
+                data = { room_id: roomId, status: 'waiting' };
               } else if (name === 'join_room') {
                 ensureRoom('invite-room', 'user-two', 'classic', 2);
                 ensureMember('invite-room', 'user-two', 0, 'host', true);
@@ -236,16 +238,23 @@ function startLocalServer() {
               } else if (name === 'start_room') {
                 const room = state.tables.rooms.find(row => row.id === args.p_room_id);
                 if (room) room.status = 'active';
-                if (!state.tables.match_history.some(row => row.id === 'history-one')) {
-                  state.tables.match_history.push({ id: 'history-one', mode: room ? room.mode : 'classic', status: 'started', winner_id: null, started_at: '2026-10-03T12:30:00.000Z', finished_at: null });
+                if (!state.tables.match_history.some(row => row.room_id === args.p_room_id)) {
+                  state.tables.match_history.push({ id: 'history-' + args.p_room_id, room_id: args.p_room_id, mode: room ? room.mode : 'classic', status: 'started', winner_id: null, started_at: '2026-10-03T12:30:00.000Z', finished_at: null });
                 }
-                const match = {
-                  room_id: args.p_room_id, version: 0,
-                  state: { protocol: 1, mode: 'classic', roll_style: 'star', players: [0, 1], pieces: [[-1, -1, -1, -1], [-1, -1, -1, -1], null, null], rules: { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true }, turn: 0, phase: 'roll', queue: [], sixes: 0, bonus: 0, ranking: [], turn_count: 0, last_roll: null, last_action: null }
-                };
-                state.tables.match_states = state.tables.match_states.filter(row => row.room_id !== args.p_room_id);
-                state.tables.match_states.push(match);
-                state.emit('match_states', { event: 'INSERT', new: match });
+                if (room && room.mode === 'ludo_chess') {
+                  const match = { room_id: args.p_room_id, version: 0, state: window.LudoChess.initialState() };
+                  state.tables.ludo_chess_matches = state.tables.ludo_chess_matches.filter(row => row.room_id !== args.p_room_id);
+                  state.tables.ludo_chess_matches.push(match);
+                  state.emit('ludo_chess_matches', { event: 'INSERT', new: match });
+                } else {
+                  const match = {
+                    room_id: args.p_room_id, version: 0,
+                    state: { protocol: 1, mode: 'classic', roll_style: 'star', players: [0, 1], pieces: [[-1, -1, -1, -1], [-1, -1, -1, -1], null, null], rules: { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true }, turn: 0, phase: 'roll', queue: [], sixes: 0, bonus: 0, ranking: [], turn_count: 0, last_roll: null, last_action: null }
+                  };
+                  state.tables.match_states = state.tables.match_states.filter(row => row.room_id !== args.p_room_id);
+                  state.tables.match_states.push(match);
+                  state.emit('match_states', { event: 'INSERT', new: match });
+                }
                 data = { started: true };
               } else if (name === 'roll_match') {
                 const match = state.tables.match_states.find(row => row.room_id === args.p_room_id);
@@ -280,6 +289,13 @@ function startLocalServer() {
                 match.state = nextState;
                 data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
                 state.emit('match_states', { event: 'UPDATE', new: match });
+              } else if (name === 'ludo_chess_move') {
+                const match = state.tables.ludo_chess_matches.find(row => row.room_id === args.p_room_id);
+                const nextState = window.LudoChess.applyMove(match.state, { from: args.p_from, to: args.p_to, promotion: args.p_promotion });
+                match.version++;
+                match.state = nextState;
+                data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
+                state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
               } else if (name === 'leave_room') {
                 state.tables.room_members = state.tables.room_members.filter(row => !(row.room_id === args.p_room_id && row.user_id === 'user-one'));
                 state.activeRoomId = null;
@@ -390,6 +406,35 @@ function startLocalServer() {
 
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+    await page.$eval('#online-capacity', el => { el.value = '3'; el.dispatchEvent(new Event('change', { bubbles: true })); });
+    await page.select('#online-mode', 'ludo_chess');
+    assert.equal(await page.$eval('#online-capacity', el => el.value + ':' + el.disabled), '2:true', 'Chess mode forces and locks a two-player table');
+    assert.match(await page.$eval('#online-mode-note', el => el.textContent), /exactly two players/i, 'the mode explanation states the two-seat rule');
+    await page.select('#online-mode', 'classic');
+    assert.equal(await page.$eval('#online-capacity', el => el.value + ':' + el.disabled), '3:false', 'switching back to Classic restores the selected capacity');
+    await page.select('#online-mode', 'ludo_chess');
+    await page.click('#online-create-room');
+    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'INVITEROOM123456');
+    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats');
+    await page.click('#online-ready');
+    await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
+    await page.click('#online-start-room');
+    await page.waitForFunction(() => !document.querySelector('#online-chess-play').classList.contains('hidden') && document.querySelectorAll('#online-chess-board [data-square]').length === 64);
+    assert.equal(await page.$eval('#online-chess-board [data-square="52"] .online-chess-piece', el => el.classList.contains('red-piece')), true, 'seat zero is rendered as Red Ludo-colored pieces');
+    await page.click('#online-chess-board [data-square="52"]');
+    await page.waitForSelector('#online-chess-board [data-square="36"].is-legal');
+    await page.click('#online-chess-board [data-square="36"]');
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 1' && document.querySelector('#online-match-turn').textContent.includes('Blue · Bobby Live'));
+    const chessCall = await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'ludo_chess_move'));
+    assert.equal(chessCall.args.p_from, 52, 'Chess RPC receives the selected source square');
+    assert.equal(chessCall.args.p_to, 36, 'Chess RPC receives a locally legal destination square');
+    assert.equal(chessCall.args.p_expected_version, 0, 'Chess action uses the observed authoritative state version');
+    assert.equal(Object.hasOwn(chessCall.args, 'p_die'), false, 'Chess RPC does not accept any client-generated dice value');
+    assert.ok((await page.evaluate(() => window.__mockBackend.snapshot())).channels.some(channel => channel.tables.includes('ludo_chess_matches')), 'Chess state is subscribed through Realtime');
+
+    await page.click('#online-leave-room');
+    await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+    await page.select('#online-mode', 'classic');
     await page.$eval('#online-join-code', el => { el.value = ' invite-room-code '; });
     await page.click('#online-join-room');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'INVITEROOM123456');
@@ -451,7 +496,7 @@ function startLocalServer() {
     await page.waitForSelector('#setup:not(.hidden)');
     assert.equal(await page.$eval('#btn-online', el => !!el), true, 'offline game setup remains reachable after online sign-out');
     assert.deepEqual(errors, [], 'page has no uncaught JavaScript errors');
-    console.log('Online Ludo deterministic browser test passed (mocked Auth, no email/user creation, Classic match controls, Realtime lobby and offline fallback).');
+    console.log('Online Ludo deterministic browser test passed (mocked Auth, no email, Classic and Ludo Chess match controls, Realtime lobby and offline fallback).');
   } finally {
     await browser.close();
     if (localServer) await new Promise(resolve => localServer.server.close(resolve));

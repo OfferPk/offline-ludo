@@ -14,6 +14,10 @@
   var currentRoom = null;
   var currentUser = null;
   var pendingMatchAction = null;
+  var selectedChessSquare = -1;
+  var selectedChessMoves = [];
+  var pendingChessPromotion = null;
+  var capacityBeforeChess = '2';
   var recoveryMode = false;
   var roomChannel = null;
   var walletChannel = null;
@@ -54,6 +58,9 @@
   }
   function rpcObject(data) {
     return Array.isArray(data) ? (data[0] || {}) : (data || {});
+  }
+  function modeLabel(mode) {
+    return mode === 'ludo_chess' ? 'Ludo Chess' : String(mode || 'classic').charAt(0).toUpperCase() + String(mode || 'classic').slice(1);
   }
   function callRpc(name, args) {
     if (!client) return Promise.reject(new Error('Online services are not configured yet.'));
@@ -229,7 +236,7 @@
         (result.data || []).forEach(function (match) {
           var item = document.createElement('li');
           var title = document.createElement('b');
-          title.textContent = match.mode.charAt(0).toUpperCase() + match.mode.slice(1) + ' · ' + match.status;
+          title.textContent = modeLabel(match.mode) + ' · ' + match.status;
           var detail = document.createElement('small');
           detail.textContent = new Date(match.started_at).toLocaleString();
           item.append(title, detail);
@@ -245,10 +252,10 @@
     var card = $('online-room-card');
     card.classList.toggle('hidden', !room);
     if (!room) return;
-    $('online-room-mode').textContent = room.mode.charAt(0).toUpperCase() + room.mode.slice(1) + ' · ' + room.capacity + ' seats';
+    $('online-room-mode').textContent = modeLabel(room.mode) + ' · ' + room.capacity + ' seats';
     $('online-room-status').textContent = room.status === 'active'
-      ? (room.matchState ? 'Online Classic match is active. Dice and moves are validated by the server.' : 'This table predates the Online Classic gameplay update. Create a new table to play online.')
-      : room.status === 'cancelled' ? 'This table was cancelled.' : 'Waiting for players to join and ready up.';
+      ? (room.matchState ? (room.mode === 'ludo_chess' ? 'Ludo Chess is active. Legal moves and match state are validated by the server.' : 'Online Classic match is active. Dice and moves are validated by the server.') : 'This table predates the current online gameplay update. Create a new table to play online.')
+      : room.status === 'completed' ? 'This table is complete.' : room.status === 'cancelled' ? 'This table was cancelled.' : 'Waiting for players to join and ready up.';
     $('online-invite-code').value = room.inviteCode || '';
     $('online-start-room').classList.toggle('hidden', room.status !== 'waiting' || room.created_by !== (currentUser && currentUser.id));
     $('online-ready').classList.toggle('hidden', room.status !== 'waiting');
@@ -266,68 +273,144 @@
     });
     renderMatch();
   }
+  function chessSeatName(room, seat) {
+    var member = room.roster.find(function (candidate) { return Number(candidate.seat) === Number(seat); });
+    return (Number(seat) === 0 ? 'Red' : 'Blue') + ' · ' + ((member && (member.displayName || member.handle)) || 'Player');
+  }
+  function chessResultLabel(state, room) {
+    var labels = {
+      checkmate: 'Checkmate', stalemate: 'Stalemate · draw', draw_seventy_five_moves: 'Draw · 75-move rule',
+      draw_fivefold_repetition: 'Draw · fivefold repetition', draw_insufficient_material: 'Draw · insufficient material',
+      draw_fifty_move_claim: 'Draw · 50-move claim', draw_threefold_claim: 'Draw · threefold repetition claim', resignation: 'Resignation'
+    };
+    var text = labels[state.result] || 'Game complete';
+    return state.winner === 0 || state.winner === 1 ? text + ' · ' + chessSeatName(room, state.winner) + ' wins' : text;
+  }
+  function chooseChessSquare(index, state, isMyTurn) {
+    if (!isMyTurn || state.phase !== 'active' || pendingMatchAction || pendingChessPromotion || !window.LudoChess) return;
+    var matching = selectedChessMoves.find(function (move) { return move.to === index; });
+    if (selectedChessSquare >= 0 && matching) {
+      if (matching.promotion) {
+        pendingChessPromotion = { from: selectedChessSquare, to: index };
+        renderChessBoard(state, currentRoom, isMyTurn);
+      } else {
+        var args = { p_from: selectedChessSquare, p_to: index, p_promotion: null };
+        selectedChessSquare = -1; selectedChessMoves = [];
+        submitMatchAction('ludo_chess_move', args);
+      }
+      return;
+    }
+    var piece = state.board[index];
+    if (piece !== '.' && window.LudoChess.colorOf(piece) === Number(state.turn)) {
+      selectedChessSquare = index;
+      selectedChessMoves = window.LudoChess.legalMoves(state, index);
+    } else {
+      selectedChessSquare = -1;
+      selectedChessMoves = [];
+    }
+    renderChessBoard(state, currentRoom, isMyTurn);
+  }
+  function renderChessBoard(state, room, isMyTurn) {
+    var chess = window.LudoChess;
+    if (!chess || !state || typeof state.board !== 'string' || state.board.length !== 64) return;
+    var board = $('online-chess-board');
+    var chars = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚', P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔' };
+    if (!isMyTurn || state.phase !== 'active' || pendingMatchAction) {
+      selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
+    }
+    $('online-chess-red').classList.toggle('is-turn', state.phase === 'active' && Number(state.turn) === 0);
+    $('online-chess-blue').classList.toggle('is-turn', state.phase === 'active' && Number(state.turn) === 1);
+    var redName = chessSeatName(room, 0), blueName = chessSeatName(room, 1);
+    $('online-chess-red').querySelector('b').textContent = redName;
+    $('online-chess-blue').querySelector('b').textContent = blueName;
+    $('online-chess-status').textContent = state.phase === 'over'
+      ? chessResultLabel(state, room)
+      : chessSeatName(room, state.turn) + (isMyTurn ? ' · your move' : ' · waiting for their move') + (state.check ? ' · Check!' : '');
+    $('online-chess-result').textContent = state.phase === 'over'
+      ? chessResultLabel(state, room) + '. Match saved to online history.'
+      : 'Standard chess rules · Red pieces move first · Select a piece, then a highlighted square.';
+    $('online-chess-claim-draw').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || pendingMatchAction || !chess.canClaimDraw(state));
+    $('online-chess-resign').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || !!pendingMatchAction);
+    $('online-chess-promotion').classList.toggle('hidden', !pendingChessPromotion || !!pendingMatchAction);
+    board.replaceChildren();
+    for (var index = 0; index < 64; index++) {
+      var row = Math.floor(index / 8), col = index % 8, piece = state.board[index];
+      var cell = document.createElement('button');
+      cell.type = 'button'; cell.role = 'gridcell'; cell.dataset.square = String(index);
+      cell.className = 'online-chess-square ' + ((row + col) % 2 ? 'dark' : 'light');
+      if (selectedChessSquare === index) cell.classList.add('is-selected');
+      var legal = selectedChessMoves.find(function (move) { return move.to === index; });
+      if (legal) { cell.classList.add('is-legal'); if (state.board[index] !== '.' || legal.enPassant) cell.classList.add('is-capture'); }
+      if (state.last_move && (state.last_move.from === index || state.last_move.to === index)) cell.classList.add(state.last_move.from === index ? 'last-from' : 'last-to');
+      var label = piece === '.' ? 'empty' : (window.LudoChess.colorOf(piece) === 0 ? 'Red ' : 'Blue ') + chess.pieceName(piece);
+      cell.setAttribute('aria-label', label + ' on ' + chess.coord(index) + ((selectedChessSquare === index) ? ', selected' : '') + (legal ? ', legal destination' : ''));
+      if ((row === 7 || col === 0) && piece === '.') {
+        var coord = document.createElement('span'); coord.className = 'square-coord'; coord.textContent = (col === 0 ? String(8 - row) : '') + (row === 7 ? String.fromCharCode(97 + col) : ''); cell.appendChild(coord);
+      }
+      if (piece !== '.') {
+        var glyph = document.createElement('span'); glyph.className = 'online-chess-piece ' + (window.LudoChess.colorOf(piece) === 0 ? 'red-piece' : 'blue-piece');
+        glyph.textContent = chars[piece]; glyph.setAttribute('aria-hidden', 'true'); cell.appendChild(glyph);
+      }
+      cell.disabled = !isMyTurn || state.phase !== 'active' || !!pendingMatchAction;
+      cell.addEventListener('click', function (squareIndex) { return function () { chooseChessSquare(squareIndex, state, isMyTurn); }; }(index));
+      board.appendChild(cell);
+    }
+  }
   function renderMatch() {
     var room = currentRoom;
     var panel = $('online-match-panel');
     var record = room && room.matchState;
-    var show = !!(room && room.status === 'active' && record && record.state);
+    var show = !!(room && (room.status === 'active' || room.status === 'completed') && record && record.state);
     panel.classList.toggle('hidden', !show);
-    if (!show) return;
+    if (!show) { $('online-chess-play').classList.add('hidden'); return; }
     var state = record.state;
+    var isChess = room.mode === 'ludo_chess';
     var myMember = room.roster.find(function (member) { return member.user_id === (currentUser && currentUser.id); });
-    var turnMember = room.roster.find(function (member) { return member.seat === Number(state.turn); });
-    var isMyTurn = !!(myMember && myMember.seat === Number(state.turn));
+    var turnMember = room.roster.find(function (member) { return Number(member.seat) === Number(state.turn); });
+    var isMyTurn = !!(myMember && Number(myMember.seat) === Number(state.turn));
     $('online-match-version').textContent = 'Version ' + record.version;
-    $('online-match-heading').textContent = state.phase === 'over' ? 'Match complete' : 'Turn ' + ((state.turn_count || 0) + 1);
-    $('online-match-turn').textContent = state.phase === 'over'
-      ? 'Match complete. Winner: ' + ((room.roster.find(function (member) { return member.seat === Number((state.ranking || [])[0]); }) || {}).displayName || '—')
-      : (turnMember ? turnMember.displayName || turnMember.handle || 'Player' : 'Player') + (isMyTurn ? ' · your turn' : ' · waiting for their turn') + (state.phase === 'move' ? ' · choose a legal token move' : ' · roll phase');
+    $('online-match-eyebrow').textContent = isChess ? 'LUDO CHESS · LIVE STATE' : 'ONLINE CLASSIC · LIVE STATE';
+    $('online-match-heading').textContent = isChess ? (state.phase === 'over' ? 'Game complete' : 'Move ' + (state.fullmove || 1)) : (state.phase === 'over' ? 'Match complete' : 'Turn ' + ((state.turn_count || 0) + 1));
+    $('online-match-turn').textContent = isChess
+      ? (state.phase === 'over' ? chessResultLabel(state, room) : chessSeatName(room, state.turn) + (isMyTurn ? ' · your move' : ' · waiting for their move') + (state.check ? ' · check' : ''))
+      : (state.phase === 'over' ? 'Match complete. Winner: ' + ((room.roster.find(function (member) { return member.seat === Number((state.ranking || [])[0]); }) || {}).displayName || '—')
+        : (turnMember ? turnMember.displayName || turnMember.handle || 'Player' : 'Player') + (isMyTurn ? ' · your turn' : ' · waiting for their turn') + (state.phase === 'move' ? ' · choose a legal token move' : ' · roll phase'));
+    $('online-chess-play').classList.toggle('hidden', !isChess);
+    ['online-match-dice', 'online-match-pieces', 'online-match-moves', 'online-classic-note'].forEach(function (id) { $(id).classList.toggle('hidden', isChess); });
+    $('online-roll').classList.toggle('hidden', isChess || !(isMyTurn && state.phase === 'roll' && !pendingMatchAction));
+    $('online-match-retry').classList.toggle('hidden', !pendingMatchAction || pendingMatchAction.room_id !== currentRoomId);
+    if (isChess) {
+      renderChessBoard(state, room, isMyTurn);
+      return;
+    }
     var lastRoll = state.last_roll;
     var queue = Array.isArray(state.queue) ? state.queue : [];
     $('online-match-dice').textContent = (lastRoll ? 'Last server die: seat ' + (Number(lastRoll.seat) + 1) + ' rolled ' + lastRoll.face + '. ' : '') +
-      (queue.length ? 'Dice to use: ' + queue.join(' · ') : state.phase === 'over' ? 'No pending dice.' : 'No pending dice.');
-
+      (queue.length ? 'Dice to use: ' + queue.join(' · ') : 'No pending dice.');
     var pieces = $('online-match-pieces');
     pieces.replaceChildren();
     (state.players || []).forEach(function (seat) {
-      var member = room.roster.find(function (candidate) { return candidate.seat === Number(seat); });
+      var member = room.roster.find(function (candidate) { return Number(candidate.seat) === Number(seat); });
       var values = (state.pieces && state.pieces[seat]) || [];
       var item = document.createElement('li');
       var name = document.createElement('b');
       name.textContent = 'Seat ' + (Number(seat) + 1) + ' · ' + ((member && (member.displayName || member.handle)) || 'Player');
       var positions = document.createElement('small');
-      positions.textContent = values.map(function (position, index) {
-        return 'T' + (index + 1) + ' ' + (position < 0 ? 'base' : position === 57 ? 'home' : position >= 52 ? 'home lane ' + (position - 51) : 'track ' + position);
-      }).join(' · ');
-      item.append(name, positions);
-      pieces.appendChild(item);
+      positions.textContent = values.map(function (position, index) { return 'T' + (index + 1) + ' ' + (position < 0 ? 'base' : position === 57 ? 'home' : position >= 52 ? 'home lane ' + (position - 51) : 'track ' + position); }).join(' · ');
+      item.append(name, positions); pieces.appendChild(item);
     });
-
     var moves = $('online-match-moves');
     moves.replaceChildren();
-    $('online-roll').classList.toggle('hidden', !(isMyTurn && state.phase === 'roll' && !pendingMatchAction));
-    $('online-match-retry').classList.toggle('hidden', !pendingMatchAction || pendingMatchAction.room_id !== currentRoomId);
     if (isMyTurn && state.phase === 'move' && !pendingMatchAction && window.LudoLogic && typeof window.LudoLogic.queueMoves === 'function') {
-      var localView = {
-        mode: 'classic', players: state.players, pieces: state.pieces, rules: state.rules,
-        turn: Number(state.turn), phase: 'move', queue: queue, ranking: state.ranking || [],
-        effects: [], capd: [false, false, false, false], lk: null
-      };
+      var localView = { mode: 'classic', players: state.players, pieces: state.pieces, rules: state.rules, turn: Number(state.turn), phase: 'move', queue: queue, ranking: state.ranking || [], effects: [], capd: [false, false, false, false], lk: null };
       window.LudoLogic.queueMoves(localView).forEach(function (move) {
-        var action = document.createElement('button');
-        action.type = 'button';
-        action.className = 'btn plate';
-        action.textContent = 'Use ' + move.v + ' to move token ' + (move.piece + 1);
-        action.addEventListener('click', function () {
-          submitMatchAction('move_match', { p_piece: move.piece, p_queue_index: queue.indexOf(move.v) });
-        });
+        var action = document.createElement('button'); action.type = 'button'; action.className = 'btn plate'; action.textContent = 'Use ' + move.v + ' to move token ' + (move.piece + 1);
+        action.addEventListener('click', function () { submitMatchAction('move_match', { p_piece: move.piece, p_queue_index: queue.indexOf(move.v) }); });
         moves.appendChild(action);
       });
       if (!moves.childElementCount) moves.textContent = 'No legal moves are available; the server will pass the turn.';
     }
-    if (pendingMatchAction && pendingMatchAction.room_id === currentRoomId) {
-      moves.textContent = 'A match action is awaiting confirmation. Retry the same request safely if your connection dropped.';
-    }
+    if (pendingMatchAction && pendingMatchAction.room_id === currentRoomId) moves.textContent = 'A match action is awaiting confirmation. Retry the same request safely if your connection dropped.';
   }
   function refreshRoom() {
     if (!client || !currentRoomId || !currentUser) return Promise.resolve();
@@ -335,13 +418,15 @@
       client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').eq('id', currentRoomId).maybeSingle(),
       client.from('room_members').select('user_id,seat,role,ready').eq('room_id', currentRoomId),
       client.from('room_invites').select('invite_code').eq('room_id', currentRoomId).limit(1).maybeSingle(),
-      client.from('match_states').select('room_id,version,state,updated_at').eq('room_id', currentRoomId).maybeSingle()
+      client.from('match_states').select('room_id,version,state,updated_at').eq('room_id', currentRoomId).maybeSingle(),
+      client.from('ludo_chess_matches').select('room_id,version,state,updated_at').eq('room_id', currentRoomId).maybeSingle()
     ]).then(function (results) {
       if (results[0].error) throw results[0].error;
       if (!results[0].data) throw new Error('You no longer have access to this room.');
       if (results[1].error) throw results[1].error;
       if (results[2].error) throw results[2].error;
       if (results[3].error) throw results[3].error;
+      if (results[4].error) throw results[4].error;
       var roster = results[1].data || [];
       var ids = roster.map(function (member) { return member.user_id; });
       return client.from('profiles').select('id,display_name,handle').in('id', ids).then(function (profileResult) {
@@ -350,7 +435,7 @@
         (profileResult.data || []).forEach(function (profile) { profiles[profile.id] = profile; });
         currentRoom = Object.assign({}, results[0].data, {
         inviteCode: results[2].data ? results[2].data.invite_code : '',
-        matchState: results[3].data || null,
+        matchState: results[0].data.mode === 'ludo_chess' ? (results[4].data || null) : (results[3].data || null),
           roster: roster.map(function (member) {
             var profile = profiles[member.user_id] || {};
             return Object.assign({}, member, { displayName: profile.display_name, handle: profile.handle });
@@ -376,6 +461,7 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + currentRoomId }, refreshRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: 'room_id=eq.' + currentRoomId }, refreshRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_states', filter: 'room_id=eq.' + currentRoomId }, refreshRoom)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ludo_chess_matches', filter: 'room_id=eq.' + currentRoomId }, refreshRoom)
       .subscribe(function (state) {
         if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') announce('Live room updates are reconnecting.', true);
         else if (state === 'SUBSCRIBED') refreshRoom();
@@ -466,6 +552,7 @@
   }
   function attachRoom(result) {
     if (!result.room_id) throw new Error('The server did not return a room ID.');
+    if (currentRoomId !== result.room_id) { selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null; }
     if (pendingMatchAction && pendingMatchAction.room_id !== result.room_id) {
       pendingMatchAction = null;
       sessionStorage.removeItem('crossfour.online.pending-match-action');
@@ -510,6 +597,20 @@
       announce('Could not finish email authentication: ' + errorText(error), true);
     });
   }
+  function updateRoomModeOptions() {
+    var chessMode = $('online-mode').value === 'ludo_chess';
+    var capacity = $('online-capacity');
+    if (chessMode) {
+      if (capacity.value !== '2') capacityBeforeChess = capacity.value;
+      capacity.value = '2';
+      capacity.disabled = true;
+      $('online-mode-note').textContent = 'Ludo Chess uses standard chess rules and exactly two players. Classic Ludo keeps its existing 2–4 player rooms.';
+    } else {
+      capacity.disabled = false;
+      if (capacityBeforeChess && Array.prototype.some.call(capacity.options, function (option) { return option.value === capacityBeforeChess; })) capacity.value = capacityBeforeChess;
+      $('online-mode-note').textContent = 'Classic Ludo and Ludo Chess are playable online. Mystery and Lucky Chaos remain offline modes.';
+    }
+  }
   function bindEvents() {
     $('btn-online').addEventListener('click', openOnline);
     $('online-back').addEventListener('click', closeOnline);
@@ -520,6 +621,9 @@
     $('online-signup').addEventListener('click', signUpWithPassword);
     $('online-reset-request').addEventListener('click', requestPasswordReset);
     $('online-recovery-form').addEventListener('submit', updateRecoveredPassword);
+    $('online-mode').addEventListener('change', updateRoomModeOptions);
+    $('online-capacity').addEventListener('change', function () { if ($('online-mode').value !== 'ludo_chess') capacityBeforeChess = $('online-capacity').value; });
+    updateRoomModeOptions();
     $('online-signout').addEventListener('click', function () {
       if (!client) return;
       client.auth.signOut().then(function (result) {
@@ -535,6 +639,7 @@
         currentRoomId = '';
         currentRoom = null;
         pendingMatchAction = null;
+        selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
         sessionStorage.removeItem('crossfour.online.pending-match-action');
         sessionStorage.removeItem('crossfour.online.room');
         renderRoom();
@@ -590,13 +695,23 @@
       if (!currentRoomId) return;
       callRpc('start_room', { p_room_id: currentRoomId })
         .then(function () {
-          announce('Online Classic table started. The server owns dice, turn validation and match state.');
+          announce(currentRoom && currentRoom.mode === 'ludo_chess' ? 'Ludo Chess table started. The server owns legal-move validation and match state.' : 'Online Classic table started. The server owns dice, turn validation and match state.');
           return refreshRoom();
         })
         .catch(function (error) { announce('Table could not be started: ' + errorText(error), true); });
     });
     $('online-roll').addEventListener('click', function () { submitMatchAction('roll_match', {}); });
     $('online-match-retry').addEventListener('click', runPendingMatchAction);
+    $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) {
+      button.addEventListener('click', function () {
+        if (!pendingChessPromotion || pendingMatchAction) return;
+        var move = pendingChessPromotion; pendingChessPromotion = null;
+        selectedChessSquare = -1; selectedChessMoves = [];
+        submitMatchAction('ludo_chess_move', { p_from: move.from, p_to: move.to, p_promotion: button.dataset.promotion });
+      });
+    });
+    $('online-chess-claim-draw').addEventListener('click', function () { submitMatchAction('claim_ludo_chess_draw', {}); });
+    $('online-chess-resign').addEventListener('click', function () { submitMatchAction('resign_ludo_chess', {}); });
     $('online-leave-room').addEventListener('click', function () {
       if (!currentRoomId) return;
       callRpc('leave_room', { p_room_id: currentRoomId })
@@ -606,6 +721,7 @@
           currentRoomId = '';
           currentRoom = null;
           pendingMatchAction = null;
+          selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
           sessionStorage.removeItem('crossfour.online.pending-match-action');
           sessionStorage.removeItem('crossfour.online.room');
           renderRoom();
