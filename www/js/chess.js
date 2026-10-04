@@ -235,6 +235,16 @@
     finish(next, next.halfmove >= 100 ? 'draw_fifty_move_claim' : 'draw_threefold_claim', null);
     return next;
   }
+  function claimableDrawByMove(state, move) {
+    if (!state || state.phase !== 'active' || !move) return null;
+    var legal = legalMoves(state, move.from).find(function (item) {
+      return item.to === move.to && (item.promotion || null) === (move.promotion || null);
+    });
+    if (!legal) return null;
+    var next = applyMove(state, legal);
+    if (!canClaimDraw(next)) return null;
+    return next.halfmove >= 100 ? 'draw_fifty_move_claim' : 'draw_threefold_claim';
+  }
   function coord(index) {
     return String.fromCharCode(97 + index % 8) + String(8 - Math.floor(index / 8));
   }
@@ -249,6 +259,7 @@
     inCheck: inCheck,
     canClaimDraw: canClaimDraw,
     claimDraw: claimDraw,
+    claimableDrawByMove: claimableDrawByMove,
     positionKey: positionKey,
     repetitions: repetitions,
     insufficientMaterial: insufficientMaterial,

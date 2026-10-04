@@ -17,6 +17,7 @@
   var selectedChessSquare = -1;
   var selectedChessMoves = [];
   var pendingChessPromotion = null;
+  var pendingChessDrawClaim = null;
   var capacityBeforeChess = '2';
   var recoveryMode = false;
   var roomChannel = null;
@@ -113,6 +114,7 @@
     selectedChessSquare = -1;
     selectedChessMoves = [];
     pendingChessPromotion = null;
+    pendingChessDrawClaim = null;
     if (clearStoredState) {
       sessionStorage.removeItem('crossfour.online.pending-match-action');
       sessionStorage.removeItem('crossfour.online.room');
@@ -352,14 +354,32 @@
     var text = labels[state.result] || 'Game complete';
     return state.winner === 0 || state.winner === 1 ? text + ' · ' + chessSeatName(room, state.winner) + ' wins' : text;
   }
+  function stageDrawClaimByMove(move, state, isMyTurn) {
+    if (!window.LudoChess || window.LudoChess.canClaimDraw(state) || !currentRoom || !currentRoom.matchState) return false;
+    var result = window.LudoChess.claimableDrawByMove(state, move);
+    if (!result) return false;
+    pendingChessDrawClaim = {
+      roomId: currentRoomId,
+      version: Number(currentRoom.matchState.version),
+      from: move.from,
+      to: move.to,
+      promotion: move.promotion || null,
+      result: result
+    };
+    renderChessBoard(state, currentRoom, isMyTurn);
+    announce('This move would allow a ' + (result === 'draw_fifty_move_claim' ? '50-move' : 'threefold-repetition') + ' draw claim. Claim the draw or play the move instead.');
+    return true;
+  }
   function chooseChessSquare(index, state, isMyTurn) {
     if (!isMyTurn || state.phase !== 'active' || pendingMatchAction || pendingChessPromotion || roomConnectionState !== 'connected' || !window.LudoChess) return;
+    pendingChessDrawClaim = null;
     var matching = selectedChessMoves.find(function (move) { return move.to === index; });
     if (selectedChessSquare >= 0 && matching) {
       if (matching.promotion) {
         pendingChessPromotion = { from: selectedChessSquare, to: index };
         renderChessBoard(state, currentRoom, isMyTurn);
       } else {
+        if (stageDrawClaimByMove({ from: selectedChessSquare, to: index, promotion: matching.promotion || null }, state, isMyTurn)) return;
         var args = { p_from: selectedChessSquare, p_to: index, p_promotion: null };
         selectedChessSquare = -1; selectedChessMoves = [];
         submitMatchAction('ludo_chess_move', args);
@@ -379,6 +399,7 @@
   function renderChessBoard(state, room, isMyTurn) {
     var chess = window.LudoChess;
     if (!chess || !state || typeof state.board !== 'string' || state.board.length !== 64) return;
+    if (pendingChessDrawClaim && (!room || pendingChessDrawClaim.roomId !== room.id || !room.matchState || pendingChessDrawClaim.version !== Number(room.matchState.version))) pendingChessDrawClaim = null;
     var board = $('online-chess-board');
     var chars = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚', P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔' };
     if (!isMyTurn || state.phase !== 'active' || pendingMatchAction) {
@@ -391,11 +412,16 @@
     $('online-chess-blue').querySelector('b').textContent = blueName;
     $('online-chess-status').textContent = state.phase === 'over'
       ? chessResultLabel(state, room)
-      : chessSeatName(room, state.turn) + (isMyTurn ? ' · your move' : ' · waiting for their move') + (state.check ? ' · Check!' : '');
+      : chessSeatName(room, state.turn) + (isMyTurn ? ' · your move' : ' · waiting for their move') + (state.check ? ' · Check!' : '') + (pendingChessDrawClaim ? ' · choose whether to claim or play the intended move' : '');
     $('online-chess-result').textContent = state.phase === 'over'
       ? chessResultLabel(state, room) + '. Match saved to online history.'
-      : 'Standard chess rules · Red pieces move first · Select a piece, then a highlighted square.';
-    $('online-chess-claim-draw').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || pendingMatchAction || !chess.canClaimDraw(state));
+      : pendingChessDrawClaim
+        ? 'This intended move reaches a claimable draw. Claiming ends the game before the move; choose Play intended move to continue instead.'
+        : 'Standard chess rules · Red pieces move first · Select a piece, then a highlighted square.';
+    var claimButton = $('online-chess-claim-draw');
+    claimButton.textContent = pendingChessDrawClaim ? 'Claim draw by intended move' : 'Claim draw';
+    claimButton.classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || pendingMatchAction || (!pendingChessDrawClaim && !chess.canClaimDraw(state)));
+    $('online-chess-play-claimable-move').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || pendingMatchAction || !pendingChessDrawClaim);
     $('online-chess-resign').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || !!pendingMatchAction);
     $('online-chess-promotion').classList.toggle('hidden', !pendingChessPromotion || !!pendingMatchAction);
     board.replaceChildren();
@@ -449,6 +475,7 @@
     $('online-match-retry').classList.toggle('hidden', !pendingMatchAction || pendingMatchAction.room_id !== currentRoomId);
     $('online-match-retry').disabled = !isSynchronized;
     $('online-chess-claim-draw').disabled = !isSynchronized;
+    $('online-chess-play-claimable-move').disabled = !isSynchronized;
     $('online-chess-resign').disabled = !isSynchronized;
     $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) { button.disabled = !isSynchronized; });
     if (isChess) {
@@ -741,6 +768,7 @@
       roomRestoreUserId = '';
       roomRestoreRoomId = '';
       selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
+      pendingChessDrawClaim = null;
     }
     if (pendingMatchAction && pendingMatchAction.room_id !== result.room_id) {
       pendingMatchAction = null;
@@ -879,15 +907,38 @@
     });
     $('online-roll').addEventListener('click', function () { submitMatchAction('roll_match', {}); });
     $('online-match-retry').addEventListener('click', runPendingMatchAction);
-    $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) {
-      button.addEventListener('click', function () {
-        if (!pendingChessPromotion || pendingMatchAction) return;
-        var move = pendingChessPromotion; pendingChessPromotion = null;
-        selectedChessSquare = -1; selectedChessMoves = [];
-        submitMatchAction('ludo_chess_move', { p_from: move.from, p_to: move.to, p_promotion: button.dataset.promotion });
+      $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          if (!pendingChessPromotion || pendingMatchAction) return;
+          var move = pendingChessPromotion; pendingChessPromotion = null;
+          if (stageDrawClaimByMove({ from: move.from, to: move.to, promotion: button.dataset.promotion }, currentRoom && currentRoom.matchState && currentRoom.matchState.state, true)) return;
+          selectedChessSquare = -1; selectedChessMoves = [];
+          submitMatchAction('ludo_chess_move', { p_from: move.from, p_to: move.to, p_promotion: button.dataset.promotion });
+        });
       });
+    $('online-chess-claim-draw').addEventListener('click', function () {
+      var claim = pendingChessDrawClaim;
+      if (!claim) return submitMatchAction('claim_ludo_chess_draw', {});
+      if (!currentRoom || !currentRoom.matchState || claim.roomId !== currentRoomId || claim.version !== Number(currentRoom.matchState.version)) {
+        pendingChessDrawClaim = null;
+        renderMatch();
+        return announce('The position changed before the draw claim. Review the latest board and try again.', true);
+      }
+      pendingChessDrawClaim = null;
+      selectedChessSquare = -1; selectedChessMoves = [];
+      submitMatchAction('claim_ludo_chess_draw_by_move', { p_from: claim.from, p_to: claim.to, p_promotion: claim.promotion });
     });
-    $('online-chess-claim-draw').addEventListener('click', function () { submitMatchAction('claim_ludo_chess_draw', {}); });
+    $('online-chess-play-claimable-move').addEventListener('click', function () {
+      var move = pendingChessDrawClaim;
+      if (!move || !currentRoom || !currentRoom.matchState || move.roomId !== currentRoomId || move.version !== Number(currentRoom.matchState.version)) {
+        pendingChessDrawClaim = null;
+        renderMatch();
+        return announce('The position changed before the move. Review the latest board and try again.', true);
+      }
+      pendingChessDrawClaim = null;
+      selectedChessSquare = -1; selectedChessMoves = [];
+      submitMatchAction('ludo_chess_move', { p_from: move.from, p_to: move.to, p_promotion: move.promotion });
+    });
     $('online-chess-resign').addEventListener('click', function () { submitMatchAction('resign_ludo_chess', {}); });
     $('online-leave-room').addEventListener('click', function () {
       if (!currentRoomId) return;

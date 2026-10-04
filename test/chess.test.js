@@ -27,6 +27,8 @@ let mate = Chess.initialState();
 mate = move(mate, 53, 45); // f3
 mate = move(mate, 12, 28); // ... e5
 mate = move(mate, 54, 38); // g4
+const mateAtThreshold = move(Object.assign({}, mate, { halfmove: 149 }), 3, 39);
+ok(mateAtThreshold.phase === 'over' && mateAtThreshold.result === 'checkmate', 'checkmate takes precedence over the 75-move threshold on the same move');
 mate = move(mate, 3, 39);  // ... Qh4#
 ok(mate.phase === 'over' && mate.result === 'checkmate' && mate.winner === 1 && mate.check, 'Scholar’s Mate ends with a black checkmate win');
 
@@ -67,6 +69,14 @@ for (let cycle = 0; cycle < 2; cycle++) {
 }
 ok(Chess.repetitions(repetition) === 3 && Chess.canClaimDraw(repetition), 'threefold repetition permits a draw claim');
 ok(Chess.claimDraw(repetition).result === 'draw_threefold_claim', 'the current player can claim threefold repetition');
+let fivefold = Chess.initialState();
+for (let cycle = 0; cycle < 4; cycle++) {
+  fivefold = move(fivefold, 62, 45); // Nf3
+  fivefold = move(fivefold, 6, 21);  // ... Nf6
+  fivefold = move(fivefold, 45, 62); // Ng1
+  fivefold = move(fivefold, 21, 6);  // ... Ng8
+}
+ok(Chess.repetitions(fivefold) === 5 && fivefold.phase === 'over' && fivefold.result === 'draw_fivefold_repetition', 'fivefold repetition ends the game automatically');
 let uncapturableEpRepetition = pos({ 4: 'k', 1: 'n', 60: 'K', 57: 'N', 52: 'P' });
 uncapturableEpRepetition = move(uncapturableEpRepetition, 52, 36); // e4; no black pawn can capture en passant
 const boardAfterE4 = uncapturableEpRepetition.board;
@@ -82,9 +92,23 @@ ok(Chess.repetitions(uncapturableEpRepetition) === 3 && Chess.canClaimDraw(uncap
 const fiftyMove = Chess.initialState();
 fiftyMove.halfmove = 100;
 ok(Chess.canClaimDraw(fiftyMove) && Chess.claimDraw(fiftyMove).result === 'draw_fifty_move_claim', 'the 50-move rule allows a valid draw claim');
+const intendedFifty = pos({ 60: 'K', 4: 'k', 56: 'R', 7: 'r' });
+intendedFifty.halfmove = 99;
+const intendedQuietMove = { from: 56, to: 48 };
+ok(!Chess.canClaimDraw(intendedFifty) && Chess.claimableDrawByMove(intendedFifty, intendedQuietMove) === 'draw_fifty_move_claim', 'a player may claim the 50-move draw by declaring the quiet move that reaches 100 half-moves');
+ok(intendedFifty.halfmove === 99 && intendedFifty.phase === 'active' && intendedFifty.board[56] === 'R', 'checking an intended draw claim does not apply the move to the current state');
+const intendedRepetition = pos({ 60: 'K', 4: 'k', 56: 'R', 7: 'r' });
+const repeatedMove = { from: 56, to: 48 };
+const repeatedPosition = Chess.positionKey(move(intendedRepetition, repeatedMove.from, repeatedMove.to));
+intendedRepetition.position_history = [Chess.positionKey(intendedRepetition), repeatedPosition, repeatedPosition];
+ok(!Chess.canClaimDraw(intendedRepetition) && Chess.claimableDrawByMove(intendedRepetition, repeatedMove) === 'draw_threefold_claim', 'a player may claim threefold repetition by declaring the move that creates the third occurrence');
+ok(Chess.claimableDrawByMove(intendedRepetition, { from: 56, to: 47 }) === null, 'an intended move that does not create a repetition cannot claim a draw');
 const seventyFive = Chess.initialState();
 seventyFive.halfmove = 149;
 const autoDraw = move(seventyFive, 62, 45);
 ok(autoDraw.phase === 'over' && autoDraw.result === 'draw_seventy_five_moves', 'the 75-move rule ends the game automatically');
 ok(Chess.insufficientMaterial(pos({ 60: 'K', 4: 'k' }).board), 'king versus king is insufficient material');
+const lastMinorCapture = pos({ 60: 'K', 4: 'k', 12: 'b', 21: 'B' }, 1);
+const deadMaterial = move(lastMinorCapture, 12, 21);
+ok(deadMaterial.phase === 'over' && deadMaterial.result === 'draw_insufficient_material', 'capturing the last opposing minor piece automatically records the dead-material draw');
 console.log('\nLudo Chess rules tests passed (' + checks + ' checks).');
