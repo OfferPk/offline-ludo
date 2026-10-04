@@ -974,7 +974,8 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .chess-side b { font-size: 12px; line-height: 1.1; }
 .chess-side small { color: var(--muted); font-size: 10px; }
 .chess-side.is-turn { box-shadow: 0 0 0 2px rgba(var(--chess-rgb),.28), 0 0 18px rgba(var(--chess-rgb),.22); }
-.online-chess-board { width: min(100%, 520px); aspect-ratio: 1; display: grid; grid-template-columns: repeat(8, minmax(0,1fr)); grid-template-rows: repeat(8, minmax(0,1fr)); border: 2px solid rgba(255,255,255,.18); border-radius: 10px; overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,.28); touch-action: manipulation; }
+.online-chess-board { width: min(100%, 520px); aspect-ratio: 1; display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: repeat(8, minmax(0,1fr)); border: 2px solid rgba(255,255,255,.18); border-radius: 10px; overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,.28); touch-action: manipulation; }
+.online-chess-row { min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(8, minmax(0,1fr)); grid-template-rows: minmax(0,1fr); }
 .online-chess-square { --square: #ead9bc; min-width: 0; min-height: 0; display: grid; place-items: center; position: relative; padding: 0; color: #191b22; border-radius: 0; background: var(--square); }
 .online-chess-square.dark { --square: #846b59; }
 .online-chess-square:focus-visible { z-index: 1; outline: 3px solid #39bfff; outline-offset: -3px; }
@@ -985,11 +986,11 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-chess-piece { z-index: 1; color: var(--piece-color); font-family: "DejaVu Sans", "Segoe UI Symbol", "Noto Sans Symbols 2", serif; font-size: clamp(20px, 7.5vw, 47px); line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,.78), 0 0 2px rgba(0,0,0,.9); pointer-events: none; }
 .online-chess-piece.red-piece { --piece-color: #d83c37; }
 .online-chess-piece.blue-piece { --piece-color: #175ac6; }
-.online-chess-square .square-coord { position: absolute; z-index: 2; left: 3px; top: 2px; color: rgba(0,0,0,.56); font-size: clamp(7px, 1.8vw, 10px); font-weight: 800; line-height: 1; pointer-events: none; }
-.online-chess-square.dark .square-coord { color: rgba(255,255,255,.76); }
+.online-chess-square .square-coord { position: absolute; z-index: 2; left: 3px; top: 2px; color: #31271e; font-size: clamp(9px, 2vw, 11px); font-weight: 800; line-height: 1; pointer-events: none; }
+.online-chess-square.dark .square-coord { color: #fff5df; }
 .online-chess-promotion { width: min(100%,520px); display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; padding: 8px; border: 1px solid var(--surface-edge); border-radius: 12px; background: var(--surface); }
 .online-chess-promotion span { flex-basis: 100%; color: var(--muted); text-align: center; font-size: 12px; }
-.online-chess-promotion button { min-height: 38px; padding: 6px 9px; border-radius: 9px; background: rgba(255,255,255,.08); font-size: 12px; font-weight: 700; }
+.online-chess-promotion button { min-height: 44px; padding: 6px 9px; border-radius: 9px; background: rgba(255,255,255,.08); font-size: 12px; font-weight: 700; }
 .online-chess-actions { width: min(100%,520px); display: flex; justify-content: center; gap: 8px; }
 .online-chess-actions .btn { flex: 1; min-height: 40px; padding: 8px; font-size: 13px; }
 @media (min-width: 700px) { .online-chess-board { width: min(100%, 520px); } }
@@ -998,7 +999,7 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 
 /* ---------------- Dedicated online Ludo Chess play surface ---------------- */
 .online-room-actions { display: flex; align-items: center; gap: 7px; flex: none; }
-.online-room-actions > .btn { min-height: 36px; padding: 6px 10px; font-size: 11px; }
+.online-room-actions > .btn { min-height: 44px; padding: 6px 10px; font-size: 11px; }
 .online-chess-screen {
   position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; overflow-y: auto;
   overscroll-behavior: contain; padding: max(12px, var(--sat)) 20px calc(max(16px, var(--sab)) + var(--banner-h));
@@ -1018,8 +1019,9 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-chess-network { min-width: 0; }
 .online-chess-screen .online-room-connection { margin: 0; padding: 7px 9px; font-size: 10px !important; white-space: normal; }
 .online-chess-header-actions { display: flex; align-items: center; gap: 7px; }
-.online-chess-header-actions .btn { min-height: 38px; padding: 7px 11px; border-radius: 10px; font-size: 11px; white-space: nowrap; }
+.online-chess-header-actions .btn { min-height: 44px; padding: 7px 11px; border-radius: 10px; font-size: 11px; white-space: nowrap; }
 .online-chess-header-actions #online-leave-room { color: #ffaaa1; border-color: rgba(255,111,97,.27); background: rgba(255,111,97,.075); }
+#online-chess-screen #online-leave-room { min-height: 44px !important; padding-block: 7px !important; }
 .online-chess-screen .online-match-panel { width: min(100%, 1260px); flex: 1 0 auto; align-self: center; margin: 0 auto; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .online-match-panel.is-chess-match > .online-card-head { margin: 0 0 12px; padding: 0 0 10px; border-bottom: 1px solid rgba(255,255,255,.085); }
 .online-match-panel.is-chess-match > .online-card-head h4 { color: #f2f3f4; font-size: 18px !important; letter-spacing: -.025em; }
@@ -1050,7 +1052,9 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-chess-square.last-from, .online-chess-square.last-to { background-image: linear-gradient(rgba(255,220,81,.31),rgba(255,220,81,.31)); }
 .online-chess-square.is-check.last-from, .online-chess-square.is-check.last-to { background-image: radial-gradient(circle, rgba(226,48,53,.76), rgba(226,48,53,.2) 72%), linear-gradient(rgba(255,220,81,.24),rgba(255,220,81,.24)); }
 .online-chess-square .square-coord.file-coord { top: auto; right: 3px; bottom: 2px; left: auto; }
-.online-chess-piece { font-size: clamp(27px, 6.2vmin, 54px); text-shadow: 0 1px 1px rgba(0,0,0,.84), 0 0 3px rgba(0,0,0,.83); }
+.online-chess-piece { font-size: clamp(27px, 6.2vmin, 54px); text-shadow: 0 1px 1px rgba(0,0,0,.84), 0 0 3px rgba(0,0,0,.83); paint-order: stroke fill; }
+.online-chess-square.light .online-chess-piece { -webkit-text-stroke: 1.2px #2a3640; }
+.online-chess-square.dark .online-chess-piece { -webkit-text-stroke: 1.2px #fff5df; }
 .online-chess-square.is-check .online-chess-piece { filter: drop-shadow(0 0 5px rgba(255,46,46,.72)); }
 .online-chess-square:focus-visible { z-index: 2; outline: 3px solid #f6d66b; outline-offset: -3px; }
 .online-chess-promotion { width: 100%; }
@@ -1075,7 +1079,10 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-chess-actions .btn { min-width: 0; min-height: 44px; padding: 9px 10px; border-radius: 10px; font-size: 12px; }
 .online-chess-actions #online-match-retry { grid-column: 1 / -1; border-color: rgba(105,205,255,.24); color: #a8e2ff; }
 .online-chess-actions #online-chess-resign { border-color: rgba(255,111,97,.22); background: rgba(255,111,97,.055); }
-#online-chess-screen button:focus-visible { outline: 3px solid #a6dcff; outline-offset: 3px; }
+#online-chess-screen button:focus-visible { outline: 3px solid #fff5df; outline-offset: 3px; box-shadow: 0 0 0 1px #111820; }
+#online-chess-screen .online-chess-square:focus-visible { outline-offset: -3px; box-shadow: inset 0 0 0 3px #151d25; }
+#online-chess-screen-title:focus { outline: 2px solid #fff5df; outline-offset: 4px; border-radius: 3px; }
+.online-chess-sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 .online-chess-screen .online-match-panel > .online-provider-actions { display: none; }
 @media (max-width: 900px) {
   .online-chess-screen { padding-inline: 14px; }
@@ -1093,7 +1100,7 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
   .online-chess-network { grid-column: 1 / -1; grid-row: 2; }
   .online-chess-screen .online-room-connection { padding: 6px 8px; }
   .online-chess-header-actions { grid-column: 2; grid-row: 1; gap: 5px; }
-  .online-chess-header-actions .btn { min-height: 36px; padding: 6px 8px; font-size: 10px; }
+  .online-chess-header-actions .btn { min-height: 44px; padding: 6px 8px; font-size: 10px; }
   .online-match-panel.is-chess-match > .online-card-head { margin-bottom: 9px; }
   .online-match-panel.is-chess-match > .online-card-head h4 { font-size: 15px !important; }
   .online-chess-stage { gap: 11px; }

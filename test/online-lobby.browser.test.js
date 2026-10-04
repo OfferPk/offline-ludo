@@ -433,22 +433,82 @@ function startLocalServer() {
     await page.click('#online-start-room');
     await page.waitForFunction(() => !document.querySelector('#online-chess-play').classList.contains('hidden') && document.querySelectorAll('#online-chess-board [data-square]').length === 64);
     assert.equal(await page.$eval('#online-chess-screen', el => !el.classList.contains('hidden') && el.getAttribute('aria-hidden') === 'false'), true, 'an active Chess room opens the dedicated accessible play screen');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'online-chess-screen-title', 'opening the play screen moves focus to its visible title');
+    assert.match(await page.$eval('#online-chess-screen-title', el => getComputedStyle(el).outlineStyle), /solid/, 'the focused screen title has a visible focus indicator');
     assert.equal(await page.$eval('#online-match-panel', el => el.parentElement.id), 'online-chess-screen', 'the Chess match panel is moved into the focused screen without duplicating state');
     assert.equal(await page.$eval('#online-chess-red-clock', el => el.textContent.trim()), 'Untimed', 'the UI does not invent a clock absent from server match state');
     assert.equal(await page.$eval('#online-chess-resign', el => !el.classList.contains('hidden')), true, 'the active player sees the existing resignation control');
     assert.equal(await page.$eval('#online-chess-screen-title', el => el.textContent), 'Ludo Chess', 'the play screen has a clear accessible title');
+    const boardSemantics = await page.evaluate(() => {
+      const board = document.querySelector('#online-chess-board');
+      return { role: board.getAttribute('role'), rowCount: board.getAttribute('aria-rowcount'), colCount: board.getAttribute('aria-colcount'), describedBy: board.getAttribute('aria-describedby'), rows: [...board.children].map(row => ({ role: row.getAttribute('role'), index: row.getAttribute('aria-rowindex'), cells: row.children.length })), firstSquareRole: board.querySelector('[data-square="0"]').getAttribute('role'), firstSquareName: board.querySelector('[data-square="0"]').getAttribute('aria-label'), firstSquareDisabled: board.querySelector('[data-square="0"]').getAttribute('aria-disabled'), firstSquareSelected: board.querySelector('[data-square="0"]').getAttribute('aria-selected') };
+    });
+    assert.equal(boardSemantics.role + ':' + boardSemantics.rowCount + ':' + boardSemantics.colCount, 'grid:8:8', 'the board exposes an 8-by-8 ARIA grid');
+    assert.equal(boardSemantics.rows.length, 8, 'the Chess grid has eight explicit accessible rows');
+    assert.ok(boardSemantics.rows.every((row, index) => row.role === 'row' && row.index === String(index + 1) && row.cells === 8), 'each grid row exposes its index and eight squares');
+    assert.equal(boardSemantics.firstSquareRole, 'gridcell', 'each square exposes the gridcell role');
+    assert.match(boardSemantics.firstSquareName, /(?:Red|Blue) rook on a8/, 'each square has a spoken piece and coordinate name');
+    assert.equal(boardSemantics.firstSquareDisabled, 'false', 'the active player can act on their own turn');
+    assert.equal(boardSemantics.firstSquareSelected, 'false', 'square selection state is exposed to assistive technology');
+    assert.match(await page.$eval('#online-chess-board-instructions', el => el.textContent), /arrow keys[\s\S]*Enter or Space/i, 'keyboard instructions describe board navigation and activation');
+    const liveSemantics = await page.evaluate(() => ['online-chess-status', 'online-chess-announcement', 'online-room-connection'].map(id => { const el = document.getElementById(id); return [el.getAttribute('role'), el.getAttribute('aria-live'), el.getAttribute('aria-atomic')]; }));
+    assert.ok(liveSemantics.every(parts => parts[0] === 'status' && parts[1] === 'polite' && parts[2] === 'true'), 'turn, move-result, and connection updates use polite atomic status announcements');
+    assert.match(await page.$eval('#online-chess-status', el => el.textContent), /Alice.*your move/, 'the current turn is announced with the player name');
     assert.equal(await page.$$eval('#online-chess-board [data-square][tabindex="0"]', cells => cells.length), 1, 'the chess grid uses a single roving keyboard tab stop');
     await page.focus('#online-chess-board [data-square="52"]');
+    assert.equal(await page.$eval('#online-chess-board [data-square="52"]', el => el.tabIndex), 0, 'the focused square becomes the roving tab stop');
     await page.keyboard.press('ArrowRight');
     assert.equal(await page.evaluate(() => document.activeElement.dataset.square), '53', 'arrow keys move keyboard focus across board squares');
+    assert.equal(await page.$eval('#online-chess-board [data-square="53"]', el => el.tabIndex), 0, 'arrow navigation moves the single tab stop with focus');
+    assert.equal(await page.$eval('#online-chess-board [data-square="52"]', el => el.tabIndex), -1, 'the previous square leaves the tab sequence');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'online-chess-resign', 'Tab exits the grid to the next visible control');
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('Tab');
+    await page.keyboard.up('Shift');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.square), '53', 'Shift+Tab re-enters the grid at its current roving tab stop');
     const mobileBoard = await page.evaluate(() => ({ board: document.querySelector('#online-chess-board').getBoundingClientRect().width, viewport: innerWidth, square: document.querySelector('#online-chess-board [data-square]').getBoundingClientRect().width, overflow: document.documentElement.scrollWidth > innerWidth }));
     assert.equal(mobileBoard.overflow, false, 'the Chess screen has no horizontal overflow on a phone viewport');
     assert.ok(mobileBoard.board <= mobileBoard.viewport && mobileBoard.square >= 35, 'the mobile board fits the screen with practical touch targets');
+    const touchTargets = await page.evaluate(() => ['#online-chess-back', '#online-leave-room', '#online-chess-resign'].map(selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { selector, width: r.width, height: r.height }; }));
+    assert.ok(touchTargets.every(target => target.width >= 24 && target.height >= 44), 'room navigation and gameplay actions have WCAG-sized mobile tap targets: ' + JSON.stringify(touchTargets));
+    const contrast = await page.evaluate(() => {
+      function rgb(value) { return value.match(/[\d.]+/g).slice(0, 3).map(Number).map(channel => channel / 255); }
+      function luminance(value) { const channels = rgb(value).map(channel => channel <= .04045 ? channel / 12.92 : Math.pow((channel + .055) / 1.055, 2.4)); return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2]; }
+      function ratio(foreground, background) { const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a); return (values[0] + .05) / (values[1] + .05); }
+      const light = document.querySelector('#online-chess-board [data-square="52"]');
+      const dark = document.querySelector('#online-chess-board [data-square="56"]');
+      const lightCoordinate = document.querySelector('#online-chess-board [data-square="0"]');
+      return {
+        lightCoordinate: ratio(getComputedStyle(lightCoordinate.querySelector('.square-coord')).color, getComputedStyle(lightCoordinate).backgroundColor),
+        darkCoordinate: ratio(getComputedStyle(dark.querySelector('.square-coord')).color, getComputedStyle(dark).backgroundColor),
+        lightPieceEdge: ratio(getComputedStyle(light.querySelector('.online-chess-piece')).webkitTextStrokeColor, getComputedStyle(light).backgroundColor),
+        darkPieceEdge: ratio(getComputedStyle(dark.querySelector('.online-chess-piece')).webkitTextStrokeColor, getComputedStyle(dark).backgroundColor),
+        focus: { outline: getComputedStyle(document.activeElement).outlineColor, shadow: getComputedStyle(document.activeElement).boxShadow }
+      };
+    });
+    assert.ok(contrast.lightCoordinate >= 4.5 && contrast.darkCoordinate >= 4.5, 'board coordinates meet 4.5:1 text contrast on both square tones');
+    assert.ok(contrast.lightPieceEdge >= 3 && contrast.darkPieceEdge >= 3, 'piece outlines meet 3:1 non-text contrast on both square tones');
+    assert.match(contrast.focus.outline, /255, 245, 223/, 'focused squares use a high-contrast light outline');
+    assert.match(contrast.focus.shadow, /inset/, 'focused squares also use a contrasting inner outline');
+    await page.setViewport({ width: 320, height: 780, isMobile: true, hasTouch: true });
+    const compactBoard = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth > innerWidth, square: document.querySelector('#online-chess-board [data-square]').getBoundingClientRect().width }));
+    assert.equal(compactBoard.overflow, false, 'the board remains within a narrow 320px phone viewport');
+    assert.ok(compactBoard.square >= 24, 'even the narrow phone layout retains accessible square tap targets');
+    await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
     assert.equal(await page.$eval('#online-chess-board [data-square="52"] .online-chess-piece', el => el.classList.contains('red-piece')), true, 'seat zero is rendered as Red Ludo-colored pieces');
     await page.click('#online-chess-board [data-square="52"]');
     await page.waitForSelector('#online-chess-board [data-square="36"].is-legal');
     await page.click('#online-chess-board [data-square="36"]');
     await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 1' && document.querySelector('#online-match-turn').textContent.includes('Blue · Bobby Live'));
+    assert.match(await page.$eval('#online-chess-announcement', el => el.textContent), /Red · Alice(?: Online)? moved from e2 to e4\. Blue · Bobby Live to move\./, 'an accepted move result is announced with its coordinates and the next player');
+    assert.deepEqual(await page.$eval('#online-chess-board [data-square="52"]', el => ({ disabled: el.disabled, ariaDisabled: el.getAttribute('aria-disabled') })), { disabled: false, ariaDisabled: 'true' }, 'opponent-turn squares are announced disabled but remain focusable');
+    await page.focus('#online-chess-board [data-square="52"]');
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.square), '53', 'arrow navigation remains available while waiting for the opponent');
+    const waitingRpcCount = await page.evaluate(() => window.__mockBackend.rpcCalls.length);
+    await page.click('#online-chess-board [data-square="53"]');
+    assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.length), waitingRpcCount, 'aria-disabled board squares cannot submit an out-of-turn action');
     assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /e2–e4/, 'the coordinate move list is reconstructed from server position history');
     assert.equal(await page.$eval('#online-chess-board [data-square="52"]', el => el.classList.contains('last-from')), true, 'the board marks the origin square of the latest move');
     assert.equal(await page.$eval('#online-chess-board [data-square="36"]', el => el.classList.contains('last-to')), true, 'the board marks the destination square of the latest move');
@@ -634,6 +694,7 @@ function startLocalServer() {
       state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
     });
     await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 5' && document.querySelector('#online-chess-move-list').textContent.includes('e4×d5'));
+    assert.match(await page.$eval('#online-chess-announcement', el => el.textContent), /moved from e4 to d5 and captured a piece/, 'an authoritative opponent-state update announces the captured move');
     assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /e2–e4[\s\S]*d7–d5[\s\S]*e4×d5/, 'history reconstructs both sides from synchronized position snapshots');
     assert.equal(await page.$eval('#online-chess-red-captured', el => el.getAttribute('aria-label')), '1 captured pieces', 'capture tray counts the exact captured piece from match history');
     const previewDir = path.resolve(__dirname, '../../artifacts/ludo-chess-play');
@@ -656,6 +717,8 @@ function startLocalServer() {
       channel.statusCallback('CHANNEL_ERROR');
     });
     await page.waitForFunction(() => document.querySelector('#online-room-connection').dataset.state === 'reconnecting');
+    assert.match(await page.$eval('#online-room-connection', el => el.textContent), /Reconnecting/);
+    assert.equal(await page.$eval('#online-room-connection', el => el.getAttribute('aria-live') + ':' + el.getAttribute('aria-atomic')), 'polite:true', 'reconnection changes are exposed as complete polite live updates');
     await page.evaluate(() => {
       const state = window.__mockBackend;
       state.tables.ludo_chess_matches[0].version = 6;
@@ -663,6 +726,7 @@ function startLocalServer() {
       channel.statusCallback('SUBSCRIBED');
     });
     await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 6' && document.querySelector('#online-room-connection').dataset.state === 'connected');
+    assert.match(await page.$eval('#online-room-connection', el => el.textContent), /Connected/);
     assert.equal(await page.evaluate(() => window.__mockBackend.channels.filter(channel => channel.name === 'crossfour-room-resume-ludo_chess' && !channel.removed).length), 1, 'Chess reconnect rejoins the same single room channel');
 
     await page.evaluate(() => {
