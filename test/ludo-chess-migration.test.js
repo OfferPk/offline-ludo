@@ -34,6 +34,10 @@ ok(/p_expected_version <> v_version[\s\S]*?private\.ludo_chess_legal/i.test(move
 ok(/primary key \(room_id, action_id\)/i.test(read('supabase/migrations/20261004100500_online_authoritative_match.sql')) && /v_existing\.actor_id <> v_user or v_existing\.request <> v_request/i.test(moveBody), 'Chess actions reuse actor- and payload-bound idempotency');
 ok(/en.passant/i.test(sql) && /castling/i.test(sql) && /p_promotion/i.test(sql) && /checkmate/i.test(sql) && /stalemate/i.test(sql), 'server rules cover en passant, castling, promotion, checkmate, and stalemate');
 ok(/draw_seventy_five_moves/i.test(sql) && /draw_fivefold_repetition/i.test(sql) && /draw_insufficient_material/i.test(sql) && /claimable/i.test(sql), 'server recognizes automatic and claimable standard draw conditions');
+const drawClaimableStart = sql.indexOf('create or replace function private.ludo_chess_draw_claimable(');
+const drawClaimableEnd = sql.indexOf('$$;', drawClaimableStart);
+const drawClaimableBody = sql.slice(drawClaimableStart, drawClaimableEnd);
+ok(/p_state->>'phase' <> 'active' then return false/i.test(drawClaimableBody), 'server draw claims cannot override checkmate, stalemate, or automatic terminal draws');
 ok(/if not v_has_move then[\s\S]*?checkmate[\s\S]*?stalemate[\s\S]*?else[\s\S]*?v_halfmove >= 150[\s\S]*?v_repetitions >= 5[\s\S]*?ludo_chess_insufficient/i.test(sql), 'server evaluates checkmate or stalemate before automatic 75-move, fivefold, and insufficient-material draws');
 ok(/if v_state->>'phase' = 'over' then[\s\S]*?update public\.match_history set status = 'completed',winner_id = v_winner,result = pg_catalog\.jsonb_build_object\('version',v_new_version,'state',v_state\)/i.test(moveBody), 'server persists checkmate, stalemate, and automatic draw state/results in match history');
 const currentClaimStart = sql.indexOf('create or replace function public.claim_ludo_chess_draw(');
