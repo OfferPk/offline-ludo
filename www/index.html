@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#12151b">
-  <meta name="description" content="Crossfour: offline Ludo for 2 to 4 players. Star-style stacked rolls, Mystery Tiles mode, computer players (Easy, Normal, Hard) or pass and play on one phone.">
-  <title>Crossfour – Offline Ludo</title>
+  <meta name="description" content="Online Ludo with cloud profiles and room matchmaking in development, alongside local game modes and offline saves. Online sign-in is not yet enabled; board and turn sync are not available.">
+  <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
   <link rel="stylesheet" href="css/style.css">
@@ -21,8 +21,8 @@
       <div class="home-main">
         <div class="logo">
           <div class="logo-mark" aria-hidden="true"><i class="q0"></i><i class="q1"></i><i class="q3"></i><i class="q2"></i></div>
-          <h1>Crossfour</h1>
-          <p class="tag">offline ludo</p>
+          <h1>Online Ludo</h1>
+          <p class="tag">online rooms · offline modes stay local</p>
         </div>
         <div class="home-actions" role="group" aria-label="Choose a game mode">
           <button id="btn-continue" class="btn primary big hidden"><span>Continue match</span><small id="continue-sub">vs Computer</small></button>
@@ -52,6 +52,9 @@
           <span class="community-launch-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 3 28 12 23 28H9L4 12 16 3Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m4 12 12 4 12-4M16 16v12M10 9l6 7 6-7" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></span>
           <span class="community-launch-copy"><b>Leaderboard &amp; referrals</b><small>Weekly crystal rewards · invite friends</small></span>
           <span class="community-launch-arrow" aria-hidden="true">›</span>
+        </button>
+        <button id="btn-online" class="online-launch" type="button">
+          <span><b>Online rooms</b><small>Cloud profiles · matchmaking · invites</small></span><span aria-hidden="true">›</span>
         </button>
         <a class="home-link" href="privacy.html">Privacy policy</a>
       </div>
@@ -160,6 +163,77 @@
           <p id="community-claim-note" class="community-claim-note">Claim unavailable in demo. This non-submitting preview does not check, send, or save your number.</p>
           <p id="community-claim-status" class="community-claim-status hidden" role="status" aria-live="polite"></p>
           <div class="panel-actions"><button id="community-claim-cancel" class="btn plate" type="button">Close preview</button><button id="community-claim-preview" class="btn primary" type="button">Preview only</button></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- Optional online account and realtime room lobby -->
+    <section id="online" class="screen online-screen hidden" aria-labelledby="online-title">
+      <header class="online-topbar">
+        <button id="online-back" class="icon-btn" type="button" aria-label="Back to home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5 8 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div><h1 id="online-title">Online rooms</h1><small>Cloud profile · matchmaking</small></div>
+        <span class="online-live-dot" aria-hidden="true"></span>
+      </header>
+      <div class="online-body">
+        <p id="online-status" class="online-status" role="status" aria-live="polite">Checking online services…</p>
+        <p class="online-limit-note"><b>Online vs offline:</b> Online Classic and Ludo Chess rooms use server-validated, synchronized match state. Mystery and Lucky Chaos remain available in offline play only. Offline saves and balances stay separate.</p>
+        <section id="online-auth-panel" class="online-card" aria-labelledby="online-auth-title">
+          <span class="online-eyebrow">OPTIONAL ACCOUNT</span><h2 id="online-auth-title">Sign in with email</h2>
+          <p id="online-config-note">Use an email address and password for online rooms.</p>
+          <p class="online-mode-note">New email/password accounts sign in immediately; no confirmation link is required. Gmail SMTP remains configured for password resets, but reset-email delivery has not yet been tested.</p>
+          <form id="online-auth-form" class="online-auth-form">
+            <label for="online-email">Email address<input id="online-email" type="email" autocomplete="email" maxlength="254" required></label>
+            <label for="online-password">Password<input id="online-password" type="password" autocomplete="current-password" required></label>
+            <div class="online-auth-actions"><button id="online-signin" class="btn primary" type="submit">Sign in</button><button id="online-signup" class="btn plate" type="button">Create account</button></div>
+            <button id="online-reset-request" class="online-auth-link" type="button">Forgot password?</button>
+          </form>
+        </section>
+        <section id="online-recovery-panel" class="online-card hidden" aria-labelledby="online-recovery-title">
+          <span class="online-eyebrow">PASSWORD RECOVERY</span><h2 id="online-recovery-title">Choose a new password</h2>
+          <form id="online-recovery-form" class="online-auth-form">
+            <label for="online-new-password">New password<input id="online-new-password" type="password" autocomplete="new-password" required></label>
+            <button id="online-recovery-submit" class="btn primary" type="submit">Update password</button>
+          </form>
+        </section>
+        <section id="online-account-panel" class="online-card hidden" aria-labelledby="online-account-title">
+          <div class="online-card-head"><div><span class="online-eyebrow">CLOUD PROFILE</span><h2 id="online-account-title">Your account</h2><small id="online-profile-handle">Loading profile…</small></div><button id="online-signout" class="btn plate online-signout" type="button">Sign out</button></div>
+          <form id="online-profile-form" class="online-profile-form"><label for="online-profile-name">Display name</label><div><input id="online-profile-name" maxlength="32" autocomplete="nickname" required><button class="btn primary" type="submit">Save</button></div></form>
+          <div class="online-wallet" aria-label="Cloud-synced balance"><span><b id="online-wallet-coins">—</b><small>Coins</small></span><span><b id="online-wallet-diamonds">—</b><small>Diamonds</small></span></div>
+          <p class="online-wallet-note">These balances are server-owned. Offline coins are not uploaded, and the app cannot mint or spend cloud currency directly.</p>
+        </section>
+        <section id="online-room-panel" class="online-card hidden" aria-labelledby="online-lobby-title">
+          <span class="online-eyebrow">MATCHMAKING · INVITES</span><h2 id="online-lobby-title">Find or host a table</h2>
+          <div class="online-room-options"><label>Online mode<select id="online-mode"><option value="classic">Classic · server-authoritative</option><option value="ludo_chess">Ludo Chess · standard rules</option></select></label><label>Seats<select id="online-capacity"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label></div>
+          <p id="online-mode-note" class="online-mode-note">Classic and Ludo Chess are playable online. Mystery and Lucky Chaos remain offline modes.</p>
+          <div class="online-provider-actions"><button id="online-quick-match" class="btn primary" type="button">Find a table</button><button id="online-create-room" class="btn plate" type="button">Create invite room</button></div>
+          <div class="online-join-row"><label for="online-join-code">Join with invite code</label><div><input id="online-join-code" maxlength="16" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="16-character code"><button id="online-join-room" class="btn plate" type="button">Join</button></div></div>
+          <section id="online-room-card" class="online-room-card hidden" aria-labelledby="online-room-heading">
+            <div class="online-card-head"><div><span class="online-eyebrow">TABLE</span><h3 id="online-room-heading">Your room</h3><small id="online-room-mode"></small></div><button id="online-leave-room" class="btn plate online-signout" type="button">Leave</button></div>
+            <p id="online-room-status" class="online-room-state" role="status" aria-live="polite"></p>
+            <label class="online-invite-label" for="online-invite-code">Invite code</label><div class="online-invite-row"><input id="online-invite-code" readonly><button id="online-copy-invite" class="btn plate" type="button">Copy link</button></div>
+            <h4>Players</h4><ul id="online-room-roster" class="online-room-roster"></ul>
+            <div class="online-provider-actions"><button id="online-ready" class="btn plate" type="button" aria-pressed="false">Ready</button><button id="online-start-room" class="btn primary hidden" type="button">Start table</button></div>
+            <section id="online-match-panel" class="online-match-panel hidden" aria-label="Server-authoritative online match">
+              <div class="online-card-head"><div><span id="online-match-eyebrow" class="online-eyebrow">ONLINE CLASSIC · LIVE STATE</span><h4 id="online-match-heading">Match state</h4></div><span id="online-match-version" class="online-match-version"></span></div>
+              <p id="online-match-turn" class="online-room-state" role="status" aria-live="polite"></p>
+              <p id="online-match-dice" class="online-match-dice"></p>
+              <ol id="online-match-pieces" class="online-match-pieces" aria-label="Authoritative token positions"></ol>
+              <div id="online-match-moves" class="online-match-moves"></div>
+              <div class="online-provider-actions"><button id="online-roll" class="btn primary hidden" type="button">Roll server die</button><button id="online-match-retry" class="btn plate hidden" type="button">Retry pending action</button></div>
+              <p id="online-classic-note" class="online-mode-note">Dice are generated on the server. The server checks turn, die, token move, room membership and state version; only the room participants can read live state.</p>
+              <section id="online-chess-play" class="online-chess-play hidden" aria-label="Playable Ludo Chess board">
+                <div class="online-chess-sides"><span id="online-chess-red" class="chess-side red"><i aria-hidden="true"></i><b>Red</b><small>White pieces</small></span><span id="online-chess-blue" class="chess-side blue"><i aria-hidden="true"></i><b>Blue</b><small>Black pieces</small></span></div>
+                <p id="online-chess-status" class="online-room-state" role="status" aria-live="polite"></p>
+                <div id="online-chess-promotion" class="online-chess-promotion hidden" role="group" aria-label="Choose a promotion piece"><span>Promote pawn to</span><button type="button" data-promotion="q" aria-label="Queen">♛ Queen</button><button type="button" data-promotion="r" aria-label="Rook">♜ Rook</button><button type="button" data-promotion="b" aria-label="Bishop">♝ Bishop</button><button type="button" data-promotion="n" aria-label="Knight">♞ Knight</button></div>
+                <div id="online-chess-board" class="online-chess-board" role="grid" aria-label="Ludo Chess board"></div>
+                <div class="online-chess-actions"><button id="online-chess-claim-draw" class="btn plate hidden" type="button">Claim draw</button><button id="online-chess-resign" class="btn plate danger hidden" type="button">Resign</button></div>
+                <p id="online-chess-result" class="online-mode-note">Red moves first. Chess rules are standard; colored tokens mark each side.</p>
+              </section>
+            </section>
+          </section>
+        </section>
+        <section class="online-card" aria-labelledby="online-history-heading">
+          <span class="online-eyebrow">RECENT TABLES</span><h2 id="online-history-heading">Match history</h2><p id="online-history-empty">Your started online tables will appear here.</p><ol id="online-history-list" class="online-history-list"></ol>
         </section>
       </div>
     </section>
@@ -416,7 +490,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.2.0 · © OfferPk</p>
+        <p class="ver">Online Ludo v1.2.0 · © OfferPk</p>
       </div>
     </div>
 
@@ -438,5 +512,8 @@
   <script src="js/game.js"></script>
   <script src="js/community-fixtures.js"></script>
   <script src="js/community.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/chess.js"></script>
+  <script src="js/online.js"></script>
 </body>
 </html>
