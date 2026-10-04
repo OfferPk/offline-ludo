@@ -12,6 +12,9 @@ const online = read('www/js/online.js');
 const html = read('www/index.html');
 const logic = read('www/js/logic.js');
 const game = read('www/js/game.js');
+const moveStart = migration.indexOf('create or replace function public.move_match(');
+const moveEnd = migration.indexOf('$$;', moveStart);
+const moveBody = migration.slice(moveStart, moveEnd);
 let checks = 0;
 function ok(value, message) { assert.ok(value, message); checks++; console.log('  ok -', message); }
 
@@ -33,6 +36,7 @@ ok(/v_existing\.actor_id <> v_user or v_existing\.request <> v_request/i.test(mi
 ok(/v_state->>'turn'\)::integer <> v_member_seat/i.test(migration) && /You are not a member of this room/i.test(migration), 'membership and server-assigned seat ownership are checked before a transition');
 ok(/v_state->>'phase' <> 'move'/i.test(migration) && /online_ludo_can_move\(v_state, v_member_seat, p_piece, v_die\)/i.test(migration), 'server validates phase, selected queued die and legal token movement');
 ok(/three consecutive 6s forfeit/i.test(migration) && /v_sixes >= 3/i.test(migration) && /online_ludo_finish_queue/i.test(migration), 'default Star-style stacked-six and queue exhaustion rules are represented');
+ok(/v_all_home boolean := false;/i.test(moveBody) && /if v_destination = 57 then\s+v_all_home := true;\s+for v_i in 0\.\.3 loop[\s\S]*?<> 57 then v_all_home := false; end if;[\s\S]*?end if;/i.test(moveBody) && /if v_all_home then\s+v_state := private\.online_ludo_next_turn\(v_state\);\s+elsif not private\.online_ludo_has_move/i.test(moveBody), 'a Classic turn advances for all-home only after a home move leaves all four tokens home');
 ok(/safe squares/i.test(migration) && /v_target_abs <> all\(array\[0, 8, 13, 21, 26, 34, 39, 47\]\)/i.test(migration), 'server protects the existing start/star safe squares from captures');
 ok(/grant execute on function public\.roll_match\(uuid, bigint, uuid\) to authenticated/i.test(migration) && /grant execute on function public\.move_match\(uuid, bigint, uuid, integer, integer\) to authenticated/i.test(migration), 'only authenticated callers can invoke the gameplay RPCs');
 ok(/create policy "Room members can read authoritative match state"/i.test(migration) && /alter publication supabase_realtime add table public\.match_states/i.test(migration), 'state is member-readable and added to Realtime');
