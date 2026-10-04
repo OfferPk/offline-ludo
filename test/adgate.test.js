@@ -91,7 +91,7 @@ t('the session counter is bumped once at boot', () => { assert.strictEqual((game
 t('matchCompleted is counted in one place (match end)', () => { assert.strictEqual((game.match(/gate\.matchCompleted\(\)/g) || []).length, 1); });
 t('rewarded ads only from the Undo-roll and 2x-coins buttons (player taps)', () => {
   const calls = game.match(/Ads\.showRewarded\(/g) || []; assert.strictEqual(calls.length, 2);
-  assert.ok(/function undoRoll[\s\S]{0,600}Ads\.showRewarded\(/.test(game)); assert.ok(/function doubleCoins[\s\S]{0,600}Ads\.showRewarded\(/.test(game));
+  assert.ok(/function undoRoll[\s\S]{0,1200}Ads\.showRewarded\(/.test(game)); assert.ok(/function doubleCoins[\s\S]{0,600}Ads\.showRewarded\(/.test(game));
   assert.ok(/btn-undo'\)\.addEventListener\('click', undoRoll\)/.test(game) && /btn-r-double'\)\.addEventListener\('click', doubleCoins\)/.test(game));
 });
 t('no billing anywhere in the app', () => {

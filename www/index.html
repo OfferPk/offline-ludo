@@ -297,10 +297,11 @@
         </div>
         <div class="pods bottom"><div class="pod" data-slot="3"></div><div class="pod right" data-slot="2"></div></div>
         <div class="toolbar">
-          <button id="btn-undo" class="tool hidden" aria-label="Undo dice roll"><svg viewBox="0 0 24 24"><path d="M9 4 4 9l5 5M4.5 9H15a5 5 0 0 1 0 10h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="undo-label">Undo</span><em class="ad-badge hidden" id="undo-ad">▶ AD</em><i class="undo-bar" id="undo-bar"></i></button>
+          <button id="btn-undo" class="tool hidden" aria-label="Undo dice roll" aria-describedby="undo-limit-note"><svg viewBox="0 0 24 24"><path d="M9 4 4 9l5 5M4.5 9H15a5 5 0 0 1 0 10h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="undo-label">Undo</span><em class="ad-badge hidden" id="undo-ad">▶ AD</em><i class="undo-bar" id="undo-bar"></i></button>
           <div class="hint" id="hint" role="status" aria-live="polite" aria-atomic="true"></div>
           <button id="btn-chat" class="tool" aria-label="Quick chat"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/><circle cx="12" cy="10.5" r="1.2" fill="currentColor"/><circle cx="15" cy="10.5" r="1.2" fill="currentColor"/></svg><span>Chat</span></button>
         </div>
+        <div id="undo-limit-note" class="undo-limit-note hidden" role="status" aria-live="polite" aria-atomic="true"></div>
         <div id="chat" class="chat hidden">
           <div class="chat-phrases" id="chat-phrases"></div>
           <div class="chat-emotes" id="chat-emotes"></div>
@@ -429,6 +430,7 @@
         </div>
         <div class="rules-page hidden" data-page="mystery">
           <p class="note">Mystery Tiles is a Crossfour mode with 8 special tiles on the track. End a move on one to spin its wheel. A tile rests for two rounds after it has been used. There's no entry fee or stake: every match is free and coins are cosmetic.</p>
+          <p class="note"><b>Undo limits:</b> up to 6 successful undos per match and 2 per turn, including ad-based undos. A maximum of 2 undos per match can come from ads. Counts persist when you reload or continue; undoing a roll does not refresh the turn allowance.</p>
           <div class="ev-head"><span class="tile-ico boost">?</span><b>Boost wheel</b><small>always helpful</small></div>
           <div class="ev-list" id="ev-boost"></div>
           <div class="ev-head"><span class="tile-ico chaos">!</span><b>Chaos wheel</b><small>high risk, high reward</small></div>
@@ -509,6 +511,7 @@
   <script src="js/save-store.js"></script>
   <script src="js/dice-gesture.js"></script>
   <script src="js/path-animation.js"></script>
+  <script src="js/mystery-undo.js"></script>
   <script src="js/game.js"></script>
   <script src="js/community-fixtures.js"></script>
   <script src="js/community.js"></script>

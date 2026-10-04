@@ -1,7 +1,7 @@
 /* Crossfour - offline Ludo. UI, per-player dice, stacked rolls, Mystery Tiles, AI turns, chat, persistence, skins, ads hooks. */
 (function () {
   'use strict';
-  var L = window.LudoLogic, SK = window.SKINS, CFG = window.ADS_CONFIG || {}, ART = window.ART;
+  var L = window.LudoLogic, SK = window.SKINS, CFG = window.ADS_CONFIG || {}, ART = window.ART, MysteryUndo = window.MysteryUndo;
   var SFX = window.SFX, Ads = window.Ads;
   var $ = function (id) { return document.getElementById(id); };
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
@@ -80,6 +80,7 @@
     } else if (st.lk !== null) return false;
     if (!isInt(g.view, 0, 3) || !isInt(g.undoLeft, 0, 3) || !isCount(g.coins) || !isCount(g.xp) ||
         typeof g.doubled !== 'boolean' || typeof g.counted !== 'boolean' || !isCount(g.started)) return false;
+    if (st.mode === 'mystery' && Object.prototype.hasOwnProperty.call(g, 'mysteryUndo') && !MysteryUndo.valid(g.mysteryUndo, st.turnCount)) return false;
     return true;
   }
   function normalizeSeat(x) {
@@ -128,6 +129,8 @@
     });
     if (validGame(raw.game)) {
       s.game = JSON.parse(JSON.stringify(raw.game));
+      if (s.game.mode === 'mystery') s.game.mysteryUndo = MysteryUndo.normalize(s.game.mysteryUndo, s.game.st.turnCount);
+      else delete s.game.mysteryUndo;
       delete s.game.timerTk; delete s.game.actor; s.game.undo = null; s.game.sel = null;
       s.game.st.moves = s.game.st.phase === 'move' ? L.queueMoves(s.game.st) : [];
     } else s.game = null;
@@ -436,7 +439,7 @@
   function layout() {
     var stage = $('stage'); if (!stage || $('game').classList.contains('hidden')) return;
     var r = stage.getBoundingClientRect();
-    var podH = 58, tool = 46;
+    var podH = 58, tool = 46 + (G && G.st.mode === 'mystery' ? 42 : 0);
     var w = Math.min(r.width - 12, 560), h = r.height - (podH * 2 + tool + 6 * 3 + 4);
     var bs = Math.floor(Math.max(210, Math.min(w, h)));
     BS = bs; CELL = bs / 15;
@@ -457,6 +460,10 @@
   function nameOf(s) { var st = G.st; if (st.seats[s].type === 'human' && humans(st).length === 1) return 'You'; return NAMES[s]; }
   function levelOf(s) { var pl = G.st.seats[s]; return pl.type === 'human' ? (humans(G.st).length === 1 ? 'Lv ' + L.levelFromXp(save.xp).level : 'P' + (humans(G.st).indexOf(s) + 1)) : LEVEL_NAMES[pl.level]; }
   function undoActive() { return !!(G && G.undo && G.undo.until > Date.now()); }
+  function commitMysteryTurnAdvance(replacingUndo) {
+    if (!G || G.mode !== 'mystery' || !G.mysteryUndo || (G.undo && !replacingUndo)) return false;
+    return MysteryUndo.advance(G.mysteryUndo, G.st.turnCount);
+  }
 
   var forced = [], forcedEvents = [], forcedMega = []; // test hooks
   function chipMoves(v) { return G.st.moves.filter(function (m) { return m.v === v; }); }
@@ -618,9 +625,29 @@
     var u = $('btn-undo'), showU = save.settings.undo && humans(st).length > 0 && !over;
     u.classList.toggle('hidden', !showU);
     var act = undoActive();
-    u.disabled = !act; u.classList.toggle('live', act);
-    $('undo-label').textContent = G.undoLeft > 0 ? 'Undo (' + G.undoLeft + ')' : 'Undo';
-    $('undo-ad').classList.toggle('hidden', G.undoLeft > 0);
+    var limitNote = $('undo-limit-note'), mysteryUndo = st.mode === 'mystery' && G.mysteryUndo;
+    if (mysteryUndo) {
+      var undoTurnId = G.undo ? G.undo.snap.turnCount : st.turnCount;
+      var remaining = MysteryUndo.remaining(mysteryUndo, undoTurnId);
+      var adBased = G.undoLeft <= 0;
+      var blocked = act ? MysteryUndo.reason(mysteryUndo, undoTurnId, adBased) : '';
+      var noteText = 'Undo counts — Match total: ' + remaining.total + '/6 · This turn: ' + remaining.turn + '/2 · Ad claims: ' + remaining.ad + '/2.';
+      if (blocked) noteText += ' Blocked: ' + blocked;
+      limitNote.textContent = noteText; limitNote.classList.remove('hidden');
+      u.disabled = !act || busy || paused || !!(G.undo && G.undo.pending) || !!blocked;
+      u.classList.toggle('live', act && !u.disabled);
+      $('undo-label').textContent = blocked ? 'Undo limited' : 'Undo (' + Math.min(remaining.total, remaining.turn) + ' left)';
+      $('undo-ad').classList.toggle('hidden', !adBased || !!MysteryUndo.reason(mysteryUndo, undoTurnId, true));
+      u.setAttribute('aria-label', blocked ? 'Undo dice roll unavailable: ' + blocked : 'Undo dice roll. ' + noteText);
+      u.setAttribute('aria-describedby', 'undo-limit-note');
+      u.title = blocked || noteText;
+    } else {
+      limitNote.textContent = ''; limitNote.classList.add('hidden');
+      u.disabled = !act; u.classList.toggle('live', act);
+      $('undo-label').textContent = G.undoLeft > 0 ? 'Undo (' + G.undoLeft + ')' : 'Undo';
+      $('undo-ad').classList.toggle('hidden', G.undoLeft > 0);
+      u.setAttribute('aria-label', 'Undo dice roll'); u.removeAttribute('aria-describedby'); u.removeAttribute('title');
+    }
     updateTutorial();
   }
   function clearHighlights() { each(document.querySelectorAll('.pc.can'), function (e) { e.classList.remove('can'); }); }
@@ -700,6 +727,7 @@
   function advance() {
     if (!G) return;
     var st = G.st;
+    commitMysteryTurnAdvance();
     render(); persist();
     if (st.phase === 'over') { later(finishMatch, 800); return; }
     if (paused || tutorial.intro || !gameVisible() || busy) return;
@@ -754,6 +782,7 @@
       if (human) { stopTimer(); openPicker(); return; }
       chosen = L.chooseDieValue(st, s, st.seats[s].level);
     }
+    commitMysteryTurnAdvance(true);
     busy = true; clearHighlights(); stopTimer();
     var snap = human && save.settings.undo ? L.clone(st) : null;
     G.undo = null;
@@ -762,7 +791,11 @@
     render(); persist();
     animateDice(s, r.raw, function () {
       busy = false;
-      if (snap) { G.undo = { snap: snap, until: Date.now() + UNDO_MS, seat: s }; startUndoBar(); later(expireUndo, UNDO_MS + 30); }
+      if (snap) {
+        G.undo = { snap: snap, until: Date.now() + UNDO_MS, seat: s };
+        if (G.mode === 'mystery') G.undo.pending = false;
+        startUndoBar(); later(expireUndo, UNDO_MS + 30);
+      }
       if (r.doubled) { var pc = podEl(s), pr = pc.getBoundingClientRect(), br = $('board-wrap').getBoundingClientRect(); floatAt(pr.left + pr.width / 2 - br.left, slotOf(s) < 2 ? 8 : BS - 8, '×2 → ' + r.value); }
       if (r.forfeit) {
         SFX.forfeit(); haptic('warn');
@@ -782,30 +815,60 @@
   function expireUndo() {
     if (!G || !G.undo || G.undo.hold) return;
     if (G.undo.until > Date.now()) { later(expireUndo, G.undo.until - Date.now() + 20); return; }
-    G.undo = null; render(); if (!busy) advance();
+    G.undo = null; commitMysteryTurnAdvance(); render(); if (!busy) advance();
   }
   function closeUndo() { if (G) G.undo = null; }
-  function applyUndo() {
-    var u = G.undo; if (!u) return;
+  function applyUndo(adBased) {
+    var u = G && G.undo; if (!u) return false;
+    var mystery = G.mode === 'mystery', undoTurnId = u.snap.turnCount;
+    var nextCounts = mystery ? MysteryUndo.committed(G.mysteryUndo, undoTurnId, !!adBased) : null;
+    if (mystery && !nextCounts) return false;
     var rng = G.st.rng;
     cancelFlow(); paused = false;
     G.st = u.snap; G.st.rng = rng; // keep the random stream moving: the re-roll is a fresh roll
-    G.undo = null; save.game = G;
+    G.undo = null;
+    if (mystery) {
+      G.mysteryUndo = nextCounts;
+      if (!adBased) G.undoLeft = Math.max(0, G.undoLeft - 1);
+    }
+    save.game = G;
+    if (mystery) persist();
     buildPods(); layoutPieces(true); SFX.undo(); haptic('light');
-    toast(G.undoLeft > 0 ? 'Roll undone: roll again (' + G.undoLeft + ' free left)' : 'Roll undone: roll again', 1300);
+    if (mystery) {
+      var remaining = MysteryUndo.remaining(G.mysteryUndo, undoTurnId);
+      toast('Roll undone · ' + remaining.total + ' match · ' + remaining.turn + ' this turn · ' + remaining.ad + ' ad claims left', 2400);
+    } else toast(G.undoLeft > 0 ? 'Roll undone: roll again (' + G.undoLeft + ' free left)' : 'Roll undone: roll again', 1300);
     advance();
+    return true;
   }
   function undoRoll() {
     if (!G || !undoActive() || busy) return;
-    SFX.click();
-    if (G.undoLeft > 0) { G.undoLeft--; applyUndo(); return; }
+    var mystery = G.mode === 'mystery', adBased = G.undoLeft <= 0;
+    if (!mystery) {
+      SFX.click();
+      if (G.undoLeft > 0) { G.undoLeft--; applyUndo(false); return; }
+    } else {
+      if (paused || G.undo.pending) return;
+      var reason = MysteryUndo.reason(G.mysteryUndo, G.undo.snap.turnCount, adBased);
+      if (reason) { render(); toast(reason, 2200); return; }
+      SFX.click();
+      if (!adBased) { applyUndo(false); return; }
+    }
     // no free undos left: an optional rewarded ad (player's tap) gives one more
-    G.undo.hold = true; G.undo.until = Date.now() + 600000; paused = true;
-    var rewarded = false;
+    var match = G, undo = G.undo, rewarded = false;
+    if (mystery) undo.pending = true;
+    undo.hold = true; undo.until = Date.now() + 600000; paused = true;
+    if (mystery) render();
     Ads.showRewarded(function () {
-      rewarded = true; applyUndo();
+      if (mystery) {
+        if (rewarded || G !== match || G.undo !== undo || !undo.pending) return;
+        rewarded = true;
+        if (!applyUndo(true)) { paused = false; if (G === match && G.undo === undo) G.undo = null; render(); advance(); }
+      } else { rewarded = true; applyUndo(true); }
     }, function () { toast('No ad available right now. Try again later.'); }).then(function () {
-      if (!rewarded) { paused = false; if (G) G.undo = null; render(); advance(); }
+      if (mystery) {
+        if (!rewarded && G === match && G.undo === undo) { paused = false; G.undo = null; render(); advance(); }
+      } else if (!rewarded) { paused = false; if (G) G.undo = null; render(); advance(); }
     });
   }
 
@@ -1150,6 +1213,7 @@
     tutorial.intro = tutorial.active; tutorial.firstMove = false;
     var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
     G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now() };
+    if (st.mode === 'mystery') G.mysteryUndo = MysteryUndo.create(st.turnCount);
     save.game = G; persist();
     spins = [0, 0, 0, 0];
     showGame();
