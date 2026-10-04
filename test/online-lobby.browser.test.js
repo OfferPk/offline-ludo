@@ -308,6 +308,22 @@ function startLocalServer() {
                 match.state = nextState;
                 data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
                 state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+              } else if (name === 'claim_ludo_chess_draw_by_move') {
+                const match = state.tables.ludo_chess_matches.find(row => row.room_id === args.p_room_id);
+                const candidate = window.LudoChess.applyMove(match.state, { from: args.p_from, to: args.p_to, promotion: args.p_promotion });
+                const result = candidate.halfmove >= 100 ? 'draw_fifty_move_claim' : 'draw_threefold_claim';
+                const nextState = Object.assign({}, match.state, {
+                  phase: 'over', result, winner: null,
+                  draw_claim: { basis: result, intended_move: { from: args.p_from, to: args.p_to, promotion: args.p_promotion } }
+                });
+                match.version++;
+                match.state = nextState;
+                const room = state.tables.rooms.find(row => row.id === args.p_room_id);
+                if (room) room.status = 'completed';
+                const history = state.tables.match_history.find(row => row.room_id === args.p_room_id);
+                if (history) Object.assign(history, { status: 'completed', winner_id: null, result: { version: match.version, state: nextState } });
+                data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
+                state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
               } else if (name === 'leave_room') {
                 state.tables.room_members = state.tables.room_members.filter(row => !(row.room_id === args.p_room_id && row.user_id === 'user-one'));
                 state.activeRoomId = null;
@@ -443,6 +459,39 @@ function startLocalServer() {
     assert.equal(chessCall.args.p_expected_version, 0, 'Chess action uses the observed authoritative state version');
     assert.equal(Object.hasOwn(chessCall.args, 'p_die'), false, 'Chess RPC does not accept any client-generated dice value');
     assert.ok((await page.evaluate(() => window.__mockBackend.snapshot())).channels.some(channel => channel.tables.includes('ludo_chess_matches')), 'Chess state is subscribed through Realtime');
+
+    await page.evaluate(() => {
+      const backend = window.__mockBackend;
+      const match = backend.tables.ludo_chess_matches.find(row => row.room_id === 'chess-room');
+      const state = window.LudoChess.initialState();
+      const board = Array(64).fill('.');
+      board[60] = 'K'; board[4] = 'k'; board[56] = 'R'; board[7] = 'r';
+      state.board = board.join(''); state.turn = 0; state.castling = ''; state.en_passant = -1;
+      state.halfmove = 99; state.fullmove = 51; state.position_history = [window.LudoChess.positionKey(state)];
+      match.version++; match.state = state;
+      backend.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 2' && document.querySelector('#online-chess-board [data-square="56"] .online-chess-piece'));
+    const chessMovesBeforeClaim = await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => call.name === 'ludo_chess_move').length);
+    await page.click('#online-chess-board [data-square="56"]');
+    await page.waitForSelector('#online-chess-board [data-square="48"].is-legal');
+    await page.click('#online-chess-board [data-square="48"]');
+    await page.waitForFunction(() => !document.querySelector('#online-chess-claim-draw').classList.contains('hidden') && !document.querySelector('#online-chess-play-claimable-move').classList.contains('hidden'));
+    assert.match(await page.$eval('#online-chess-result', el => el.textContent), /claiming ends the game before the move/i, 'the UI explains that an intended-move claim leaves the board unchanged');
+    assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => call.name === 'ludo_chess_move').length), chessMovesBeforeClaim, 'selecting a claimable intended move does not silently play it');
+    await page.click('#online-chess-claim-draw');
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 3' && document.querySelector('#online-match-turn').textContent.includes('50-move claim'));
+    const intendedClaimCall = await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'claim_ludo_chess_draw_by_move'));
+    const claimedMatch = await page.evaluate(() => window.__mockBackend.tables.ludo_chess_matches[0]);
+    assert.equal(intendedClaimCall.args.p_from, 56, 'the server claim RPC receives the declared source square');
+    assert.equal(intendedClaimCall.args.p_to, 48, 'the server claim RPC receives the declared intended destination');
+    assert.equal(intendedClaimCall.args.p_expected_version, 2, 'the intended claim is bound to the observed authoritative version');
+    assert.equal(claimedMatch.state.board[56], 'R', 'claiming ends the match without applying the declared move');
+    assert.equal(claimedMatch.state.result, 'draw_fifty_move_claim', 'the authoritative result records the exact 50-move claim');
+    assert.equal(claimedMatch.state.draw_claim.intended_move.to, 48, 'the terminal state retains the declared move for match history');
+    const chessHistory = await page.evaluate(() => window.__mockBackend.tables.match_history.find(row => row.room_id === 'chess-room'));
+    assert.equal(chessHistory.status, 'completed', 'the claim completes the match-history row');
+    assert.equal(chessHistory.result.state.result, 'draw_fifty_move_claim', 'the match-history result contains the server draw result');
 
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
