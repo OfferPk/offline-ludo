@@ -221,7 +221,7 @@
   function hide(id) { $(id).classList.add('hidden'); }
   function isOpen(id) { return !$(id).classList.contains('hidden'); }
   function setCoins() { each(document.querySelectorAll('.coins-val'), function (e) { e.textContent = save.coins; }); }
-  function setLevel() { var l = L.levelFromXp(save.xp); $('lvl-badge').textContent = l.level; $('lvl-fill').style.width = Math.round(l.into / l.need * 100) + '%'; }
+  function setLevel() { var l = L.levelFromXp(save.xp), progress = Math.round(l.into / l.need * 100); $('lvl-badge').textContent = l.level; $('lvl-fill').style.width = progress + '%'; $('lvl-fill').parentNode.setAttribute('aria-valuenow', progress); $('home-stat-played').textContent = save.stats.played; $('home-stat-won').textContent = save.stats.won; }
   function board() { for (var i = 0; i < SK.BOARDS.length; i++) if (SK.BOARDS[i].id === save.board) return SK.BOARDS[i]; return SK.BOARDS[0]; }
   function dice() { for (var i = 0; i < SK.DICE.length; i++) if (SK.DICE[i].id === save.dice) return SK.DICE[i]; return SK.DICE[0]; }
   function seatColor(s) { return board().seats[s]; }
