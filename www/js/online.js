@@ -396,7 +396,7 @@
       ? chessResultLabel(state, room) + '. Match saved to online history.'
       : 'Standard chess rules · Red pieces move first · Select a piece, then a highlighted square.';
     $('online-chess-claim-draw').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || pendingMatchAction || !chess.canClaimDraw(state));
-    $('online-chess-resign').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || !!pendingMatchAction);
+    $('online-chess-resign').classList.toggle('hidden', state.phase !== 'active' || !!pendingMatchAction);
     $('online-chess-promotion').classList.toggle('hidden', !pendingChessPromotion || !!pendingMatchAction);
     board.replaceChildren();
     for (var index = 0; index < 64; index++) {

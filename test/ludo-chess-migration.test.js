@@ -10,6 +10,9 @@ assert.ok(name, 'Ludo Chess migration exists');
 const sql = read('supabase/migrations/' + name);
 const online = read('www/js/online.js');
 const html = read('www/index.html');
+const resignMigrationName = migrations.find(file => /_allow_out_of_turn_chess_resignation\.sql$/.test(file));
+assert.ok(resignMigrationName, 'out-of-turn resignation migration exists');
+const resignSql = read('supabase/migrations/' + resignMigrationName);
 let checks = 0;
 function ok(value, message) { assert.ok(value, message); checks++; console.log('  ok -', message); }
 
@@ -33,6 +36,16 @@ ok(/primary key \(room_id, action_id\)/i.test(read('supabase/migrations/20261004
 ok(/en.passant/i.test(sql) && /castling/i.test(sql) && /p_promotion/i.test(sql) && /checkmate/i.test(sql) && /stalemate/i.test(sql), 'server rules cover en passant, castling, promotion, checkmate, and stalemate');
 ok(/draw_seventy_five_moves/i.test(sql) && /draw_fivefold_repetition/i.test(sql) && /draw_insufficient_material/i.test(sql) && /claimable/i.test(sql), 'server recognizes automatic and claimable standard draw conditions');
 ok(/alter publication supabase_realtime add table public\.ludo_chess_matches/i.test(sql), 'Chess state is added to Realtime publication');
+const resignStart = resignSql.indexOf('create or replace function public.resign_ludo_chess(');
+const resignEnd = resignSql.indexOf('$$;', resignStart);
+const resignBody = resignSql.slice(resignStart, resignEnd);
+ok(resignStart >= 0 && resignEnd > resignStart, 'resignation migration replaces the existing authenticated RPC');
+ok(/You are not a member of this room/i.test(resignBody) && /v_status <> 'active'/i.test(resignBody) && /p_expected_version <> v_version/i.test(resignBody), 'resignation still requires an authenticated room member, an active room, and the current version');
+ok(/v_existing\.actor_id<>?v_user[\s\S]*?v_existing\.request<>?v_request/i.test(resignBody) && /room_id,action_id,actor_id,request,response/i.test(resignBody), 'out-of-turn resignations retain actor-bound idempotent persistence');
+ok(!/v_state->>'turn'\)::integer <> v_seat/i.test(resignBody), 'the resigning participant is not incorrectly restricted to the side-to-move');
+ok(/\{winner\}[\s\S]*?1-v_seat/i.test(resignBody) && /update public\.rooms set status='completed'/i.test(resignBody) && /update public\.match_history set status='completed'/i.test(resignBody), 'resignation awards the opponent and completes the room and history atomically');
+const resignVisibility = online.match(/\$\('online-chess-resign'\)\.classList\.toggle\('hidden', ([^;]+)\);/);
+ok(!!resignVisibility && /state\.phase !== 'active'/.test(resignVisibility[1]) && !/isMyTurn/.test(resignVisibility[1]), 'the resign control is available for either player during an active game');
 ok(/table: 'ludo_chess_matches'/i.test(online) && /ludo_chess_move/i.test(online), 'the signed-in client subscribes to and acts on the Chess match table');
 ok(/value="ludo_chess"/i.test(html) && /online-chess-board/i.test(html), 'online lobby offers Chess and has a dedicated playable board');
 ok(!/ludo_chess|LudoChess/.test(read('www/js/logic.js') + read('www/js/save-store.js')), 'Classic Ludo engine and local save format are not changed by Chess');
