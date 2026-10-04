@@ -34,6 +34,7 @@ function startLocalServer() {
   let url = process.argv[2];
   if (!url) { localServer = await startLocalServer(); url = localServer.url; }
   const origin = new URL(url).origin;
+  let sharedInviteUrl = '';
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROME || '/usr/bin/chromium',
     headless: 'new',
@@ -69,7 +70,7 @@ function startLocalServer() {
       try { resumeFixture = JSON.parse(sessionStorage.getItem('crossfour.online.test-fixture') || 'null'); } catch (_) {}
       const state = window.__mockBackend = {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
-        removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
+        removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, joinResult: null, session: resumeFixture && resumeFixture.session || null,
         delayNextRead: null,
         actionResponses: {}, rollCount: 0,
         tables: resumeFixture && resumeFixture.tables || {
@@ -88,7 +89,7 @@ function startLocalServer() {
           state.tables.rooms.push(room);
         }
         if (!state.tables.room_invites.some(row => row.room_id === id)) {
-          state.tables.room_invites.push({ room_id: id, invite_code: id === 'quick-room' ? 'QUICKROOM1234567' : id === 'host-room' ? 'HOSTROOM12345678' : 'INVITEROOM123456' });
+          state.tables.room_invites.push({ room_id: id, invite_code: id === 'quick-room' ? 'Q7K2M9' : id === 'host-room' ? 'A7K2P9' : 'B6C4D8' });
         }
         return room;
       }
@@ -234,15 +235,20 @@ function startLocalServer() {
                 const roomId = args.p_mode === 'ludo_chess' ? 'chess-room' : 'host-room';
                 ensureRoom(roomId, 'user-one', args.p_mode, args.p_capacity);
                 ensureMember(roomId, 'user-one', 0, 'host', false);
-                ensureMember(roomId, 'user-two', 1, 'member', true);
+                if (roomId !== 'host-room') ensureMember(roomId, 'user-two', 1, 'member', true);
                 state.activeRoomId = roomId;
                 data = { room_id: roomId, status: 'waiting' };
               } else if (name === 'join_room') {
-                ensureRoom('invite-room', 'user-two', 'classic', 2);
-                ensureMember('invite-room', 'user-two', 0, 'host', true);
-                ensureMember('invite-room', 'user-one', 1, 'member', false);
-                state.activeRoomId = 'invite-room';
-                data = { room_id: 'invite-room', status: 'waiting' };
+                if (state.joinResult) {
+                  data = state.joinResult;
+                  state.joinResult = null;
+                } else {
+                  ensureRoom('invite-room', 'user-two', 'classic', 2);
+                  ensureMember('invite-room', 'user-two', 0, 'host', true);
+                  ensureMember('invite-room', 'user-one', 1, 'member', false);
+                  state.activeRoomId = 'invite-room';
+                  data = { room_id: 'invite-room', status: 'waiting' };
+                }
               } else if (name === 'set_room_ready') {
                 const member = state.tables.room_members.find(row => row.room_id === args.p_room_id && row.user_id === 'user-one');
                 if (member) member.ready = args.p_ready;
@@ -388,7 +394,60 @@ function startLocalServer() {
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
     await page.click('#online-create-room');
-    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'HOSTROOM12345678');
+    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'A7K2P9');
+    assert.match(await page.$eval('#online-invite-code', el => el.value), /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/, 'newly created rooms display exactly six ambiguity-free invite characters');
+    assert.deepEqual(await page.$eval('#online-join-code', el => [el.maxLength, el.placeholder]), [6, '6-character code'], 'manual join input advertises and enforces the six-character format');
+    assert.equal(await page.$eval('#online-invite-feedback', el => el.getAttribute('role') === 'status' && el.getAttribute('aria-live') === 'polite'), true, 'invite feedback is announced accessibly');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'invite controls fit the mobile viewport without horizontal scrolling');
+    await page.setViewport({ width: 320, height: 740, isMobile: true, hasTouch: true });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, 'invite actions also fit a narrow 320-pixel handset');
+    await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    await page.evaluate(() => {
+      window.__inviteShareCalls = [];
+      window.__inviteClipboardCalls = [];
+      window.__resolveInviteShare = null;
+      Object.defineProperty(navigator, 'share', { configurable: true, value(data) { window.__inviteShareCalls.push(data); return new Promise(resolve => { window.__resolveInviteShare = resolve; }); } });
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText(text) { window.__inviteClipboardCalls.push(text); return Promise.resolve(); } } });
+    });
+    await page.click('#online-share-invite');
+    await page.waitForFunction(() => document.querySelector('#online-share-invite').disabled);
+    assert.equal(await page.evaluate(() => document.querySelector('#online-share-invite').getAttribute('aria-busy') === 'true' && document.querySelector('#online-copy-invite').disabled), true, 'invite actions expose an accessible busy state during native sharing');
+    await page.evaluate(() => window.__resolveInviteShare());
+    await page.waitForFunction(() => document.querySelector('#online-invite-feedback').textContent.includes('Invite shared.'));
+    const shareCall = await page.evaluate(() => window.__inviteShareCalls[0]);
+    sharedInviteUrl = shareCall.url;
+    assert.equal(shareCall.title, 'Join my Online Ludo table', 'native share uses a clear invite title');
+    assert.equal(sharedInviteUrl, origin + '/?room=A7K2P9', 'shared link continues to carry the six-character room invite code');
+    await page.click('#online-copy-invite');
+    await page.waitForFunction(() => document.querySelector('#online-invite-feedback').textContent.includes('Invite link copied.'));
+    assert.deepEqual(await page.evaluate(() => window.__inviteClipboardCalls), [sharedInviteUrl], 'copy action writes the same direct room link');
+    const inviteScreenshotPath = path.resolve(__dirname, '../../artifacts/online-room-invite-mobile.png');
+    fs.mkdirSync(path.dirname(inviteScreenshotPath), { recursive: true });
+    await page.$eval('#online-room-card', el => el.scrollIntoView({ block: 'start' }));
+    await page.screenshot({ path: inviteScreenshotPath });
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const member = { room_id: 'host-room', user_id: 'user-two', seat: 1, role: 'member', ready: true };
+      state.tables.room_members.push(member);
+      state.emit('room_members', { event: 'INSERT', new: member });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-room-roster').textContent.includes('Bob'));
+    const clipboardCallsBeforeCancel = await page.evaluate(() => window.__inviteClipboardCalls.length);
+    await page.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value() { return Promise.reject(Object.assign(new Error('Share dismissed'), { name: 'AbortError' })); } }));
+    await page.click('#online-share-invite');
+    await page.waitForFunction(() => document.querySelector('#online-invite-feedback').textContent.includes('Share cancelled.'));
+    assert.equal(await page.evaluate(() => window.__inviteClipboardCalls.length), clipboardCallsBeforeCancel, 'cancelling the native share sheet does not unexpectedly copy the link');
+    await page.evaluate(() => Object.defineProperty(navigator, 'share', { configurable: true, value: undefined }));
+    await page.click('#online-share-invite');
+    await page.waitForFunction(() => document.querySelector('#online-invite-feedback').textContent.includes('Invite link copied.'));
+    assert.equal(await page.evaluate(() => window.__inviteClipboardCalls.at(-1)), sharedInviteUrl, 'unsupported native sharing falls back to clipboard copy');
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText() { return Promise.reject(new Error('Clipboard denied')); } } });
+      Object.defineProperty(document, 'execCommand', { configurable: true, value() { return false; } });
+    });
+    await page.click('#online-copy-invite');
+    await page.waitForFunction(() => document.querySelector('#online-invite-feedback').textContent.includes('The invite code is selected'));
+    assert.equal(await page.$eval('#online-invite-code', el => document.activeElement === el && el.selectionStart === 0 && el.selectionEnd === el.value.length), true, 'failed clipboard access selects the room code for manual copying');
     await page.click('#online-ready');
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     await page.click('#online-start-room');
@@ -426,7 +485,7 @@ function startLocalServer() {
     assert.equal(await page.$eval('#online-capacity', el => el.value + ':' + el.disabled), '3:false', 'switching back to Classic restores the selected capacity');
     await page.select('#online-mode', 'ludo_chess');
     await page.click('#online-create-room');
-    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'INVITEROOM123456');
+    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'B6C4D8');
     await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats');
     await page.click('#online-ready');
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
@@ -447,10 +506,20 @@ function startLocalServer() {
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
     await page.select('#online-mode', 'classic');
-    await page.$eval('#online-join-code', el => { el.value = ' invite-room-code '; });
+    await page.evaluate(() => { window.__mockBackend.joinResult = { error: 'invite_unavailable' }; });
+    await page.$eval('#online-join-code', el => { el.value = 'A0A0A0'; });
     await page.click('#online-join-room');
-    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'INVITEROOM123456');
-    assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'join_room').args.p_invite_code), 'INVITE-ROOM-CODE', 'join-by-code normalizes invite codes before calling the RPC');
+    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('That invite is invalid, expired, or unavailable.'));
+    assert.match(await page.$eval('#online-status', el => el.textContent), /That invite is invalid, expired, or unavailable/, 'join failures use the same non-enumerating user message');
+    await page.evaluate(() => { window.__mockBackend.joinResult = { error: 'join_rate_limited' }; });
+    await page.$eval('#online-join-code', el => { el.value = ' a7k2p9 '; });
+    await page.click('#online-join-room');
+    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Too many join attempts.'));
+    assert.match(await page.$eval('#online-status', el => el.textContent), /wait a few minutes/, 'rate-limited joins receive retry guidance');
+    await page.$eval('#online-join-code', el => { el.value = ' a7k2p9 '; });
+    await page.click('#online-join-room');
+    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'B6C4D8');
+    assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'join_room').args.p_invite_code), 'A7K2P9', 'valid six-character invite is normalized before the authenticated join RPC');
 
     await page.evaluate(() => { window.__mockBackend.failRpc = 'quick_match'; });
     await page.click('#online-quick-match');
@@ -504,6 +573,50 @@ function startLocalServer() {
     await page.click('#online-signout');
     await page.waitForFunction(() => document.querySelector('#online-account-panel').classList.contains('hidden'));
 
+    await page.evaluate(() => {
+      sessionStorage.setItem('crossfour.online.test-fixture', JSON.stringify({
+        session: null,
+        tables: {
+          profiles: [{ id: 'user-one', handle: 'alice123', display_name: 'Alice' }, { id: 'user-two', handle: 'bob123', display_name: 'Bob' }],
+          wallets: [{ user_id: 'user-one', coins: 1250, diamonds: 7 }], rooms: [], room_members: [], room_invites: [], match_history: [], match_states: [], ludo_chess_matches: []
+        }
+      }));
+      sessionStorage.removeItem('crossfour.online.room');
+      sessionStorage.removeItem('crossfour.online.pending-invite');
+    });
+    await page.goto(sharedInviteUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+    await page.click('#btn-online');
+    await page.waitForFunction(() => window.__mockBackend.clientCalls.length === 1 && !document.querySelector('#online-auth-panel').classList.contains('hidden'));
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.pending-invite')), 'A7K2P9', 'six-character guest invite link is retained while the visitor signs in');
+    assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.some(call => call.name === 'join_room')), false, 'opening a guest invite does not bypass account and room authorization');
+    await page.$eval('#online-email', el => { el.value = 'guest@example.test'; });
+    await page.$eval('#online-password', el => { el.value = 'synthetic-guest-password'; });
+    await page.click('#online-signin');
+    await page.waitForFunction(() => window.__mockBackend.rpcCalls.some(call => call.name === 'join_room' && call.args.p_invite_code === 'A7K2P9') && !document.querySelector('#online-room-card').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online-invite-code', el => el.value), 'B6C4D8', 'authenticated guest lands in the joined room through the existing validated six-character join flow');
+
+    await page.evaluate(() => {
+      sessionStorage.setItem('crossfour.online.test-fixture', JSON.stringify({
+        session: null,
+        tables: {
+          profiles: [{ id: 'user-one', handle: 'alice123', display_name: 'Alice' }, { id: 'user-two', handle: 'bob123', display_name: 'Bob' }],
+          wallets: [{ user_id: 'user-one', coins: 1250, diamonds: 7 }], rooms: [], room_members: [], room_invites: [], match_history: [], match_states: [], ludo_chess_matches: []
+        }
+      }));
+      sessionStorage.removeItem('crossfour.online.room');
+      sessionStorage.removeItem('crossfour.online.pending-invite');
+    });
+    const legacyInviteUrl = origin + '/?room=ABCDEF0123456789';
+    await page.goto(legacyInviteUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+    await page.click('#btn-online');
+    await page.waitForFunction(() => window.__mockBackend.clientCalls.length === 1 && !document.querySelector('#online-auth-panel').classList.contains('hidden'));
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.pending-invite')), 'ABCDEF0123456789', 'a previously shared URL code is retained while its visitor signs in');
+    assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.some(call => call.name === 'join_room')), false, 'legacy URL invites do not bypass authentication');
+    await page.$eval('#online-email', el => { el.value = 'legacy-guest@example.test'; });
+    await page.$eval('#online-password', el => { el.value = 'synthetic-legacy-password'; });
+    await page.click('#online-signin');
+    await page.waitForFunction(() => window.__mockBackend.rpcCalls.some(call => call.name === 'join_room' && call.args.p_invite_code === 'ABCDEF0123456789') && !document.querySelector('#online-room-card').classList.contains('hidden'));
+
     async function seedAndReload(mode, storeRoomId) {
       await page.evaluate(({ mode, storeRoomId }) => {
         const roomId = 'resume-' + mode;
@@ -527,7 +640,7 @@ function startLocalServer() {
               { room_id: roomId, user_id: 'user-one', seat: 0, role: 'host', ready: true },
               { room_id: roomId, user_id: 'user-two', seat: 1, role: 'player', ready: true }
             ],
-            room_invites: [{ room_id: roomId, invite_code: 'RESUMEROOM1234567' }],
+            room_invites: [{ room_id: roomId, invite_code: 'C2D8F4' }],
             match_history: [{ id: 'history-' + roomId, room_id: roomId, mode, status: 'active', winner_id: null, started_at: '2026-10-04T12:00:00.000Z', finished_at: null }],
             match_states: mode === 'classic' ? [{ room_id: roomId, version: 7, state: classicState }] : [],
             ludo_chess_matches: mode === 'ludo_chess' ? [{ room_id: roomId, version: 4, state: window.LudoChess.initialState() }] : []

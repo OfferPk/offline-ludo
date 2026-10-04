@@ -918,10 +918,11 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-signout { flex: none !important; min-height: 36px !important; padding: 6px 10px !important; font-size: 11px !important; }
 .online-profile-form { display: grid; gap: 6px; margin-top: 12px; }
 .online-profile-form label, .online-join-row label, .online-invite-label, .online-room-options label { color: var(--muted); font-size: 12px; }
-.online-profile-form > div, .online-join-row > div, .online-invite-row { display: flex; gap: 7px; }
+.online-profile-form > div, .online-join-row > div { display: flex; gap: 7px; }
+.online-invite-row { display: grid; gap: 8px; }
 .online-screen input, .online-screen select { width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid var(--surface-edge); border-radius: 10px; outline: none; color: var(--ink); background: rgba(0,0,0,.2); font: inherit; font-size: 13px; }
 .online-screen select option { color: #111; }
-.online-profile-form button, .online-join-row button, .online-invite-row button { flex: none; min-height: 40px; padding: 8px 12px; font-size: 12px; }
+.online-profile-form button, .online-join-row button { flex: none; min-height: 40px; padding: 8px 12px; font-size: 12px; }
 .online-wallet { display: flex; gap: 10px; margin-top: 12px; }
 .online-wallet > span { flex: 1; padding: 10px 12px; border: 1px solid var(--surface-edge); border-radius: 12px; background: var(--surface); }
 .online-wallet b, .online-wallet small { display: block; }
@@ -940,7 +941,11 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-room-connection[data-state="reconnecting"] { color: #ffd37a !important; background: rgba(244,183,64,.08); }
 .online-room-connection[data-state="ended"] { color: #b8e7ce !important; background: rgba(115,224,176,.08); }
 .online-room-connection[data-state="idle"] { display: none; }
-.online-invite-row input { font-family: ui-monospace, monospace; letter-spacing: .12em; }
+.online-invite-row input { min-height: 44px; font-family: ui-monospace, monospace; letter-spacing: .12em; }
+.online-invite-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.online-invite-actions button { min-width: 0; min-height: 44px; padding: 9px 10px; font-size: 12px; }
+.online-invite-feedback { min-height: 18px; margin: 6px 1px 0; color: #9ad9ff; font-size: 11px; line-height: 1.4; }
+.online-invite-help { margin: 0 1px 8px !important; color: var(--muted); font-size: 11px !important; }
 .online-room-roster, .online-history-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .online-room-roster li, .online-history-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface); font-size: 12px; }
 .online-room-roster small, .online-history-list small { color: var(--muted); font-size: 10px; text-align: right; }

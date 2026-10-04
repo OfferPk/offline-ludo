@@ -59,6 +59,98 @@
     statusLine.textContent = message;
     statusLine.classList.toggle('is-error', !!isError);
   }
+  function inviteFeedback(message) {
+    var line = $('online-invite-feedback');
+    if (line) line.textContent = message;
+  }
+  function setInviteActionBusy(busy, activeAction) {
+    [['online-share-invite', 'share', 'Share invite', 'Sharing…'], ['online-copy-invite', 'copy', 'Copy link', 'Copying…']]
+      .forEach(function (entry) {
+        var button = $(entry[0]);
+        if (!button) return;
+        button.disabled = !!busy;
+        button.setAttribute('aria-busy', String(!!busy && activeAction === entry[1]));
+        button.textContent = busy && activeAction === entry[1] ? entry[3] : entry[2];
+      });
+  }
+  function makeInviteUrl() {
+    var url = new URL(isNative() ? 'https://offerpk.github.io/offline-ludo/' : window.location.href);
+    url.search = '?room=' + encodeURIComponent(currentRoom.inviteCode);
+    url.hash = '';
+    return url.toString();
+  }
+  function legacyCopyText(text) {
+    var field = document.createElement('textarea');
+    field.value = text;
+    field.setAttribute('readonly', '');
+    field.setAttribute('aria-hidden', 'true');
+    field.style.position = 'fixed';
+    field.style.left = '-9999px';
+    field.style.opacity = '0';
+    document.body.appendChild(field);
+    field.focus();
+    field.select();
+    field.setSelectionRange(0, field.value.length);
+    var copied = false;
+    try { copied = typeof document.execCommand === 'function' && document.execCommand('copy'); } catch (_) { copied = false; }
+    field.remove();
+    return copied;
+  }
+  function copyInviteText(text) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      try {
+        return Promise.resolve(navigator.clipboard.writeText(text)).then(function () { return true; }, function () { return legacyCopyText(text); });
+      } catch (_) {}
+    }
+    return Promise.resolve(legacyCopyText(text));
+  }
+  function reportInviteCopy(copied, prefix) {
+    if (copied) {
+      inviteFeedback((prefix || '') + 'Invite link copied. Send it to a friend to join this table.');
+      return;
+    }
+    var code = $('online-invite-code');
+    code.focus();
+    code.select();
+    inviteFeedback('Could not copy the link. The invite code is selected; copy it and send it to your friend.');
+  }
+  function copyInviteLink() {
+    if (!currentRoom || !currentRoom.inviteCode) return;
+    var link = makeInviteUrl();
+    setInviteActionBusy(true, 'copy');
+    inviteFeedback('Copying invite link…');
+    copyInviteText(link).then(function (copied) { reportInviteCopy(copied); })
+      .catch(function () { reportInviteCopy(false); })
+      .finally(function () { setInviteActionBusy(false, ''); });
+  }
+  function shareInvite() {
+    if (!currentRoom || !currentRoom.inviteCode) return;
+    var link = makeInviteUrl();
+    var code = currentRoom.inviteCode;
+    var shareData = { title: 'Join my Online Ludo table', text: 'Join my Online Ludo table. You can also enter invite code ' + code + '.', url: link };
+    setInviteActionBusy(true, 'share');
+    if (typeof navigator.share !== 'function') {
+      inviteFeedback('Native sharing is unavailable. Copying the invite link…');
+      copyInviteText(link).then(function (copied) { reportInviteCopy(copied, copied ? 'Native sharing is unavailable. ' : ''); })
+        .catch(function () { reportInviteCopy(false); })
+        .finally(function () { setInviteActionBusy(false, ''); });
+      return;
+    }
+    inviteFeedback('Opening share options…');
+    var request;
+    try { request = navigator.share(shareData); } catch (error) { request = Promise.reject(error); }
+    Promise.resolve(request).then(function () {
+      inviteFeedback('Invite shared. Send it to a friend to join this table.');
+    }).catch(function (error) {
+      if (error && error.name === 'AbortError') {
+        inviteFeedback('Share cancelled. Your invite code is still available below.');
+        return;
+      }
+      return copyInviteText(link).then(function (copied) { reportInviteCopy(copied, copied ? 'Native sharing failed. ' : ''); });
+    }).catch(function () {
+      reportInviteCopy(false);
+    }).finally(function () { setInviteActionBusy(false, ''); });
+  }
   function errorText(error) {
     var message = error && typeof error.message === 'string' ? error.message : '';
     return message || 'The request could not be completed. Please try again.';
@@ -760,7 +852,11 @@
     sessionStorage.removeItem('crossfour.online.pending-invite');
     window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     return callRpc('join_room', { p_invite_code: code.trim().toUpperCase() })
-      .then(attachRoom)
+      .then(function (result) {
+        if (result && result.error === 'join_rate_limited') throw new Error('Too many join attempts. Please wait a few minutes and try again.');
+        if (result && result.error) throw new Error('That invite is invalid, expired, or unavailable. Check the code or ask the host for a fresh invite.');
+        return attachRoom(result);
+      })
       .catch(function (error) { announce('Could not join room: ' + errorText(error), true); });
   }
   function handleNativeCallback(url) {
@@ -850,18 +946,8 @@
     $('online-join-code').addEventListener('keydown', function (event) {
       if (event.key === 'Enter') { event.preventDefault(); joinInvite($('online-join-code').value); }
     });
-    $('online-copy-invite').addEventListener('click', function () {
-      if (!currentRoom || !currentRoom.inviteCode) return;
-      var url = new URL(isNative() ? 'https://offerpk.github.io/offline-ludo/' : window.location.href);
-      url.search = '?room=' + encodeURIComponent(currentRoom.inviteCode);
-      url.hash = '';
-      var text = url.toString();
-      var copy = navigator.clipboard && navigator.clipboard.writeText
-        ? navigator.clipboard.writeText(text)
-        : Promise.reject(new Error('Clipboard access is unavailable.'));
-      copy.then(function () { announce('Invite link copied. Share it with a friend.'); })
-        .catch(function () { $('online-invite-code').focus(); $('online-invite-code').select(); announce('Copy is unavailable; select the invite code and share it manually.'); });
-    });
+    $('online-share-invite').addEventListener('click', shareInvite);
+    $('online-copy-invite').addEventListener('click', copyInviteLink);
     $('online-ready').addEventListener('click', function () {
       if (!currentRoomId || !currentRoom) return;
       callRpc('set_room_ready', { p_room_id: currentRoomId, p_ready: !currentRoom.myReady })
