@@ -65,11 +65,14 @@ function startLocalServer() {
       else request.abort().catch(() => {});
     });
     await page.evaluateOnNewDocument(() => {
+      let resumeFixture = null;
+      try { resumeFixture = JSON.parse(sessionStorage.getItem('crossfour.online.test-fixture') || 'null'); } catch (_) {}
       const state = window.__mockBackend = {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
-        removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: null,
+        removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
+        delayNextRead: null,
         actionResponses: {}, rollCount: 0,
-        tables: {
+        tables: resumeFixture && resumeFixture.tables || {
           profiles: [
             { id: 'user-one', handle: 'alice123', display_name: 'Alice' },
             { id: 'user-two', handle: 'bob123', display_name: 'Bob' }
@@ -133,13 +136,20 @@ function startLocalServer() {
         }
         function execute(single) {
           return Promise.resolve().then(() => {
-            const rows = (state.tables[table] || []).filter(matches);
+            const matchedRows = (state.tables[table] || []).filter(matches);
             if (operation === 'update') {
-              rows.forEach(row => Object.assign(row, patch));
+              matchedRows.forEach(row => Object.assign(row, patch));
               return { data: null, error: null };
             }
+            const rows = matchedRows.map(row => JSON.parse(JSON.stringify(row)));
             const limited = maxRows === null ? rows : rows.slice(0, maxRows);
-            return { data: single ? (limited[0] || null) : limited, error: null };
+            const result = { data: single ? (limited[0] || null) : limited, error: null };
+            if (state.delayNextRead && state.delayNextRead.table === table) {
+              const delayMs = state.delayNextRead.ms;
+              state.delayNextRead = null;
+              return new Promise(resolve => setTimeout(() => resolve(result), delayMs));
+            }
+            return result;
           });
         }
         const builder = {
@@ -158,10 +168,12 @@ function startLocalServer() {
         const channel = {
           name,
           handlers: [],
+          statusCallback: null,
           on(_type, filter, callback) { channel.handlers.push({ filter, callback }); return channel; },
           subscribe(callback) {
             state.channels.push(channel);
-            if (callback) callback('SUBSCRIBED');
+            channel.statusCallback = callback || null;
+            if (channel.statusCallback) channel.statusCallback('SUBSCRIBED');
             return channel;
           }
         };
@@ -491,12 +503,160 @@ function startLocalServer() {
     assert.equal(Object.hasOwn(updateCall, 'password'), false, 'recovery mock records no password value');
     await page.click('#online-signout');
     await page.waitForFunction(() => document.querySelector('#online-account-panel').classList.contains('hidden'));
+
+    async function seedAndReload(mode, storeRoomId) {
+      await page.evaluate(({ mode, storeRoomId }) => {
+        const roomId = 'resume-' + mode;
+        const classicState = {
+          protocol: 1, mode: 'classic', roll_style: 'star', players: [0, 1],
+          pieces: [[-1, -1, -1, -1], [-1, -1, -1, -1], null, null],
+          rules: { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true },
+          turn: 0, phase: 'roll', queue: [], sixes: 0, bonus: 0, ranking: [], turn_count: 0, last_roll: null, last_action: null
+        };
+        const row = { id: roomId, created_by: 'user-one', mode, capacity: 2, status: 'active', updated_at: '2026-10-04T12:00:00.000Z' };
+        const fixture = {
+          session: { user: { id: 'user-one', email: 'alice@example.test' } },
+          tables: {
+            profiles: [
+              { id: 'user-one', handle: 'alice123', display_name: 'Alice' },
+              { id: 'user-two', handle: 'bob123', display_name: 'Bob' }
+            ],
+            wallets: [{ user_id: 'user-one', coins: 1250, diamonds: 7 }],
+            rooms: [row],
+            room_members: [
+              { room_id: roomId, user_id: 'user-one', seat: 0, role: 'host', ready: true },
+              { room_id: roomId, user_id: 'user-two', seat: 1, role: 'player', ready: true }
+            ],
+            room_invites: [{ room_id: roomId, invite_code: 'RESUMEROOM1234567' }],
+            match_history: [{ id: 'history-' + roomId, room_id: roomId, mode, status: 'active', winner_id: null, started_at: '2026-10-04T12:00:00.000Z', finished_at: null }],
+            match_states: mode === 'classic' ? [{ room_id: roomId, version: 7, state: classicState }] : [],
+            ludo_chess_matches: mode === 'ludo_chess' ? [{ room_id: roomId, version: 4, state: window.LudoChess.initialState() }] : []
+          }
+        };
+        sessionStorage.setItem('crossfour.online.test-fixture', JSON.stringify(fixture));
+        if (storeRoomId) sessionStorage.setItem('crossfour.online.room', roomId);
+        else sessionStorage.removeItem('crossfour.online.room');
+      }, { mode, storeRoomId });
+      await page.reload({ waitUntil: 'networkidle0', timeout: 30000 });
+      await page.click('#btn-online');
+      await page.waitForFunction(() => window.__mockBackend && window.__mockBackend.clientCalls.length === 1);
+      await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden'));
+    }
+
+    await seedAndReload('classic', true);
+    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Classic · 2 seats' && document.querySelector('#online-match-version').textContent === 'Version 7');
+    assert.equal(await page.$eval('#online-room-connection', el => el.dataset.state), 'connected', 'refresh resumes the stored Classic room from authoritative version 7');
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.room')), 'resume-classic', 'refresh keeps the authenticated active room selected');
+    const screenshotPath = path.resolve(__dirname, '../../artifacts/online-reconnect-mobile.png');
+    fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
+    await page.$eval('#online-match-panel', el => el.scrollIntoView({ block: 'start' }));
+    await page.screenshot({ path: screenshotPath });
+
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const channel = state.channels.find(item => item.name === 'crossfour-room-resume-classic' && !item.removed);
+      channel.statusCallback('CHANNEL_ERROR');
+    });
+    await page.waitForFunction(() => document.querySelector('#online-room-connection').dataset.state === 'reconnecting');
+    assert.equal(await page.$eval('#online-roll', el => el.disabled), true, 'Classic actions pause while the realtime room is reconnecting');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const match = state.tables.match_states[0];
+      match.version = 8;
+      match.state = Object.assign({}, match.state, { turn: 1, turn_count: 1 });
+      const channel = state.channels.find(item => item.name === 'crossfour-room-resume-classic' && !item.removed);
+      channel.statusCallback('SUBSCRIBED');
+    });
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 8' && document.querySelector('#online-room-connection').dataset.state === 'connected');
+    assert.match(await page.$eval('#online-status', el => el.textContent), /Room reconnected\. Latest server state restored\./, 'transient channel rejoin reports successful server resynchronization');
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('focus'));
+      window.dispatchEvent(new Event('online'));
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await new Promise(resolve => setTimeout(resolve, 80));
+    assert.equal(await page.evaluate(() => window.__mockBackend.channels.filter(channel => channel.name === 'crossfour-room-resume-classic' && !channel.removed).length), 1, 'focus, visibility, and online events reuse one room subscription');
+    assert.equal(await page.evaluate(() => window.__mockBackend.channels.find(channel => channel.name === 'crossfour-room-resume-classic' && !channel.removed).handlers.length), 4, 'recovery reuses one set of room listeners without duplication');
+
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.delayNextRead = { table: 'match_states', ms: 220 };
+      window.dispatchEvent(new Event('focus'));
+    });
+    await page.waitForFunction(() => window.__mockBackend.delayNextRead === null);
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const match = state.tables.match_states[0];
+      match.version = 9;
+      match.state = Object.assign({}, match.state, { turn: 0, turn_count: 2 });
+      state.emit('match_states', { event: 'UPDATE', new: match });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 9');
+    await new Promise(resolve => setTimeout(resolve, 260));
+    assert.equal(await page.$eval('#online-match-version', el => el.textContent), 'Version 9', 'a delayed stale Classic snapshot cannot downgrade a newer synchronized version');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.tables.rooms[0].status = 'completed';
+      state.emit('rooms', { event: 'UPDATE', new: state.tables.rooms[0] });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-room-connection').dataset.state === 'ended');
+    assert.match(await page.$eval('#online-room-connection', el => el.textContent), /Room ended/, 'terminal room state is clearly displayed');
+
+    await seedAndReload('ludo_chess', false);
+    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats' && document.querySelector('#online-match-version').textContent === 'Version 4');
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.room')), 'resume-ludo_chess', 'room recovery discovers an active Chess match when no room ID was persisted');
+    assert.equal(await page.$eval('#online-room-connection', el => el.dataset.state), 'connected', 'discovered Chess room synchronizes its authoritative state');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const channel = state.channels.find(item => item.name === 'crossfour-room-resume-ludo_chess' && !item.removed);
+      channel.statusCallback('CHANNEL_ERROR');
+    });
+    await page.waitForFunction(() => document.querySelector('#online-room-connection').dataset.state === 'reconnecting');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.tables.ludo_chess_matches[0].version = 5;
+      const channel = state.channels.find(item => item.name === 'crossfour-room-resume-ludo_chess' && !item.removed);
+      channel.statusCallback('SUBSCRIBED');
+    });
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 5' && document.querySelector('#online-room-connection').dataset.state === 'connected');
+    assert.equal(await page.evaluate(() => window.__mockBackend.channels.filter(channel => channel.name === 'crossfour-room-resume-ludo_chess' && !channel.removed).length), 1, 'Chess reconnect rejoins the same single room channel');
+
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.session = { user: { id: 'user-three', email: 'new@example.test' } };
+      state.authListeners.forEach(callback => callback('SIGNED_IN', state.session));
+    });
+    await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden') && sessionStorage.getItem('crossfour.online.room') === null);
+    assert.equal(await page.evaluate(() => window.__mockBackend.channels.filter(channel => channel.name === 'crossfour-room-resume-ludo_chess' && !channel.removed).length), 0, 'changing auth identity removes the prior account room subscription and selection');
+
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.session = { user: { id: 'user-one', email: 'alice@example.test' } };
+      state.authListeners.forEach(callback => callback('SIGNED_IN', state.session));
+    });
+    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.tables.rooms[0].status = 'completed';
+      state.emit('rooms', { event: 'UPDATE', new: state.tables.rooms[0] });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-room-connection').dataset.state === 'ended');
+    await page.click('#online-leave-room');
+    await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden') && sessionStorage.getItem('crossfour.online.room') === null);
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('focus'));
+      window.dispatchEvent(new Event('online'));
+    });
+    await new Promise(resolve => setTimeout(resolve, 80));
+    assert.equal(await page.evaluate(() => window.__mockBackend.channels.filter(channel => channel.name === 'crossfour-room-resume-ludo_chess' && !channel.removed).length), 0, 'clean leave clears the persisted room and does not reattach on focus');
+
     await page.click('#online-back');
     await page.click('#btn-vs-ai');
     await page.waitForSelector('#setup:not(.hidden)');
     assert.equal(await page.$eval('#btn-online', el => !!el), true, 'offline game setup remains reachable after online sign-out');
     assert.deepEqual(errors, [], 'page has no uncaught JavaScript errors');
-    console.log('Online Ludo deterministic browser test passed (mocked Auth, no email, Classic and Ludo Chess match controls, Realtime lobby and offline fallback).');
+    console.log('Online Ludo deterministic browser test passed (mocked Auth, Classic/Chess refresh recovery and rejoin, active-room discovery, stale snapshots, auth changes, clean leave, mobile preview, and offline fallback).');
   } finally {
     await browser.close();
     if (localServer) await new Promise(resolve => localServer.server.close(resolve));
