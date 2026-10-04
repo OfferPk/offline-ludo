@@ -70,7 +70,7 @@ function startLocalServer() {
       try { resumeFixture = JSON.parse(sessionStorage.getItem('crossfour.online.test-fixture') || 'null'); } catch (_) {}
       const state = window.__mockBackend = {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
-        removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
+        removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, joinResult: null, session: resumeFixture && resumeFixture.session || null,
         delayNextRead: null,
         actionResponses: {}, rollCount: 0,
         tables: resumeFixture && resumeFixture.tables || {
@@ -239,11 +239,16 @@ function startLocalServer() {
                 state.activeRoomId = roomId;
                 data = { room_id: roomId, status: 'waiting' };
               } else if (name === 'join_room') {
-                ensureRoom('invite-room', 'user-two', 'classic', 2);
-                ensureMember('invite-room', 'user-two', 0, 'host', true);
-                ensureMember('invite-room', 'user-one', 1, 'member', false);
-                state.activeRoomId = 'invite-room';
-                data = { room_id: 'invite-room', status: 'waiting' };
+                if (state.joinResult) {
+                  data = state.joinResult;
+                  state.joinResult = null;
+                } else {
+                  ensureRoom('invite-room', 'user-two', 'classic', 2);
+                  ensureMember('invite-room', 'user-two', 0, 'host', true);
+                  ensureMember('invite-room', 'user-one', 1, 'member', false);
+                  state.activeRoomId = 'invite-room';
+                  data = { room_id: 'invite-room', status: 'waiting' };
+                }
               } else if (name === 'set_room_ready') {
                 const member = state.tables.room_members.find(row => row.room_id === args.p_room_id && row.user_id === 'user-one');
                 if (member) member.ready = args.p_ready;
@@ -501,6 +506,16 @@ function startLocalServer() {
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
     await page.select('#online-mode', 'classic');
+    await page.evaluate(() => { window.__mockBackend.joinResult = { error: 'invite_unavailable' }; });
+    await page.$eval('#online-join-code', el => { el.value = 'A0A0A0'; });
+    await page.click('#online-join-room');
+    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('That invite is invalid, expired, or unavailable.'));
+    assert.match(await page.$eval('#online-status', el => el.textContent), /That invite is invalid, expired, or unavailable/, 'join failures use the same non-enumerating user message');
+    await page.evaluate(() => { window.__mockBackend.joinResult = { error: 'join_rate_limited' }; });
+    await page.$eval('#online-join-code', el => { el.value = ' a7k2p9 '; });
+    await page.click('#online-join-room');
+    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Too many join attempts.'));
+    assert.match(await page.$eval('#online-status', el => el.textContent), /wait a few minutes/, 'rate-limited joins receive retry guidance');
     await page.$eval('#online-join-code', el => { el.value = ' a7k2p9 '; });
     await page.click('#online-join-room');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'B6C4D8');

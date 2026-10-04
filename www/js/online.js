@@ -852,7 +852,11 @@
     sessionStorage.removeItem('crossfour.online.pending-invite');
     window.history.replaceState({}, '', window.location.pathname + window.location.hash);
     return callRpc('join_room', { p_invite_code: code.trim().toUpperCase() })
-      .then(attachRoom)
+      .then(function (result) {
+        if (result && result.error === 'join_rate_limited') throw new Error('Too many join attempts. Please wait a few minutes and try again.');
+        if (result && result.error) throw new Error('That invite is invalid, expired, or unavailable. Check the code or ask the host for a fresh invite.');
+        return attachRoom(result);
+      })
       .catch(function (error) { announce('Could not join room: ' + errorText(error), true); });
   }
   function handleNativeCallback(url) {

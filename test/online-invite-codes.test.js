@@ -8,6 +8,10 @@ const migrationsDir = path.join(root, 'supabase/migrations');
 const migrationName = fs.readdirSync(migrationsDir).find(name => /_short_room_invite_codes\.sql$/.test(name));
 assert.ok(migrationName, 'six-character invite migration exists');
 const sql = read('supabase/migrations/' + migrationName);
+const rateMigrationName = fs.readdirSync(migrationsDir).find(name => /_room_join_rate_limits\.sql$/.test(name));
+assert.ok(rateMigrationName, 'room-join rate-limit migration exists');
+assert.ok(rateMigrationName > migrationName, 'rate-limit migration applies after the six-character invite migration');
+const rateSql = read('supabase/migrations/' + rateMigrationName);
 const html = read('www/index.html');
 const browserTest = read('test/online-lobby.browser.test.js');
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -43,4 +47,19 @@ ok(/id="online-join-code" maxlength="6"[^>]*placeholder="6-character code"/i.tes
 ok(/A7K2P9/.test(browserTest) && /\?room=A7K2P9/.test(browserTest) && /valid six-character invite/i.test(browserTest), 'browser coverage exercises six-character display, URL sharing, and valid joining');
 const fixtureCodes = ['Q7K2M9', 'A7K2P9', 'B6C4D8', 'C2D8F4'];
 ok(fixtureCodes.every(code => /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/.test(code) && browserTest.includes(code)) && /ABCDEF0123456789/.test(browserTest), 'new browser fixtures use six characters and the legacy URL flow remains covered separately');
+
+const rateJoinStart = rateSql.indexOf('create or replace function public.join_room(');
+assert.notEqual(rateJoinStart, -1, 'rate-limit migration replaces the public join RPC');
+const rateJoin = rateSql.slice(rateJoinStart);
+ok(/create table if not exists private\.room_join_rate_limits[\s\S]*enable row level security[\s\S]*revoke all on table private\.room_join_rate_limits from public, anon, authenticated/i.test(rateSql), 'attempt counters are private, RLS-enabled, and inaccessible to client roles');
+ok(/current_setting\('request\.headers', true\)[\s\S]*x-forwarded-for[\s\S]*extensions\.digest\(v_client_ip::text, 'sha256'\)/i.test(rateSql), 'the optional IP bucket uses the documented PostgREST request header and stores only a digest');
+ok(/p_user is distinct from auth\.uid\(\)[\s\S]*'user:' \|\| p_user::text/i.test(rateSql), 'the per-account limiter binds its key to the authenticated user');
+ok(/v_user_count <= 5 and \(v_ip_count is null or v_ip_count <= 20\)/i.test(rateSql), 'the RPC enforces separate five-per-account and twenty-per-IP attempt caps');
+ok(/private\.consume_room_join_attempt\(v_user\)[\s\S]*v_code !~[\s\S]*select r\.\*/i.test(rateJoin), 'every authenticated attempt is counted before code validation and room lookup');
+ok((rateJoin.match(/'error', 'invite_unavailable'/g) || []).length === 4 && !/Invite not found or expired|room is full|no longer accepting players/i.test(rateJoin), 'invalid, expired, full, and closed-room failures do not reveal code or room state');
+ok(/v_room\.status <> 'waiting'[\s\S]*v_count >= v_room\.capacity[\s\S]*generate_series\(0, v_room\.capacity - 1\)[\s\S]*insert into public\.room_members/i.test(rateJoin), 'server-side waiting, capacity, and server-assigned seat checks remain in the join RPC');
+ok(/revoke all on function public\.join_room\(text\) from public, anon[\s\S]*grant execute on function public\.join_room\(text\) to authenticated/i.test(rateSql), 'only authenticated clients retain execute access to room joining');
+const joinClient = read('www/js/online.js');
+ok(/result\.error === 'join_rate_limited'[\s\S]*result\.error\)[\s\S]*invalid, expired, or unavailable/i.test(joinClient), 'the client displays retry guidance and one generic invite-failure message');
+
 console.log('\nSix-character invite-code migration and regression checks passed (' + checks + ' checks).');
