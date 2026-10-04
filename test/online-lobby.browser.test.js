@@ -65,6 +65,7 @@ function startLocalServer() {
       else request.abort().catch(() => {});
     });
     await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__mockClipboardText = text; } } });
       let resumeFixture = null;
       try { resumeFixture = JSON.parse(sessionStorage.getItem('crossfour.online.test-fixture') || 'null'); } catch (_) {}
       const state = window.__mockBackend = {
@@ -509,7 +510,13 @@ function startLocalServer() {
     const waitingRpcCount = await page.evaluate(() => window.__mockBackend.rpcCalls.length);
     await page.click('#online-chess-board [data-square="53"]');
     assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.length), waitingRpcCount, 'aria-disabled board squares cannot submit an out-of-turn action');
-    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /e2–e4/, 'the coordinate move list is reconstructed from server position history');
+    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /1\.\s*e4/, 'the move list shows SAN reconstructed from server position history');
+    assert.match(await page.$eval('#online-chess-history-notation', el => el.textContent), /standard algebraic notation/i, 'the move-list format is explicitly identified as SAN');
+    assert.equal(await page.$eval('#online-chess-copy-pgn', el => el.disabled), false, 'PGN export is enabled only after the complete initial-to-current history verifies');
+    await page.click('#online-chess-copy-pgn');
+    await page.waitForFunction(() => document.querySelector('#online-chess-pgn-status').textContent === 'PGN copied to clipboard.');
+    const firstPgn = await page.evaluate(() => window.__mockClipboardText);
+    assert.match(firstPgn, /\[Event "Ludo Chess"\][\s\S]*\[Result "\*"\][\s\S]*1\. e4 \*/, 'copy action exports the verified SAN game as PGN without inventing a result');
     assert.equal(await page.$eval('#online-chess-board [data-square="52"]', el => el.classList.contains('last-from')), true, 'the board marks the origin square of the latest move');
     assert.equal(await page.$eval('#online-chess-board [data-square="36"]', el => el.classList.contains('last-to')), true, 'the board marks the destination square of the latest move');
     const chessCall = await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'ludo_chess_move'));
@@ -693,10 +700,24 @@ function startLocalServer() {
       match.state = position;
       state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
     });
-    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 5' && document.querySelector('#online-chess-move-list').textContent.includes('e4×d5'));
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 5' && document.querySelector('#online-chess-move-list').textContent.includes('exd5'));
     assert.match(await page.$eval('#online-chess-announcement', el => el.textContent), /moved from e4 to d5 and captured a piece/, 'an authoritative opponent-state update announces the captured move');
-    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /e2–e4[\s\S]*d7–d5[\s\S]*e4×d5/, 'history reconstructs both sides from synchronized position snapshots');
+    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /1\.\s*e4[\s\S]*d5[\s\S]*2\.\s*exd5/, 'history reconstructs numbered SAN and captures from synchronized position snapshots');
     assert.equal(await page.$eval('#online-chess-red-captured', el => el.getAttribute('aria-label')), '1 captured pieces', 'capture tray counts the exact captured piece from match history');
+    await page.click('#online-chess-copy-pgn');
+    await page.waitForFunction(() => document.querySelector('#online-chess-pgn-status').textContent === 'PGN copied to clipboard.');
+    assert.match(await page.evaluate(() => window.__mockClipboardText), /1\. e4 d5 2\. exd5 \*/, 'PGN copy preserves fullmove numbers and capture SAN');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const match = state.tables.ludo_chess_matches[0];
+      match.state.position_history = match.state.position_history.slice(1);
+      match.version++;
+      state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 6' && document.querySelector('#online-chess-history-notation').textContent.includes('incomplete'));
+    assert.equal(await page.$eval('#online-chess-copy-pgn', el => el.disabled), true, 'PGN export is disabled when the server history is truncated');
+    assert.match(await page.$eval('#online-chess-pgn-status', el => el.textContent), /complete server move history is unavailable/i, 'the UI explains the missing complete server history');
+    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /d7–d5[\s\S]*e4×d5/, 'a partial history retains only verified coordinate moves instead of manufacturing SAN or PGN');
     const previewDir = path.resolve(__dirname, '../../artifacts/ludo-chess-play');
     fs.mkdirSync(previewDir, { recursive: true });
     await page.screenshot({ path: path.join(previewDir, 'mobile.png') });

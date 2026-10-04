@@ -375,49 +375,38 @@
     message += '. ' + chessSeatName(room, state.turn) + ' to move.';
     return message;
   }
-  function chessMoveRows(state, room, version) {
+  function chessMoveHistory(state, room, version) {
     var roomId = room && room.id || '';
-    if (chessMoveHistoryCache.roomId === roomId && chessMoveHistoryCache.version === version) return chessMoveHistoryCache.rows;
-    var chess = window.LudoChess, history = state && Array.isArray(state.position_history) ? state.position_history : [], rows = [], captures = [];
-    if (chess && history.length > 1) {
-      for (var ply = 1; ply < history.length; ply++) {
-        var beforeParts = String(history[ply - 1]).split('|'), targetKey = String(history[ply]);
-        if (beforeParts.length !== 4 || beforeParts[0].length !== 64) continue;
-        var turn = Number(beforeParts[1]), enPassant = Number(beforeParts[3]);
-        if ((turn !== 0 && turn !== 1) || !Number.isInteger(enPassant)) continue;
-        var before = { mode: 'ludo_chess', board: beforeParts[0], turn: turn, phase: 'active', castling: beforeParts[2] === '-' ? '' : beforeParts[2], en_passant: enPassant, halfmove: 0, fullmove: 1, position_history: [history[ply - 1]] };
-        var legal = chess.legalMoves(before), matchedMove = null, after = null;
-        for (var moveIndex = 0; moveIndex < legal.length; moveIndex++) {
-          try {
-            var candidate = chess.applyMove(before, legal[moveIndex]);
-            if (chess.positionKey(candidate) === targetKey) { matchedMove = legal[moveIndex]; after = candidate; break; }
-          } catch (_) { /* Skip malformed or legacy position snapshots. */ }
-        }
-        if (!matchedMove) continue;
-        var moveNumber = Math.floor((ply - 1) / 2) + 1;
-        var entry = rows[moveNumber - 1] || (rows[moveNumber - 1] = { number: moveNumber, red: '', blue: '' });
-        var capture = matchedMove.enPassant || before.board[matchedMove.to] !== '.';
-        if (capture) {
-          var capturedAt = matchedMove.enPassant ? matchedMove.to + (turn === 0 ? 8 : -8) : matchedMove.to;
-          var capturedPiece = before.board[capturedAt];
-          if (capturedPiece && capturedPiece !== '.') captures.push({ by: turn, piece: capturedPiece });
-        }
-        var notation = chess.coord(matchedMove.from) + (capture ? '×' : '–') + chess.coord(matchedMove.to) + (matchedMove.promotion ? '=' + String(matchedMove.promotion).toUpperCase() : '');
-        if (after.check) notation += after.phase === 'over' && after.result === 'checkmate' ? '#' : '+';
-        entry[turn === 0 ? 'red' : 'blue'] = notation;
-      }
-    }
-    if (!rows.some(function (row) { return row && (row.red || row.blue); }) && state && state.last_move && chess) {
-      var last = state.last_move, lastMover = 1 - Number(state.turn), lastNumber = Math.max(1, Number(state.fullmove) || 1);
+    if (chessMoveHistoryCache.roomId === roomId && chessMoveHistoryCache.version === version) return chessMoveHistoryCache;
+    var chess = window.LudoChess, derived = chess && chess.movesFromPositionHistory ? chess.movesFromPositionHistory(state) : { complete: false, moves: [], reason: 'Complete server move history is unavailable.' };
+    var rows = [], captures = [];
+    derived.moves.forEach(function (entry) {
+      var row = rows.find(function (candidate) { return candidate.number === entry.number; });
+      if (!row) { row = { number: entry.number, red: '', blue: '' }; rows.push(row); }
+      row[entry.color === 0 ? 'red' : 'blue'] = derived.complete ? entry.san : entry.coordinate;
+      if (entry.capture && entry.capturedPiece) captures.push({ by: entry.color, piece: entry.capturedPiece });
+    });
+    if (!derived.moves.length && state && state.last_move && chess) {
+      var last = state.last_move, lastMover = 1 - Number(state.turn);
+      var lastNumber = Math.max(1, (Number(state.fullmove) || 1) - (lastMover === 1 ? 1 : 0));
       var fallback = { number: lastNumber, red: '', blue: '' };
-      fallback[lastMover === 0 ? 'red' : 'blue'] = chess.coord(Number(last.from)) + (last.capture ? '×' : '–') + chess.coord(Number(last.to)) + (last.promotion ? '=' + String(last.promotion).toUpperCase() : '') + (state.result === 'checkmate' ? '#' : state.check ? '+' : '');
-      rows = [fallback];
+      fallback[lastMover === 0 ? 'red' : 'blue'] = chess.coord(Number(last.from)) + (last.capture || last.en_passant ? '×' : '–') + chess.coord(Number(last.to)) + (last.promotion ? '=' + String(last.promotion).toUpperCase() : '') + (state.result === 'checkmate' ? '#' : state.check ? '+' : '');
+      rows.push(fallback);
     }
-    chessMoveHistoryCache = { roomId: roomId, version: version, rows: rows, captures: captures };
-    return rows;
+    rows.sort(function (a, b) { return a.number - b.number; });
+    chessMoveHistoryCache = { roomId: roomId, version: version, rows: rows, captures: captures, complete: !!derived.complete, reason: derived.reason || '' };
+    return chessMoveHistoryCache;
   }
   function renderChessMoveHistory(state, room, version) {
-    var list = $('online-chess-move-list'), empty = $('online-chess-move-empty'), rows = chessMoveRows(state, room, version), count = rows.reduce(function (total, row) { return total + (row.red ? 1 : 0) + (row.blue ? 1 : 0); }, 0);
+    var list = $('online-chess-move-list'), empty = $('online-chess-move-empty'), history = chessMoveHistory(state, room, version), rows = history.rows;
+    var count = rows.reduce(function (total, row) { return total + (row.red ? 1 : 0) + (row.blue ? 1 : 0); }, 0);
+    $('online-chess-history-notation').textContent = history.complete ? 'Standard algebraic notation (SAN)' : 'Coordinate notation · incomplete server history';
+    list.setAttribute('aria-label', history.complete ? 'Move list in standard algebraic chess notation' : 'Verified coordinate moves; the full move history is unavailable');
+    $('online-chess-copy-pgn').disabled = !history.complete;
+    $('online-chess-copy-pgn').title = history.complete ? 'Copy the verified complete game as PGN; download it if clipboard access is unavailable.' : 'PGN export requires a complete, verifiable server move history.';
+    $('online-chess-pgn-status').textContent = history.complete
+      ? (count ? 'PGN ready · full server history verified.' : 'PGN ready · Red moves first.')
+      : (history.reason || 'PGN unavailable because the server did not provide a complete move history.');
     list.replaceChildren();
     rows.forEach(function (row, index) {
       if (!row || (!row.red && !row.blue)) return;
@@ -430,8 +419,32 @@
       list.appendChild(item);
     });
     $('online-chess-move-count').textContent = count + (count === 1 ? ' move' : ' moves');
+    if (!count) empty.textContent = history.complete ? 'No moves yet. Red makes the first move.' : 'No complete move could be verified. PGN export is unavailable.';
     empty.classList.toggle('hidden', count > 0);
     if (count > 0) list.scrollTop = list.scrollHeight;
+  }
+  function downloadChessPgn(pgn) {
+    if (typeof Blob !== 'function' || !window.URL || typeof window.URL.createObjectURL !== 'function') throw new Error('File export is unavailable in this browser.');
+    var blob = new Blob([pgn], { type: 'application/vnd.chess-pgn; charset=utf-8' });
+    var url = window.URL.createObjectURL(blob), link = document.createElement('a');
+    var roomName = String(currentRoomId || 'game').replace(/[^a-z0-9_-]/gi, '-');
+    link.href = url; link.download = 'ludo-chess-' + roomName + '.pgn'; link.hidden = true;
+    document.body.appendChild(link); link.click(); link.remove();
+    window.setTimeout(function () { window.URL.revokeObjectURL(url); }, 1000);
+    $('online-chess-pgn-status').textContent = 'Clipboard access was unavailable; the PGN file was downloaded.';
+  }
+  function copyChessPgn() {
+    if (!currentRoom || !currentRoom.matchState || !currentRoom.matchState.state || !window.LudoChess) return;
+    try {
+      var state = currentRoom.matchState.state;
+      var pgn = window.LudoChess.exportPgn(state, { red: chessPlayerName(currentRoom, 0), blue: chessPlayerName(currentRoom, 1) });
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return downloadChessPgn(pgn);
+      navigator.clipboard.writeText(pgn).then(function () {
+        $('online-chess-pgn-status').textContent = 'PGN copied to clipboard.';
+      }).catch(function () { try { downloadChessPgn(pgn); } catch (error) { $('online-chess-pgn-status').textContent = 'PGN could not be copied or downloaded: ' + errorText(error); } });
+    } catch (error) {
+      $('online-chess-pgn-status').textContent = 'PGN export unavailable: ' + errorText(error);
+    }
   }
   function renderCapturedPieces(captures, capturingSeat, targetId) {
     var target = $(targetId), glyphs = { q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }, counts = {}, total = 0;
@@ -1073,6 +1086,7 @@
     });
     $('online-chess-claim-draw').addEventListener('click', function () { submitMatchAction('claim_ludo_chess_draw', {}); });
     $('online-chess-resign').addEventListener('click', function () { submitMatchAction('resign_ludo_chess', {}); });
+    $('online-chess-copy-pgn').addEventListener('click', copyChessPgn);
     $('online-chess-back').addEventListener('click', function () {
       chessPlayViewDismissed = true;
       renderMatch();
