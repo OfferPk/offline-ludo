@@ -1007,7 +1007,7 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
   scrollbar-gutter: stable; -webkit-overflow-scrolling: touch;
 }
 .online-chess-header {
-  position: sticky; top: 0; z-index: 3; width: min(100%, 1260px); min-height: 56px; flex: none; align-self: center;
+  position: relative; z-index: 3; width: min(100%, 1260px); min-height: 56px; flex: none; align-self: center;
   display: grid; grid-template-columns: minmax(0,1fr) minmax(160px,auto) auto; align-items: center; gap: 14px;
   margin: 0 auto 8px; padding: 4px 0 10px; border-bottom: 1px solid rgba(255,255,255,.09);
   background: linear-gradient(#121a21 0%, rgba(18,26,33,.96) 75%, rgba(18,26,33,0));

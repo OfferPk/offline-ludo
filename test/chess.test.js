@@ -74,9 +74,42 @@ ep = move(ep, 28, 19);
 ok(ep.board[19] === 'P' && ep.board[27] === '.' && ep.halfmove === 0, 'en-passant removes the captured pawn and resets the halfmove clock');
 
 const promotion = pos({ 8: 'P', 7: 'k', 60: 'K' });
-ok(['q', 'r', 'b', 'n'].every(p => has(promotion, 8, 0, p)) && !has(promotion, 8, 0, null), 'promotion requires a choice among queen, rook, bishop, and knight');
-ok(san(promotion, 8, 0, 'q') === 'a8=Q+', 'SAN includes the selected promotion piece and check suffix');
-ok(move(promotion, 8, 0, 'n').board[0] === 'N', 'underpromotion changes the pawn into the selected piece');
+const promotionChoices = ['q', 'r', 'b', 'n'];
+for (const scenario of [
+  { color: 0, from: square('a7'), to: square('a8'), pieces: { [square('a7')]: 'P', [square('e1')]: 'K', [square('e8')]: 'k' }, coord: 'a8' },
+  { color: 1, from: square('h2'), to: square('h1'), pieces: { [square('h2')]: 'p', [square('e1')]: 'K', [square('e8')]: 'k' }, coord: 'h1' }
+]) {
+  const promotionState = pos(scenario.pieces, scenario.color);
+  ok(promotionChoices.every(piece => has(promotionState, scenario.from, scenario.to, piece)) && !has(promotionState, scenario.from, scenario.to, null), `${scenario.color === 0 ? 'Red' : 'Blue'} promotion requires an explicit choice among all four pieces`);
+  for (const choice of promotionChoices) {
+    const promoted = move(promotionState, scenario.from, scenario.to, choice);
+    const expectedPiece = scenario.color === 0 ? choice.toUpperCase() : choice;
+    ok(promoted.board[scenario.to] === expectedPiece && promoted.last_move.promotion === choice, `${scenario.color === 0 ? 'Red' : 'Blue'} can promote to ${choice.toUpperCase()} with the correct board color and recorded choice`);
+    ok(san(promotionState, scenario.from, scenario.to, choice).startsWith(scenario.coord + '=' + choice.toUpperCase()), `SAN records ${scenario.coord}=${choice.toUpperCase()} for ${scenario.color === 0 ? 'Red' : 'Blue'}`);
+  }
+}
+assert.throws(() => move(promotion, 8, 0), /not legal/, 'promotion cannot silently default to a queen');
+assert.throws(() => move(promotion, 8, 0, 'king'), /not legal/, 'promotion rejects a piece outside queen, rook, bishop, and knight');
+assert.throws(() => move(Chess.initialState(), square('e2'), square('e4'), 'n'), /not legal/, 'non-promotion moves reject an extraneous promotion choice');
+checks += 3;
+
+function verifyPromotionReplay(color, choice) {
+  const line = color === 0
+    ? [[53, 37], [14, 22], [37, 29], [6, 21], [29, 22], [15, 23], [22, 14], [23, 31], [14, 6, choice]]
+    : [[55, 39], [14, 30], [39, 30], [15, 31], [62, 45], [31, 39], [54, 38], [39, 47], [63, 62], [47, 55], [52, 44], [55, 63, choice]];
+  let replay = Chess.initialState();
+  for (const [from, to, promotionChoice] of line) replay = move(replay, from, to, promotionChoice || null);
+  const history = Chess.movesFromPositionHistory(replay);
+  const expectedSan = (color === 0 ? 'g8=' : 'h1=') + choice.toUpperCase();
+  ok(history.complete, `${color === 0 ? 'Red' : 'Blue'} ${choice.toUpperCase()} promotion replays as complete verified server history`);
+  ok(history.moves.at(-1).san.startsWith(expectedSan), `replayed SAN preserves ${expectedSan}`);
+  const pgn = Chess.exportPgn(replay);
+  ok(pgn.includes(history.moves.at(-1).san) && pgn.endsWith('*\n'), `PGN preserves the ${color === 0 ? 'Red' : 'Blue'} ${choice.toUpperCase()} promotion without inventing a result`);
+}
+for (const choice of promotionChoices) {
+  verifyPromotionReplay(0, choice);
+  verifyPromotionReplay(1, choice);
+}
 
 const pinned = pos({ 60: 'K', 52: 'R', 4: 'r', 0: 'k' });
 ok(!has(pinned, 52, 48), 'a pinned piece cannot expose its own king to check');

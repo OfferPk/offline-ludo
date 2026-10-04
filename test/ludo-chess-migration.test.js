@@ -31,6 +31,16 @@ ok(/auth\.uid\(\)[\s\S]*?You are not a member of this room[\s\S]*?v_state->>'tur
 ok(/p_expected_version <> v_version[\s\S]*?private\.ludo_chess_legal/i.test(moveBody), 'move RPC rejects stale versions and independently validates legal moves');
 ok(/primary key \(room_id, action_id\)/i.test(read('supabase/migrations/20261004100500_online_authoritative_match.sql')) && /v_existing\.actor_id <> v_user or v_existing\.request <> v_request/i.test(moveBody), 'Chess actions reuse actor- and payload-bound idempotency');
 ok(/en.passant/i.test(sql) && /castling/i.test(sql) && /p_promotion/i.test(sql) && /checkmate/i.test(sql) && /stalemate/i.test(sql), 'server rules cover en passant, castling, promotion, checkmate, and stalemate');
+const legalStart = sql.indexOf('create or replace function private.ludo_chess_legal(');
+const legalEnd = sql.indexOf('$$;', legalStart);
+const legalBody = sql.slice(legalStart, legalEnd);
+const applyStart = sql.indexOf('create or replace function private.ludo_chess_apply(');
+const applyEnd = sql.indexOf('$$;', applyStart);
+const applyBody = sql.slice(applyStart, applyEnd);
+ok(/v_promo text := pg_catalog\.lower\(coalesce\(p_promotion, ''\)\)/i.test(legalBody) && /if v_tr = v_last then[\s\S]*?v_promo not in \('q','r','b','n'\) then return false/i.test(legalBody), 'server promotion legality accepts exactly queen, rook, bishop, or knight and rejects a missing choice');
+ok(/elsif p_promotion is not null then return false/i.test(legalBody), 'server rejects promotion parameters on ordinary non-promotion moves');
+ok(/v_moved := case when v_color = 0 then pg_catalog\.upper\(pg_catalog\.lower\(p_promotion\)\) else pg_catalog\.lower\(p_promotion\) end/i.test(applyBody) && /'promotion',case when p_promotion is null then null else pg_catalog\.lower\(p_promotion\) end/i.test(applyBody), 'server applies and records the exact selected promotion with the correct Red/Blue piece case');
+ok(/'promotion',p_promotion/i.test(moveBody) && moveBody.indexOf('select a.* into v_existing') < moveBody.indexOf("if p_expected_version <> v_version") && /return v_existing\.response \|\| pg_catalog\.jsonb_build_object\('duplicate',true\)/i.test(moveBody), 'RPC binds the promotion choice to its idempotency payload and resolves exact duplicates before stale-version rejection');
 ok(/draw_seventy_five_moves/i.test(sql) && /draw_fivefold_repetition/i.test(sql) && /draw_insufficient_material/i.test(sql) && /claimable/i.test(sql), 'server recognizes automatic and claimable standard draw conditions');
 ok(/alter publication supabase_realtime add table public\.ludo_chess_matches/i.test(sql), 'Chess state is added to Realtime publication');
 ok(/table: 'ludo_chess_matches'/i.test(online) && /ludo_chess_move/i.test(online), 'the signed-in client subscribes to and acts on the Chess match table');

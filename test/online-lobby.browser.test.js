@@ -72,7 +72,7 @@ function startLocalServer() {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
         removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
         delayNextRead: null,
-        actionResponses: {}, rollCount: 0,
+        actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false,
         tables: resumeFixture && resumeFixture.tables || {
           profiles: [
             { id: 'user-one', handle: 'alice123', display_name: 'Alice' },
@@ -304,11 +304,36 @@ function startLocalServer() {
                 state.emit('match_states', { event: 'UPDATE', new: match });
               } else if (name === 'ludo_chess_move') {
                 const match = state.tables.ludo_chess_matches.find(row => row.room_id === args.p_room_id);
-                const nextState = window.LudoChess.applyMove(match.state, { from: args.p_from, to: args.p_to, promotion: args.p_promotion });
+                const request = { type: 'chess_move', expected_version: args.p_expected_version, from: args.p_from, to: args.p_to, promotion: args.p_promotion };
+                const actorId = state.session && state.session.user && state.session.user.id;
+                const prior = state.chessActionResponses[args.p_action_id];
+                if (prior) {
+                  if (prior.actorId !== actorId || JSON.stringify(prior.request) !== JSON.stringify(request)) {
+                    return Promise.resolve({ data: null, error: { message: 'Action ID was reused for a different request', code: '23505' } });
+                  }
+                  data = Object.assign({}, prior.response, { duplicate: true });
+                  return Promise.resolve({ data, error: null });
+                }
+                if (state.forceChessStale || Number(args.p_expected_version) !== Number(match.version)) {
+                  if (state.forceChessStale) {
+                    state.forceChessStale = false;
+                    match.version++;
+                    state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+                  }
+                  return Promise.resolve({ data: null, error: { message: 'Match state is stale; refresh and try again', code: '40001' } });
+                }
+                let nextState;
+                try { nextState = window.LudoChess.applyMove(match.state, { from: args.p_from, to: args.p_to, promotion: args.p_promotion }); }
+                catch (error) { return Promise.resolve({ data: null, error: { message: error.message, code: '22023' } }); }
                 match.version++;
                 match.state = nextState;
                 data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
+                state.chessActionResponses[args.p_action_id] = { actorId, request, response: data };
                 state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+                if (state.dropChessResponseAfterCommit) {
+                  state.dropChessResponseAfterCommit = false;
+                  return Promise.resolve({ data: null, error: { message: 'The response was lost after the server applied the move' } });
+                }
               } else if (name === 'leave_room') {
                 state.tables.room_members = state.tables.room_members.filter(row => !(row.room_id === args.p_room_id && row.user_id === 'user-one'));
                 state.activeRoomId = null;
@@ -525,6 +550,117 @@ function startLocalServer() {
     assert.equal(chessCall.args.p_expected_version, 0, 'Chess action uses the observed authoritative state version');
     assert.equal(Object.hasOwn(chessCall.args, 'p_die'), false, 'Chess RPC does not accept any client-generated dice value');
     assert.ok((await page.evaluate(() => window.__mockBackend.snapshot())).channels.some(channel => channel.tables.includes('ludo_chess_matches')), 'Chess state is subscribed through Realtime');
+
+    async function seedPromotionPosition(color) {
+      const version = await page.evaluate(color => {
+        const backend = window.__mockBackend;
+        const match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+        backend.tables.room_members.filter(member => member.room_id === match.room_id).forEach(member => { member.seat = member.user_id === 'user-one' ? color : 1 - color; });
+        const position = window.LudoChess.initialState();
+        const board = Array(64).fill('.');
+        board[60] = 'K'; board[4] = 'k';
+        if (color === 0) board[8] = 'P'; else board[55] = 'p';
+        position.board = board.join(''); position.turn = color; position.phase = 'active'; position.castling = ''; position.en_passant = -1;
+        position.halfmove = 0; position.fullmove = 1; position.last_move = null; position.winner = null; position.result = null; position.check = false;
+        position.position_history = [window.LudoChess.positionKey(position)];
+        match.version++; match.state = position;
+        backend.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+        return match.version;
+      }, color);
+      await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + value, {}, version);
+      await page.waitForFunction(value => document.querySelector('#online-chess-status').textContent.includes((value === 0 ? 'Red' : 'Blue') + ' · Alice Online · your move'), {}, color);
+      return version;
+    }
+
+    for (const choice of ['q', 'r', 'b', 'n']) {
+      const version = await seedPromotionPosition(0);
+      await page.click('#online-chess-board [data-square="8"]');
+      await page.waitForSelector('#online-chess-board [data-square="0"].is-legal');
+      const destinationHit = await page.evaluate(() => {
+        const cell = document.querySelector('#online-chess-board [data-square="0"]'), rect = cell.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        return { reachable: hit === cell || cell.contains(hit), headerPosition: getComputedStyle(document.querySelector('.online-chess-header')).position };
+      });
+      assert.equal(destinationHit.reachable, true, 'the top-rank promotion destination is not covered by screen chrome on mobile');
+      assert.equal(destinationHit.headerPosition, 'relative', 'the play-screen header scrolls with content instead of overlaying board cells');
+      await page.click('#online-chess-board [data-square="0"]');
+      const chooser = await page.waitForFunction(() => {
+        const group = document.querySelector('#online-chess-promotion');
+        return !group.classList.contains('hidden') ? group : false;
+      }, { timeout: 10000 });
+      assert.ok(await chooser.evaluate(el => el.getAttribute('role') === 'group' && el.getAttribute('aria-label') === 'Choose a promotion piece'), 'the visible mobile promotion chooser is a named accessible group');
+      const choices = await page.$$eval('#online-chess-promotion [data-promotion]', buttons => buttons.map(button => ({ piece: button.dataset.promotion, name: button.getAttribute('aria-label'), height: button.getBoundingClientRect().height, disabled: button.disabled })));
+      assert.deepEqual(choices.map(button => [button.piece, button.name]), [['q', 'Queen'], ['r', 'Rook'], ['b', 'Bishop'], ['n', 'Knight']], 'the chooser offers accessible Queen, Rook, Bishop, and Knight options');
+      assert.ok(choices.every(button => button.height >= 44 && !button.disabled), 'each promotion choice has a 44px touch target while synchronized');
+      if (choice === 'q') await page.evaluate(() => { window.__mockBackend.dropChessResponseAfterCommit = true; });
+      await page.click('#online-chess-promotion [data-promotion="' + choice + '"]');
+      if (choice === 'q') {
+        await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Retry uses the same action ID.'));
+        const firstAttempt = await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => call.name === 'ludo_chess_move').at(-1).args);
+        assert.equal(firstAttempt.p_promotion, choice, 'the Queen choice reaches the authoritative move RPC unchanged');
+        await page.click('#online-match-retry');
+        await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('The server confirmed this was already applied.'));
+        const retried = await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => call.name === 'ludo_chess_move').slice(-2).map(call => call.args));
+        assert.deepEqual(retried[1], retried[0], 'a retry after a lost response reuses the same promotion, version, and action ID');
+      } else {
+        await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + (value + 1), {}, version);
+      }
+      const result = await page.evaluate(() => {
+        const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+        const call = backend.rpcCalls.filter(item => item.name === 'ludo_chess_move').at(-1);
+        return { piece: match.state.board[0], version: match.version, args: call.args };
+      });
+      assert.equal(result.piece, choice.toUpperCase(), 'the server-returned Red board contains the selected ' + choice.toUpperCase());
+      assert.equal(result.version, version + 1, 'duplicate promotion retries advance the authoritative state only once');
+      assert.deepEqual([result.args.p_from, result.args.p_to, result.args.p_promotion, result.args.p_expected_version], [8, 0, choice, version], 'the exact Red source, destination, choice, and observed version are sent');
+    }
+
+    const staleVersion = await seedPromotionPosition(0);
+    await page.click('#online-chess-board [data-square="8"]');
+    await page.waitForSelector('#online-chess-board [data-square="0"].is-legal');
+    await page.click('#online-chess-board [data-square="0"]');
+    await page.evaluate(() => { window.__mockBackend.forceChessStale = true; });
+    await page.click('#online-chess-promotion [data-promotion="b"]');
+    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Refresh the state and try again.'));
+    await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + (value + 1), {}, staleVersion);
+    const staleState = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+      const call = backend.rpcCalls.filter(item => item.name === 'ludo_chess_move').at(-1);
+      return { board: match.state.board, action: sessionStorage.getItem('crossfour.online.pending-match-action'), args: call.args };
+    });
+    assert.equal(staleState.board[8], 'P', 'a stale promotion request leaves the pawn and server board unchanged');
+    assert.equal(staleState.board[0], '.', 'stale choices never alter the authoritative destination square');
+    assert.equal(staleState.action, null, 'the client clears a rejected stale action instead of retrying it indefinitely');
+    assert.equal(staleState.args.p_promotion, 'b', 'the stale request still carries its explicit Bishop choice for server validation');
+
+    const blueVersion = await seedPromotionPosition(1);
+    const blueOrientation = await page.evaluate(() => ({
+      label: document.querySelector('#online-chess-board').getAttribute('aria-label'),
+      top: [...document.querySelector('#online-chess-board').children[0].children].map(square => Number(square.dataset.square)),
+      bottom: [...document.querySelector('#online-chess-board').children[7].children].map(square => Number(square.dataset.square)),
+      blue: document.querySelector('#online-chess-board [data-square="55"] .online-chess-piece').classList.contains('blue-piece'),
+      redKing: document.querySelector('#online-chess-board [data-square="60"] .online-chess-piece').classList.contains('red-piece'),
+      blueRole: document.querySelector('#online-chess-blue-role').textContent
+    }));
+    assert.match(blueOrientation.label, /Red side at bottom/);
+    assert.deepEqual(blueOrientation.top, [0, 1, 2, 3, 4, 5, 6, 7], 'Blue sees the same standard rank-8-at-top board orientation');
+    assert.deepEqual(blueOrientation.bottom, [56, 57, 58, 59, 60, 61, 62, 63], 'Blue sees the Red home rank at the bottom of the board');
+    assert.equal(blueOrientation.blue, true, 'the Blue pawn remains correctly colored on h2');
+    assert.equal(blueOrientation.redKing, true, 'the Red king remains correctly colored at the bottom');
+    assert.match(blueOrientation.blueRole, /Blue pieces · you/);
+    await page.click('#online-chess-board [data-square="55"]');
+    await page.waitForSelector('#online-chess-board [data-square="63"].is-legal');
+    await page.click('#online-chess-board [data-square="63"]');
+    await page.waitForFunction(() => !document.querySelector('#online-chess-promotion').classList.contains('hidden'));
+    await page.click('#online-chess-promotion [data-promotion="n"]');
+    await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + (value + 1), {}, blueVersion);
+    const blueResult = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+      const call = backend.rpcCalls.filter(item => item.name === 'ludo_chess_move').at(-1);
+      return { piece: match.state.board[63], args: call.args };
+    });
+    assert.equal(blueResult.piece, 'n', 'the Blue Knight underpromotion is applied with lowercase Blue piece notation');
+    assert.deepEqual([blueResult.args.p_from, blueResult.args.p_to, blueResult.args.p_promotion, blueResult.args.p_expected_version], [55, 63, 'n', blueVersion], 'the Blue Knight underpromotion reaches the RPC with correct board coordinates and version');
 
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
