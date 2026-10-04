@@ -20,6 +20,13 @@
   var capacityBeforeChess = '2';
   var recoveryMode = false;
   var roomChannel = null;
+  var roomChannelStatus = 'idle';
+  var roomConnectionState = 'idle';
+  var roomRefreshSequence = 0;
+  var roomRestoreSequence = 0;
+  var roomRestorePromise = null;
+  var roomRestoreUserId = '';
+  var roomRestoreRoomId = '';
   var walletChannel = null;
   var profileChannel = null;
   var historyChannel = null;
@@ -62,6 +69,57 @@
   function modeLabel(mode) {
     return mode === 'ludo_chess' ? 'Ludo Chess' : String(mode || 'classic').charAt(0).toUpperCase() + String(mode || 'classic').slice(1);
   }
+  function setRoomConnectionState(state, message) {
+    roomConnectionState = state;
+    var line = $('online-room-connection');
+    if (!line) return;
+    line.dataset.state = state;
+    line.textContent = message || ({
+      connecting: 'Restoring the latest server match state…',
+      connected: 'Connected · server match state is up to date.',
+      reconnecting: 'Reconnecting · actions are paused until the latest server state is restored.',
+      ended: 'Room ended · final authoritative match state is available.'
+    }[state] || '');
+    if (currentRoom) renderMatch();
+  }
+  function removeRealtimeChannel(channel) {
+    if (client && channel) client.removeChannel(channel);
+  }
+  function clearRoomChannel() {
+    var channel = roomChannel;
+    roomChannel = null;
+    roomChannelStatus = 'idle';
+    removeRealtimeChannel(channel);
+  }
+  function clearAccountChannels() {
+    clearRoomChannel();
+    removeRealtimeChannel(walletChannel);
+    removeRealtimeChannel(profileChannel);
+    removeRealtimeChannel(historyChannel);
+    walletChannel = null;
+    profileChannel = null;
+    historyChannel = null;
+  }
+  function clearRoomSelection(clearStoredState) {
+    roomRestoreSequence++;
+    roomRestorePromise = null;
+    roomRestoreUserId = '';
+    roomRestoreRoomId = '';
+    roomRefreshSequence++;
+    clearRoomChannel();
+    currentRoomId = '';
+    currentRoom = null;
+    pendingMatchAction = null;
+    selectedChessSquare = -1;
+    selectedChessMoves = [];
+    pendingChessPromotion = null;
+    if (clearStoredState) {
+      sessionStorage.removeItem('crossfour.online.pending-match-action');
+      sessionStorage.removeItem('crossfour.online.room');
+    }
+    setRoomConnectionState('idle', '');
+    renderRoom();
+  }
   function callRpc(name, args) {
     if (!client) return Promise.reject(new Error('Online services are not configured yet.'));
     return client.rpc(name, args).then(function (result) {
@@ -83,7 +141,10 @@
         if (currentUser) refreshAccount();
         if (pendingInvite && currentUser) joinInvite(pendingInvite);
       }).catch(function (error) { announce('Online sign-in could not load: ' + errorText(error), true); });
-    } else if (currentUser) refreshAccount();
+    } else if (currentUser) {
+      refreshAccount();
+      if (!pendingInvite) restoreActiveRoom();
+    }
     if (pendingInvite && currentUser) joinInvite(pendingInvite);
   }
   function closeOnline() {
@@ -202,12 +263,14 @@
   }
   function refreshAccount() {
     if (!client || !currentUser) return Promise.resolve();
+    var requestedUserId = currentUser.id;
     return Promise.all([
       client.from('profiles').select('handle,display_name').eq('id', currentUser.id).maybeSingle(),
       client.from('wallets').select('coins,diamonds').eq('user_id', currentUser.id).maybeSingle()
     ]).then(function (results) {
       if (results[0].error) throw results[0].error;
       if (results[1].error) throw results[1].error;
+      if (!currentUser || currentUser.id !== requestedUserId) return;
       var profile = results[0].data;
       var wallet = results[1].data;
       if (profile) {
@@ -225,12 +288,14 @@
   }
   function refreshHistory() {
     if (!client || !currentUser) return Promise.resolve();
+    var requestedUserId = currentUser.id;
     return client.from('match_history')
       .select('id,mode,status,winner_id,started_at,finished_at')
       .order('started_at', { ascending: false })
       .limit(10)
       .then(function (result) {
         if (result.error) throw result.error;
+        if (!currentUser || currentUser.id !== requestedUserId) return;
         var list = $('online-history-list');
         list.replaceChildren();
         (result.data || []).forEach(function (match) {
@@ -252,6 +317,7 @@
     var card = $('online-room-card');
     card.classList.toggle('hidden', !room);
     if (!room) return;
+    if (room.status === 'completed' || room.status === 'cancelled' || (room.matchState && room.matchState.state && room.matchState.state.phase === 'over')) setRoomConnectionState('ended');
     $('online-room-mode').textContent = modeLabel(room.mode) + ' · ' + room.capacity + ' seats';
     $('online-room-status').textContent = room.status === 'active'
       ? (room.matchState ? (room.mode === 'ludo_chess' ? 'Ludo Chess is active. Legal moves and match state are validated by the server.' : 'Online Classic match is active. Dice and moves are validated by the server.') : 'This table predates the current online gameplay update. Create a new table to play online.')
@@ -287,7 +353,7 @@
     return state.winner === 0 || state.winner === 1 ? text + ' · ' + chessSeatName(room, state.winner) + ' wins' : text;
   }
   function chooseChessSquare(index, state, isMyTurn) {
-    if (!isMyTurn || state.phase !== 'active' || pendingMatchAction || pendingChessPromotion || !window.LudoChess) return;
+    if (!isMyTurn || state.phase !== 'active' || pendingMatchAction || pendingChessPromotion || roomConnectionState !== 'connected' || !window.LudoChess) return;
     var matching = selectedChessMoves.find(function (move) { return move.to === index; });
     if (selectedChessSquare >= 0 && matching) {
       if (matching.promotion) {
@@ -365,6 +431,7 @@
     if (!show) { $('online-chess-play').classList.add('hidden'); return; }
     var state = record.state;
     var isChess = room.mode === 'ludo_chess';
+    var isSynchronized = roomConnectionState === 'connected';
     var myMember = room.roster.find(function (member) { return member.user_id === (currentUser && currentUser.id); });
     var turnMember = room.roster.find(function (member) { return Number(member.seat) === Number(state.turn); });
     var isMyTurn = !!(myMember && Number(myMember.seat) === Number(state.turn));
@@ -378,7 +445,12 @@
     $('online-chess-play').classList.toggle('hidden', !isChess);
     ['online-match-dice', 'online-match-pieces', 'online-match-moves', 'online-classic-note'].forEach(function (id) { $(id).classList.toggle('hidden', isChess); });
     $('online-roll').classList.toggle('hidden', isChess || !(isMyTurn && state.phase === 'roll' && !pendingMatchAction));
+    $('online-roll').disabled = !isSynchronized;
     $('online-match-retry').classList.toggle('hidden', !pendingMatchAction || pendingMatchAction.room_id !== currentRoomId);
+    $('online-match-retry').disabled = !isSynchronized;
+    $('online-chess-claim-draw').disabled = !isSynchronized;
+    $('online-chess-resign').disabled = !isSynchronized;
+    $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) { button.disabled = !isSynchronized; });
     if (isChess) {
       renderChessBoard(state, room, isMyTurn);
       return;
@@ -405,6 +477,7 @@
       var localView = { mode: 'classic', players: state.players, pieces: state.pieces, rules: state.rules, turn: Number(state.turn), phase: 'move', queue: queue, ranking: state.ranking || [], effects: [], capd: [false, false, false, false], lk: null };
       window.LudoLogic.queueMoves(localView).forEach(function (move) {
         var action = document.createElement('button'); action.type = 'button'; action.className = 'btn plate'; action.textContent = 'Use ' + move.v + ' to move token ' + (move.piece + 1);
+        action.disabled = roomConnectionState !== 'connected';
         action.addEventListener('click', function () { submitMatchAction('move_match', { p_piece: move.piece, p_queue_index: queue.indexOf(move.v) }); });
         moves.appendChild(action);
       });
@@ -412,60 +485,167 @@
     }
     if (pendingMatchAction && pendingMatchAction.room_id === currentRoomId) moves.textContent = 'A match action is awaiting confirmation. Retry the same request safely if your connection dropped.';
   }
+  function discoverActiveRoom(userId, restoreToken) {
+    if (!client || !currentUser || currentUser.id !== userId) return Promise.resolve(null);
+    return client.from('room_members').select('room_id').eq('user_id', userId).then(function (membershipResult) {
+      if (membershipResult.error) throw membershipResult.error;
+      if (restoreToken !== roomRestoreSequence || !currentUser || currentUser.id !== userId) return null;
+      var roomIds = Array.from(new Set((membershipResult.data || []).map(function (member) { return member.room_id; }).filter(Boolean)));
+      if (!roomIds.length) return { rooms: [] };
+      return client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').in('id', roomIds).then(function (roomResult) {
+        if (roomResult.error) throw roomResult.error;
+        return { rooms: roomResult.data || [] };
+      });
+    }).then(function (result) {
+      if (!result || restoreToken !== roomRestoreSequence || !currentUser || currentUser.id !== userId) return null;
+      var active = result.rooms.filter(function (room) {
+        return room.status === 'active' && (room.mode === 'classic' || room.mode === 'ludo_chess');
+      }).sort(function (a, b) { return String(b.updated_at || '').localeCompare(String(a.updated_at || '')); })[0];
+      if (!active) return null;
+      currentRoomId = active.id;
+      roomRestoreRoomId = active.id;
+      currentRoom = null;
+      sessionStorage.setItem('crossfour.online.room', currentRoomId);
+      subscribeRoom();
+      setRoomConnectionState('reconnecting');
+      return refreshRoom();
+    }).catch(function (error) {
+      if (restoreToken === roomRestoreSequence && currentUser && currentUser.id === userId) {
+        setRoomConnectionState(currentRoom ? 'reconnecting' : 'idle', currentRoom ? undefined : 'Could not check for an active room. Try again when your connection is stable.');
+        announce('Active online room could not be restored: ' + errorText(error), true);
+      }
+      return null;
+    });
+  }
+  function restoreActiveRoom() {
+    if (!client || !currentUser || recoveryMode) return Promise.resolve(null);
+    var userId = currentUser.id;
+    var roomId = currentRoomId;
+    if (roomRestorePromise && roomRestoreUserId === userId && roomRestoreRoomId === roomId) return roomRestorePromise;
+    var restoreToken = ++roomRestoreSequence;
+    roomRestoreUserId = userId;
+    roomRestoreRoomId = roomId;
+    if (!roomId) {
+      roomRestorePromise = discoverActiveRoom(userId, restoreToken);
+    } else {
+      subscribeRoom();
+      setRoomConnectionState('reconnecting');
+      roomRestorePromise = refreshRoom().then(function (result) {
+        if (result && result.unavailable && restoreToken === roomRestoreSequence) return discoverActiveRoom(userId, restoreToken);
+        return result;
+      });
+    }
+    var promise = roomRestorePromise;
+    return promise.finally(function () {
+      if (roomRestorePromise === promise) {
+        roomRestorePromise = null;
+        roomRestoreUserId = '';
+        roomRestoreRoomId = '';
+      }
+    });
+  }
   function refreshRoom() {
-    if (!client || !currentRoomId || !currentUser) return Promise.resolve();
+    if (!client || !currentRoomId || !currentUser) return Promise.resolve(null);
+    var requestedRoomId = currentRoomId;
+    var userId = currentUser.id;
+    var requestSequence = ++roomRefreshSequence;
     return Promise.all([
-      client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').eq('id', currentRoomId).maybeSingle(),
-      client.from('room_members').select('user_id,seat,role,ready').eq('room_id', currentRoomId),
-      client.from('room_invites').select('invite_code').eq('room_id', currentRoomId).limit(1).maybeSingle(),
-      client.from('match_states').select('room_id,version,state,updated_at').eq('room_id', currentRoomId).maybeSingle(),
-      client.from('ludo_chess_matches').select('room_id,version,state,updated_at').eq('room_id', currentRoomId).maybeSingle()
+      client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').eq('id', requestedRoomId).maybeSingle(),
+      client.from('room_members').select('user_id,seat,role,ready').eq('room_id', requestedRoomId),
+      client.from('room_invites').select('invite_code').eq('room_id', requestedRoomId).limit(1).maybeSingle(),
+      client.from('match_states').select('room_id,version,state,updated_at').eq('room_id', requestedRoomId).maybeSingle(),
+      client.from('ludo_chess_matches').select('room_id,version,state,updated_at').eq('room_id', requestedRoomId).maybeSingle()
     ]).then(function (results) {
-      if (results[0].error) throw results[0].error;
-      if (!results[0].data) throw new Error('You no longer have access to this room.');
-      if (results[1].error) throw results[1].error;
-      if (results[2].error) throw results[2].error;
-      if (results[3].error) throw results[3].error;
-      if (results[4].error) throw results[4].error;
+      if (results.some(function (result) { return result.error; })) throw results.filter(function (result) { return result.error; })[0].error;
+      if (!results[0].data) {
+        var unavailable = new Error('This room ended or your membership is no longer active.');
+        unavailable.code = 'ROOM_UNAVAILABLE';
+        throw unavailable;
+      }
       var roster = results[1].data || [];
+      if (!roster.some(function (member) { return member.user_id === userId; })) {
+        var notMember = new Error('Your room membership is no longer active.');
+        notMember.code = 'ROOM_UNAVAILABLE';
+        throw notMember;
+      }
       var ids = roster.map(function (member) { return member.user_id; });
       return client.from('profiles').select('id,display_name,handle').in('id', ids).then(function (profileResult) {
         if (profileResult.error) throw profileResult.error;
+        if (requestSequence !== roomRefreshSequence || currentRoomId !== requestedRoomId || !currentUser || currentUser.id !== userId) return null;
         var profiles = {};
         (profileResult.data || []).forEach(function (profile) { profiles[profile.id] = profile; });
+        var existingRoom = currentRoom && currentRoom.id === requestedRoomId ? currentRoom : null;
+        var serverMatchState = results[0].data.mode === 'ludo_chess' ? (results[4].data || null) : (results[3].data || null);
+        if (existingRoom && existingRoom.matchState && serverMatchState && Number(existingRoom.matchState.version) > Number(serverMatchState.version)) serverMatchState = existingRoom.matchState;
+        var roomStatus = results[0].data.status;
+        if (existingRoom && (existingRoom.status === 'completed' || existingRoom.status === 'cancelled') && roomStatus === 'active') roomStatus = existingRoom.status;
         currentRoom = Object.assign({}, results[0].data, {
-        inviteCode: results[2].data ? results[2].data.invite_code : '',
-        matchState: results[0].data.mode === 'ludo_chess' ? (results[4].data || null) : (results[3].data || null),
+          status: roomStatus,
+          inviteCode: results[2].data ? results[2].data.invite_code : '',
+          matchState: serverMatchState,
           roster: roster.map(function (member) {
             var profile = profiles[member.user_id] || {};
             return Object.assign({}, member, { displayName: profile.display_name, handle: profile.handle });
           })
         });
-        var mine = roster.filter(function (member) { return member.user_id === currentUser.id; })[0];
-        currentRoom.myReady = !!(mine && mine.ready);
+        var mine = roster.filter(function (member) { return member.user_id === userId; })[0];
+        currentRoom.myReady = !!mine.ready;
+        if (roomStatus === 'completed' || roomStatus === 'cancelled' || (serverMatchState && serverMatchState.state && serverMatchState.state.phase === 'over')) {
+          setRoomConnectionState('ended');
+        } else if (roomChannelStatus === 'SUBSCRIBED') {
+          var wasReconnecting = roomConnectionState === 'reconnecting';
+          setRoomConnectionState('connected');
+          if (wasReconnecting) announce('Room reconnected. Latest server state restored.');
+        }
         renderRoom();
-        return refreshHistory();
+        return refreshHistory().then(function () { return currentRoom; });
       });
     }).catch(function (error) {
-      currentRoom = null;
-      currentRoomId = '';
-      sessionStorage.removeItem('crossfour.online.room');
-      renderRoom();
-      announce('Room could not be loaded: ' + errorText(error), true);
+      if (requestSequence !== roomRefreshSequence || currentRoomId !== requestedRoomId || !currentUser || currentUser.id !== userId) return null;
+      if (error && error.code === 'ROOM_UNAVAILABLE') {
+        clearRoomChannel();
+        currentRoomId = '';
+        currentRoom = null;
+        pendingMatchAction = null;
+        sessionStorage.removeItem('crossfour.online.pending-match-action');
+        sessionStorage.removeItem('crossfour.online.room');
+        setRoomConnectionState('idle', 'Room ended or membership ended. Find or join another table.');
+        renderRoom();
+        announce('The saved room is no longer available. Checking for another active match.');
+        return { unavailable: true };
+      }
+      setRoomConnectionState('reconnecting');
+      announce('Room reconnecting. Your saved room and pending action are preserved: ' + errorText(error), true);
+      return null;
     });
   }
   function subscribeRoom() {
-    if (!client || !currentRoomId) return;
-    if (roomChannel) client.removeChannel(roomChannel);
-    roomChannel = client.channel('crossfour-room-' + currentRoomId)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + currentRoomId }, refreshRoom)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: 'room_id=eq.' + currentRoomId }, refreshRoom)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_states', filter: 'room_id=eq.' + currentRoomId }, refreshRoom)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ludo_chess_matches', filter: 'room_id=eq.' + currentRoomId }, refreshRoom)
-      .subscribe(function (state) {
-        if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') announce('Live room updates are reconnecting.', true);
-        else if (state === 'SUBSCRIBED') refreshRoom();
-      });
+    if (!client || !currentRoomId || !currentUser) return null;
+    if (roomChannel && roomChannel.roomId === currentRoomId && roomChannel.userId === currentUser.id) return roomChannel;
+    clearRoomChannel();
+    var roomId = currentRoomId;
+    var userId = currentUser.id;
+    setRoomConnectionState('connecting');
+    var channel = client.channel('crossfour-room-' + roomId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId }, refreshRoom)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: 'room_id=eq.' + roomId }, refreshRoom)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'match_states', filter: 'room_id=eq.' + roomId }, refreshRoom)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ludo_chess_matches', filter: 'room_id=eq.' + roomId }, refreshRoom);
+    channel.roomId = roomId;
+    channel.userId = userId;
+    roomChannel = channel;
+    roomChannelStatus = 'joining';
+    channel.subscribe(function (state) {
+      if (roomChannel !== channel || currentRoomId !== roomId || !currentUser || currentUser.id !== userId) return;
+      roomChannelStatus = state;
+      if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT' || state === 'CLOSED') {
+        setRoomConnectionState('reconnecting');
+        announce('Live room updates are reconnecting. Match actions are paused until the room is synchronized.', true);
+      } else if (state === 'SUBSCRIBED') {
+        refreshRoom();
+      }
+    });
+    return channel;
   }
   function makeActionId() {
     if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
@@ -474,9 +654,11 @@
   }
   function submitMatchAction(rpc, values) {
     if (!currentRoomId || !currentRoom || !currentRoom.matchState || pendingMatchAction) return;
+    if (roomConnectionState !== 'connected') return announce('Reconnect to the room before sending a match action.', true);
     try {
       pendingMatchAction = {
         room_id: currentRoomId,
+        actor_id: currentUser && currentUser.id,
         rpc: rpc,
         args: Object.assign({ p_room_id: currentRoomId, p_expected_version: currentRoom.matchState.version, p_action_id: makeActionId() }, values)
       };
@@ -488,12 +670,13 @@
   function runPendingMatchAction() {
     var pending = pendingMatchAction;
     if (!client || !pending || pending.room_id !== currentRoomId) return;
+    if (roomConnectionState !== 'connected' || !currentUser || (pending.actor_id && pending.actor_id !== currentUser.id)) return announce('Reconnect to the room before retrying this action.', true);
     announce('Sending the validated match action…');
     callRpc(pending.rpc, pending.args).then(function (result) {
       if (pendingMatchAction !== pending) return;
       pendingMatchAction = null;
       sessionStorage.removeItem('crossfour.online.pending-match-action');
-      if (currentRoomId === pending.room_id && currentRoom && (!currentRoom.matchState || result.version >= currentRoom.matchState.version)) {
+      if (currentRoomId === pending.room_id && currentRoom && (!currentRoom.matchState || Number(result.version) > Number(currentRoom.matchState.version))) {
         currentRoom.matchState = { room_id: pending.room_id, version: result.version, state: result.state };
         renderMatch();
       }
@@ -552,7 +735,13 @@
   }
   function attachRoom(result) {
     if (!result.room_id) throw new Error('The server did not return a room ID.');
-    if (currentRoomId !== result.room_id) { selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null; }
+    if (currentRoomId !== result.room_id) {
+      roomRestoreSequence++;
+      roomRestorePromise = null;
+      roomRestoreUserId = '';
+      roomRestoreRoomId = '';
+      selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
+    }
     if (pendingMatchAction && pendingMatchAction.room_id !== result.room_id) {
       pendingMatchAction = null;
       sessionStorage.removeItem('crossfour.online.pending-match-action');
@@ -560,6 +749,7 @@
     currentRoomId = result.room_id;
     currentRoom = null;
     sessionStorage.setItem('crossfour.online.room', currentRoomId);
+    setRoomConnectionState('connecting');
     announce(result.status === 'waiting' ? 'Room ready. Share the code to invite another player.' : 'Joined the waiting room.');
     subscribeRoom();
     return refreshRoom();
@@ -628,21 +818,8 @@
       if (!client) return;
       client.auth.signOut().then(function (result) {
         if (result.error) throw result.error;
-        if (roomChannel) client.removeChannel(roomChannel);
-        if (walletChannel) client.removeChannel(walletChannel);
-        if (profileChannel) client.removeChannel(profileChannel);
-        if (historyChannel) client.removeChannel(historyChannel);
-        roomChannel = null;
-        walletChannel = null;
-        profileChannel = null;
-        historyChannel = null;
-        currentRoomId = '';
-        currentRoom = null;
-        pendingMatchAction = null;
-        selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
-        sessionStorage.removeItem('crossfour.online.pending-match-action');
-        sessionStorage.removeItem('crossfour.online.room');
-        renderRoom();
+        clearAccountChannels();
+        clearRoomSelection(true);
       }).catch(function (error) { announce('Sign-out failed: ' + errorText(error), true); });
     });
     $('online-profile-form').addEventListener('submit', function (event) {
@@ -716,24 +893,26 @@
       if (!currentRoomId) return;
       callRpc('leave_room', { p_room_id: currentRoomId })
         .then(function () {
-          if (roomChannel) client.removeChannel(roomChannel);
-          roomChannel = null;
-          currentRoomId = '';
-          currentRoom = null;
-          pendingMatchAction = null;
-          selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
-          sessionStorage.removeItem('crossfour.online.pending-match-action');
-          sessionStorage.removeItem('crossfour.online.room');
-          renderRoom();
+          clearRoomSelection(true);
           announce('You left the room.');
           return refreshHistory();
         })
         .catch(function (error) { announce('Could not leave room: ' + errorText(error), true); });
     });
     function refreshAfterReconnect() {
-      if (currentRoomId && currentUser && !screen.classList.contains('hidden')) refreshRoom();
+      if (!currentUser || !client || screen.classList.contains('hidden')) return;
+      if (!currentRoomId) { restoreActiveRoom(); return; }
+      if (roomChannel && ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].indexOf(roomChannelStatus) >= 0) clearRoomChannel();
+      subscribeRoom();
+      refreshRoom();
     }
     window.addEventListener('online', refreshAfterReconnect);
+    window.addEventListener('offline', function () {
+      if (currentRoomId && currentUser) {
+        setRoomConnectionState('reconnecting');
+        announce('Connection lost. The room will resynchronize before match actions resume.', true);
+      }
+    });
     window.addEventListener('focus', refreshAfterReconnect);
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) refreshAfterReconnect();
@@ -751,6 +930,46 @@
       }
     }
   }
+  function startUserSession() {
+    if (!currentUser || recoveryMode) return;
+    var userId = currentUser.id;
+    refreshAccount();
+    subscribeWallet();
+    subscribeProfile();
+    subscribeHistory();
+    if (pendingInvite && !handlingPendingInvite) {
+      handlingPendingInvite = true;
+      joinInvite(pendingInvite).finally(function () { handlingPendingInvite = false; });
+    } else {
+      restoreActiveRoom();
+    }
+    return userId;
+  }
+  function applyAuthSession(event, session) {
+    var nextUser = session && session.user ? session.user : null;
+    var oldUserId = currentUser && currentUser.id;
+    var nextUserId = nextUser && nextUser.id;
+    var identityChanged = oldUserId !== nextUserId;
+    if (event === 'PASSWORD_RECOVERY') recoveryMode = true;
+    else if (event === 'SIGNED_OUT') recoveryMode = false;
+    if (oldUserId && oldUserId !== nextUserId) {
+      clearAccountChannels();
+      clearRoomSelection(true);
+    }
+    if (!nextUser) {
+      recoveryMode = false;
+      clearAccountChannels();
+      clearRoomSelection(true);
+    }
+    currentUser = nextUser;
+    renderAccount();
+    if (currentUser && !recoveryMode && (identityChanged || event === 'GET_SESSION' || event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+      var userId = currentUser.id;
+      window.setTimeout(function () {
+        if (currentUser && currentUser.id === userId && !recoveryMode) startUserSession();
+      }, 0);
+    }
+  }
   function initializeClient() {
     if (client) return Promise.resolve(client);
     if (!window.supabase || typeof window.supabase.createClient !== 'function') {
@@ -760,54 +979,10 @@
       auth: { flowType: 'pkce', autoRefreshToken: true, persistSession: true, detectSessionInUrl: !isNative() }
     });
     renderAccount();
-    client.auth.onAuthStateChange(function (event, session) {
-      if (event === 'PASSWORD_RECOVERY') recoveryMode = true;
-      else if (event === 'SIGNED_OUT') recoveryMode = false;
-      currentUser = session && session.user ? session.user : null;
-      if (!currentUser) {
-        recoveryMode = false;
-        if (roomChannel) client.removeChannel(roomChannel);
-        if (walletChannel) client.removeChannel(walletChannel);
-        if (profileChannel) client.removeChannel(profileChannel);
-        if (historyChannel) client.removeChannel(historyChannel);
-        roomChannel = null;
-        walletChannel = null;
-        profileChannel = null;
-        historyChannel = null;
-        currentRoomId = '';
-        pendingMatchAction = null;
-        sessionStorage.removeItem('crossfour.online.pending-match-action');
-        sessionStorage.removeItem('crossfour.online.room');
-        currentRoom = null;
-        renderRoom();
-      }
-      renderAccount();
-      if (currentUser && !recoveryMode) {
-        window.setTimeout(function () {
-          refreshAccount();
-          subscribeWallet();
-          subscribeProfile();
-          subscribeHistory();
-          if (currentRoomId) { subscribeRoom(); refreshRoom(); }
-          if (pendingInvite && !handlingPendingInvite) {
-            handlingPendingInvite = true;
-            joinInvite(pendingInvite).finally(function () { handlingPendingInvite = false; });
-          }
-        }, 0);
-      }
-    });
+    client.auth.onAuthStateChange(applyAuthSession);
     client.auth.getSession().then(function (result) {
       if (result.error) throw result.error;
-      currentUser = result.data.session && result.data.session.user ? result.data.session.user : null;
-      renderAccount();
-      if (currentUser && !recoveryMode) {
-        refreshAccount();
-        subscribeWallet();
-        subscribeProfile();
-        subscribeHistory();
-        if (currentRoomId) { subscribeRoom(); refreshRoom(); }
-        if (pendingInvite) joinInvite(pendingInvite);
-      }
+      applyAuthSession('GET_SESSION', result.data.session);
     }).catch(function (error) { announce('Could not check your online session: ' + errorText(error), true); });
     return Promise.resolve(client);
   }
