@@ -297,10 +297,11 @@
         </div>
         <div class="pods bottom"><div class="pod" data-slot="3"></div><div class="pod right" data-slot="2"></div></div>
         <div class="toolbar">
-          <button id="btn-undo" class="tool hidden" aria-label="Undo dice roll"><svg viewBox="0 0 24 24"><path d="M9 4 4 9l5 5M4.5 9H15a5 5 0 0 1 0 10h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="undo-label">Undo</span><em class="ad-badge hidden" id="undo-ad">▶ AD</em><i class="undo-bar" id="undo-bar"></i></button>
+          <button id="btn-undo" class="tool hidden" aria-label="Undo dice roll" aria-describedby="undo-limit-note"><svg viewBox="0 0 24 24"><path d="M9 4 4 9l5 5M4.5 9H15a5 5 0 0 1 0 10h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="undo-label">Undo</span><em class="ad-badge hidden" id="undo-ad">▶ AD</em><i class="undo-bar" id="undo-bar"></i></button>
           <div class="hint" id="hint" role="status" aria-live="polite" aria-atomic="true"></div>
           <button id="btn-chat" class="tool" aria-label="Quick chat"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/><circle cx="12" cy="10.5" r="1.2" fill="currentColor"/><circle cx="15" cy="10.5" r="1.2" fill="currentColor"/></svg><span>Chat</span></button>
         </div>
+        <div id="undo-limit-note" class="undo-limit-note hidden" role="status" aria-live="polite" aria-atomic="true"></div>
         <div id="chat" class="chat hidden">
           <div class="chat-phrases" id="chat-phrases"></div>
           <div class="chat-emotes" id="chat-emotes"></div>
@@ -348,7 +349,7 @@
           <div class="r-xp"><b id="r-xp">+0</b><small>XP</small><span class="lvl-bar"><i id="r-lvl-fill"></i></span><small id="r-lvl">Level 1</small></div>
         </div>
         <button id="btn-r-double" class="btn rewarded-btn">▶ Watch an ad for 2× coins</button>
-        <p class="note tiny">Coins only unlock cosmetic skins. They can't be bought, bet or cashed out.</p>
+        <p class="note tiny">Offline coins unlock cosmetic skins and can pay for a 25-coin Mystery Tiles undo. They cannot be bought, bet or cashed out.</p>
         <div class="panel-actions">
           <button id="btn-r-home" class="btn plate">Home</button>
           <button id="btn-r-again" class="btn primary">Play again</button>
@@ -365,6 +366,20 @@
           <button id="confirm-no" class="btn plate">Cancel</button>
           <button id="confirm-yes" class="btn primary">Start</button>
         </div>
+      </div>
+    </div>
+
+    <!-- MYSTERY UNDO ROUTE CHOICE -->
+    <div id="undo-choice" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="undo-choice-title" aria-describedby="undo-choice-copy">
+      <div id="undo-choice-panel" class="panel undo-choice-panel" tabindex="-1">
+        <h3 id="undo-choice-title">Undo this roll?</h3>
+        <p id="undo-choice-copy" class="note">Choose one route: spend 25 offline coins or watch a rewarded ad for a free undo. Both routes count toward the same turn and match limits.</p>
+        <div class="panel-actions col">
+          <button id="btn-undo-coins" class="btn primary" aria-describedby="undo-choice-status">Undo for 25 coins</button>
+          <button id="btn-undo-ad-choice" class="btn rewarded-btn" aria-describedby="undo-choice-status">Watch rewarded ad (free)</button>
+          <button id="btn-undo-cancel" class="btn plate">Keep the roll</button>
+        </div>
+        <p id="undo-choice-status" class="note tiny undo-choice-status" role="status" aria-live="polite" aria-atomic="true">Current match limits apply to both choices.</p>
       </div>
     </div>
 
@@ -394,7 +409,7 @@
     <div id="skins" class="overlay hidden">
       <div class="panel wide">
         <div class="panel-head"><h3>Skins</h3><div class="coins"><span class="coin-ico"></span><span class="coins-val">0</span></div><button class="icon-btn close" data-close="skins" aria-label="Close">✕</button></div>
-        <p class="note">Cosmetic only. Earn coins by finishing matches. Coins can't be bought, bet or cashed out.</p>
+        <p class="note">Earn offline coins by finishing matches. Coins unlock cosmetic skins and can pay for Mystery Tiles undo; they can't be bought, bet or cashed out.</p>
         <div class="tabs" id="skin-tabs"><button data-tab="boards" class="on">Boards</button><button data-tab="dice">Dice</button></div>
         <div id="skin-grid" class="skin-grid"></div>
       </div>
@@ -423,12 +438,13 @@
             <li>After your first roll that is not a 6, move your chips one by one, in any order. Tap a chip, then a token. When only one move is possible it is played for you.</li>
             <li>Chips that can't be used (for example a 5 when every token is in base) are dropped.</li>
             <li><b>Classic style</b>: you move each roll before rolling again; a 6 still gives another roll after moving.</li>
-            <li><b>Undo dice roll</b>: for about 2 seconds after your roll you can undo it and roll again. 3 free undos per match; after that, an optional ad gives one more. You can switch undo off in Settings.</li>
+            <li><b>Undo dice roll</b>: for about 2 seconds after your roll, Classic and Lucky Chaos allow 3 free undos per match; after that, an optional ad gives one more. Mystery Tiles uses the separate 25-coin or free-ad rules on its tab. You can switch undo off in Settings.</li>
             <li><b>Turn timer</b> (optional, off by default): if time runs out the game rolls or moves for you.</li>
           </ul>
         </div>
         <div class="rules-page hidden" data-page="mystery">
-          <p class="note">Mystery Tiles is a Crossfour mode with 8 special tiles on the track. End a move on one to spin its wheel. A tile rests for two rounds after it has been used. There's no entry fee or stake: every match is free and coins are cosmetic.</p>
+          <p class="note">Mystery Tiles is a Crossfour mode with 8 special tiles on the track. End a move on one to spin its wheel. A tile rests for two rounds after it has been used. There is no entry fee or stake. Offline coins can be used for this mode's undo action; they cannot be bought or cashed out.</p>
+          <p class="note"><b>Undo limits:</b> each successful undo costs 25 offline coins or one free rewarded-ad claim. Both routes count toward a maximum of 6 successful undos per match and 2 per turn; no more than 2 may use ads. If you do not have 25 coins and the ad route is capped or unavailable, undo is disabled. Counts persist when you reload or continue; undoing a roll does not refresh the turn allowance.</p>
           <div class="ev-head"><span class="tile-ico boost">?</span><b>Boost wheel</b><small>always helpful</small></div>
           <div class="ev-list" id="ev-boost"></div>
           <div class="ev-head"><span class="tile-ico chaos">!</span><b>Chaos wheel</b><small>high risk, high reward</small></div>
@@ -509,6 +525,7 @@
   <script src="js/save-store.js"></script>
   <script src="js/dice-gesture.js"></script>
   <script src="js/path-animation.js"></script>
+  <script src="js/mystery-undo.js"></script>
   <script src="js/game.js"></script>
   <script src="js/community-fixtures.js"></script>
   <script src="js/community.js"></script>

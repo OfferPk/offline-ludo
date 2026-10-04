@@ -1,7 +1,7 @@
 /* Crossfour - offline Ludo. UI, per-player dice, stacked rolls, Mystery Tiles, AI turns, chat, persistence, skins, ads hooks. */
 (function () {
   'use strict';
-  var L = window.LudoLogic, SK = window.SKINS, CFG = window.ADS_CONFIG || {}, ART = window.ART;
+  var L = window.LudoLogic, SK = window.SKINS, CFG = window.ADS_CONFIG || {}, ART = window.ART, MysteryUndo = window.MysteryUndo;
   var SFX = window.SFX, Ads = window.Ads;
   var $ = function (id) { return document.getElementById(id); };
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
@@ -80,6 +80,7 @@
     } else if (st.lk !== null) return false;
     if (!isInt(g.view, 0, 3) || !isInt(g.undoLeft, 0, 3) || !isCount(g.coins) || !isCount(g.xp) ||
         typeof g.doubled !== 'boolean' || typeof g.counted !== 'boolean' || !isCount(g.started)) return false;
+    if (st.mode === 'mystery' && Object.prototype.hasOwnProperty.call(g, 'mysteryUndo') && !MysteryUndo.valid(g.mysteryUndo, st.turnCount)) return false;
     return true;
   }
   function normalizeSeat(x) {
@@ -128,6 +129,11 @@
     });
     if (validGame(raw.game)) {
       s.game = JSON.parse(JSON.stringify(raw.game));
+      if (s.game.mode === 'mystery') {
+        s.game.mysteryUndo = MysteryUndo.normalize(s.game.mysteryUndo, s.game.st.turnCount);
+        s.game.undoLeft = 0;
+      }
+      else delete s.game.mysteryUndo;
       delete s.game.timerTk; delete s.game.actor; s.game.undo = null; s.game.sel = null;
       s.game.st.moves = s.game.st.phase === 'move' ? L.queueMoves(s.game.st) : [];
     } else s.game = null;
@@ -190,6 +196,7 @@
   persist();
 
   var G = validGame(save.game) ? save.game : null;
+  var mysteryUndoChoice = null;
   if (!G) save.game = null;
   if (G) {
     G.undo = null; G.sel = null; delete G.timerTk; delete G.actor;
@@ -436,7 +443,7 @@
   function layout() {
     var stage = $('stage'); if (!stage || $('game').classList.contains('hidden')) return;
     var r = stage.getBoundingClientRect();
-    var podH = 58, tool = 46;
+    var podH = 58, tool = 46 + (G && G.st.mode === 'mystery' ? 70 : 0);
     var w = Math.min(r.width - 12, 560), h = r.height - (podH * 2 + tool + 6 * 3 + 4);
     var bs = Math.floor(Math.max(210, Math.min(w, h)));
     BS = bs; CELL = bs / 15;
@@ -449,7 +456,7 @@
   var runToken = 0, timers = [], busy = false, paused = false, keyboardRoll = false;
   var autoRollTk = null, autoRollKey = null, autoRollDeadline = 0, autoRollRemaining = null;
   function later(fn, ms) { var tk = runToken; var id = setTimeout(function () { var k = timers.indexOf(id); if (k >= 0) timers.splice(k, 1); if (tk === runToken) fn(); }, ms); timers.push(id); return id; }
-  function cancelFlow() { stopAutoRollTimer(false); runToken++; timers.forEach(clearTimeout); timers = []; Object.keys(activeMotions).forEach(function (id) { var motion = activeMotions[id]; if (motion && motion.cancel) motion.cancel(); }); activeMotions = {}; moving = {}; busy = false; keyboardRoll = false; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
+  function cancelFlow() { clearMysteryUndoChoice(); stopAutoRollTimer(false); runToken++; timers.forEach(clearTimeout); timers = []; Object.keys(activeMotions).forEach(function (id) { var motion = activeMotions[id]; if (motion && motion.cancel) motion.cancel(); }); activeMotions = {}; moving = {}; busy = false; keyboardRoll = false; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
   function gameVisible() { return !$('game').classList.contains('hidden') && document.visibilityState === 'visible'; }
   function humans(st) { return st.players.filter(function (s) { return st.seats[s].type === 'human'; }); }
   function hasAI(st) { return st.players.some(function (s) { return st.seats[s].type === 'ai'; }); }
@@ -457,6 +464,66 @@
   function nameOf(s) { var st = G.st; if (st.seats[s].type === 'human' && humans(st).length === 1) return 'You'; return NAMES[s]; }
   function levelOf(s) { var pl = G.st.seats[s]; return pl.type === 'human' ? (humans(G.st).length === 1 ? 'Lv ' + L.levelFromXp(save.xp).level : 'P' + (humans(G.st).indexOf(s) + 1)) : LEVEL_NAMES[pl.level]; }
   function undoActive() { return !!(G && G.undo && G.undo.until > Date.now()); }
+  function commitMysteryTurnAdvance(replacingUndo) {
+    if (!G || G.mode !== 'mystery' || !G.mysteryUndo || (G.undo && !replacingUndo)) return false;
+    return MysteryUndo.advance(G.mysteryUndo, G.st.turnCount);
+  }
+  function mysteryUndoRoutes() {
+    if (!G || G.mode !== 'mystery' || !G.mysteryUndo) return { coin: false, ad: false, any: false, blocked: '' };
+    var undo = G.undo, turnId = undo ? undo.snap.turnCount : G.st.turnCount;
+    var common = undo ? MysteryUndo.reason(G.mysteryUndo, turnId, false) : '';
+    var adLimit = undo ? MysteryUndo.reason(G.mysteryUndo, turnId, true) : '';
+    var coinBalance = save.coins, coinUnavailable = coinBalance < MysteryUndo.COIN_COST ? 'Need ' + MysteryUndo.COIN_COST + ' coins; current balance is ' + coinBalance + '.' : '';
+    var adUnavailable = undo && undo.adUnavailable ? 'A rewarded ad is unavailable for this roll.' : '';
+    var pending = !!(undo && undo.pending);
+    var active = !!undoActive();
+    var coin = active && !pending && !common && !coinUnavailable;
+    var ad = active && !pending && !adLimit && !adUnavailable;
+    var blocked = common || (pending ? 'A rewarded ad is in progress.' : !coin && !ad ? [coinUnavailable, adLimit || adUnavailable].filter(Boolean).join(' ') : '');
+    return { coin: coin, ad: ad, any: coin || ad, blocked: blocked, coinReason: common || coinUnavailable, adReason: common || adLimit || adUnavailable, balance: coinBalance };
+  }
+  function clearMysteryUndoChoice() {
+    mysteryUndoChoice = null;
+    hide('undo-choice');
+  }
+  function renderMysteryUndoChoice() {
+    var ref = mysteryUndoChoice;
+    if (!ref) return;
+    if (G !== ref.match || !G.undo || G.undo !== ref.undo) { dismissMysteryUndoChoice(); return; }
+    if (!undoActive() && !ref.undo.pending) { dismissMysteryUndoChoice(); return; }
+    var routes = mysteryUndoRoutes(), pending = !!ref.undo.pending;
+    var coin = $('btn-undo-coins'), ad = $('btn-undo-ad-choice'), cancel = $('btn-undo-cancel');
+    coin.disabled = !routes.coin || pending;
+    coin.setAttribute('aria-label', routes.coin ? 'Undo this roll for 25 coins. Current balance ' + routes.balance + ' coins.' : 'Coin undo unavailable. ' + (routes.coinReason || 'The undo is not available.'));
+    coin.title = routes.coin ? 'Spend 25 coins' : routes.coinReason || 'Undo unavailable';
+    ad.disabled = !routes.ad || pending;
+    ad.setAttribute('aria-label', routes.ad ? 'Use one free rewarded ad to undo this roll.' : 'Rewarded-ad undo unavailable. ' + (routes.adReason || 'The undo is not available.'));
+    ad.title = routes.ad ? 'Free rewarded ad; counts toward the 2 ad claims per match limit' : routes.adReason || 'Ad undo unavailable';
+    cancel.disabled = pending;
+    var detail = 'Wallet: ' + routes.balance + ' coins. ' + (routes.coin ? 'Coin route available: 25 coins.' : 'Coin route unavailable: ' + (routes.coinReason || 'undo unavailable') + ' ') +
+      (routes.ad ? 'Free ad route available.' : 'Ad route unavailable: ' + (routes.adReason || 'undo unavailable'));
+    if (pending) detail = 'Rewarded ad in progress. No coins or undo counters are committed until the undo succeeds.';
+    $('undo-choice-status').textContent = detail;
+  }
+  function focusMysteryUndoChoiceRoute() {
+    var routes = mysteryUndoRoutes();
+    var first = routes.coin ? $('btn-undo-coins') : routes.ad ? $('btn-undo-ad-choice') : $('btn-undo-cancel');
+    if (first && !first.disabled) first.focus(); else $('undo-choice-panel').focus();
+  }
+  function openMysteryUndoChoice() {
+    if (!G || G.mode !== 'mystery' || !undoActive() || busy || paused || (G.undo && G.undo.pending)) return;
+    var routes = mysteryUndoRoutes();
+    if (!routes.any) { render(); toast(routes.blocked || 'Undo is unavailable.', 2600); return; }
+    SFX.click();
+    mysteryUndoChoice = { match: G, undo: G.undo };
+    paused = true;
+    show('undo-choice'); render(); renderMysteryUndoChoice(); focusMysteryUndoChoiceRoute();
+  }
+  function dismissMysteryUndoChoice() {
+    if (mysteryUndoChoice && mysteryUndoChoice.undo.pending) return;
+    clearMysteryUndoChoice(); paused = false; render(); advance();
+    if (G && $('game').classList.contains('hidden') === false) $('btn-undo').focus();
+  }
 
   var forced = [], forcedEvents = [], forcedMega = []; // test hooks
   function chipMoves(v) { return G.st.moves.filter(function (m) { return m.v === v; }); }
@@ -618,9 +685,31 @@
     var u = $('btn-undo'), showU = save.settings.undo && humans(st).length > 0 && !over;
     u.classList.toggle('hidden', !showU);
     var act = undoActive();
-    u.disabled = !act; u.classList.toggle('live', act);
-    $('undo-label').textContent = G.undoLeft > 0 ? 'Undo (' + G.undoLeft + ')' : 'Undo';
-    $('undo-ad').classList.toggle('hidden', G.undoLeft > 0);
+    var limitNote = $('undo-limit-note'), mysteryUndo = st.mode === 'mystery' && G.mysteryUndo;
+    if (mysteryUndo) {
+      var undoTurnId = G.undo ? G.undo.snap.turnCount : st.turnCount;
+      var remaining = MysteryUndo.remaining(mysteryUndo, undoTurnId);
+      var routes = mysteryUndoRoutes();
+      var blocked = act && !routes.any ? routes.blocked : '';
+      var noteText = 'Mystery undo: 25 coins or a free rewarded ad · Wallet ' + routes.balance + ' coins · Match ' + remaining.total + ' left · Turn ' + remaining.turn + ' left · Ads ' + remaining.ad + ' left.';
+      if (blocked) noteText += ' Undo disabled: ' + blocked;
+      else if (G.undo && G.undo.pending) noteText += ' Rewarded ad in progress.';
+      limitNote.textContent = noteText; limitNote.classList.toggle('hidden', !showU);
+      u.disabled = !act || busy || !!(G.undo && G.undo.pending) || !!mysteryUndoChoice || !routes.any;
+      u.classList.toggle('live', act && !u.disabled);
+      $('undo-label').textContent = blocked ? 'Undo limited' : 'Undo · 25 coins';
+      $('undo-ad').classList.toggle('hidden', !act || !routes.ad);
+      u.setAttribute('aria-label', blocked ? 'Undo dice roll unavailable: ' + blocked : 'Undo dice roll. Choose 25 coins or a free rewarded ad. ' + noteText);
+      u.setAttribute('aria-describedby', 'undo-limit-note');
+      u.title = blocked || noteText;
+    } else {
+      limitNote.textContent = ''; limitNote.classList.add('hidden');
+      u.disabled = !act; u.classList.toggle('live', act);
+      $('undo-label').textContent = G.undoLeft > 0 ? 'Undo (' + G.undoLeft + ')' : 'Undo';
+      $('undo-ad').classList.toggle('hidden', G.undoLeft > 0);
+      u.setAttribute('aria-label', 'Undo dice roll'); u.removeAttribute('aria-describedby'); u.removeAttribute('title');
+    }
+    if (isOpen('undo-choice')) renderMysteryUndoChoice();
     updateTutorial();
   }
   function clearHighlights() { each(document.querySelectorAll('.pc.can'), function (e) { e.classList.remove('can'); }); }
@@ -700,6 +789,7 @@
   function advance() {
     if (!G) return;
     var st = G.st;
+    commitMysteryTurnAdvance();
     render(); persist();
     if (st.phase === 'over') { later(finishMatch, 800); return; }
     if (paused || tutorial.intro || !gameVisible() || busy) return;
@@ -754,6 +844,7 @@
       if (human) { stopTimer(); openPicker(); return; }
       chosen = L.chooseDieValue(st, s, st.seats[s].level);
     }
+    commitMysteryTurnAdvance(true);
     busy = true; clearHighlights(); stopTimer();
     var snap = human && save.settings.undo ? L.clone(st) : null;
     G.undo = null;
@@ -762,7 +853,11 @@
     render(); persist();
     animateDice(s, r.raw, function () {
       busy = false;
-      if (snap) { G.undo = { snap: snap, until: Date.now() + UNDO_MS, seat: s }; startUndoBar(); later(expireUndo, UNDO_MS + 30); }
+      if (snap) {
+        G.undo = { snap: snap, until: Date.now() + UNDO_MS, seat: s };
+        if (G.mode === 'mystery') G.undo.pending = false;
+        startUndoBar(); later(expireUndo, UNDO_MS + 30);
+      }
       if (r.doubled) { var pc = podEl(s), pr = pc.getBoundingClientRect(), br = $('board-wrap').getBoundingClientRect(); floatAt(pr.left + pr.width / 2 - br.left, slotOf(s) < 2 ? 8 : BS - 8, '×2 → ' + r.value); }
       if (r.forfeit) {
         SFX.forfeit(); haptic('warn');
@@ -782,28 +877,91 @@
   function expireUndo() {
     if (!G || !G.undo || G.undo.hold) return;
     if (G.undo.until > Date.now()) { later(expireUndo, G.undo.until - Date.now() + 20); return; }
-    G.undo = null; render(); if (!busy) advance();
+    var choiceWasOpen = !!(mysteryUndoChoice && mysteryUndoChoice.undo === G.undo);
+    G.undo = null;
+    if (choiceWasOpen) { clearMysteryUndoChoice(); paused = false; }
+    commitMysteryTurnAdvance(); render(); if (!busy) advance();
   }
-  function closeUndo() { if (G) G.undo = null; }
-  function applyUndo() {
-    var u = G.undo; if (!u) return;
+  function closeUndo() { if (G) G.undo = null; clearMysteryUndoChoice(); }
+  function applyUndo(source, expected) {
+    var u = G && G.undo; if (!u) return false;
+    var mystery = G.mode === 'mystery', undoTurnId = u.snap.turnCount;
+    if (expected && (G !== expected.match || u !== expected.undo)) return false;
+    var transaction = null;
+    if (mystery) {
+      if (!expected || (source !== 'coins' && source !== 'ad')) return false;
+      transaction = MysteryUndo.commit(G.mysteryUndo, undoTurnId, source, save.coins);
+      if (!transaction) return false;
+    }
+    var adBased = source === true || source === 'ad';
     var rng = G.st.rng;
     cancelFlow(); paused = false;
     G.st = u.snap; G.st.rng = rng; // keep the random stream moving: the re-roll is a fresh roll
-    G.undo = null; save.game = G;
+    G.undo = null;
+    if (mystery) {
+      G.mysteryUndo = transaction.counters;
+      if (source === 'coins') save.coins = transaction.coins;
+    }
+    save.game = G;
+    if (mystery) { setCoins(); persist(); }
     buildPods(); layoutPieces(true); SFX.undo(); haptic('light');
-    toast(G.undoLeft > 0 ? 'Roll undone: roll again (' + G.undoLeft + ' free left)' : 'Roll undone: roll again', 1300);
+    if (mystery) {
+      var remaining = MysteryUndo.remaining(G.mysteryUndo, undoTurnId);
+      toast('Roll undone' + (source === 'coins' ? ' · 25 coins spent' : ' · ad undo') + ' · ' + remaining.total + ' match · ' + remaining.turn + ' this turn · ' + remaining.ad + ' ad claims left', 2400);
+    } else toast(G.undoLeft > 0 ? 'Roll undone: roll again (' + G.undoLeft + ' free left)' : 'Roll undone: roll again', 1300);
     advance();
+    return true;
+  }
+  function selectMysteryUndo(source) {
+    var ref = mysteryUndoChoice;
+    if (!ref || G !== ref.match || !G.undo || G.undo !== ref.undo || !undoActive() || G.undo.pending) return false;
+    var routes = mysteryUndoRoutes();
+    if (source === 'coins') {
+      if (!routes.coin) { render(); renderMysteryUndoChoice(); return false; }
+      return applyUndo('coins', ref);
+    }
+    if (source !== 'ad' || !routes.ad) { render(); renderMysteryUndoChoice(); return false; }
+    var match = G, undo = G.undo, rewarded = false, noFill = false;
+    undo.pending = true; undo.adUnavailable = false;
+    if (!undo.choiceHoldUntil) undo.choiceHoldUntil = Date.now() + 600000;
+    undo.hold = true; undo.until = undo.choiceHoldUntil; paused = true;
+    render();
+    Ads.showRewarded(function () {
+      if (rewarded || G !== match || G.undo !== undo || !undo.pending) return;
+      rewarded = true;
+      if (!applyUndo('ad', ref) && G === match && G.undo === undo) {
+        undo.pending = false; undo.hold = false; undo.adUnavailable = true; paused = true;
+        render(); focusMysteryUndoChoiceRoute(); toast('Undo could not be committed; no coin or undo count was charged.', 2600);
+        later(expireUndo, Math.max(20, undo.until - Date.now() + 20));
+      }
+    }, function () {
+      noFill = true;
+      if (G === match && G.undo === undo) { undo.adUnavailable = true; render(); }
+      toast('No ad available right now. You were not charged.', 2400);
+    }).then(function () {
+      if (!rewarded && G === match && G.undo === undo && undo.pending) {
+        undo.pending = false; undo.hold = false; undo.adUnavailable = noFill;
+        undo.until = undo.choiceHoldUntil || Date.now() + UNDO_MS; paused = true;
+        render();
+        focusMysteryUndoChoiceRoute();
+        if (!noFill) toast('The ad did not grant an undo. No coin or limit was charged.', 2400);
+        later(expireUndo, Math.max(20, undo.until - Date.now() + 20));
+      }
+    });
+    return true;
   }
   function undoRoll() {
     if (!G || !undoActive() || busy) return;
+    var mystery = G.mode === 'mystery';
+    if (mystery) { openMysteryUndoChoice(); return; }
+    if (paused) return;
     SFX.click();
-    if (G.undoLeft > 0) { G.undoLeft--; applyUndo(); return; }
+    if (G.undoLeft > 0) { G.undoLeft--; applyUndo(false); return; }
     // no free undos left: an optional rewarded ad (player's tap) gives one more
-    G.undo.hold = true; G.undo.until = Date.now() + 600000; paused = true;
-    var rewarded = false;
+    var match = G, undo = G.undo, rewarded = false;
+    undo.hold = true; undo.until = Date.now() + 600000; paused = true;
     Ads.showRewarded(function () {
-      rewarded = true; applyUndo();
+      rewarded = true; applyUndo(true);
     }, function () { toast('No ad available right now. Try again later.'); }).then(function () {
       if (!rewarded) { paused = false; if (G) G.undo = null; render(); advance(); }
     });
@@ -1149,7 +1307,8 @@
     tutorial.active = offerTutorial === true && mode === 'classic' && !tutorialSeen();
     tutorial.intro = tutorial.active; tutorial.firstMove = false;
     var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
-    G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now() };
+    G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: st.mode === 'mystery' ? 0 : FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now() };
+    if (st.mode === 'mystery') G.mysteryUndo = MysteryUndo.create(st.turnCount);
     save.game = G; persist();
     spins = [0, 0, 0, 0];
     showGame();
@@ -1488,6 +1647,9 @@
     if (best && bd < CELL * 1.6) { SFX.unlock(); doMove(best.piece, best.v); }
   });
   $('btn-undo').addEventListener('click', undoRoll);
+  $('btn-undo-coins').addEventListener('click', function () { SFX.click(); selectMysteryUndo('coins'); });
+  $('btn-undo-ad-choice').addEventListener('click', function () { SFX.unlock(); SFX.click(); selectMysteryUndo('ad'); });
+  $('btn-undo-cancel').addEventListener('click', function () { SFX.click(); dismissMysteryUndoChoice(); });
   $('btn-chat').addEventListener('click', function () { SFX.click(); if (isOpen('chat')) hide('chat'); else show('chat'); });
   $('btn-home').addEventListener('click', function () { SFX.click(); hide('chat'); openMenu(); });
   $('btn-m-resume').addEventListener('click', function () { SFX.click(); resumeFromMenu(); });
@@ -1539,6 +1701,17 @@
     });
   });
   document.addEventListener('keydown', function (e) {
+    if (isOpen('undo-choice')) {
+      if (e.key === 'Escape') { e.preventDefault(); dismissMysteryUndoChoice(); return; }
+      if (e.key === 'Tab') {
+        var undoButtons = document.querySelectorAll('#undo-choice button:not([disabled])');
+        if (!undoButtons.length) { e.preventDefault(); $('undo-choice-panel').focus(); return; }
+        var firstUndoButton = undoButtons[0], lastUndoButton = undoButtons[undoButtons.length - 1];
+        if (e.shiftKey && document.activeElement === firstUndoButton) { e.preventDefault(); lastUndoButton.focus(); }
+        else if (!e.shiftKey && document.activeElement === lastUndoButton) { e.preventDefault(); firstUndoButton.focus(); }
+      }
+      return;
+    }
     if (tutorial.intro && e.key === 'Escape') { e.preventDefault(); closeTutorial(); return; }
     if (tutorial.intro && e.key === 'Tab') {
       var dialogButtons = document.querySelectorAll('#tutorial-intro button:not([disabled])');
@@ -1559,7 +1732,14 @@
     } else if (e.key === 'u' || e.key === 'U') undoRoll();
   });
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState !== 'visible') { if (G) { cancelFlow(); stopTimer(); layoutPieces(true); persist(); } }
+    if (document.visibilityState !== 'visible') {
+      if (G) {
+        var routeOpen = !!mysteryUndoChoice;
+        var adPending = !!(routeOpen && G === mysteryUndoChoice.match && G.undo === mysteryUndoChoice.undo && G.undo.pending);
+        if (!adPending) { cancelFlow(); if (routeOpen) paused = false; }
+        stopTimer(); layoutPieces(true); persist();
+      }
+    }
     else if (G && !$('game').classList.contains('hidden') && !paused && !isOpen('result')) { layoutPieces(true); render(); advance(); }
   });
   window.addEventListener('resize', layout);

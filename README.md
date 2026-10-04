@@ -25,8 +25,8 @@ Full rules: **[RULES.md](RULES.md)** (also in the game under **Rules**). In shor
 - **Star style (default):** a 6 gives another roll straight away; rolls stack as **dice chips** (e.g. 6, 6, 3). After the non-6 roll you tap a chip, then a token (auto when only one move is possible). **Three 6s in a row forfeit the whole turn.** A **capture** and a token **reaching home** each give a bonus roll.
 - 6 to leave base, exact roll to reach home, safe start and star squares.
 - **House rules** in Settings: Star style vs **Classic** (move each 6 before rolling again), safe squares, **capture to enter home**, **blocks**, capture/home bonus rolls.
-- **Undo dice roll:** about 2 s after your roll, 3 free per match; one more only via an optional rewarded ad that the player taps.
-- Finishing a match earns cosmetic **coins** and **XP/levels**. Coins only unlock board and dice skins; they can't be bought, bet, wagered or cashed out. There are no purchases and no entry fees.
+- **Undo dice roll:** Classic and Lucky Chaos retain 3 free undos per match, then an optional player-tapped rewarded ad. In Mystery Tiles, each undo costs 25 offline coins or one free rewarded-ad claim; the shared limits are 6 total, 2 per turn, and 2 ad-based per match.
+- Finishing a match earns offline **coins** and **XP/levels**. Coins unlock board and dice skins and can pay for Mystery Tiles undo; they can't be bought, bet, wagered or cashed out. There are no purchases and no entry fees.
 
 ## Modes
 

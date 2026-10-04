@@ -90,9 +90,10 @@ t('game.js asks for an interstitial in exactly one place: leaving the match-resu
 t('the session counter is bumped once at boot', () => { assert.strictEqual((game.match(/gate\.sessionStarted\(\)/g) || []).length, 1); });
 t('matchCompleted is counted in one place (match end)', () => { assert.strictEqual((game.match(/gate\.matchCompleted\(\)/g) || []).length, 1); });
 t('rewarded ads only from the Undo-roll and 2x-coins buttons (player taps)', () => {
-  const calls = game.match(/Ads\.showRewarded\(/g) || []; assert.strictEqual(calls.length, 2);
-  assert.ok(/function undoRoll[\s\S]{0,600}Ads\.showRewarded\(/.test(game)); assert.ok(/function doubleCoins[\s\S]{0,600}Ads\.showRewarded\(/.test(game));
-  assert.ok(/btn-undo'\)\.addEventListener\('click', undoRoll\)/.test(game) && /btn-r-double'\)\.addEventListener\('click', doubleCoins\)/.test(game));
+  const calls = game.match(/Ads\.showRewarded\(/g) || []; assert.strictEqual(calls.length, 3);
+  assert.ok(/function undoRoll[\s\S]{0,1200}Ads\.showRewarded\(/.test(game)); assert.ok(/function doubleCoins[\s\S]{0,600}Ads\.showRewarded\(/.test(game));
+  assert.ok(/function selectMysteryUndo[\s\S]{0,2500}Ads\.showRewarded\(/.test(game));
+  assert.ok(/btn-undo'\)\.addEventListener\('click', undoRoll\)/.test(game) && /btn-undo-ad-choice'\)\.addEventListener\('click', function \(\) \{[^}]*selectMysteryUndo\('ad'\)/.test(game) && /btn-r-double'\)\.addEventListener\('click', doubleCoins\)/.test(game));
 });
 t('no billing anywhere in the app', () => {
   const pkg = fs.readFileSync(__dirname + '/../package.json', 'utf8'); const man = fs.readFileSync(__dirname + '/../android/app/src/main/AndroidManifest.xml', 'utf8');
