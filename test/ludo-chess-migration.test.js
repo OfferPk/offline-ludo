@@ -8,6 +8,7 @@ const migrations = fs.readdirSync(path.join(root, 'supabase/migrations'));
 const name = migrations.find(file => /_ludo_chess\.sql$/.test(file));
 assert.ok(name, 'Ludo Chess migration exists');
 const sql = read('supabase/migrations/' + name);
+const repetitionSql = read('supabase/migrations/20261005011600_chess_repetition_en_passant.sql');
 const online = read('www/js/online.js');
 const html = read('www/index.html');
 let checks = 0;
@@ -32,6 +33,9 @@ ok(/p_expected_version <> v_version[\s\S]*?private\.ludo_chess_legal/i.test(move
 ok(/primary key \(room_id, action_id\)/i.test(read('supabase/migrations/20261004100500_online_authoritative_match.sql')) && /v_existing\.actor_id <> v_user or v_existing\.request <> v_request/i.test(moveBody), 'Chess actions reuse actor- and payload-bound idempotency');
 ok(/en.passant/i.test(sql) && /castling/i.test(sql) && /p_promotion/i.test(sql) && /checkmate/i.test(sql) && /stalemate/i.test(sql), 'server rules cover en passant, castling, promotion, checkmate, and stalemate');
 ok(/draw_seventy_five_moves/i.test(sql) && /draw_fivefold_repetition/i.test(sql) && /draw_insufficient_material/i.test(sql) && /claimable/i.test(sql), 'server recognizes automatic and claimable standard draw conditions');
+ok(/private\.ludo_chess_legal\(p_state, v_from, v_ep, null\)/i.test(repetitionSql), 'server repetition identity preserves en-passant only when a legal capture is available');
+ok(/create or replace function private\.ludo_chess_normalize_position_key/i.test(repetitionSql) && /split_part/i.test(repetitionSql), 'server can normalize legacy repetition-history keys');
+ok((repetitionSql.match(/private\.ludo_chess_normalize_position_key\(h\.value\)\s*=\s*v_key/gi) || []).length === 2, 'draw claims and automatic fivefold detection both count normalized history keys');
 ok(/alter publication supabase_realtime add table public\.ludo_chess_matches/i.test(sql), 'Chess state is added to Realtime publication');
 ok(/table: 'ludo_chess_matches'/i.test(online) && /ludo_chess_move/i.test(online), 'the signed-in client subscribes to and acts on the Chess match table');
 ok(/value="ludo_chess"/i.test(html) && /online-chess-board/i.test(html), 'online lobby offers Chess and has a dedicated playable board');

@@ -24,7 +24,32 @@
   }
   function inside(row, col) { return row >= 0 && row < 8 && col >= 0 && col < 8; }
   function square(row, col) { return row * 8 + col; }
-  function positionKey(state) { return state.board + '|' + state.turn + '|' + (state.castling || '-') + '|' + (state.en_passant == null ? -1 : state.en_passant); }
+  function hasLegalEnPassant(state) {
+    if (!state || typeof state.board !== 'string' || state.board.length !== 64) return false;
+    var turn = Number(state.turn), target = Number(state.en_passant);
+    if ((turn !== 0 && turn !== 1) || !Number.isInteger(target) || target < 0 || target > 63) return false;
+    var targetRow = Math.floor(target / 8), targetCol = target % 8;
+    var fromRow = targetRow + (turn === 0 ? 1 : -1);
+    var pawn = turn === 0 ? 'P' : 'p';
+    for (var dc of [-1, 1]) {
+      var fromCol = targetCol + dc;
+      if (!inside(fromRow, fromCol)) continue;
+      var from = square(fromRow, fromCol);
+      if (state.board[from] === pawn && legalMoves(state, from).some(function (move) { return move.to === target && move.enPassant; })) return true;
+    }
+    return false;
+  }
+  function positionKey(state) {
+    var ep = hasLegalEnPassant(state) ? Number(state.en_passant) : -1;
+    return state.board + '|' + state.turn + '|' + (state.castling || '-') + '|' + ep;
+  }
+  function normalizePositionKey(key) {
+    var value = String(key), parts = value.split('|');
+    if (parts.length !== 4 || parts[0].length !== 64) return value;
+    var turn = Number(parts[1]), ep = Number(parts[3]);
+    if ((turn !== 0 && turn !== 1) || !Number.isInteger(ep)) return value;
+    return positionKey({ board: parts[0], turn: turn, phase: 'active', castling: parts[2] === '-' ? '' : parts[2], en_passant: ep });
+  }
   function cloneState(state) { return JSON.parse(JSON.stringify(state)); }
   function findKing(board, color) { return board.indexOf(color === 0 ? 'K' : 'k'); }
 
@@ -180,7 +205,7 @@
   }
   function repetitions(state) {
     var key = positionKey(state);
-    return (state.position_history || []).filter(function (item) { return item === key; }).length;
+    return (state.position_history || []).filter(function (item) { return normalizePositionKey(item) === key; }).length;
   }
   function finish(state, result, winner) {
     state.phase = 'over'; state.result = result; state.winner = winner == null ? null : winner;

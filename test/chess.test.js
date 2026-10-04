@@ -43,6 +43,7 @@ ep = move(ep, 52, 36); // e4
  ep = move(ep, 36, 28); // e5
  ep = move(ep, 11, 27); // ... d5
 ok(ep.en_passant === 19 && has(ep, 28, 19), 'en-passant capture is offered only on the immediately following turn');
+ok(Chess.positionKey(ep).endsWith('|19') && Chess.positionKey(Object.assign({}, ep, { en_passant: -1 })) !== Chess.positionKey(ep), 'a legal en-passant capture keeps positions distinct for repetition');
 ep = move(ep, 28, 19);
 ok(ep.board[19] === 'P' && ep.board[27] === '.' && ep.halfmove === 0, 'en-passant removes the captured pawn and resets the halfmove clock');
 
@@ -66,6 +67,18 @@ for (let cycle = 0; cycle < 2; cycle++) {
 }
 ok(Chess.repetitions(repetition) === 3 && Chess.canClaimDraw(repetition), 'threefold repetition permits a draw claim');
 ok(Chess.claimDraw(repetition).result === 'draw_threefold_claim', 'the current player can claim threefold repetition');
+let uncapturableEpRepetition = pos({ 4: 'k', 1: 'n', 60: 'K', 57: 'N', 52: 'P' });
+uncapturableEpRepetition = move(uncapturableEpRepetition, 52, 36); // e4; no black pawn can capture en passant
+const boardAfterE4 = uncapturableEpRepetition.board;
+uncapturableEpRepetition.position_history[1] = boardAfterE4 + '|1|-|44'; // legacy key recorded before en-passant normalization
+for (let cycle = 0; cycle < 2; cycle++) {
+  uncapturableEpRepetition = move(uncapturableEpRepetition, 1, 18);  // ... Nc6
+  uncapturableEpRepetition = move(uncapturableEpRepetition, 57, 42); // Nc3
+  uncapturableEpRepetition = move(uncapturableEpRepetition, 18, 1);  // ... Nb8
+  uncapturableEpRepetition = move(uncapturableEpRepetition, 42, 57); // Nb1
+}
+ok(uncapturableEpRepetition.board === boardAfterE4 && uncapturableEpRepetition.turn === 1, 'knight-return cycles restore the board and side to move after e4');
+ok(Chess.repetitions(uncapturableEpRepetition) === 3 && Chess.canClaimDraw(uncapturableEpRepetition), 'an unusable en-passant right does not hide a threefold repetition');
 const fiftyMove = Chess.initialState();
 fiftyMove.halfmove = 100;
 ok(Chess.canClaimDraw(fiftyMove) && Chess.claimDraw(fiftyMove).result === 'draw_fifty_move_claim', 'the 50-move rule allows a valid draw claim');
