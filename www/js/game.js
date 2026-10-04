@@ -236,6 +236,7 @@
     var acc = ACCENT[b.id] || ACCENT.graphite; r.setProperty('--accent', acc[0]); r.setProperty('--accent-ink', acc[1]);
     r.setProperty('--d-face', d.face); r.setProperty('--d-edge', d.edge); r.setProperty('--d-pip', d.pip);
     document.body.classList.toggle('light', !b.dark);
+    document.body.dataset.diceSkin = d.id;
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', b.bg);
   }
 
@@ -325,7 +326,7 @@
       el.innerHTML = '<div class="avatar"><svg class="tring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/></svg><span class="av">' + ART.avatar(pl.type) + '</span>' +
         (pl.type === 'ai' ? '<span class="lvtag">' + LEVEL_NAMES[pl.level].charAt(0) + '</span>' : '') + '<span class="lkb"></span></div>' +
         '<div class="pmeta"><b class="pname"></b><small class="plvl"></small><div class="chips"></div></div>' +
-        '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + ' (tap or swipe)">' + cubeHTML() + '<i class="roll-countdown" aria-hidden="true"></i><em class="boost-tag hidden"></em></button>' +
+        '<button class="pdice" aria-label="Roll the ' + dice().name + ' for ' + NAMES[s] + ' (tap or swipe)">' + cubeHTML() + '<i class="roll-countdown" aria-hidden="true"></i><em class="boost-tag hidden"></em></button>' +
         '<div class="bubble hidden"></div>';
       var die = el.querySelector('.pdice');
       window.DiceGesture.bind(die, function (e) {
@@ -1383,7 +1384,7 @@
         var cv = document.createElement('canvas'); cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', it.name + ' board preview');
         el.appendChild(cv); drawBoard(cv, 150, it, L.DEFAULT_RULES);
       } else {
-        var dp = document.createElement('div'); dp.className = 'dprev'; dp.setAttribute('role', 'img'); dp.setAttribute('aria-label', it.name + ' dice preview');
+        var dp = document.createElement('div'); dp.className = 'dprev'; dp.dataset.skin = it.id; dp.setAttribute('role', 'img'); dp.setAttribute('aria-label', it.name + ' dice preview');
         dp.style.background = it.face; dp.style.boxShadow = 'inset 0 -4px 0 ' + it.edge;
         dp.innerHTML = '<i></i><i></i><i></i>'; each(dp.children, function (pip) { pip.style.background = it.pip; }); el.appendChild(dp);
       }

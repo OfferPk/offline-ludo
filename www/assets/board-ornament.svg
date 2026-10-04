@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600" fill="none">
+  <defs>
+    <linearGradient id="glass" x1="25" y1="20" x2="575" y2="580" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#d8f5ff" stop-opacity=".82"/>
+      <stop offset=".48" stop-color="#fff" stop-opacity=".24"/>
+      <stop offset="1" stop-color="#ffd78a" stop-opacity=".72"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#glass)" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="5" y="5" width="590" height="590" rx="28" stroke-width="2.5" opacity=".76"/>
+    <rect x="13" y="13" width="574" height="574" rx="23" stroke-width="1.2" opacity=".46"/>
+    <path d="M78 20H31a11 11 0 0 0-11 11v47M522 20h47a11 11 0 0 1 11 11v47M20 522v47a11 11 0 0 0 11 11h47M580 522v47a11 11 0 0 1-11 11h-47" stroke-width="2.3" opacity=".72"/>
+    <path d="M28 92V72l44-44M572 92V72L528 28M28 508v20l44 44M572 508v20l-44 44" stroke-width="1.2" opacity=".45"/>
+    <path d="M269 8h62M592 269v62M269 592h62M8 269v62" stroke-width="1.4" opacity=".58"/>
+  </g>
+  <g stroke="url(#glass)" stroke-width="1.5" opacity=".72">
+    <path d="m30 20 10 10-10 10-10-10zM570 20l10 10-10 10-10-10zM30 560l10 10-10 10-10-10zM570 560l10 10-10 10-10-10z"/>
+    <path d="m300 2 6 7-6 7-6-7zM598 300l-7 6-7-6 7-6zM300 598l-6-7 6-7 6 7zM2 300l7-6 7 6-7 6z"/>
+  </g>
+  <g fill="#e6f7ff" opacity=".55">
+    <circle cx="53" cy="53" r="2"/><circle cx="547" cy="53" r="2"/>
+    <circle cx="53" cy="547" r="2"/><circle cx="547" cy="547" r="2"/>
+  </g>
+</svg>
