@@ -31,6 +31,11 @@
   var STAR_SQUARES = [8, 21, 34, 47];
   var ARROW_SQUARES = [4, 17, 30, 43]; // board number 4 on each side (absolute index 4, then +13). Not the old 2/7 squares.
   var ARROW_JUMP = 4; // land on arrow → advance exactly this many squares (no chaining)
+  // Danger (khatra) zone: the 3 track squares the jump passes THROUGH (between the arrow and the stop).
+  // Arrow 4 → 5, 6, 7 (stop on 8 = star). Visual only: a token sitting here can be captured by an arrow jump.
+  var ARROW_DANGER = ARROW_JUMP - 1;
+  var ARROW_DANGER_SQUARES = [];
+  ARROW_SQUARES.forEach(function (a) { for (var d = 1; d <= ARROW_DANGER; d++) ARROW_DANGER_SQUARES.push((a + d) % 52); });
   var DEFAULT_RULES = { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true, arrows: false, noCapture: false };
   var LEVELS = ['easy', 'medium', 'hard'];
   var MODES = ['classic', 'mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'];
@@ -1122,7 +1127,7 @@
   function clone(st) { return JSON.parse(JSON.stringify(st)); }
 
   return {
-    TRACK: TRACK, LAST_TRACK: LAST_TRACK, CIRCLE: CIRCLE, COL0: COL0, HOME: HOME, PIECES: PIECES, START_SQUARES: START_SQUARES, STAR_SQUARES: STAR_SQUARES, ARROW_SQUARES: ARROW_SQUARES, ARROW_JUMP: ARROW_JUMP,
+    TRACK: TRACK, LAST_TRACK: LAST_TRACK, CIRCLE: CIRCLE, COL0: COL0, HOME: HOME, PIECES: PIECES, START_SQUARES: START_SQUARES, STAR_SQUARES: STAR_SQUARES, ARROW_SQUARES: ARROW_SQUARES, ARROW_JUMP: ARROW_JUMP, ARROW_DANGER: ARROW_DANGER, ARROW_DANGER_SQUARES: ARROW_DANGER_SQUARES,
     DEFAULT_RULES: DEFAULT_RULES, LEVELS: LEVELS, MODES: MODES, BOOST_TILES: BOOST_TILES, CHAOS_TILES: CHAOS_TILES, WHEELS: WHEELS, EVENT_INFO: EVENT_INFO,
     TRACK_CELLS: TRACK_CELLS, HOME_COLS: HOME_COLS, BASE_SPOTS: BASE_SPOTS, HOME_SPOTS: HOME_SPOTS, rot: rot,
     cellOf: cellOf, absOf: absOf, posFromAbs: posFromAbs, onTrack: onTrack, isSafeAbs: isSafeAbs, advance: advance, rngNext: rngNext, rollDie: rollDie,

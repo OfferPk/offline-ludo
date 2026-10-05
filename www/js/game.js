@@ -409,11 +409,39 @@
         ctx.restore();
       }
     }
+    // Arrow danger (khatra) cells: permanent red on the 3 squares each arrow jump passes through.
+    var DANGER_FILL = '#d23a30', DANGER_EDGE = '#7c1610';
+    function dangerMark(rc, cx, cy) {
+      var x = rc[1] * c + gap / 2, y = rc[0] * c + gap / 2, w = c - gap, h = c - gap;
+      ctx.save();
+      rr(ctx, x, y, w, h, c * 0.16); ctx.clip();
+      // top-lit sheen so the red reads as a lacquered tile on wood / felt / dark themes
+      var dg = ctx.createLinearGradient(x, y, x, y + h);
+      dg.addColorStop(0, 'rgba(255,140,120,.42)'); dg.addColorStop(0.5, 'rgba(255,90,70,0)'); dg.addColorStop(1, 'rgba(60,0,0,.28)');
+      ctx.fillStyle = dg; ctx.fillRect(x, y, w, h);
+      // faint diagonal hazard stripes
+      ctx.strokeStyle = 'rgba(90,0,0,.22)'; ctx.lineWidth = Math.max(1.2, c * 0.09);
+      for (var k = -2; k <= 3; k++) { ctx.beginPath(); ctx.moveTo(x + k * c * 0.34, y + h); ctx.lineTo(x + k * c * 0.34 + h, y); ctx.stroke(); }
+      ctx.restore();
+      // small warning triangle with "!" (khatra)
+      ctx.save(); ctx.translate(cx, cy + c * 0.02);
+      var t = c * 0.2;
+      ctx.beginPath(); ctx.moveTo(0, -t); ctx.lineTo(t * 1.1, t * 0.78); ctx.lineTo(-t * 1.1, t * 0.78); ctx.closePath();
+      ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(1.3, c * 0.06);
+      ctx.fillStyle = 'rgba(255,244,236,.92)'; ctx.fill(); ctx.strokeStyle = 'rgba(90,8,4,.55)'; ctx.stroke();
+      ctx.fillStyle = '#9c1c14';
+      ctx.fillRect(-c * 0.022, -t * 0.42, c * 0.044, t * 0.68);
+      ctx.beginPath(); ctx.arc(0, t * 0.5, c * 0.03, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
     L.TRACK_CELLS.forEach(function (rc, a) {
       var startOf = L.START_SQUARES.indexOf(a), isStar = L.STAR_SQUARES.indexOf(a) >= 0;
+      var isDanger = !!(rules && rules.arrows && L.ARROW_DANGER_SQUARES && L.ARROW_DANGER_SQUARES.indexOf(a) >= 0 && startOf < 0 && !isStar);
       if (startOf >= 0) cell(rc, b.seats[startOf], alpha(mix(b.seats[startOf], 'b', 0.25), 0.55), true);
+      else if (isDanger) cell(rc, DANGER_FILL, DANGER_EDGE, true);
       else cell(rc, b.cell, b.cellEdge, true);
       var cx = (rc[1] + 0.5) * c, cy = (rc[0] + 0.5) * c;
+      if (isDanger) dangerMark(rc, cx, cy);
       if (startOf >= 0) {
         ctx.save(); ctx.translate(cx, cy);
         var nx = L.TRACK_CELLS[(a + 1) % 52]; ctx.rotate(Math.atan2(nx[0] - rc[0], nx[1] - rc[1]));
@@ -1647,7 +1675,7 @@
       lucky: 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.',
       quick: 'Quick Ludo: 2 tokens each on the normal board. Same rules (6 to leave base, exact home, safe squares) so matches finish much faster. 1 v 1 or more.',
       team: 'Team Ludo, 2v2. Partners sit opposite: Coral with Saffron, Jade with Cobalt. A team wins when both partners have every token home. You cannot capture your partner.',
-      arrow: 'Arrow Ludo: 1 starter token out. Exact land on amber arrow → jump +4. Passing over an arrow is normal movement.',
+      arrow: 'Arrow Ludo: 1 starter token out. Exact land on amber arrow → jump +4. The 3 red squares after each arrow are the danger zone: rivals there get hit by the jump. Passing over an arrow is normal movement.',
       friendly: 'Friendly: captures are off. It is a pure race home. The app stays 13+.'
     };
     $('mode-note').textContent = NOTES[setupMode] || 'Classic Ludo on a clean board.';
