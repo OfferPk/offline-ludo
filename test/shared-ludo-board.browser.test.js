@@ -79,8 +79,6 @@ function contrast(a, b) {
           document.body.classList.toggle('light', !theme.dark);
           window.__cf.layout();
         });
-        if (capture) await page.screenshot({ path: path.join(shotDir, capture), fullPage: false });
-
       const result = await page.evaluate(() => {
         const c = window.__cf, logic = c.logic, game = c.game;
         const canvas = document.getElementById('board'), context = canvas.getContext('2d');
@@ -104,6 +102,17 @@ function contrast(a, b) {
         const tokenBox = rect(token);
         const digit = document.querySelector('#pieces .gem-num');
         const badge = document.querySelector('#pieces .gem-num-disc');
+        const tokenTargets = [...document.querySelectorAll('#pieces .pc')].map(element => {
+          const box = rect(element), point = c.piecePoint(+element.dataset.seat, +element.dataset.piece);
+          return {
+            seat: +element.dataset.seat, piece: +element.dataset.piece,
+            width: box.width, height: box.height,
+            centerMatches: !!point && Math.abs(box.left + box.width / 2 - point.x) < 0.75 && Math.abs(box.top + box.height / 2 - point.y) < 0.75,
+            button: element.tagName === 'BUTTON', disabled: element.disabled,
+            label: element.getAttribute('aria-label'),
+            color: getComputedStyle(element).getPropertyValue('--pc').trim()
+          };
+        });
         return {
           mode: game.st.mode,
           players: game.st.players.length,
@@ -123,6 +132,7 @@ function contrast(a, b) {
           homeColor,
           tokenWidth: tokenBox.width,
           tokenHeight: tokenBox.height,
+          tokenTargets,
           cell: boardRect.width / 15,
           tokenNumberSize: parseFloat(getComputedStyle(digit).fontSize),
           tokenBadgeFill: getComputedStyle(badge).fill,
@@ -130,6 +140,29 @@ function contrast(a, b) {
           screenSize: [innerWidth, innerHeight]
         };
       });
+        if (width === 390 && entry.kind === 'ai' && entry.mode === 'classic') {
+          await page.evaluate(() => window.__cf.edit(st => {
+            st.turn = 0; st.phase = 'move'; st.queue = [3]; st.pieces[0][0] = 4;
+          }));
+          await page.waitForSelector('#game .pod[data-seat="0"] .chip-v[data-v="3"]');
+          const movable = await page.evaluate(() => {
+            const element = document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]'), box = element.getBoundingClientRect();
+            return { can: element.classList.contains('can'), turn: element.classList.contains('is-turn'), disabled: element.disabled, label: element.getAttribute('aria-label'), pointerEvents: getComputedStyle(element).pointerEvents, width: box.width };
+          });
+          result.movable = movable;
+          await page.click('#game .pod[data-seat="0"] .chip-v[data-v="3"]');
+          await new Promise(resolve => setTimeout(resolve, 180));
+          result.selected = await page.evaluate(() => {
+            const element = document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]'), box = element.getBoundingClientRect();
+            return { can: element.classList.contains('can'), selected: element.classList.contains('sel'), disabled: element.disabled, label: element.getAttribute('aria-label'), width: box.width, ring: getComputedStyle(element, '::before').boxShadow };
+          });
+          await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+          result.reducedMotion = await page.evaluate(() => {
+            const element = document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]');
+            return { ring: getComputedStyle(element, '::before').animationName, core: getComputedStyle(element.querySelector('.gem-core')).animationName };
+          });
+        }
+        if (capture) await page.screenshot({ path: path.join(shotDir, capture), fullPage: false });
         return result;
       } finally {
         await session.context.close();
@@ -158,14 +191,27 @@ function contrast(a, b) {
         ok(!board.podOverlap && board.podBounds && board.noDocumentOverflow, viewport.width + '×' + viewport.height + ': ' + entry.label + ' has no board/pod overlap or viewport overflow');
         ok(board.chessHidden, viewport.width + '×' + viewport.height + ': ' + entry.label + ' remains on Ludo, not the separate Chess board');
         ok(board.tokenWidth > board.cell * 0.75 && board.tokenWidth < board.cell * 0.77 && Math.abs(board.tokenWidth - board.tokenHeight) < 0.5, viewport.width + '×' + viewport.height + ': ' + entry.label + ' keeps the original token touch-target size');
-        ok(board.tokenNumberSize >= 7 && /rgba\(8, 14, 22, 0\.72\)/.test(board.tokenBadgeFill), viewport.width + '×' + viewport.height + ': ' + entry.label + ' exposes the higher-contrast token identity badge');
+        ok(board.tokenNumberSize >= 7.3 && /rgba\(7, 12, 20, 0\.82\)/.test(board.tokenBadgeFill), viewport.width + '×' + viewport.height + ': ' + entry.label + ' exposes the double-lipped high-contrast token identity badge');
+        ok(board.tokenTargets.length === board.pieceCount && board.tokenTargets.every(token => token.button && token.centerMatches && Math.abs(token.width / board.cell - 0.76) < 0.015 && Math.abs(token.height / board.cell - 0.76) < 0.015), viewport.width + '×' + viewport.height + ': ' + entry.label + ' preserves every token hitbox size and canvas hit-point center');
+        ok(board.tokenTargets.every(token => /token [1-4]/.test(token.label || '') && /in base|on the track|in home lane|home/.test(token.label || '')), viewport.width + '×' + viewport.height + ': ' + entry.label + ' exposes readable seat, number, and position labels');
+        if (board.movable) {
+          const base = board.tokenTargets.find(token => token.seat === 0 && token.piece === 0);
+          ok(board.movable.can && board.movable.turn && !board.movable.disabled && board.movable.pointerEvents === 'auto' && /movable, select to move/.test(board.movable.label), 'Classic exposes an enabled, labeled movable crystal token');
+          ok(Math.abs(board.movable.width / base.width - 1.05) < 0.025, 'movable-state emphasis preserves the original token hitbox scaling');
+          ok(board.selected.can && board.selected.selected && !board.selected.disabled && /select to move/.test(board.selected.label) && board.selected.ring !== 'none', 'selected token remains operable, labeled, and distinctly ringed: ' + JSON.stringify(board.selected));
+          ok(Math.abs(board.selected.width / base.width - 1.05) < 0.025, 'selected-state ring preserves the original movable-token hitbox scaling');
+          ok(board.reducedMotion.ring === 'none' && board.reducedMotion.core === 'none', 'reduced motion removes token ring and crystal-core animation');
+        }
         if (entry.mode === 'mystery' || entry.mode === 'lucky') ok(board.hasMysteryTiles, viewport.width + '×' + viewport.height + ': ' + entry.label + ' keeps tile effects in the separate overlay');
         if (!reference) reference = board;
         else {
           ok(Math.abs(board.board.width - reference.board.width) < 0.5 && Math.abs(board.board.height - reference.board.height) < 0.5, viewport.width + '×' + viewport.height + ': ' + entry.label + ' uses the same board geometry as Classic');
+          ok(board.tokenTargets.every(token => Math.abs(token.width / board.cell - reference.tokenTargets[0].width / reference.cell) < 0.015 && Math.abs(token.height / board.cell - reference.tokenTargets[0].height / reference.cell) < 0.015), viewport.width + '×' + viewport.height + ': ' + entry.label + ' matches Classic token hit-target dimensions');
           ok(contrast(board.safeContrast, board.normalTrack) >= 2.2, viewport.width + '×' + viewport.height + ': ' + entry.label + ' keeps safe-space markings distinct from ordinary track');
         }
         if (entry.mode === 'classic' && entry.kind === 'ai') {
+          const playerColors = board.tokenTargets.filter(token => token.piece === 0).map(token => token.color);
+          ok(new Set(playerColors).size === 4, viewport.width + '×' + viewport.height + ': all four crystal tokens use distinct player colors');
           const uniqueStartColors = board.startColors.every((color, index) => board.startColors.slice(index + 1).every(other => Math.hypot(color[0] - other[0], color[1] - other[1], color[2] - other[2]) > 25));
           ok(uniqueStartColors, viewport.width + '×' + viewport.height + ': all four player entry colors remain visually distinct');
           ok(Math.hypot(board.homeColor[0] - board.normalTrack[0], board.homeColor[1] - board.normalTrack[1], board.homeColor[2] - board.normalTrack[2]) > 30, viewport.width + '×' + viewport.height + ': the home lane remains distinct from the main track');
@@ -222,15 +268,26 @@ function contrast(a, b) {
       await page.waitForFunction(() => window.__cf && window.__cf.game && window.__cf.game.online && !document.getElementById('game').classList.contains('hidden'));
       const onlineBoard = await page.evaluate(() => {
         const rect = document.getElementById('board-wrap').getBoundingClientRect();
+        const cell = rect.width / 15;
+        const tokens = [...document.querySelectorAll('#pieces .pc')].map(element => {
+          const box = element.getBoundingClientRect(), point = window.__cf.piecePoint(+element.dataset.seat, +element.dataset.piece);
+          return { seat: +element.dataset.seat, piece: +element.dataset.piece, width: box.width, height: box.height, centerMatches: !!point && Math.abs(box.left + box.width / 2 - point.x) < 0.75 && Math.abs(box.top + box.height / 2 - point.y) < 0.75, can: element.classList.contains('can'), selected: element.classList.contains('sel'), label: element.getAttribute('aria-label'), color: getComputedStyle(element).getPropertyValue('--pc').trim() };
+        });
         return {
           canvas: document.getElementById('board').tagName,
           width: rect.width,
           height: rect.height,
-          tokens: document.querySelectorAll('#pieces .pc').length,
+          tokens,
+          cell,
           chessHidden: document.getElementById('online-chess-screen').classList.contains('hidden')
         };
       });
-      ok(onlineBoard.canvas === 'CANVAS' && onlineBoard.tokens === 8 && onlineBoard.chessHidden, 'online Classic uses the same Ludo canvas, not the separate Chess board');
+      ok(onlineBoard.canvas === 'CANVAS' && onlineBoard.tokens.length === 8 && onlineBoard.chessHidden, 'online Classic uses the same Ludo canvas, not the separate Chess board');
+      ok(onlineBoard.tokens.every(token => {
+        const lower = 0.76 * (token.can ? 1.05 : 1), upper = 0.76 * (token.can ? 1.12 : 1);
+        return token.width / onlineBoard.cell >= lower - 0.015 && token.width / onlineBoard.cell <= upper + 0.015 && token.height / onlineBoard.cell >= lower - 0.015 && token.height / onlineBoard.cell <= upper + 0.015 && token.centerMatches;
+      }), 'online Classic preserves each shared hitbox size and center, including its existing move emphasis');
+      ok(onlineBoard.tokens.every(token => /token [1-4]/.test(token.label || '')) && new Set(onlineBoard.tokens.filter((_, index) => index % 4 === 0).map(token => token.color)).size === 2, 'online Classic keeps accessible token identities and distinct seat colors');
       ok(Math.abs(onlineBoard.width - localBoard.width) < 0.5 && Math.abs(onlineBoard.height - localBoard.height) < 0.5, 'online Classic preserves the local shared-board geometry');
     } finally {
       await paletteSession.context.close();

@@ -675,12 +675,14 @@
           '<path class="gem-facet gem-facet-dark" d="M12 1.1 19.2 5 17 12.6 12 13.6Z"/>' +
           '<path class="gem-facet gem-facet-side" d="M7 12.6 12 13.6 9.5 16.3Z"/>' +
           '<path class="gem-facet gem-facet-base" d="M7 12.6 12 13.6 17 12.6 12 18.7Z"/>' +
+          '<path class="gem-refraction" d="M12 1.55 18.45 5.25 16.55 11.85 12 13.1Z"/>' +
           '<path class="gem-sheen" style="fill:url(#gem-sheen-' + s + '-' + i + ')" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
           '<path class="gem-bevel" style="stroke:url(#gem-metal-' + s + '-' + i + ')" d="M12 1.7 18.4 5.25 16.5 12.2 12 17.5 7.5 12.2 5.6 5.25Z"/>' +
           '<ellipse class="gem-core" style="fill:url(#gem-core-' + s + '-' + i + ')" cx="12" cy="8.85" rx="3.35" ry="4.35"/>' +
           '<ellipse class="gem-glint-soft" cx="8.85" cy="5.9" rx="3.9" ry="2.45"/>' +
           '<path class="gem-glint" d="M5.75 4.95 10.65 2.4 8.4 6.85 6.45 7.5Z"/>' +
           '<path class="gem-spec" d="M7.05 3.75 11.2 1.95 10.6 3.4 7.95 4.95Z"/>' +
+          '<circle class="gem-num-rim" cx="12" cy="11.15" r="4.78"/>' +
           '<circle class="gem-num-disc" cx="12" cy="11.15" r="4.15"/>' +
           '<text class="gem-num" x="12" y="13.05" text-anchor="middle">' + tokNum + '</text>' +
           '<circle class="gem-shield" cx="12" cy="10.2" r="9.3"/>' +
@@ -951,7 +953,7 @@
         var canMove = pieceMoves.some(function (m) { return m.seat === s && m.piece === i; });
         pc.disabled = !canMove;
         pc.classList.toggle('is-turn', canMove);
-        pc.setAttribute('aria-label', nameOf(s) + ' token ' + (i + 1) + ', ' + place + (canMove ? ', select to move' : ''));
+        pc.setAttribute('aria-label', nameOf(s) + ' token ' + (i + 1) + ', ' + place + (canMove ? ', movable, select to move' : ''));
       });
     });
     var s = cur, lbl = $('turn-label'), banner = $('turn-banner');
@@ -1036,7 +1038,7 @@
     $('hint').textContent = 'Pick ' + moves.map(function (m) { return m.v; }).join(' or ') + ' for this token';
   }
   function handleTokenTap(seat, piece, keyboard) {
-    if (!G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn) || G.online) return false;
+    if (!G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn)) return false;
     var opts = tokenDieMoves(seat, piece);
     if (!opts.length) return false;
     // Multi-die for this token: open the premium picker (overrides chip selection).
