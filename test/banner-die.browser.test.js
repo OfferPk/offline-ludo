@@ -1,9 +1,11 @@
 // Banner die must show pips whenever a roll face exists (incl. AI turn).
-const assert = require('assert');
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
-const puppeteer = require('/tmp/pp/node_modules/puppeteer-core');
+// Optional local/CI-with-Chrome: PUPPETEER=/path CHROME=/usr/bin/google-chrome node test/banner-die.browser.test.js
+'use strict';
+const assert = require('node:assert/strict');
+const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
 
 const root = path.join(__dirname, '..', 'www');
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml' };
@@ -51,7 +53,6 @@ function listen() { return new Promise((resolve) => server.listen(0, '127.0.0.1'
         face,
         pips,
         opacity: style && style.opacity,
-        bg: style && style.backgroundImage + style.backgroundColor,
         label: document.getElementById('turn-label') && document.getElementById('turn-label').textContent
       };
     });
