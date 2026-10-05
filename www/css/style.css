@@ -1087,6 +1087,13 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-chess-promotion { width: 100%; }
 .online-chess-info { min-width: 0; display: grid; gap: 11px; }
 .chess-live-status, .chess-move-section { min-width: 0; padding: 13px 14px; border: 1px solid rgba(255,255,255,.085); border-radius: 13px; background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018)); }
+.chess-draw-card { min-width: 0; padding: 12px 14px; border: 1px solid rgba(130,201,187,.18); border-radius: 13px; background: linear-gradient(135deg, rgba(80,159,143,.075), rgba(255,255,255,.02)); }
+.chess-draw-card > .chess-info-label { color: #82c9bb; }
+.chess-draw-card p { min-height: 20px; margin: 6px 0 10px; color: #d6dfdd; font-size: 11px; line-height: 1.45; }
+.chess-draw-actions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
+.chess-draw-actions .btn { min-width: 0; min-height: 44px; padding: 8px 9px; border-radius: 9px; font-size: 11px; }
+.chess-draw-actions #online-chess-accept-draw { border-color: rgba(130,201,187,.32); background: linear-gradient(120deg, rgba(73,158,139,.27), rgba(69,124,143,.18)); }
+.chess-draw-actions #online-chess-withdraw-draw { grid-column: 1 / -1; }
 .chess-info-label { color: #8b9b9e; font-size: 9px; font-weight: 850; letter-spacing: .15em; }
 .chess-live-status .online-room-state { min-height: 22px; margin: 7px 0 0; color: #eef0ed !important; font-size: 13px !important; font-weight: 700; line-height: 1.45; }
 .chess-info-heading { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 9px; }
@@ -1147,7 +1154,7 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
   .online-chess-board { border-radius: 9px; }
   .online-chess-piece { font-size: clamp(24px, 7.5vw, 42px); }
   .online-chess-info { gap: 8px; }
-  .chess-live-status, .chess-move-section { padding: 11px; border-radius: 11px; }
+  .chess-live-status, .chess-move-section, .chess-draw-card { padding: 11px; border-radius: 11px; }
   .online-chess-move-list { max-height: 230px; }
 }
 @media (max-width: 360px) {
@@ -1158,6 +1165,8 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
   .chess-player { padding-inline: 7px; }
   .online-chess-piece { font-size: clamp(22px, 7vw, 30px); }
   .online-chess-actions .btn { padding-inline: 6px; font-size: 11px; }
+  .chess-draw-actions { gap: 6px; }
+  .chess-draw-actions .btn { padding-inline: 6px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .chess-player { transition: none; }

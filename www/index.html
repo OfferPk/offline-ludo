@@ -244,6 +244,16 @@
                   </div>
                   <aside class="online-chess-info" aria-label="Game information and controls">
                     <section class="chess-live-status" aria-labelledby="online-chess-status-label"><span id="online-chess-status-label" class="chess-info-label">MATCH STATUS</span><p id="online-chess-status" class="online-room-state" role="status" aria-live="polite" aria-atomic="true"></p><p id="online-chess-announcement" class="online-chess-sr-only" role="status" aria-live="polite" aria-atomic="true"></p></section>
+                    <section class="chess-draw-card" aria-labelledby="online-chess-draw-heading">
+                      <span id="online-chess-draw-heading" class="chess-info-label">DRAW OFFER</span>
+                      <p id="online-chess-draw-status" role="status" aria-live="polite" aria-atomic="true">Either player may offer a draw. A completed move clears any pending offer.</p>
+                      <div class="chess-draw-actions" aria-label="Draw offer actions">
+                        <button id="online-chess-offer-draw" class="btn primary hidden" type="button">Offer draw</button>
+                        <button id="online-chess-withdraw-draw" class="btn plate hidden" type="button">Withdraw offer</button>
+                        <button id="online-chess-accept-draw" class="btn primary hidden" type="button">Accept draw</button>
+                        <button id="online-chess-decline-draw" class="btn plate hidden" type="button">Decline offer</button>
+                      </div>
+                    </section>
                     <div id="online-chess-actions" class="online-chess-actions"><button id="online-chess-claim-draw" class="btn plate hidden" type="button">Claim draw</button><button id="online-chess-resign" class="btn plate danger hidden" type="button">Resign</button></div>
                     <section class="chess-move-section" aria-labelledby="online-chess-move-heading"><div class="chess-info-heading"><div><h5 id="online-chess-move-heading">Move history</h5><small id="online-chess-history-notation">Standard algebraic notation (SAN)</small></div><span id="online-chess-move-count">0 moves</span></div><div class="chess-pgn-actions"><button id="online-chess-copy-pgn" class="btn plate" type="button" disabled aria-label="Copy the complete chess game as PGN">Copy PGN</button></div><p id="online-chess-pgn-status" class="chess-pgn-status" role="status" aria-live="polite" aria-atomic="true">PGN export requires complete, verified server move history.</p><ol id="online-chess-move-list" class="online-chess-move-list" aria-label="Move list in standard algebraic chess notation"></ol><p id="online-chess-move-empty" class="chess-history-empty">No moves yet. Red makes the first move.</p></section>
                     <p id="online-chess-result" class="online-mode-note">Standard chess rules · moves and match state are validated by the server.</p>

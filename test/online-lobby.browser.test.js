@@ -72,7 +72,7 @@ function startLocalServer() {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
         removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
         delayNextRead: null,
-        actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false,
+        actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false, dropNextDrawResponseAfterCommit: false,
         tables: resumeFixture && resumeFixture.tables || {
           profiles: [
             { id: 'user-one', handle: 'alice123', display_name: 'Alice' },
@@ -252,10 +252,10 @@ function startLocalServer() {
                 const room = state.tables.rooms.find(row => row.id === args.p_room_id);
                 if (room) room.status = 'active';
                 if (!state.tables.match_history.some(row => row.room_id === args.p_room_id)) {
-                  state.tables.match_history.push({ id: 'history-' + args.p_room_id, room_id: args.p_room_id, mode: room ? room.mode : 'classic', status: 'started', winner_id: null, started_at: '2026-10-03T12:30:00.000Z', finished_at: null });
+                  state.tables.match_history.push({ id: 'history-' + args.p_room_id, room_id: args.p_room_id, mode: room ? room.mode : 'classic', status: 'active', winner_id: null, started_at: '2026-10-03T12:30:00.000Z', finished_at: null });
                 }
                 if (room && room.mode === 'ludo_chess') {
-                  const match = { room_id: args.p_room_id, version: 0, state: window.LudoChess.initialState() };
+                  const match = { room_id: args.p_room_id, version: 0, state: window.LudoChess.initialState(), draw_offer: null };
                   state.tables.ludo_chess_matches = state.tables.ludo_chess_matches.filter(row => row.room_id !== args.p_room_id);
                   state.tables.ludo_chess_matches.push(match);
                   state.emit('ludo_chess_matches', { event: 'INSERT', new: match });
@@ -327,12 +327,58 @@ function startLocalServer() {
                 catch (error) { return Promise.resolve({ data: null, error: { message: error.message, code: '22023' } }); }
                 match.version++;
                 match.state = nextState;
+                match.draw_offer = null;
                 data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
                 state.chessActionResponses[args.p_action_id] = { actorId, request, response: data };
                 state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
                 if (state.dropChessResponseAfterCommit) {
                   state.dropChessResponseAfterCommit = false;
                   return Promise.resolve({ data: null, error: { message: 'The response was lost after the server applied the move' } });
+                }
+              } else if (name === 'offer_ludo_chess_draw' || name === 'respond_ludo_chess_draw') {
+                const match = state.tables.ludo_chess_matches.find(row => row.room_id === args.p_room_id);
+                const room = state.tables.rooms.find(row => row.id === args.p_room_id);
+                const actorId = state.session && state.session.user && state.session.user.id;
+                const member = state.tables.room_members.find(row => row.room_id === args.p_room_id && row.user_id === actorId);
+                const isOffer = name === 'offer_ludo_chess_draw';
+                const request = isOffer
+                  ? { type: 'chess_draw_offer', expected_version: args.p_expected_version }
+                  : { type: 'chess_draw_response', expected_version: args.p_expected_version, response: args.p_response };
+                const prior = state.chessActionResponses[args.p_action_id];
+                if (prior) {
+                  if (prior.actorId !== actorId || JSON.stringify(prior.request) !== JSON.stringify(request)) {
+                    return Promise.resolve({ data: null, error: { message: 'Action ID was reused for a different request', code: '23505' } });
+                  }
+                  return Promise.resolve({ data: Object.assign({}, prior.response, { duplicate: true }), error: null });
+                }
+                if (!member) return Promise.resolve({ data: null, error: { message: 'You are not a member of this room', code: '42501' } });
+                if (Number(args.p_expected_version) !== Number(match.version)) return Promise.resolve({ data: null, error: { message: 'Match state is stale; refresh and try again', code: '40001' } });
+                if (!room || room.status !== 'active' || match.state.phase !== 'active') return Promise.resolve({ data: null, error: { message: 'Chess game is not active', code: '55000' } });
+                if (isOffer) {
+                  if (match.draw_offer) return Promise.resolve({ data: null, error: { message: 'A draw offer is already pending', code: '55000' } });
+                  match.draw_offer = { offered_by: Number(member.seat), position_version: Number(match.version) };
+                } else {
+                  const offer = match.draw_offer;
+                  if (!offer) return Promise.resolve({ data: null, error: { message: 'There is no pending draw offer', code: '55000' } });
+                  if (args.p_response === 'withdraw' && Number(member.seat) !== Number(offer.offered_by)) return Promise.resolve({ data: null, error: { message: 'Only the player who offered the draw can withdraw it', code: '42501' } });
+                  if (['accept', 'decline'].includes(args.p_response) && Number(member.seat) === Number(offer.offered_by)) return Promise.resolve({ data: null, error: { message: 'Only the other player can respond to this draw offer', code: '42501' } });
+                  if (!['accept', 'decline', 'withdraw'].includes(args.p_response)) return Promise.resolve({ data: null, error: { message: 'Match action is invalid', code: '22023' } });
+                  if (Number(offer.position_version) !== Number(match.version) - 1) return Promise.resolve({ data: null, error: { message: 'Draw offer is stale; refresh and try again', code: '40001' } });
+                  if (args.p_response === 'accept') {
+                    match.state = Object.assign({}, match.state, { phase: 'over', result: 'draw_agreement', winner: null });
+                    room.status = 'completed';
+                    const history = state.tables.match_history.find(row => row.room_id === args.p_room_id);
+                    if (history) Object.assign(history, { status: 'completed', winner_id: null, result: { version: Number(match.version) + 1, state: match.state }, finished_at: '2026-10-05T00:00:00.000Z' });
+                  }
+                  match.draw_offer = null;
+                }
+                match.version++;
+                data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: match.state, draw_offer: match.draw_offer };
+                state.chessActionResponses[args.p_action_id] = { actorId, request, response: data };
+                state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+                if (state.dropNextDrawResponseAfterCommit) {
+                  state.dropNextDrawResponseAfterCommit = false;
+                  return Promise.resolve({ data: null, error: { message: 'The draw response was lost after the server applied the action' } });
                 }
               } else if (name === 'leave_room') {
                 state.tables.room_members = state.tables.room_members.filter(row => !(row.room_id === args.p_room_id && row.user_id === 'user-one'));
@@ -419,7 +465,7 @@ function startLocalServer() {
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     await page.click('#online-start-room');
       await page.waitForFunction(() => document.querySelector('#online-room-status').textContent.includes('validated by the server'));
-      await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · started'));
+    await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · active'));
       await page.waitForFunction(() => !document.querySelector('#online-match-panel').classList.contains('hidden') && document.querySelector('#online-match-version').textContent === 'Version 0');
       await page.evaluate(() => { window.__mockBackend.failRpc = 'roll_match'; });
       await page.click('#online-roll');
@@ -488,7 +534,7 @@ function startLocalServer() {
     assert.equal(await page.$eval('#online-chess-board [data-square="53"]', el => el.tabIndex), 0, 'arrow navigation moves the single tab stop with focus');
     assert.equal(await page.$eval('#online-chess-board [data-square="52"]', el => el.tabIndex), -1, 'the previous square leaves the tab sequence');
     await page.keyboard.press('Tab');
-    assert.equal(await page.evaluate(() => document.activeElement.id), 'online-chess-resign', 'Tab exits the grid to the next visible control');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'online-chess-offer-draw', 'Tab exits the grid to the first visible draw-offer control');
     await page.keyboard.down('Shift');
     await page.keyboard.press('Tab');
     await page.keyboard.up('Shift');
@@ -496,7 +542,7 @@ function startLocalServer() {
     const mobileBoard = await page.evaluate(() => ({ board: document.querySelector('#online-chess-board').getBoundingClientRect().width, viewport: innerWidth, square: document.querySelector('#online-chess-board [data-square]').getBoundingClientRect().width, overflow: document.documentElement.scrollWidth > innerWidth }));
     assert.equal(mobileBoard.overflow, false, 'the Chess screen has no horizontal overflow on a phone viewport');
     assert.ok(mobileBoard.board <= mobileBoard.viewport && mobileBoard.square >= 35, 'the mobile board fits the screen with practical touch targets');
-    const touchTargets = await page.evaluate(() => ['#online-chess-back', '#online-leave-room', '#online-chess-resign'].map(selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { selector, width: r.width, height: r.height }; }));
+    const touchTargets = await page.evaluate(() => ['#online-chess-back', '#online-leave-room', '#online-chess-offer-draw', '#online-chess-resign'].map(selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { selector, width: r.width, height: r.height }; }));
     assert.ok(touchTargets.every(target => target.width >= 24 && target.height >= 44), 'room navigation and gameplay actions have WCAG-sized mobile tap targets: ' + JSON.stringify(touchTargets));
     const contrast = await page.evaluate(() => {
       function rgb(value) { return value.match(/[\d.]+/g).slice(0, 3).map(Number).map(channel => channel / 255); }
@@ -576,10 +622,12 @@ function startLocalServer() {
       const version = await seedPromotionPosition(0);
       await page.click('#online-chess-board [data-square="8"]');
       await page.waitForSelector('#online-chess-board [data-square="0"].is-legal');
+      await page.$eval('#online-chess-board [data-square="0"]', el => el.scrollIntoView({ block: 'center', inline: 'center' }));
       const destinationHit = await page.evaluate(() => {
         const cell = document.querySelector('#online-chess-board [data-square="0"]'), rect = cell.getBoundingClientRect();
         const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
-        return { reachable: hit === cell || cell.contains(hit), headerPosition: getComputedStyle(document.querySelector('.online-chess-header')).position };
+        const header = document.querySelector('.online-chess-header'), headerRect = header.getBoundingClientRect();
+        return { reachable: hit === cell || cell.contains(hit), headerPosition: getComputedStyle(header).position };
       });
       assert.equal(destinationHit.reachable, true, 'the top-rank promotion destination is not covered by screen chrome on mobile');
       assert.equal(destinationHit.headerPosition, 'relative', 'the play-screen header scrolls with content instead of overlaying board cells');
@@ -661,6 +709,118 @@ function startLocalServer() {
     });
     assert.equal(blueResult.piece, 'n', 'the Blue Knight underpromotion is applied with lowercase Blue piece notation');
     assert.deepEqual([blueResult.args.p_from, blueResult.args.p_to, blueResult.args.p_promotion, blueResult.args.p_expected_version], [55, 63, 'n', blueVersion], 'the Blue Knight underpromotion reaches the RPC with correct board coordinates and version');
+
+    const drawSetupVersion = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+      match.state = window.LudoChess.initialState();
+      match.draw_offer = null;
+      match.version++;
+      backend.tables.room_members.forEach(member => { member.seat = member.user_id === 'user-one' ? 0 : 1; });
+      const room = backend.tables.rooms.find(row => row.id === match.room_id);
+      room.status = 'active';
+      backend.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+      return match.version;
+    });
+    await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + value && !document.querySelector('#online-chess-offer-draw').classList.contains('hidden'), {}, drawSetupVersion);
+    const balancesBeforeDrawActions = await page.evaluate(() => window.__mockBackend.tables.wallets.map(wallet => [wallet.user_id, wallet.coins]));
+
+    const staleOfferVersion = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+      const version = match.version;
+      match.version++;
+      return version;
+    });
+    const offerButtonState = await page.evaluate(() => {
+      const backend = window.__mockBackend, button = document.querySelector('#online-chess-offer-draw'), match = backend.tables.ludo_chess_matches[0];
+      const rect = button.getBoundingClientRect();
+      return { className: button.className, disabled: button.disabled, rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height }, phase: match.state.phase, roomStatus: backend.tables.rooms.find(row => row.id === match.room_id).status, offer: match.draw_offer };
+    });
+    assert.equal(offerButtonState.className.includes('hidden'), false, 'offer control is shown for the active match: ' + JSON.stringify(offerButtonState));
+    await page.click('#online-chess-offer-draw');
+    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Match state is stale; refresh and try again'));
+    await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + (value + 1), {}, staleOfferVersion);
+    const staleOffer = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+      return { offer: match.draw_offer, args: backend.rpcCalls.filter(call => call.name === 'offer_ludo_chess_draw').at(-1).args };
+    });
+    assert.equal(staleOffer.offer, null, 'a stale draw offer request is rejected without creating an offer');
+    assert.equal(staleOffer.args.p_expected_version, staleOfferVersion, 'the stale offer sends only the version the client actually observed');
+
+    const versionBeforeRetryableOffer = await page.evaluate(() => {
+      window.__mockBackend.dropNextDrawResponseAfterCommit = true;
+      return window.__mockBackend.tables.ludo_chess_matches[0].version;
+    });
+    await page.click('#online-chess-offer-draw');
+    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Retry uses the same action ID.'));
+    const offerBeforeRetry = await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => call.name === 'offer_ludo_chess_draw').at(-1).args);
+    await page.click('#online-match-retry');
+    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('The server confirmed this was already applied.'));
+    const retriedOffer = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches[0];
+      return { calls: backend.rpcCalls.filter(call => call.name === 'offer_ludo_chess_draw').slice(-2).map(call => call.args), version: match.version, offer: match.draw_offer };
+    });
+    assert.deepEqual(retriedOffer.calls[1], offerBeforeRetry, 'a lost offer response retries the identical version, action ID, and payload');
+    assert.equal(retriedOffer.version, versionBeforeRetryableOffer + 1, 'an idempotent offer retry advances the match only once');
+    assert.match(await page.$eval('#online-chess-draw-status', el => el.textContent), /Your draw offer is pending/i, 'the offerer sees a clear pending-offer state');
+    assert.equal(retriedOffer.offer.offered_by, 0, 'the server-bound pending offer records the offerer seat, not a board move');
+    await page.click('#online-chess-withdraw-draw');
+    await page.waitForFunction(() => document.querySelector('#online-chess-offer-draw').classList.contains('hidden') === false && document.querySelector('#online-chess-withdraw-draw').classList.contains('hidden'));
+    assert.equal(await page.evaluate(() => window.__mockBackend.tables.ludo_chess_matches[0].draw_offer), null, 'withdrawing cancels only the pending offer');
+
+    async function seedOpponentDrawOffer() {
+      const version = await page.evaluate(() => {
+        const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches[0];
+        match.draw_offer = { offered_by: 1, position_version: match.version };
+        match.version++;
+        backend.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+        return match.version;
+      });
+      await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + value, {}, version);
+      return version;
+    }
+    await seedOpponentDrawOffer();
+    assert.match(await page.$eval('#online-chess-draw-status', el => el.textContent), /Blue .* offered a draw/i, 'the opponent offer is identified in an accessible live status');
+    assert.equal(await page.$eval('#online-chess-accept-draw', el => !el.classList.contains('hidden')), true, 'only the recipient is shown the accept action');
+    assert.equal(await page.$eval('#online-chess-withdraw-draw', el => !el.classList.contains('hidden')), false, 'the recipient cannot withdraw another player’s offer');
+    const versionBeforeDecline = await page.evaluate(() => window.__mockBackend.tables.ludo_chess_matches[0].version);
+    await page.click('#online-chess-decline-draw');
+    await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + (value + 1), {}, versionBeforeDecline);
+    const declined = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches[0];
+      return { offer: match.draw_offer, state: match.state, history: backend.tables.match_history[0] };
+    });
+    assert.equal(declined.offer, null, 'declining clears the pending offer');
+    assert.equal(declined.state.phase, 'active', 'declining leaves the Chess game active');
+    assert.equal(declined.history.status, 'active', 'declining does not finish or rewrite match history');
+
+    await seedOpponentDrawOffer();
+    const versionBeforeMove = await page.evaluate(() => window.__mockBackend.tables.ludo_chess_matches[0].version);
+    await page.click('#online-chess-board [data-square="52"]');
+    await page.waitForSelector('#online-chess-board [data-square="36"].is-legal');
+    await page.click('#online-chess-board [data-square="36"]');
+    await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + (value + 1) && document.querySelector('#online-chess-accept-draw').classList.contains('hidden'), {}, versionBeforeMove);
+    assert.equal(await page.evaluate(() => window.__mockBackend.tables.ludo_chess_matches[0].draw_offer), null, 'a completed move automatically clears an unanswered offer');
+    assert.match(await page.$eval('#online-chess-announcement', el => el.textContent), /moved from e2 to e4/i, 'the offer-clearing move remains the announced legal game action');
+
+    await seedOpponentDrawOffer();
+    await page.click('#online-chess-accept-draw');
+    await page.waitForFunction(() => document.querySelector('#online-match-turn').textContent.includes('Draw · by agreement'));
+    const agreedDraw = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches[0];
+      const room = backend.tables.rooms.find(row => row.id === match.room_id);
+      const history = backend.tables.match_history.find(row => row.room_id === match.room_id);
+      return { state: match.state, offer: match.draw_offer, room: room.status, history };
+    });
+    assert.equal(agreedDraw.state.phase, 'over', 'accepting an offer ends the game');
+    assert.equal(agreedDraw.state.result, 'draw_agreement', 'the authoritative game result identifies an agreed draw');
+    assert.equal(agreedDraw.state.winner, null, 'an agreed draw has no winner');
+    assert.equal(agreedDraw.offer, null, 'the accepted offer is cleared');
+    assert.equal(agreedDraw.room, 'completed', 'acceptance completes the room');
+    assert.equal(agreedDraw.history.status, 'completed', 'acceptance completes match history');
+    assert.equal(agreedDraw.history.winner_id, null, 'draw history records no winner');
+    assert.equal(agreedDraw.history.result.state.result, 'draw_agreement', 'history stores the same agreed-draw state');
+    assert.equal(await page.$eval('#online-chess-result', el => el.textContent.includes('Draw · by agreement')), true, 'the final result is explained in the Chess screen');
+    assert.deepEqual(await page.evaluate(() => window.__mockBackend.tables.wallets.map(wallet => [wallet.user_id, wallet.coins])), balancesBeforeDrawActions, 'draw offers and acceptance do not change any wallet balance');
 
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
