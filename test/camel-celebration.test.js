@@ -17,13 +17,17 @@ const C = require(path.join(root, 'www/js/celebration.js'));
 
 console.log('camel-celebration.test.js');
 
-assert.equal(pkg.version, '1.6.3');
-assert.match(gradle, /versionCode 20\b/);
-assert.match(gradle, /versionName "1\.6\.3"/);
-assert.match(html, /Crossfour v1\.6\.3/);
+// Version moves forward with each release (v1.6.4 = versionCode 21); the camel wiring must remain.
+const [cMaj, cMin, cPat] = pkg.version.split('.').map(Number);
+assert.ok(cMaj > 1 || (cMaj === 1 && (cMin > 6 || (cMin === 6 && cPat >= 3))), 'version >= 1.6.3');
+const vCode = Number((gradle.match(/versionCode (\d+)/) || [])[1]);
+assert.ok(vCode >= 20, 'versionCode >= 20');
+const vEsc = pkg.version.replace(/\./g, '\\.');
+assert.match(gradle, new RegExp('versionName "' + vEsc + '"'));
+assert.match(html, new RegExp('Crossfour v' + vEsc));
 assert.doesNotMatch(html, /\?v=1\.6\.2/);
-assert.match(html, /<script src="js\/celebration\.js\?v=1\.6\.3"><\/script>\s*<script src="js\/game\.js\?v=1\.6\.3">/);
-console.log('  ok - version 1.6.3 / versionCode 20, celebration.js loads before game.js');
+assert.match(html, new RegExp('<script src="js/celebration\\.js\\?v=' + vEsc + '"></script>\\s*<script src="js/game\\.js\\?v=' + vEsc + '">'));
+console.log('  ok - version ' + pkg.version + ' / versionCode ' + vCode + ' (>= 1.6.3 / 20), celebration.js loads before game.js');
 
 // Geometry: 390x844 phone, seats as laid out by buildPods (slot 0 TL, 1 TR, 2 BR, 3 BL).
 const VW = 390, VH = 844;
