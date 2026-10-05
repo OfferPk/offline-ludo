@@ -12,7 +12,13 @@
   var tutorial = { active: false, intro: false, firstMove: false };
   var NAMES = SK.SEAT_NAMES;
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
-  var ACCENT = { graphite: ['#f4b740', '#1c1504'], linen: ['#2b3140', '#ffffff'], walnut: ['#e0a232', '#231605'], aurora: ['#27e0b3', '#03261d'], midnight: ['#6aa8ff', '#071018'], timber: ['#c47a32', '#2a1808'] };
+  var ACCENT = { graphite: ['#f4b740', '#1c1504'], linen: ['#2b3140', '#ffffff'], walnut: ['#e0a232', '#231605'], aurora: ['#27e0b3', '#03261d'], midnight: ['#6aa8ff', '#071018'], timber: ['#c47a32', '#2a1808'],
+    // v1.6.4 light-theme contrast: deep accents on pale skins (pale amber on cream was unreadable).
+    desert: ['#8f5212', '#ffffff'], candy: ['#a3306b', '#ffffff'], sakura: ['#a3364b', '#ffffff'], frost: ['#28609f', '#ffffff'] };
+  // v1.6.4 UI chrome tokens. The board canvas keeps each skin's own palette untouched; only page text/chrome changes.
+  // Classic Wood has a light board on a dark walnut page, so its chrome (text, chips, cards) follows the dark styles.
+  var UI_CHROME = { timber: { dark: true, ink: '#fdf5e6', muted: '#ead6b4' } };
+  var LIGHT_MUTED_DEEPEN = 0.3; // light skins: pull --muted toward black for >= 4.5:1 subtitle contrast
   var CORE_LIGHTS = ['#ffd0c1', '#a0ffd2', '#ffe7a3', '#a9ddff'];
   var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, MOVE_DECIDE_MS = 4000, FREE_UNDOS = 3;
   var PHRASES = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!'];
@@ -251,7 +257,9 @@
   }
   function applySkin() {
     var b = board(), d = dice(), r = document.documentElement.style;
-    r.setProperty('--bg', b.bg); r.setProperty('--page', b.page); r.setProperty('--board', b.board); r.setProperty('--ink', b.ink); r.setProperty('--muted', b.muted);
+    var ui = UI_CHROME[b.id] || {}, uiDark = ui.dark != null ? !!ui.dark : !!b.dark;
+    var uiMuted = ui.muted || (uiDark ? b.muted : mix(b.muted, 'b', LIGHT_MUTED_DEEPEN));
+    r.setProperty('--bg', b.bg); r.setProperty('--page', b.page); r.setProperty('--board', b.board); r.setProperty('--ink', ui.ink || b.ink); r.setProperty('--muted', uiMuted);
     b.seats.forEach(function (c, i) { r.setProperty('--s' + i, c); });
     var acc = ACCENT[b.id] || ACCENT.graphite; r.setProperty('--accent', acc[0]); r.setProperty('--accent-ink', acc[1]);
     var faceSolid = diceFaceSolid(d);
@@ -263,7 +271,8 @@
     r.setProperty('--d-pip', d.pip);
     r.setProperty('--d-pip-hi', mix(d.pip, 'w', 0.45));
     r.setProperty('--d-face-img', isGrad ? d.face : 'none');
-    document.body.classList.toggle('light', !b.dark);
+    document.body.classList.toggle('light', !uiDark);
+    document.body.setAttribute('data-skin', b.id);
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', b.bg);
   }
 

@@ -1500,3 +1500,129 @@ body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-
   .camel-cel .cc-garland-rose { transform: translate3d(var(--gx), var(--gy), 0); }
   .camel-cel .cc-halo, .camel-cel .cc-bouquet { transform: none; }
 }
+
+/* ---------------- v1.6.4 · Light theme contrast polish (original Crossfour look) ----------------
+   Light skins only (body.light). Darker text, stronger icons, clearer borders/shadows.
+   Dark skins are untouched; the board canvas keeps its own palette. --muted is deepened in JS (applySkin). */
+body.light {
+  --surface: rgba(28,32,44,.05); --surface-edge: rgba(28,32,44,.15);
+  --lt-card: rgba(255,255,255,.82); --lt-edge: rgba(28,32,44,.16); --lt-edge-strong: rgba(28,32,44,.26);
+  --lt-shadow: 0 1px 2px rgba(30,30,40,.08), 0 6px 16px rgba(40,36,30,.09);
+  --lt-link: #1d5f96; --lt-warn: #9a5300;
+}
+/* header chips + XP bar */
+body.light .chip, body.light .coins { background: var(--lt-card); border-color: var(--lt-edge); box-shadow: var(--lt-shadow); }
+body.light .lvl-badge { box-shadow: inset 0 -2px 0 rgba(0,0,0,.18), 0 1px 2px rgba(0,0,0,.18); }
+body.light .lvl-bar { height: 7px; border-radius: 4px; background: rgba(28,32,44,.14); box-shadow: inset 0 1px 1.5px rgba(0,0,0,.16); }
+body.light .lvl-bar i { border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 82%, #fff), var(--accent)); box-shadow: inset 0 -1px 0 rgba(0,0,0,.18); }
+body.light .coin-ico { box-shadow: inset 0 0 0 2px rgba(120,80,10,.45), 0 1px 2px rgba(90,60,10,.3); }
+body.light .logo .tag { color: var(--muted); font-weight: 700; }
+body.light .logo-mark::after { box-shadow: 0 0 0 4px var(--bg), 0 4px 10px rgba(40,30,20,.28); }
+
+/* home mode cards: deep per-mode ink for icons/borders */
+body.light .mode-card { --mode-deep: 22,104,164; border-color: rgba(var(--mode-deep),.40); background: linear-gradient(145deg, rgba(255,255,255,.95), rgba(var(--mode-color),.15) 62%, rgba(var(--mode-color),.24)); box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(30,30,40,.08), 0 8px 20px rgba(var(--mode-deep),.13); backdrop-filter: none; }
+body.light .mode-card.mode-computer { --mode-deep: 22,104,164; }
+body.light .mode-card.mode-lucky { --mode-deep: 160,86,6; }
+body.light .mode-card.mode-mystery { --mode-deep: 102,58,186; }
+body.light .mode-card.mode-pass { --mode-deep: 12,120,88; }
+body.light .mode-card:hover { border-color: rgba(var(--mode-deep),.66); box-shadow: inset 0 1px 0 #fff, 0 2px 4px rgba(30,30,40,.1), 0 10px 24px rgba(var(--mode-deep),.18); }
+body.light .mode-card.lucky-btn { background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(var(--mode-color),.16)) padding-box, linear-gradient(var(--page), var(--page)) padding-box, linear-gradient(120deg, #d98f10, #cf2f63, #7531c8, #1a8fcb) border-box; border: 1.5px solid transparent; }
+body.light .mode-card.mystery-btn { background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(var(--mode-color),.16)) padding-box, linear-gradient(var(--page), var(--page)) padding-box, linear-gradient(120deg, #1a8fcb, #7531c8, #cf2f63) border-box; border: 1.5px solid transparent; }
+body.light .mode-card .mode-card-icon { color: rgb(var(--mode-deep)); border-color: rgba(var(--mode-deep),.30); background: linear-gradient(145deg, rgba(var(--mode-color),.34), rgba(var(--mode-color),.14)); box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 2px 6px rgba(var(--mode-deep),.18); }
+body.light .mode-card .mode-card-icon svg * { stroke-width: 2; }
+body.light .mode-card-subtitle { color: var(--muted); font-weight: 600; }
+body.light .new-badge { box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+
+/* Ludo Chess entry (ludo-chess-discovery.css) */
+body.light #home .home-chess-launch { border-color: rgba(190,66,50,.44); background: radial-gradient(70% 140% at 0% 0%, rgba(255,111,97,.16), transparent 72%), linear-gradient(112deg, rgba(255,255,255,.94), rgba(255,111,97,.10) 42%, rgba(77,130,255,.12)); box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(30,30,40,.08), 0 8px 22px rgba(170,64,50,.13); backdrop-filter: none; }
+body.light #home .home-chess-launch-copy small { color: var(--muted); font-weight: 600; }
+body.light #home .home-chess-launch-mark { color: #ad3529; border-color: rgba(173,53,41,.28); background: linear-gradient(145deg, rgba(255,111,97,.24), rgba(77,130,255,.18)); box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 2px 6px rgba(173,53,41,.16); }
+body.light #home .home-chess-launch-mark span { text-shadow: 1px 1px 0 rgba(36,84,196,.55); }
+body.light #home .home-chess-launch-arrow { color: #b3372a; }
+body.light #home .home-chess-launch:focus-visible { outline-color: #1d5f96; }
+
+/* How to play */
+body.light .howto-card { background: linear-gradient(145deg, rgba(255,255,255,.92), rgba(20,168,162,.09)); border-color: #149c98; box-shadow: 0 0 0 3px rgba(20,156,152,.12), 0 1px 2px rgba(30,30,40,.08), 0 8px 22px rgba(10,110,110,.14); }
+body.light .howto-open { color: #0a4f54; border-color: rgba(10,110,114,.46); background: linear-gradient(180deg, rgba(20,168,162,.16), rgba(20,168,162,.07)); box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 1px 2px rgba(10,80,84,.12); }
+body.light .howto-panel-title { color: var(--ink); }
+body.light .howto-table th { background: #dcf1ef; color: #0a4f54; }
+body.light .howto-table th, body.light .howto-table td { border-bottom-color: rgba(28,32,44,.12); }
+body.light .howto-table td { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { body.light .howto-card { box-shadow: 0 0 0 1.5px #149c98; } }
+
+/* buttons: quick modes, Skins/Rules/Settings, panel actions */
+body.light .btn:not(.primary):not(.rewarded-btn) { background: rgba(255,255,255,.74); border-color: var(--lt-edge); box-shadow: 0 1px 2px rgba(30,30,40,.07); }
+body.light .btn small { color: var(--muted); }
+body.light .btn.primary small { color: inherit; }
+body.light .btn.danger { color: #c22f2f; }
+body.light .btn:disabled { opacity: .55; }
+body.light .home-row .btn { background: var(--lt-card); border-color: var(--lt-edge); backdrop-filter: none; box-shadow: var(--lt-shadow); }
+body.light .mode-grid .btn small { opacity: 1; color: var(--muted); font-weight: 600; }
+body.light .community-launch, body.light .online-launch { border-color: rgba(36,96,156,.30); background: linear-gradient(120deg, rgba(255,255,255,.92), rgba(87,138,191,.12) 55%, rgba(178,134,255,.10)); box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(30,30,40,.08), 0 6px 18px rgba(40,70,110,.10); backdrop-filter: none; }
+body.light .community-launch-mark { color: #1f60a0; border: 1px solid rgba(31,96,160,.22); background: linear-gradient(145deg, rgba(84,180,255,.26), rgba(117,93,221,.16)); box-shadow: inset 0 1px 0 rgba(255,255,255,.85); }
+body.light .community-launch-arrow, body.light .online-launch > span:last-child { color: #1f60a0; }
+body.light .community-launch-copy small, body.light .online-launch small { font-weight: 600; }
+body.light .home-link { color: var(--muted); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: rgba(28,32,44,.25); }
+body.light .mode-card:focus-visible, body.light .home-row .btn:focus-visible, body.light .howto-open:focus-visible, body.light .community-launch:focus-visible, body.light .online-launch:focus-visible, body.light #setup button:focus-visible { outline-color: #1d5f96; }
+
+/* setup screen */
+body.light #mode-seg { border-color: var(--lt-edge); background: rgba(28,32,44,.06); }
+body.light .seg button:not(.on) { color: var(--muted); }
+body.light #mode-seg button.on { color: var(--ink); border-color: rgba(var(--mode-deep, 22,104,164),.55); background: linear-gradient(145deg, #fff, rgba(var(--mode-rgb, 89,195,255),.18)); box-shadow: 0 1px 2px rgba(30,30,40,.1), 0 4px 10px rgba(var(--mode-deep, 22,104,164),.14); }
+body.light #mode-seg button[data-mode="mystery"] { --mode-deep: 102,58,186; }
+body.light #mode-seg button[data-mode="lucky"] { --mode-deep: 160,86,6; }
+body.light .presets button { background: rgba(255,255,255,.74); border-color: var(--lt-edge); box-shadow: 0 1px 2px rgba(30,30,40,.06); }
+body.light .presets button[aria-pressed="true"] { color: #0f4a75; border-color: rgba(31,96,160,.55); background: linear-gradient(145deg, rgba(75,171,221,.22), rgba(128,98,202,.12)), #fff; box-shadow: 0 1px 2px rgba(30,30,40,.1), 0 4px 12px rgba(31,96,160,.14); }
+body.light .seat { box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 1px 2px rgba(30,30,40,.06), 0 6px 16px rgba(40,36,30,.08); border-color: rgba(var(--seat-rgb),.5); }
+body.light .seat .seat-options, body.light .seat-options { border-color: rgba(28,32,44,.10); background: rgba(28,32,44,.06); }
+body.light .seat .seat-options button[aria-pressed="true"], body.light .seat-options button[aria-pressed="true"] { border-color: rgba(28,32,44,.18); box-shadow: 0 1px 3px rgba(30,30,40,.16), 0 0 10px rgba(var(--seat-rgb),.22), inset 0 1px 0 #fff; }
+body.light .rules-sum { border-color: var(--lt-edge); background: rgba(255,255,255,.6); box-shadow: none; }
+body.light .rule-chip { color: #23384e; border-color: rgba(36,96,156,.24); background: rgba(36,96,156,.09); }
+body.light .setup-msg { color: #b42318; }
+body.light .setup-foot { background: linear-gradient(180deg, color-mix(in srgb, var(--page) 0%, transparent), color-mix(in srgb, var(--page) 94%, transparent) 22%); }
+
+/* modals: settings, stats, skins, rules, menus */
+body.light .panel { border-color: rgba(28,32,44,.12); box-shadow: 0 20px 60px rgba(40,34,24,.28); }
+body.light #settings .row { border-bottom-color: rgba(28,32,44,.10); }
+body.light .sw { background: rgba(28,32,44,.24); box-shadow: inset 0 0 0 1px rgba(28,32,44,.10); }
+body.light .stats-grid div { background: rgba(28,32,44,.05); box-shadow: inset 0 0 0 1px rgba(28,32,44,.07); }
+body.light .tabs { background: rgba(28,32,44,.07); }
+body.light .skin { background: rgba(28,32,44,.045); border-color: rgba(28,32,44,.08); }
+body.light .skin.on { border-color: var(--accent); }
+body.light .skin.is-locked { border-color: rgba(28,32,44,.14); }
+body.light .rank li, body.light .ev { box-shadow: inset 0 0 0 1px rgba(28,32,44,.07); }
+body.light .overlay.exit-confirm { background: rgba(30,28,24,.42); }
+body.light .overlay.exit-confirm .panel { border-color: rgba(53,120,154,.28); background: linear-gradient(140deg, rgba(93,178,220,.12), rgba(128,111,211,.08)), var(--page); box-shadow: 0 22px 60px rgba(30,30,40,.3); }
+body.light .overlay.exit-confirm .panel h3 { color: var(--ink); }
+body.light .choice-title, body.light .wheel-note { color: var(--lt-warn); }
+body.light .copt .ci { color: #1d6fa5; }
+body.light .danger-tag, body.light .ev b em { color: var(--lt-warn); }
+body.light .wheel-result.good b { color: #0d8a62; } body.light .wheel-result.bad b { color: #c0392b; } body.light .wheel-result.meh b { color: var(--lt-warn); }
+
+/* in-game chrome on light skins */
+body.light .pod { background: rgba(255,255,255,.62); box-shadow: 0 1px 2px rgba(30,30,40,.07); }
+body.light .plvl .hd i, body.light .plvl .chg i { background: rgba(28,32,44,.22); }
+body.light .tool { background: rgba(255,255,255,.7); box-shadow: 0 1px 2px rgba(30,30,40,.07); }
+body.light .chips .pw { color: #3f4a5a; border-color: rgba(28,32,44,.2); background: rgba(28,32,44,.08); }
+body.light .chips .pw-on { color: #0d7a56; }
+
+/* online lobby */
+body.light .online-status { color: var(--lt-link); }
+body.light .online-status.is-error { color: #b42318; }
+body.light .online-eyebrow { color: #1f6aa5; }
+body.light .online-auth-link { color: var(--lt-link); font-weight: 700; }
+body.light .online-card { border-color: rgba(28,32,44,.12); background: rgba(255,255,255,.74); box-shadow: 0 1px 2px rgba(30,30,40,.06), 0 8px 22px rgba(40,36,30,.08); }
+body.light .online-screen input, body.light .online-screen select { border-color: rgba(28,32,44,.22); background: #fff; box-shadow: inset 0 1px 2px rgba(0,0,0,.05); }
+body.light .online-screen input::placeholder { color: var(--muted); }
+body.light .online-limit-note { border-color: rgba(176,112,16,.32); background: rgba(244,183,64,.12); }
+body.light .online-live-dot { background: #18a074; box-shadow: 0 0 8px rgba(24,160,116,.5); }
+body.light .online-room-card { border-color: rgba(31,96,160,.26); background: rgba(53,153,220,.07); }
+body.light .online-room-connection { color: var(--lt-link) !important; background: rgba(31,96,160,.08); }
+body.light .online-room-connection[data-state="reconnecting"] { color: var(--lt-warn) !important; background: rgba(244,183,64,.14); }
+body.light .online-room-connection[data-state="ended"] { color: #11744f !important; background: rgba(24,160,116,.1); }
+/* The dedicated online Ludo Chess surface is always dark: give it dark tokens on light skins too. */
+body.light .online-chess-screen { --ink: #eef1f5; --muted: #9ba6b0; --surface: rgba(255,255,255,.05); --surface-edge: rgba(255,255,255,.1); }
+body.light .online-chess-screen .btn:not(.primary):not(.rewarded-btn) { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); box-shadow: none; }
+body.light .online-chess-screen .online-room-connection { color: #9ad9ff !important; background: rgba(105,205,255,.07); }
+body.light .online-chess-screen .online-room-connection[data-state="reconnecting"] { color: #ffd37a !important; background: rgba(244,183,64,.08); }
+body.light .online-chess-screen .online-room-connection[data-state="ended"] { color: #b8e7ce !important; background: rgba(115,224,176,.08); }
