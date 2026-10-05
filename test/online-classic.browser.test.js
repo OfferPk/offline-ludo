@@ -82,7 +82,9 @@ function startLocalServer() {
       textHidden: document.querySelector('#online-match-pieces').classList.contains('hidden'),
       timer: document.querySelector('#online-turn-timer').textContent,
       grace: document.querySelector('#online-grace').textContent,
-      piece: document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]') && !document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]').disabled
+      piece: document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]') && !document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]').disabled,
+      pieceLabel: document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]').getAttribute('aria-label'),
+      target: (() => { const element = document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]'), rect = element.getBoundingClientRect(), point = window.__cf.piecePoint(0, 0); return { width: rect.width, height: rect.height, cell: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--cell')), centered: !!point && Math.abs(rect.left + rect.width / 2 - point.x) < 0.75 && Math.abs(rect.top + rect.height / 2 - point.y) < 0.75, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }; })()
     }));
     assert.equal(board.game, true);
     assert.equal(board.canvas, true);
@@ -90,7 +92,10 @@ function startLocalServer() {
     assert.match(board.timer, /s$/);
     assert.match(board.grace, /Reconnect window/);
     assert.equal(board.piece, true, 'a legal token is tappable');
-    await page.evaluate(() => document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]').click());
+    assert.match(board.pieceLabel, /You token 1, on the track, movable, select to move/, 'online Classic token has a readable move-state label');
+    const moveScale = board.target.width / board.target.cell;
+    assert.ok(moveScale >= 0.76 * 1.05 - 0.015 && moveScale <= 0.76 * 1.12 + 0.015 && Math.abs(board.target.height / board.target.cell - moveScale) < 0.015 && board.target.centered, 'online Classic retains the shared selected-token hitbox dimensions and center');
+    await page.touchscreen.tap(board.target.x, board.target.y);
     const moved = await page.evaluate(() => window.__moves.slice());
     assert.deepEqual(moved, [[0, 0]], 'canvas tap sends the legal queue index');
     await page.evaluate(() => {

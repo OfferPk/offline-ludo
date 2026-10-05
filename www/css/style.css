@@ -340,6 +340,7 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc .gem-facet-dark { fill: var(--pcdd); fill-opacity: .88; }
 .pc .gem-facet-side { fill: var(--pcd); fill-opacity: .8; }
 .pc .gem-facet-base { fill: var(--pcdd); fill-opacity: .72; }
+.pc .gem-refraction { fill: rgba(255,255,255,.14); stroke: rgba(255,255,255,.28); stroke-width: .3; }
 .pc .gem-core { fill: var(--pccore); opacity: .9; filter: drop-shadow(0 0 4px var(--pccore)) drop-shadow(0 0 7px rgba(255,255,255,.38)); animation: gem-core-breathe 2.8s ease-in-out infinite; animation-delay: var(--jugnu-delay, 0s); }
 .pc.is-turn .gem-core { animation-duration: 2.1s; }
 @keyframes gem-core-breathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
@@ -353,10 +354,11 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc .gem-jugnu-glow { opacity: .55; mix-blend-mode: screen; animation: jugnu-glow 3.2s ease-in-out infinite; animation-delay: var(--jugnu-delay, 0s); pointer-events: none; }
 @keyframes jugnu-pulse { 0%, 100% { opacity: .28; transform: translate(-50%, -50%) scale(.92); } 50% { opacity: .58; transform: translate(-50%, -50%) scale(1.08); } }
 @keyframes jugnu-glow { 0%, 100% { opacity: .32; } 50% { opacity: .72; } }
-/* Token id 1–4: high-contrast disc + outlined numeral, readable on all seat colors */
-.pc .gem-num-disc { fill: rgba(12, 14, 18, .55); stroke: rgba(255,255,255,.88); stroke-width: .7; }
-.pc .gem-num { fill: #fff; font-family: Inter, system-ui, "Segoe UI", sans-serif; font-size: 6.6px; font-weight: 900; letter-spacing: -.04em;
-  paint-order: stroke fill; stroke: rgba(8,10,14,.92); stroke-width: 1.15px; stroke-linejoin: round; dominant-baseline: alphabetic; pointer-events: none; }
+/* Token id 1–4: a double-lipped dark glass bezel keeps numerals crisp on every seat color. */
+.pc .gem-num-rim { fill: rgba(8,14,22,.16); stroke: rgba(255,255,255,.58); stroke-width: .52; }
+.pc .gem-num-disc { fill: rgba(7, 12, 20, .82); stroke: rgba(255,255,255,.98); stroke-width: .9; }
+.pc .gem-num { fill: #fff; font-family: Inter, system-ui, "Segoe UI", sans-serif; font-size: 7.35px; font-weight: 900; letter-spacing: -.04em;
+  paint-order: stroke fill; stroke: rgba(5,8,14,.98); stroke-width: 1.35px; stroke-linejoin: round; dominant-baseline: alphabetic; pointer-events: none; }
 .pc.is-frozen .jugnu, .pc.is-frozen .gem-jugnu-glow { animation: none; opacity: .12; }
 .pc.done .jugnu { opacity: .35; filter: blur(2px) saturate(1.2); }
 .pc .gem-shield { fill: #c9f2ff; fill-opacity: .16; stroke: #c9f2ff; stroke-opacity: .8; stroke-width: .7; opacity: 0; transition: opacity .16s; }
@@ -370,11 +372,14 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc.is-frozen .gem-frost-wash, .pc.is-frozen .gem-frost-crack { opacity: 1; }
 .pc.hop { transition-timing-function: cubic-bezier(.2,.9,.3,1.3); z-index: 6; }
 .pc.can { pointer-events: auto; cursor: pointer; z-index: 5; }
-.pc.can .gem-token { filter: drop-shadow(0 6px 2.8px rgba(0,0,0,.5)) drop-shadow(0 0 0 3px rgba(255,255,255,.78)) drop-shadow(0 0 10px rgba(255,255,255,.22)) drop-shadow(0 1px 0 rgba(255,255,255,.34)); }
+.pc.can .gem-token { filter: drop-shadow(0 7px 3px rgba(0,0,0,.52)) drop-shadow(0 0 3px rgba(255,255,255,.92)) drop-shadow(0 0 9px var(--pc)) drop-shadow(0 1px 0 rgba(255,255,255,.34)); }
+.pc.can .gem-core { opacity: 1; animation-duration: 1.7s; }
+.pc.can .gem-num-disc { stroke-width: 1.05; }
 .pc.is-turn { z-index: 6; }
-.pc.is-turn::before { content: ""; position: absolute; inset: -22%; border-radius: 50%; border: 2.5px solid #fff; box-shadow: 0 0 0 3px var(--pc), 0 0 18px var(--pc), 0 6px 10px rgba(0,0,0,.22); animation: token-ring 1.15s ease-in-out infinite; pointer-events: none; z-index: 4; }
+.pc.is-turn::before { content: ""; position: absolute; inset: -24%; border-radius: 50%; border: 2.5px solid rgba(255,255,255,.98); box-shadow: 0 0 0 2px var(--pc), 0 0 17px var(--pc), 0 6px 10px rgba(0,0,0,.24); animation: token-ring 1.25s ease-in-out infinite; pointer-events: none; z-index: 4; }
 .pc.sel { z-index: 7; }
-.pc.sel::before { content: ""; position: absolute; inset: -30%; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 4px var(--accent), 0 0 22px var(--accent), 0 10px 16px rgba(0,0,0,.32); animation: token-ring .8s ease-in-out infinite; pointer-events: none; }
+.pc.sel::before { content: ""; position: absolute; inset: -30%; border-radius: 50%; border: 3px solid #fff; background: rgba(255,255,255,.035); box-shadow: 0 0 0 4px var(--accent), 0 0 22px var(--accent), 0 10px 16px rgba(0,0,0,.32); animation: token-ring .8s ease-in-out infinite; pointer-events: none; }
+.pc.sel .gem-num-disc { fill: rgba(5,9,16,.9); stroke: #fff; stroke-width: 1.1; }
 .pc.sel .gem-token { filter: drop-shadow(0 11px 5px rgba(0,0,0,.58)) drop-shadow(0 3.5px 1.8px rgba(0,0,0,.38)) drop-shadow(0 0 12px rgba(255,255,255,.38)) drop-shadow(0 0 0 2px rgba(255,255,255,.55)); }
 .pc:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; z-index: 8; }
 @keyframes token-ring { 0%, 100% { transform: scale(.9); opacity: 1; } 50% { transform: scale(1.1); opacity: .48; } }
