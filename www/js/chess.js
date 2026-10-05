@@ -380,6 +380,54 @@
   function pieceName(piece) {
     return ({ p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' })[String(piece || '').toLowerCase()] || 'empty';
   }
+  function computerPositionScore(state, perspective) {
+    if (state.phase === 'over') return state.winner == null ? 0 : state.winner === perspective ? 100000 : -100000;
+    var values = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+    var score = 0;
+    for (var index = 0; index < 64; index++) {
+      var piece = state.board[index], color = colorOf(piece);
+      if (color == null) continue;
+      var kind = piece.toLowerCase(), row = Math.floor(index / 8), col = index % 8;
+      var centrality = 7 - Math.abs(3.5 - row) - Math.abs(3.5 - col);
+      var positional = kind === 'p' ? (color === 0 ? 6 - row : row - 1) * 3 :
+        (kind === 'n' || kind === 'b' ? centrality * 4 : kind === 'q' ? centrality : 0);
+      score += (color === perspective ? 1 : -1) * (values[kind] + positional);
+    }
+    if (inCheck(state, perspective)) score -= 28;
+    if (inCheck(state, 1 - perspective)) score += 18;
+    return score;
+  }
+  // A small one-reply search keeps the guest opponent responsive; all moves still
+  // come from the same legal-move rules used by online Chess.
+  function chooseComputerMove(state) {
+    if (!state || state.phase !== 'active' || (state.turn !== 0 && state.turn !== 1)) return null;
+    var candidates = legalMoves(state), perspective = state.turn;
+    if (!candidates.length) return null;
+    var best = null, bestScore = -Infinity;
+    candidates.forEach(function (candidate) {
+      var after = rawApply(state, candidate);
+      var replies = legalMoves(after);
+      var score;
+      if (!replies.length) {
+        score = inCheck(after, after.turn) ? 100000 : 0;
+      } else {
+        score = Infinity;
+        replies.forEach(function (reply) {
+          var next = rawApply(after, reply);
+          var replyScore = computerPositionScore(next, perspective);
+          if (inCheck(next, next.turn)) {
+            var defenses = legalMoves(next);
+            if (!defenses.length) replyScore = -100000;
+            else replyScore -= 30;
+          }
+          if (replyScore < score) score = replyScore;
+        });
+        if (inCheck(after, after.turn)) score += 12;
+      }
+      if (score > bestScore) { bestScore = score; best = candidate; }
+    });
+    return best;
+  }
   return {
     initialState: initialState,
     legalMoves: legalMoves,
@@ -396,6 +444,7 @@
     movesFromPositionHistory: movesFromPositionHistory,
     exportPgn: exportPgn,
     pieceName: pieceName,
-    colorOf: colorOf
+    colorOf: colorOf,
+    chooseComputerMove: chooseComputerMove
   };
 });
