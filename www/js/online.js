@@ -128,6 +128,7 @@
       sessionStorage.removeItem('crossfour.online.room');
     }
     setRoomConnectionState('idle', '');
+    if (window.__cf && window.__cf.clearOnline) window.__cf.clearOnline();
     renderRoom();
   }
   function callRpc(name, args) {
@@ -624,6 +625,12 @@
       if (focusTarget) focusTarget.focus({ preventScroll: true });
     }
   }
+  function expireOnlineTurn() {
+    if (!currentRoomId || !client || roomConnectionState !== 'connected') return;
+    callRpc('expire_turn', { p_room_id: currentRoomId }).then(function () { return refreshRoom(); }).catch(function (error) {
+      if (!/expire_turn|schema cache|Could not find the function|PGRST202/i.test(errorText(error))) announce('Turn timer could not be applied: ' + errorText(error), true);
+    });
+  }
   function renderMatch() {
     var room = currentRoom;
     var panel = $('online-match-panel');
@@ -636,6 +643,7 @@
       panel.classList.remove('is-chess-match');
       setChessPlayScreen(false);
       chessAnnouncementRoomId = ''; chessAnnouncementVersion = null; chessAnnouncementState = null; chessAnnouncementDrawOffer = null; $('online-chess-announcement').textContent = '';
+      if (window.__cf && window.__cf.clearOnline) window.__cf.clearOnline();
       return;
     }
     var state = record.state;
@@ -670,8 +678,8 @@
       : (state.phase === 'over' ? 'Match complete. Winner: ' + ((room.roster.find(function (member) { return member.seat === Number((state.ranking || [])[0]); }) || {}).displayName || '—')
         : (turnMember ? turnMember.displayName || turnMember.handle || 'Player' : 'Player') + (isMyTurn ? ' · your turn' : ' · waiting for their turn') + (state.phase === 'move' ? ' · choose a legal token move' : ' · roll phase'));
     $('online-chess-play').classList.toggle('hidden', !isChess);
-    ['online-match-dice', 'online-match-pieces', 'online-match-moves', 'online-classic-note'].forEach(function (id) { $(id).classList.toggle('hidden', isChess); });
-    $('online-roll').classList.toggle('hidden', isChess || !(isMyTurn && state.phase === 'roll' && !pendingMatchAction));
+    ['online-match-dice', 'online-match-pieces', 'online-match-moves', 'online-classic-note', 'online-roll'].forEach(function (id) { $(id).classList.toggle('hidden', true); });
+    if (!isChess) $('online-roll').classList.add('hidden');
     $('online-roll').disabled = !isSynchronized;
     $('online-match-retry').classList.toggle('hidden', !pendingMatchAction || pendingMatchAction.room_id !== currentRoomId);
     $('online-match-retry').disabled = !isSynchronized;
@@ -679,6 +687,7 @@
     $('online-chess-resign').disabled = !isSynchronized;
     $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) { button.disabled = !isSynchronized; });
     if (isChess) {
+      if (window.__cf && window.__cf.clearOnline) window.__cf.clearOnline();
       renderChessDrawControls(state, room, isSynchronized);
       renderChessMoveHistory(state, room, record.version);
       renderCapturedPieces(chessMoveHistoryCache.captures, 0, 'online-chess-red-captured');
@@ -690,31 +699,26 @@
     var queue = Array.isArray(state.queue) ? state.queue : [];
     $('online-match-dice').textContent = (lastRoll ? 'Last server die: seat ' + (Number(lastRoll.seat) + 1) + ' rolled ' + lastRoll.face + '. ' : '') +
       (queue.length ? 'Dice to use: ' + queue.join(' · ') : 'No pending dice.');
-    var pieces = $('online-match-pieces');
-    pieces.replaceChildren();
-    (state.players || []).forEach(function (seat) {
-      var member = room.roster.find(function (candidate) { return Number(candidate.seat) === Number(seat); });
-      var values = (state.pieces && state.pieces[seat]) || [];
-      var item = document.createElement('li');
-      var name = document.createElement('b');
-      name.textContent = 'Seat ' + (Number(seat) + 1) + ' · ' + ((member && (member.displayName || member.handle)) || 'Player');
-      var positions = document.createElement('small');
-      positions.textContent = values.map(function (position, index) { return 'T' + (index + 1) + ' ' + (position < 0 ? 'base' : position === 57 ? 'home' : position >= 52 ? 'home lane ' + (position - 51) : 'track ' + position); }).join(' · ');
-      item.append(name, positions); pieces.appendChild(item);
-    });
-    var moves = $('online-match-moves');
-    moves.replaceChildren();
     if (isMyTurn && state.phase === 'move' && !pendingMatchAction && window.LudoLogic && typeof window.LudoLogic.queueMoves === 'function') {
-      var localView = { mode: 'classic', players: state.players, pieces: state.pieces, rules: state.rules, turn: Number(state.turn), phase: 'move', queue: queue, ranking: state.ranking || [], effects: [], capd: [false, false, false, false], lk: null };
-      window.LudoLogic.queueMoves(localView).forEach(function (move) {
-        var action = document.createElement('button'); action.type = 'button'; action.className = 'btn plate'; action.textContent = 'Use ' + move.v + ' to move token ' + (move.piece + 1);
-        action.disabled = roomConnectionState !== 'connected';
-        action.addEventListener('click', function () { submitMatchAction('move_match', { p_piece: move.piece, p_queue_index: queue.indexOf(move.v) }); });
-        moves.appendChild(action);
-      });
-      if (!moves.childElementCount) moves.textContent = 'No legal moves are available; the server will pass the turn.';
+      var localView = { mode: 'classic', players: state.players, pieces: state.pieces, rules: state.rules, turn: Number(state.turn), phase: 'move', queue: queue, ranking: state.ranking || [], effects: [], capd: state.capd || [false, false, false, false], lk: null };
+      window.LudoLogic.queueMoves(localView);
     }
-    if (pendingMatchAction && pendingMatchAction.room_id === currentRoomId) moves.textContent = 'A match action is awaiting confirmation. Retry the same request safely if your connection dropped.';
+    var names = {};
+    (room.roster || []).forEach(function (member) { names[Number(member.seat)] = member.displayName || member.handle || ('Seat ' + (Number(member.seat) + 1)); });
+    if (window.__cf && window.__cf.presentOnline) {
+      window.__cf.presentOnline({
+        state: state,
+        mySeat: myMember ? Number(myMember.seat) : Number(state.turn),
+        names: names,
+        deadline: Number(state.turn_deadline) || 0,
+        grace: state.grace || null,
+        pending: !!(pendingMatchAction && pendingMatchAction.room_id === currentRoomId),
+        onRoll: function () { submitMatchAction('roll_match', {}); },
+        onMove: function (piece, queueIndex) { submitMatchAction('move_match', { p_piece: piece, p_queue_index: queueIndex }); },
+        onExpire: function () { expireOnlineTurn(); },
+        onRetry: runPendingMatchAction
+      });
+    }
   }
   function discoverActiveRoom(userId, restoreToken) {
     if (!client || !currentUser || currentUser.id !== userId) return Promise.resolve(null);
@@ -1029,7 +1033,7 @@
     } else {
       capacity.disabled = false;
       if (capacityBeforeChess && Array.prototype.some.call(capacity.options, function (option) { return option.value === capacityBeforeChess; })) capacity.value = capacityBeforeChess;
-      $('online-mode-note').textContent = 'Classic Ludo and Ludo Chess are playable online. Mystery and Lucky Chaos remain offline modes.';
+      $('online-mode-note').textContent = 'Classic Ludo plays on the same board as offline. House rules lock when the room is created. Mystery and Lucky Chaos remain offline modes.';
     }
   }
   function bindEvents() {
@@ -1065,17 +1069,45 @@
           return refreshAccount().then(function () { return refreshRoom(); });
         }).catch(function (error) { announce('Profile update failed: ' + errorText(error), true); });
     });
+    function classicRulesPayload() {
+      var rules = window.__cf && window.__cf.save && window.__cf.save.rules;
+      if (!rules) return { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true, arrows: false, noCapture: false };
+      return {
+        rollStyle: rules.rollStyle === 'classic' ? 'classic' : 'star',
+        safeSquares: !!rules.safeSquares, captureToEnter: !!rules.captureToEnter, blocks: !!rules.blocks,
+        bonusOnCapture: !!rules.bonusOnCapture, bonusOnHome: !!rules.bonusOnHome, arrows: !!rules.arrows, noCapture: !!rules.noCapture
+      };
+    }
+    function roomRpcArgs() {
+      var args = { p_mode: $('online-mode').value, p_capacity: Number($('online-capacity').value) };
+      if (args.p_mode === 'classic') args.p_rules = classicRulesPayload();
+      return args;
+    }
+    function missingRulesRpc(error) {
+      var text = errorText(error);
+      return /create_room|quick_match|schema cache|Could not find the function|PGRST202/i.test(text);
+    }
     $('online-create-room').addEventListener('click', function () {
       if (!client) return;
-      callRpc('create_room', { p_mode: $('online-mode').value, p_capacity: Number($('online-capacity').value) })
-        .then(attachRoom)
-        .catch(function (error) { announce('Room could not be created: ' + errorText(error), true); });
+      var args = roomRpcArgs();
+      callRpc('create_room', args).then(attachRoom).catch(function (error) {
+        if (args.p_rules && missingRulesRpc(error)) {
+          announce('This server has not applied the v1.4.0 rules migration, so house rules cannot be locked yet. Creating the room with the previous server rules.', true);
+          return callRpc('create_room', { p_mode: args.p_mode, p_capacity: args.p_capacity }).then(attachRoom);
+        }
+        announce('Room could not be created: ' + errorText(error), true);
+      });
     });
     $('online-quick-match').addEventListener('click', function () {
       if (!client) return;
-      callRpc('quick_match', { p_mode: $('online-mode').value, p_capacity: Number($('online-capacity').value) })
-        .then(attachRoom)
-        .catch(function (error) { announce('Matchmaking failed: ' + errorText(error), true); });
+      var args = roomRpcArgs();
+      callRpc('quick_match', args).then(attachRoom).catch(function (error) {
+        if (args.p_rules && missingRulesRpc(error)) {
+          announce('This server has not applied the v1.4.0 rules migration, so quick match cannot lock house rules yet. Searching with the previous server rules.', true);
+          return callRpc('quick_match', { p_mode: args.p_mode, p_capacity: args.p_capacity }).then(attachRoom);
+        }
+        announce('Matchmaking failed: ' + errorText(error), true);
+      });
     });
     $('online-join-room').addEventListener('click', function () { joinInvite($('online-join-code').value); });
     $('online-join-code').addEventListener('keydown', function (event) {
@@ -1110,6 +1142,7 @@
     });
     $('online-roll').addEventListener('click', function () { submitMatchAction('roll_match', {}); });
     $('online-match-retry').addEventListener('click', runPendingMatchAction);
+    if ($('online-board-retry')) $('online-board-retry').addEventListener('click', runPendingMatchAction);
     $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) {
       button.addEventListener('click', function () {
         if (!pendingChessPromotion || pendingMatchAction) return;
@@ -1150,13 +1183,22 @@
       if (!currentRoomId) { restoreActiveRoom(); return; }
       if (roomChannel && ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].indexOf(roomChannelStatus) >= 0) clearRoomChannel();
       subscribeRoom();
-      refreshRoom();
+      var rejoin = currentRoom && currentRoom.mode === 'classic' && currentRoom.status === 'active'
+        ? callRpc('rejoin_match', { p_room_id: currentRoomId }).catch(function (error) {
+          if (!/rejoin_match|schema cache|Could not find the function|PGRST202/i.test(errorText(error))) announce('Rejoin failed: ' + errorText(error), true);
+          return null;
+        })
+        : Promise.resolve(null);
+      rejoin.then(function () { return refreshRoom(); });
     }
     window.addEventListener('online', refreshAfterReconnect);
     window.addEventListener('offline', function () {
       if (currentRoomId && currentUser) {
         setRoomConnectionState('reconnecting');
-        announce('Connection lost. The room will resynchronize before match actions resume.', true);
+        announce('Connection lost. You have a short reconnect window to rejoin the same seat. No computer takes your place.', true);
+        if (currentRoom && currentRoom.mode === 'classic' && currentRoom.status === 'active') {
+          callRpc('note_disconnect', { p_room_id: currentRoomId }).catch(function () {});
+        }
       }
     });
     window.addEventListener('focus', refreshAfterReconnect);

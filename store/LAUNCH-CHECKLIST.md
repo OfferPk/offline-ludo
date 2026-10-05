@@ -1,5 +1,19 @@
 # Launch checklist: Crossfour on Google Play (new personal account)
 
+## v1.4.0 update — Roman Urdu khulasa (naya kya hai)
+
+- **Online Classic:** text panel hata diya. Ab wahi local canvas board hai jo offline match mein hai. Rooms, quick match aur invites pehle jese hain.
+- **Rules lock:** host Settings ke house rules choose karta hai jab room banta hai. Sab wahi rules khelte hain. Beech match mein change nahi.
+- **Server:** star-style roll stacking, safe squares, capture extra turn, home extra turn, ghar ke liye exact number, base se 6. `move_match` ka `v_all_home` bug fix (non-home move ab galat next turn nahi leta).
+- **Reconnect:** 20 second ka window, wahi seat. Computer seat nahi leta. Us ke baad seat drop, 2 se kam hon to match abandon.
+- **Turn timer:** 45 second, screen par dikhta hai. Waqt khatam ho to turn pass.
+- **Arrows:** purane squares hata diye. Teer ab board number 4 par (4, 17, 30, 43).
+- **Undo:** Settings mein Undo. Default on. Off karo to undo bilkul band, ad undo bhi nahi.
+- **How to play:** home par Rule | Kaise table, top 4 mode cards jitna size, neon border.
+- **Ads wahi:** interstitial sirf match ke baad, 5 matches AUR 3 minute, cap, pehle session / launch / exit / back par kabhi nahi. Rewarded sirf tap. Google TEST ad IDs. targetSdk 36. Coins/diamonds cosmetic. Koi wager, cash-out, billing nahi. 13+.
+- **Upload:** `offline-ludo-v1.4.0.aab` (version 1.4.0, **versionCode 5**), wahi upload key. **Asli AdMob IDs wala agla version v1.4.1 / versionCode 6 hoga.**
+- **Online server:** migration repo mein hai. Is machine par database password / service role nahi, is liye live Supabase par migration apply nahi hui. Client canvas, timer, rule lock aur tests local chalaye gaye.
+
 ## v1.3.0 update — Roman Urdu khulasa (naya kya hai)
 
 - **Quick Ludo:** har player ki 2 gotiyan (4 nahi), wahi board. 6 se base se nikalna, ghar ke liye exact number, safe squares. Match bohot jaldi khatam (300 games mein average ~86 rolls). 1 v 1 aur computer.
@@ -8,7 +22,7 @@
 - **Friendly:** capture band. Sirf race. App phir bhi **13+** hai.
 - **Polish:** chuni hui goti highlight, pichhli chaal ke khane roshan, jeet ki screen par moves aur waqt. Haptics dice aur capture par, Settings se band (default on). Do muft board: Midnight (dark) aur Classic Wood. Coins sirf cosmetic. Koi purchase / bet / entry fee nahi.
 - **Ads wahi:** interstitial sirf match ke baad, 5 matches AUR 3 minute ke baad, cap, pehle session / launch / exit / back par kabhi nahi. Rewarded sirf tap par. Google TEST ad IDs. targetSdk 36. Poora offline.
-- **Upload:** `offline-ludo-v1.3.0.aab` (version 1.3.0, **versionCode 4**), wahi upload key (SHA-256 `F1:C8:15:EA…`). **Asli AdMob IDs wala agla version v1.3.1 / versionCode 5 hoga** (pehle v1.2.1 / code 4 likha tha).
+- **Upload:** `offline-ludo-v1.3.0.aab` (version 1.3.0, **versionCode 4**), wahi upload key (SHA-256 `F1:C8:15:EA…`). **Asli AdMob IDs wala agla version v1.4.1 / versionCode 6 hoga** (pehle v1.2.1 / code 4 likha tha).
 
 ## v1.2.0 update — Roman Urdu khulasa (naya kya hai)
 
@@ -49,7 +63,7 @@
 4. **12 testers, 14 din:** kam az kam **12 log (behtar hai 15–20)** opt-in karein aur **lagatar 14 din** tak test mein rahein. Beech mein koi nikal gaya to ginti dobara ho sakti hai.
 5. **Production ke liye apply karo:** 14 din ke baad Dashboard par "Apply for production" dabao aur sawalon ke jawab do.
 6. **AdMob:** app banao, **Banner, Interstitial, Rewarded** teen ad units banao, **GDPR (UMP) message** publish karo. App Play par live hone ke baad AdMob mein Play se **link** karo.
-7. **IDs mujhe bhejo:** AdMob **App ID** aur teeno **ad unit IDs** mujhe do. Main inhein `www/js/ads-config.js` aur `AndroidManifest.xml` mein laga kar naya version (v1.3.1) bana dunga. Wo version production mein jayega.
+7. **IDs mujhe bhejo:** AdMob **App ID** aur teeno **ad unit IDs** mujhe do. Main inhein `www/js/ads-config.js` aur `AndroidManifest.xml` mein laga kar naya version (v1.4.1) bana dunga. Wo version production mein jayega.
 8. **Kabhi apne ads par khud click na karo.** Is se AdMob account band ho sakta hai.
 9. **Target audience:** sirf **13–15, 16–17 aur 18+** tick karo (bachon wale age groups nahin). Data safety mein AdMob wale 4 data types bharo (details `play-console-answers.md` mein hain).
 10. **Upload key ka backup:** `offline-ludo-key-backup.zip` (keystore + password file) ko kisi mehfooz jagah, jaise USB ya password manager, mein rakho. GitHub par kabhi mat daalna. Key gum ho jaye to Play Console se upload key reset karwani padegi.
@@ -134,7 +148,7 @@
     - **Stay in the test.** They should not click "Leave the program".
     - Open and play the game a few times during the 14 days, and send you short feedback.
 
-> Note: v1.3.0 still uses Google's **test ad IDs**, so testers will see "Test Ad" banners. That is fine and safe for testing. The real ad IDs go into v1.3.1 (see Part F).
+> Note: v1.3.0 still uses Google's **test ad IDs**, so testers will see "Test Ad" banners. That is fine and safe for testing. The real ad IDs go into v1.4.1 (see Part F).
 
 ---
 
@@ -148,7 +162,7 @@
 - If you drop below 12, add new testers quickly. The 14-day window must be unbroken.
 - Check progress on the **Dashboard**. It shows how many testers are opted in and for how many days.
 - Tip: invite 15–20 people. Keep a simple list with their name, Gmail, the date they joined, and their feedback. You will need this for the production questions.
-- You can upload a newer build (for example v1.3.1 with real ads) to the **same closed track** during the test. Testers stay opted in.
+- You can upload a newer build (for example v1.4.1 with real ads) to the **same closed track** during the test. Testers stay opted in.
 - Official rule: https://support.google.com/googleplay/android-developer/answer/14151465
 
 ---
@@ -159,11 +173,11 @@
 2. Answer the questions honestly and in detail. For example:
    - How you found testers (friends, family, colleagues).
    - What they tested (2, 3 and 4 player matches, all three computer levels, pass & play, each house rule on and off, captures, exact home entry, three 6s, undo vs computer, resume after closing, stats, skins, settings, ads).
-   - What feedback you got and what you changed. Even small fixes count (for example, "added real ad IDs and turned off test mode in v1.3.1").
+   - What feedback you got and what you changed. Even small fixes count (for example, "added real ad IDs and turned off test mode in v1.4.1").
    - Why the app is ready (stable, no crashes, rules covered by automated tests including 1000 simulated computer-vs-computer matches that all finish, works offline, match saved automatically).
 3. Submit. Google usually answers within about 7 days.
 4. When approved: go to **Test and release → Production → Create new release**.
-   - Upload the **newest AAB** (v1.3.1 with real ad IDs, see Part F), or promote the release from closed testing.
+   - Upload the **newest AAB** (v1.4.1 with real ad IDs, see Part F), or promote the release from closed testing.
    - Choose countries/regions.
    - Add release notes, then **Save → Send changes for review**.
 5. After review, the app is live on Google Play. 🎉
@@ -242,7 +256,7 @@ Then I will:
 1. Put the IDs in `www/js/ads-config.js` and set `IS_TESTING: false`.
 2. Put the App ID in `android/app/src/main/AndroidManifest.xml` (`com.google.android.gms.ads.APPLICATION_ID`).
 3. Bump the version to **1.3.1 (versionCode 5)**.
-4. Tag **v1.3.1** so GitHub Actions builds the signed AAB and creates the release.
+4. Tag **v1.4.1** so GitHub Actions builds the signed AAB and creates the release.
 5. Give you the new AAB link. You upload it to the closed test track (and later to production).
 
 ---
@@ -253,7 +267,7 @@ Then I will:
 |---|---|
 | Day 0 | Sign up for Play Console, pay $25, verify identity |
 | Day 1–3 | Identity approved. Create the app, fill in App content and the store listing, upload v1.3.0 to closed testing. Set up AdMob. |
-| Day 2–7 | Closed test review done. Send the opt-in link to 15–20 testers. Send me the AdMob IDs and I build v1.3.1. |
-| Day ~5–21 | 14 continuous days with 12+ testers. Upload v1.3.1 to the closed track. |
+| Day 2–7 | Closed test review done. Send the opt-in link to 15–20 testers. Send me the AdMob IDs and I build v1.4.1. |
+| Day ~5–21 | 14 continuous days with 12+ testers. Upload v1.4.1 to the closed track. |
 | Day ~21 | Apply for production |
-| Day ~28 | Production approved. Release v1.3.1. Link AdMob to Play. Add app-ads.txt. |
+| Day ~28 | Production approved. Release v1.4.1. Link AdMob to Play. Add app-ads.txt. |

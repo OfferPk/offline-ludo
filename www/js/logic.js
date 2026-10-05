@@ -29,7 +29,7 @@
   var TRACK = 52, LAST_TRACK = 50, CIRCLE = 51, COL0 = 52, HOME = 57, PIECES = 4;
   var START_SQUARES = [0, 13, 26, 39];
   var STAR_SQUARES = [8, 21, 34, 47];
-  var ARROW_SQUARES = [2, 7, 15, 20, 28, 33, 41, 46]; // one-way, always clockwise; never a start or star
+  var ARROW_SQUARES = [4, 17, 30, 43]; // board number 4 on each side (absolute index 4, then +13). Not the old 2/7 squares.
   var DEFAULT_RULES = { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true, arrows: false, noCapture: false };
   var LEVELS = ['easy', 'medium', 'hard'];
   var MODES = ['classic', 'mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'];

@@ -467,19 +467,19 @@ function startLocalServer() {
       await page.waitForFunction(() => document.querySelector('#online-room-status').textContent.includes('validated by the server'));
     await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · active'));
       await page.waitForFunction(() => !document.querySelector('#online-match-panel').classList.contains('hidden') && document.querySelector('#online-match-version').textContent === 'Version 0');
+      await page.waitForFunction(() => !document.querySelector('#game').classList.contains('hidden') && document.querySelector('#board') && document.querySelector('#online-match-pieces').classList.contains('hidden'));
       await page.evaluate(() => { window.__mockBackend.failRpc = 'roll_match'; });
-      await page.click('#online-roll');
+      await page.evaluate(() => document.querySelector('#game .pod[data-seat="0"] .pdice').click());
       await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Retry uses the same action ID.'));
       const firstRollId = await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'roll_match').args.p_action_id);
       await page.evaluate(() => { window.__mockBackend.failRpc = null; });
       await page.click('#online-match-retry');
       await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 1' && document.querySelector('#online-match-dice').textContent.includes('rolled 6'));
-      await page.click('#online-roll');
+      await page.evaluate(() => document.querySelector('#game .pod[data-seat="0"] .pdice').click());
       await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 2' && document.querySelector('#online-match-turn').textContent.includes('choose a legal token move'));
-      await page.waitForSelector('#online-match-moves button');
-      assert.match(await page.$eval('#online-match-moves button', el => el.textContent), /Use 6 to move token 1/, 'local rules engine supplies legal move choices for server dice');
-      await page.click('#online-match-moves button');
-      await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 3' && document.querySelector('#online-match-pieces').textContent.includes('T1 track 0'));
+      await page.waitForFunction(() => { const g = window.__cf.game; return g && g.online && g.st.phase === 'move' && g.st.moves.some(m => m.piece === 0); });
+      await page.evaluate(() => document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]').click());
+      await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 3' && window.__cf.game && window.__cf.game.st.pieces[0][0] === 0);
       const matchCalls = await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => ['roll_match', 'move_match'].includes(call.name)));
       assert.equal(matchCalls[0].args.p_action_id, firstRollId, 'retry sends the same idempotency key after a dropped action');
       assert.equal(Object.hasOwn(matchCalls[0].args, 'p_die'), false, 'client cannot pass a dice face into the server roll RPC');
@@ -488,6 +488,7 @@ function startLocalServer() {
       assert.ok((await page.evaluate(() => window.__mockBackend.snapshot())).channels.some(channel => channel.tables.includes('match_states')), 'live match-state changes are subscribed and re-read after reconnect');
       await page.evaluate(() => window.__mockBackend.emit('match_history', { event: 'INSERT', new: { id: 'history-one', user_id: 'user-one' } }));
 
+    await page.evaluate(() => document.querySelector('#btn-home').click());
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
     await page.$eval('#online-capacity', el => { el.value = '3'; el.dispatchEvent(new Event('change', { bubbles: true })); });

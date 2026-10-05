@@ -42,6 +42,26 @@
             <span class="mode-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="8.5" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 19c.3-3.2 2-4.8 5-4.8s4.7 1.6 5 4.8M14.2 15.2c3.7-.8 5.8.6 6.3 3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
             <span class="mode-card-copy"><span class="mode-card-title" id="mode-pass-title">Pass &amp; Play</span><span class="mode-card-subtitle" id="mode-pass-subtitle">2–4 players on one phone</span></span>
           </button>
+
+          <section id="howto-card" class="howto-card" aria-labelledby="howto-title">
+            <h2 id="howto-title">How to play</h2>
+            <div class="howto-scroll">
+              <table class="howto-table">
+                <thead><tr><th>Rule</th><th>Kaise</th></tr></thead>
+                <tbody>
+                  <tr><td>Leave base</td><td>Sirf 6 par. Goti start square par aati hai.</td></tr>
+                  <tr><td>Safe squares</td><td>Start aur star par capture nahi. Goti share kar sakti hai.</td></tr>
+                  <tr><td>Capture</td><td>Rival par rukna: wo base par. Default bonus roll.</td></tr>
+                  <tr><td>Exact home</td><td>Ghar ke liye exact number. Zyada ho to wo roll nahi chalta.</td></tr>
+                  <tr><td>Quick</td><td>2 gotiyan. Wahi rules: 6, exact home, safe squares.</td></tr>
+                  <tr><td>Team</td><td>2v2, partners opposite. Dono ghar pohanchein. Partner capture nahi.</td></tr>
+                  <tr><td>One-way tiles</td><td>Board number 4 par teer. Ek extra square clockwise.</td></tr>
+                  <tr><td>Friendly</td><td>Capture band. Sirf race home. App 13+ rehti hai.</td></tr>
+                  <tr><td>Online Classic</td><td>Wahi board. Host ke rules room par lock. 45s turn, 20s reconnect.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
           <div class="mode-grid">
             <button id="btn-quick" class="btn plate"><span><em class="new-badge">NEW</em>Quick Ludo</span><small>2 tokens · fast games</small></button>
             <button id="btn-team" class="btn plate"><span>Team Ludo</span><small>2v2 · partners opposite</small></button>
@@ -304,12 +324,14 @@
     <section id="game" class="screen hidden">
       <header class="topbar">
         <button id="btn-home" class="icon-btn" aria-label="Menu"><svg viewBox="0 0 24 24"><path d="M15.5 4.5 8 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <div class="turn-label" id="turn-label">—</div>
+        <div class="turn-label" id="turn-label">—</div><span id="online-turn-timer" class="online-turn-timer hidden"></span>
         <div class="topbar-actions">
           <button id="btn-game-settings" class="icon-btn" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
           <button id="btn-exit-match" class="exit-match" type="button" aria-label="Exit match" title="Exit match"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20h-6v-6h-4v6H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 9.5h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Home</span></button>
         </div>
       </header>
+      <p id="online-grace" class="online-grace hidden" role="status"></p>
+      <button id="online-board-retry" class="btn plate hidden" type="button">Retry pending action</button>
       <div id="stage">
         <div class="pods top"><div class="pod" data-slot="0"></div><div class="pod right" data-slot="1"></div></div>
         <div id="board-wrap">
@@ -524,11 +546,12 @@
         <label class="row"><span>Sound effects</span><input type="checkbox" id="set-sound"><i class="sw"></i></label>
         <label class="row"><span>Haptics <small>dice roll and captures</small></span><input type="checkbox" id="set-haptics"><i class="sw"></i></label>
         <label class="row"><span>Auto-move when only one move</span><input type="checkbox" id="set-auto"><i class="sw"></i></label>
-        <label class="row"><span>Undo dice roll <small>about 2 s to undo after your roll</small></span><input type="checkbox" id="set-undo"><i class="sw"></i></label>
+        <label class="row"><span>Undo <small>on by default. Off removes undo completely, including the ad undo</small></span><input type="checkbox" id="set-undo"><i class="sw"></i></label>
         <label class="row"><span>Turn timer <small>20 s per turn for human players</small></span><input type="checkbox" id="set-timer"><i class="sw"></i></label>
         <label class="row"><span>Computer chat &amp; emotes</span><input type="checkbox" id="set-chat"><i class="sw"></i></label>
         <label class="row"><span>Fast animations</span><input type="checkbox" id="set-fast"><i class="sw"></i></label>
         <div class="sect">House rules <small>(new matches)</small></div>
+        <p id="rule-lock-note" class="note hidden">Locked for this online room. The host chose these when the table was created.</p>
         <div class="row nolabel"><span>Roll style</span><div class="seg mini" id="rule-style"><button data-v="star">Star</button><button data-v="classic">Classic</button></div></div>
         <label class="row"><span>Safe squares <small>start squares &amp; stars</small></span><input type="checkbox" id="rule-safeSquares"><i class="sw"></i></label>
         <label class="row"><span>Capture to enter home</span><input type="checkbox" id="rule-captureToEnter"><i class="sw"></i></label>
@@ -542,7 +565,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.3.0 · © OfferPk</p>
+        <p class="ver">Crossfour v1.4.0 · © OfferPk</p>
       </div>
     </div>
 

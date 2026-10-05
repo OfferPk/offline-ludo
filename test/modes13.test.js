@@ -22,15 +22,16 @@ t('Arrow: landing or passing both ride one extra clockwise square', () => {
   const st = L.newGame([H, A(), null, null], {}, 4, 'arrow');
   assert.ok(st.rules.arrows);
   assert.deepStrictEqual(L.legalMoves(st, 0, 1).find(m => m.from === -1), undefined);
-  st.pieces[0][0] = 1;
+  assert.deepStrictEqual(L.ARROW_SQUARES, [4, 17, 30, 43]);
+  st.pieces[0][0] = 3;
   const land = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
-  assert.deepStrictEqual(land.path, [2, 3], 'landing on arrow 2 rides to 3');
-  st.pieces[0][0] = 0;
+  assert.deepStrictEqual(land.path, [4, 5], 'landing on board number 4 rides to 5');
+  st.pieces[0][0] = 2;
   const pass = L.legalMoves(st, 0, 2).find(m => m.piece === 0);
-  assert.deepStrictEqual(pass.path, [1, 2, 3], 'passing through arrow 2 also rides to 3');
+  assert.deepStrictEqual(pass.path, [3, 4, 5], 'passing through board number 4 also rides to 5');
   const classic = L.newGame([H, A(), null, null], { arrows: true }, 4, 'classic');
-  classic.pieces[0][0] = 1;
-  assert.deepStrictEqual(L.legalMoves(classic, 0, 1)[0].path, [2, 3], 'arrow house rule works in classic');
+  classic.pieces[0][0] = 3;
+  assert.deepStrictEqual(L.legalMoves(classic, 0, 1)[0].path, [4, 5], 'arrow house rule works in classic');
 });
 
 t('Friendly and the noCapture rule never capture', () => {

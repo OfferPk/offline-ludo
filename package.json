@@ -1,12 +1,12 @@
 {
   "name": "offline-ludo",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Crossfour: offline Ludo for 2-4 players (vs Easy/Medium/Hard AI or pass & play), vanilla JS with a Capacitor Android build and AdMob.",
   "private": true,
   "license": "MIT",
   "scripts": {
     "serve": "npx --yes http-server www -p 8080 -c-1",
-    "test": "node test/logic.test.js && node test/lucky.test.js && node test/modes13.test.js && node test/chess.test.js && node test/save-store.test.js && node test/adgate.test.js && node test/dice-gesture.test.js && node test/path-animation.test.js && node test/sound.test.js && node test/skins.test.js && node test/online-backend.test.js && node test/online-authoritative.test.js && node test/ludo-chess-migration.test.js",
+    "test": "node test/logic.test.js && node test/lucky.test.js && node test/modes13.test.js && node test/chess.test.js && node test/save-store.test.js && node test/adgate.test.js && node test/dice-gesture.test.js && node test/path-animation.test.js && node test/sound.test.js && node test/skins.test.js && node test/online-backend.test.js && node test/online-authoritative.test.js && node test/ludo-chess-migration.test.js && node test/online-classic-14.test.js",
     "test:home-cards": "node test/home-mode-cards.browser.test.js",
     "test:setup-layout": "node test/setup-layout.browser.test.js",
     "test:tutorial": "node test/tutorial.browser.test.js",

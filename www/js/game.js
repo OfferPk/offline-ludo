@@ -433,8 +433,8 @@
       g.forEach(function (si, idx) {
         var s = si[0], i = si[1], id = s + '-' + i, el = pieceEls[s][i];
         if (!el || moving[id]) return;
-        var p = st.pieces[s][i], c = center(L.cellOf(s, p, i)), sc = p === L.HOME ? 0.72 : 1;
-        if (n > 1) { var off = CLUSTER[Math.min(n, 4)][Math.min(idx, 3)]; c.x += off[0] * CELL; c.y += off[1] * CELL; sc = 0.78; }
+        var p = st.pieces[s][i], c = center(L.cellOf(s, p, i)), sc = 1;
+        if (n > 1) { var off = CLUSTER[Math.min(n, 4)][Math.min(idx, 3)]; c.x += off[0] * CELL; c.y += off[1] * CELL; }
         if (instant) { el.style.transition = 'none'; place(el, c.x, c.y, sc); void el.offsetWidth; el.style.transition = ''; }
         else place(el, c.x, c.y, sc);
         el.classList.toggle('done', p === L.HOME);
@@ -484,8 +484,8 @@
   function humans(st) { return st.players.filter(function (s) { return st.seats[s].type === 'human'; }); }
   function hasAI(st) { return st.players.some(function (s) { return st.seats[s].type === 'ai'; }); }
   function isHuman(s) { return G && G.st.seats[s] && G.st.seats[s].type === 'human'; }
-  function nameOf(s) { var st = G.st; if (st.seats[s].type === 'human' && humans(st).length === 1) return 'You'; return NAMES[s]; }
-  function levelOf(s) { var pl = G.st.seats[s]; return pl.type === 'human' ? (humans(G.st).length === 1 ? 'Lv ' + L.levelFromXp(save.xp).level : 'P' + (humans(G.st).indexOf(s) + 1)) : LEVEL_NAMES[pl.level]; }
+  function nameOf(s) { var st = G.st; var named = st.seats[s] && st.seats[s].name; if (named) return named; if (st.seats[s].type === 'human' && humans(st).length === 1) return 'You'; return NAMES[s]; }
+  function levelOf(s) { var pl = G.st.seats[s]; if (pl.type === 'remote') return 'Online'; return pl.type === 'human' ? (humans(G.st).length === 1 ? 'Lv ' + L.levelFromXp(save.xp).level : 'P' + (humans(G.st).indexOf(s) + 1)) : LEVEL_NAMES[pl.level]; }
   function undoActive() { return !!(G && G.undo && G.undo.until > Date.now()); }
 
   var forced = [], forcedEvents = [], forcedMega = []; // test hooks
@@ -681,7 +681,7 @@
   function startTimer() {
     var st = G.st, s = st.turn, el = podEl(s);
     stopTimer();
-    if (!save.settings.timer || !isHuman(s) || st.phase !== 'move' || !el) return;
+    if (G.online || !save.settings.timer || !isHuman(s) || st.phase !== 'move' || !el) return;
     el.style.setProperty('--tdur', TIMER_MS + 'ms'); void el.offsetWidth; el.classList.add('timing');
     G.timerTk = later(function () {
       G.timerTk = null;
@@ -730,6 +730,7 @@
 
   function advance() {
     if (!G) return;
+    if (G.online) { render(); highlight(); paintOnlineChrome(); return; }
     var st = G.st;
     render(); persist();
     if (st.phase === 'over') { later(finishMatch, 800); return; }
@@ -760,7 +761,7 @@
   }
   function prefersReducedMotion() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
   function animateDice(s, v, cb) {
-    var cube = cubeOf(s), reduced = prefersReducedMotion(), dur = reduced ? 0 : save.settings.fast ? 420 : 700;
+    var cube = cubeOf(s), reduced = prefersReducedMotion(), dur = reduced ? 0 : save.settings.fast ? 560 : 920;
     spins[s]++;
     if (cube) { cube.style.transitionDuration = dur + 'ms'; setDiceFace(s, v); var pd = cube.parentNode; pd.classList.remove('rolling'); if (!reduced) { void pd.offsetWidth; pd.classList.add('rolling'); } }
     SFX.roll();
@@ -779,6 +780,10 @@
 
   function doRoll(chosen) {
     if (!G || busy || G.st.phase !== 'roll' || paused) return;
+    if (G.online) {
+      if (isHuman(G.st.turn) && onlineHooks && onlineHooks.onRoll) onlineHooks.onRoll();
+      return;
+    }
     var st = G.st, s = st.turn, human = isHuman(s);
     stopAutoRollTimer(false);
     if (L.mustChoose(st) && chosen == null) {
@@ -827,6 +832,7 @@
     advance();
   }
   function undoRoll() {
+    if (!save.settings.undo) return;
     if (!G || !undoActive() || busy) return;
     SFX.click();
     if (G.undoLeft > 0) { G.undoLeft--; applyUndo(); return; }
@@ -910,6 +916,13 @@
 
   function doMove(piece, v, keyboard) {
     if (!G || busy || G.st.phase !== 'move' || paused) return;
+    if (G.online) {
+      if (!isHuman(G.st.turn) || !onlineHooks || !onlineHooks.onMove) return;
+      var q = G.st.queue || [], idx = q.indexOf(v);
+      if (idx < 0) return;
+      onlineHooks.onMove(piece, idx);
+      return;
+    }
     var st = G.st, s = st.turn, human = isHuman(s);
     if (!st.moves.some(function (m) { return m.piece === piece && (v == null || m.v === v); })) return;
     busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); stopAutoRollTimer(false); hide('chat');
@@ -1470,9 +1483,11 @@
   var SETTINGS = ['sound', 'haptics', 'auto', 'undo', 'timer', 'chat', 'fast'];
   var RULE_KEYS = ['safeSquares', 'captureToEnter', 'blocks', 'bonusOnCapture', 'bonusOnHome', 'arrows', 'noCapture'];
   function syncSettingsUI() {
+    var locked = !!(G && G.online);
     SETTINGS.forEach(function (k) { $('set-' + k).checked = !!save.settings[k]; });
-    RULE_KEYS.forEach(function (k) { $('rule-' + k).checked = !!save.rules[k]; });
-    each($('rule-style').children, function (b) { b.classList.toggle('on', b.dataset.v === save.rules.rollStyle); });
+    RULE_KEYS.forEach(function (k) { $('rule-' + k).checked = !!save.rules[k]; $('rule-' + k).disabled = locked; });
+    each($('rule-style').children, function (b) { b.classList.toggle('on', b.dataset.v === save.rules.rollStyle); b.disabled = locked; });
+    if ($('rule-lock-note')) $('rule-lock-note').classList.toggle('hidden', !locked);
     $('btn-privacy-options').classList.toggle('hidden', !(native && Ads.privacyOptionsRequired()));
   }
   function buildRulesEvents() {
@@ -1548,7 +1563,7 @@
   });
   $('btn-undo').addEventListener('click', undoRoll);
   $('btn-chat').addEventListener('click', function () { SFX.click(); if (isOpen('chat')) hide('chat'); else show('chat'); });
-  $('btn-home').addEventListener('click', function () { SFX.click(); hide('chat'); openMenu(); });
+  $('btn-home').addEventListener('click', function () { SFX.click(); hide('chat'); if (G && G.online) { $('game').classList.add('hidden'); return; } openMenu(); });
   $('btn-m-resume').addEventListener('click', function () { SFX.click(); resumeFromMenu(); });
   $('btn-m-rules').addEventListener('click', function () { SFX.click(); openRules(G && G.st.mode === 'mystery' ? 'mystery' : G && G.st.mode === 'lucky' ? 'lucky' : G && ['quick','team','arrow','friendly'].indexOf(G.st.mode) >= 0 ? 'modes' : 'basics'); });
   $('btn-m-home').addEventListener('click', function () { SFX.click(); hide('menu'); showHome(); });
@@ -1570,13 +1585,14 @@
       save.settings[k] = $('set-' + k).checked; persist();
       if (k === 'sound') { SFX.setEnabled(save.settings.sound); SFX.unlock(); }
       if (k === 'fast') document.documentElement.style.setProperty('--step-ms', stepMs() + 'ms');
+      if (k === 'undo' && !save.settings.undo && G) { G.undo = null; }
       if (k === 'timer' && G && !$('game').classList.contains('hidden') && !busy) { if (save.settings.timer) startTimer(); else stopTimer(); }
       if (G) render();
       SFX.click();
     });
   });
-  RULE_KEYS.forEach(function (k) { $('rule-' + k).addEventListener('change', function () { save.rules[k] = $('rule-' + k).checked; persist(); SFX.click(); if (setupVisible()) renderSetup(); }); });
-  each($('rule-style').children, function (b) { b.addEventListener('click', function () { save.rules.rollStyle = b.dataset.v; persist(); SFX.click(); syncSettingsUI(); if (setupVisible()) renderSetup(); }); });
+  RULE_KEYS.forEach(function (k) { $('rule-' + k).addEventListener('change', function () { if (G && G.online) { $('rule-' + k).checked = !!save.rules[k]; return; } save.rules[k] = $('rule-' + k).checked; persist(); SFX.click(); if (setupVisible()) renderSetup(); }); });
+  each($('rule-style').children, function (b) { b.addEventListener('click', function () { if (G && G.online) return; save.rules.rollStyle = b.dataset.v; persist(); SFX.click(); syncSettingsUI(); if (setupVisible()) renderSetup(); }); });
   $('btn-privacy-options').addEventListener('click', function () { Ads.showPrivacyOptions(); });
   $('btn-reset').addEventListener('click', function () {
     hide('settings');
@@ -1615,13 +1631,23 @@
     else if (/^[1-4]$/.test(e.key) && G.st.phase === 'move' && isHuman(G.st.turn)) {
       var p = +e.key - 1, ms = G.st.moves.filter(function (x) { return x.piece === p; }), m = ms.filter(function (x) { return x.v === G.sel; })[0] || ms[0];
       if (m) doMove(m.piece, m.v, true);
-    } else if (e.key === 'u' || e.key === 'U') undoRoll();
+    } else if ((e.key === 'u' || e.key === 'U') && save.settings.undo) undoRoll();
   });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState !== 'visible') { if (G) { cancelFlow(); stopTimer(); layoutPieces(true); persist(); } }
     else if (G && !$('game').classList.contains('hidden') && !paused && !isOpen('result')) { layoutPieces(true); render(); advance(); }
   });
-  window.addEventListener('resize', layout);
+  function sizeHowtoCard() {
+    var card = $('howto-card'); if (!card) return;
+    var ids = ['btn-vs-ai', 'btn-lucky', 'btn-mystery', 'btn-pass'];
+    var rects = ids.map(function (id) { var el = $(id); return el ? el.getBoundingClientRect() : null; });
+    if (rects.some(function (r) { return !r || !r.width; })) return;
+    var height = Math.max(rects[2].bottom, rects[3].bottom) - Math.min(rects[0].top, rects[1].top);
+    card.style.height = height + 'px';
+    card.style.minHeight = height + 'px';
+    card.style.maxHeight = height + 'px';
+  }
+  window.addEventListener('resize', function () { layout(); sizeHowtoCard(); });
   if (window.ResizeObserver) new ResizeObserver(function () { layout(); }).observe($('stage'));
 
   // play time for the ad gate (only while a match is on screen and running)
@@ -1639,6 +1665,108 @@
   if (loadResult.status === 'recovered') toast('Recovered your last safe save. Some recent moves may be missing.', 5000);
   // consent + SDK init only: no interstitial is ever shown on launch; the banner sits on the menu / game screens
   if (Ads) Ads.init().then(function () { syncSettingsUI(); Ads.showBanner(); });
+  sizeHowtoCard();
+
+
+  // ---------------- online Classic on the local board ----------------
+  var onlineHooks = null;
+  var parkedLocal = null;
+  var onlineClock = null;
+  var onlineExpireKey = '';
+  function onlineNames(names, seat) { return names && names[seat] ? names[seat] : NAMES[seat]; }
+  function serverToLocal(state, mySeat, names) {
+    var players = (state.players || []).map(function (n) { return Number(n); });
+    var seats = [null, null, null, null];
+    var rules = {};
+    var key;
+    for (key in L.DEFAULT_RULES) if (Object.prototype.hasOwnProperty.call(L.DEFAULT_RULES, key)) rules[key] = L.DEFAULT_RULES[key];
+    if (state.rules) for (key in state.rules) if (Object.prototype.hasOwnProperty.call(state.rules, key)) rules[key] = state.rules[key];
+    players.forEach(function (seat) { seats[seat] = { type: seat === mySeat ? 'human' : 'remote', name: onlineNames(names, seat) }; });
+    var pieces = state.pieces || [null, null, null, null];
+    var st = {
+      v: 2, mode: 'classic', nPieces: 4, seats: seats, players: players, pieces: pieces,
+      turn: Number(state.turn) || 0, phase: state.phase || 'roll', queue: (state.queue || []).slice(),
+      sixes: state.sixes || 0, bonus: state.bonus || 0, ranking: (state.ranking || []).slice(),
+      rules: rules, capd: state.capd || [false, false, false, false], faces: state.faces || [1, 1, 1, 1],
+      effects: [], tiles: [], lk: null, pending: null, boost: [null, null, null, null], moves: [],
+      stats: seats.map(function (x) { return x ? { captures: 0, captured: 0, sixes: 0, home: 0, rolls: 0, events: 0 } : null; }),
+      rolls: state.turn_count || 0, turnCount: state.turn_count || 0, rng: 1, rollAgain: !!state.roll_again, moveCount: 0
+    };
+    if (st.phase === 'move') st.moves = L.queueMoves(st);
+    return st;
+  }
+  function hideClassicTextPanel() {
+    ['online-match-dice', 'online-match-pieces', 'online-match-moves', 'online-classic-note', 'online-roll'].forEach(function (id) {
+      var el = $(id); if (el) el.classList.add('hidden');
+    });
+    var pieces = $('online-match-pieces'); if (pieces) pieces.replaceChildren();
+    var moves = $('online-match-moves'); if (moves) moves.replaceChildren();
+  }
+  function paintOnlineChrome() {
+    var timer = $('online-turn-timer'), grace = $('online-grace');
+    if (!G || !G.online || !onlineHooks) {
+      if (timer) timer.classList.add('hidden');
+      if (grace) grace.classList.add('hidden');
+      return;
+    }
+    var deadline = Number(onlineHooks.deadline) || 0;
+    if (timer) {
+      if (!deadline || G.st.phase === 'over') timer.classList.add('hidden');
+      else {
+        var left = Math.max(0, deadline - Date.now());
+        timer.classList.remove('hidden');
+        timer.textContent = Math.ceil(left / 1000) + 's';
+        var key = String(deadline);
+        if (left <= 0 && onlineExpireKey !== key && onlineHooks.onExpire) {
+          onlineExpireKey = key;
+          onlineHooks.onExpire();
+        }
+      }
+    }
+    var g = onlineHooks.grace;
+    if (grace) {
+      if (g && Number(g.until) > Date.now() && G.st.phase !== 'over') {
+        grace.classList.remove('hidden');
+        grace.textContent = 'Reconnect window: seat ' + (Number(g.seat) + 1) + ' can rejoin for ' + Math.ceil((Number(g.until) - Date.now()) / 1000) + 's. No computer takes the seat.';
+      } else grace.classList.add('hidden');
+    }
+    var retry = $('online-board-retry');
+    if (retry) retry.classList.toggle('hidden', !onlineHooks.pending);
+  }
+  function stopOnlineClock() { if (onlineClock) { clearInterval(onlineClock); onlineClock = null; } }
+  function presentOnline(opts) {
+    opts = opts || {};
+    if (!G || !G.online) parkedLocal = G;
+    onlineHooks = opts;
+    hideClassicTextPanel();
+    document.body.classList.add('online-classic-board');
+    var mySeat = Number(opts.mySeat);
+    var st = serverToLocal(opts.state || {}, mySeat, opts.names || null);
+    G = { st: st, seats: st.seats, mode: 'classic', view: mySeat, online: true, undoLeft: 0, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: true, started: Date.now() };
+    screen('game'); paused = false;
+    buildPods(); buildTiles(); buildPieces(); layout(); render(); highlight(); paintOnlineChrome();
+    stopOnlineClock();
+    onlineClock = setInterval(paintOnlineChrome, 250);
+  }
+  function showOnlineBoard() {
+    if (!G || !G.online) return;
+    $('game').classList.remove('hidden');
+    layout(); render(); highlight();
+  }
+  function clearOnline() {
+    stopOnlineClock();
+    onlineHooks = null;
+    onlineExpireKey = '';
+    if ($('online-turn-timer')) $('online-turn-timer').classList.add('hidden');
+    if ($('online-grace')) $('online-grace').classList.add('hidden');
+    if ($('online-board-retry')) $('online-board-retry').classList.add('hidden');
+    document.body.classList.remove('online-classic-board');
+    if (!G || !G.online) return;
+    G = parkedLocal;
+    parkedLocal = null;
+    $('game').classList.add('hidden');
+    if (G) { G.undo = null; G.sel = null; }
+  }
 
   window.__cf = {
     get game() { return G; }, get save() { return save; }, get loadStatus() { return loadResult.status; }, logic: L, gate: gate,
@@ -1654,6 +1782,9 @@
     edit: function (fn) { cancelFlow(); fn(G.st); G.st.moves = G.st.phase === 'move' ? L.queueMoves(G.st) : []; buildPods(); buildTiles(); buildPieces(); layout(); render(); advance(); },
     piecePoint: function (s, i) { var r = $('board-wrap').getBoundingClientRect(), p = piecePos[s + '-' + i]; return p ? { x: r.left + p.x, y: r.top + p.y } : null; },
     podOf: function (s) { var p = podEl(s); return p ? +p.dataset.slot : null; },
-    layout: layout
+    layout: layout,
+    presentOnline: presentOnline,
+    clearOnline: clearOnline,
+    showOnlineBoard: showOnlineBoard
   };
 })();

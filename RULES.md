@@ -1,4 +1,4 @@
-# Crossfour: Offline Ludo — Rules (v1.3)
+# Crossfour: Offline Ludo — Rules (v1.4)
 
 The same rules are shown in the game (**Rules** on the home screen or in the match menu). The rules engine is
 `www/js/logic.js` and every rule below is covered by `test/logic.test.js`, `test/lucky.test.js` and `test/modes13.test.js`.
@@ -55,6 +55,18 @@ off in Settings. Undo is only offered for human rolls.
 
 Off by default. When on, a human player has 20 seconds per decision (a ring drains round their avatar);
 when it runs out, a sensible move is played for them.
+
+## Online Classic
+
+Online Classic uses the same canvas board as a local game. The text token list is not the board.
+
+The host's house rules (the Settings toggles: roll style, safe squares, capture to enter home, blocks, bonus on capture, bonus on reaching home, arrow tiles, no captures) are stored when the room is created. Everyone in that room plays those rules. They do not change mid-match.
+
+A token leaves base only on a 6, needs the exact roll to enter home, and captures on an unsafe square unless no-capture is locked on. Star style stacks 6s; three 6s forfeit the turn. A capture or a token reaching home can give an extra roll when those toggles are on.
+
+Each turn shows a 45 second timer. If it runs out, the turn passes. A dropped player has 20 seconds to rejoin the same seat. Nobody is replaced by the computer. If the seat is not back in time it is dropped, and the match is abandoned when fewer than two players remain.
+
+Rooms, quick match and invites stay. Mystery Tiles, Lucky Chaos and Ludo Chess rules are unchanged. Ludo Chess still has its own board.
 
 ## Mystery Tiles mode
 
@@ -208,7 +220,7 @@ pass & play. In 300 simulated 1 v 1 games the average was about 86 rolls (a 4-to
 capture your partner, and a partner's block does not stop you. Pass & play, or you with a computer partner against
 two computers, or four computers. An opponent who finishes their own tokens first does not win the match.
 
-**Arrow Ludo.** Eight amber one-way arrows on the track (squares 2, 7, 15, 20, 28, 33, 41 and 46), always pointing
+**Arrow Ludo.** Amber one-way arrows on board number 4 of each side (absolute squares 4, 17, 30 and 43), always pointing
 clockwise, which is the only direction tokens move. Stepping onto an arrow, whether the die **lands** there or
 **passes through**, carries the token one extra square clockwise. You cannot choose to stop on an arrow. If that
 extra square is blocked, or the ride would overshoot home, the token stays on the arrow. The home column has no
