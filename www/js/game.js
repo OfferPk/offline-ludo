@@ -498,9 +498,8 @@
     return h;
   }
   function cubeHTML() {
-    var h = '<div class="cube" aria-hidden="true">';
-    for (var f = 1; f <= 6; f++) { h += '<div class="face f' + f + '">'; for (var k = 0; k < f; k++) h += '<i></i>'; h += '</div>'; }
-    return h + '</div><div class="pdice-flat f1" data-face="1">' + flatPipsHTML(1) + '</div>';
+    // Flat face only — 3D cube removed from paint path (Android WebView blank-tile bug)
+    return '<div class="cube" aria-hidden="true" hidden></div><div class="pdice-flat f1" data-face="1">' + flatPipsHTML(1) + '</div>';
   }
   function podEl(seat) { return document.querySelector('.pod[data-slot="' + slotOf(seat) + '"]'); }
   function buildPods() {
@@ -525,6 +524,8 @@
         if (G && G.st.turn === s && isHuman(s)) doRoll();
       });
       setDiceFace(s, G.st.faces ? G.st.faces[s] : 1, true);
+      die.classList.add('show-flat');
+      die.classList.remove('rolling');
     });
   }
   function hasTiles() { return G && (G.st.mode === 'mystery' || G.st.mode === 'lucky'); }
@@ -949,35 +950,39 @@
   var spins = [0, 0, 0, 0];
   function cubeOf(s) { var p = podEl(s); return p ? p.querySelector('.cube') : null; }
   function setDiceFace(s, v, instant) {
-    var n = Math.min(6, Math.max(1, +v || 1)), f = FACE[n], pod = podEl(s), cube = pod && pod.querySelector('.cube'), flat = pod && pod.querySelector('.pdice-flat');
-    if (!cube && !flat) return;
-    // Keep spin counters small so WebView transforms stay stable (huge deg can blank faces)
+    var n = Math.min(6, Math.max(1, +v || 1)), pod = podEl(s), die = pod && pod.querySelector('.pdice'), flat = pod && pod.querySelector('.pdice-flat');
+    if (!flat && !die) return;
     if (spins[s] > 20) spins[s] = spins[s] % 4;
-    if (cube) {
-      if (instant) cube.style.transitionDuration = '0ms';
-      cube.style.transform = 'rotateX(' + (f[0] + 720 * spins[s]) + 'deg) rotateY(' + (f[1] + 360 * spins[s]) + 'deg)';
-    }
+    // Flat pips only — cream face is painted on .pdice itself (WebView-safe, no 3D/filter)
     if (flat) {
       flat.dataset.face = String(n);
       flat.className = 'pdice-flat f' + n;
       flat.innerHTML = flatPipsHTML(n);
     }
+    if (die) {
+      die.classList.add('show-flat');
+      die.dataset.face = String(n);
+      die.setAttribute('aria-label', 'Die showing ' + n + '. Tap or swipe to roll.');
+    }
     if (pod) pod.dataset.face = String(n);
   }
   function prefersReducedMotion() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  function diceBtn(s) { var p = podEl(s); return p ? p.querySelector('.pdice') : null; }
   function animateDice(s, v, cb) {
-    var cube = cubeOf(s), pod = podEl(s), reduced = prefersReducedMotion(), dur = reduced ? 0 : save.settings.fast ? 560 : 920;
+    var die = diceBtn(s), reduced = prefersReducedMotion(), dur = reduced ? 0 : save.settings.fast ? 420 : 720;
     spins[s]++;
-    if (pod) {
-      pod.classList.remove('rolling', 'show-flat');
-      if (!reduced) { void pod.offsetWidth; pod.classList.add('rolling'); }
+    // Classes MUST live on .pdice (CSS targets .pdice.rolling / .pdice.show-flat), never on .pod
+    if (die) {
+      die.classList.remove('rolling');
+      die.classList.add('show-flat');
+      if (!reduced) { void die.offsetWidth; die.classList.add('rolling'); }
     }
-    if (cube) { cube.style.transitionDuration = dur + 'ms'; setDiceFace(s, v); }
-    else setDiceFace(s, v, true);
+    // Flat-only: snap face immediately, animate with 2D toss (no 3D cube on WebView)
+    setDiceFace(s, v, true);
     SFX.roll();
     later(function () {
-      if (pod) { pod.classList.remove('rolling'); pod.classList.add('show-flat'); }
-      setDiceFace(s, v, true); // snap idle face so it never stays blank mid-rotation
+      if (die) { die.classList.remove('rolling'); die.classList.add('show-flat'); }
+      setDiceFace(s, v, true);
       SFX.land(v === 6); haptic('light'); cb();
     }, dur);
   }

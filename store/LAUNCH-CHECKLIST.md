@@ -1,3 +1,8 @@
+## v1.5.7 update — WebView-safe corner die
+
+- **Upload:** `offline-ludo-v1.5.7.aab` (version 1.5.7, **versionCode 14**), same upload key.
+- Corner `.pdice` is flat-only (no filter + 3D cube). Cream face + solid black pips on Graphite/Midnight/Wood. Arrow land-only unchanged. Pages `?v=1.5.7`.
+
 ## v1.5.6 update — banner die + Arrow land-only proof
 
 - **Upload:** `offline-ludo-v1.5.6.aab` (version 1.5.6, **versionCode 13**), wahi upload key.

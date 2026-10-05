@@ -155,21 +155,54 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .chip-v.sel { box-shadow: inset 0 -2px 0 var(--d-edge), 0 0 0 2px var(--accent); transform: translateY(-2px); }
 .chip-v.dim { opacity: .45; }
 .chip-v.dbl { background: linear-gradient(135deg, #2a86e0, #18b3b8); color: #fff; box-shadow: none; }
-.pdice { width: 44px; height: 44px; perspective: 320px; flex: none; position: relative; border-radius: 11px; touch-action: none; filter: drop-shadow(0 5px 3.5px rgba(0,0,0,.34)); }
-.pdice:disabled { cursor: default; }
-.pdice .cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform .88s cubic-bezier(.14,.7,.18,1); }
-.pdice .face { position: absolute; inset: 0; border-radius: 11px; background: linear-gradient(155deg, #ffffff 0%, var(--d-face) 40%, var(--d-edge) 100%); box-shadow: inset 0 2px 0 rgba(255,255,255,.95), inset 0 -8px 10px rgba(40,32,20,.2), 0 1px 2px rgba(0,0,0,.14); border: 1px solid rgba(255,255,255,.82); display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 6px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-.pdice .face i { width: 8.5px; height: 8.5px; border-radius: 50%; background: radial-gradient(circle at 30% 28%, #9aa3b2, var(--d-pip) 52%, #07090c); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 1px rgba(0,0,0,.35), 0 1px 1.5px rgba(0,0,0,.45); place-self: center; }
-/* Always-on flat face so idle/roll-end never shows a blank cube edge (WebView-safe) */
-.pdice-flat { position: absolute; inset: 0; border-radius: 11px; background: linear-gradient(155deg, #ffffff 0%, var(--d-face) 40%, var(--d-edge) 100%); box-shadow: inset 0 2px 0 rgba(255,255,255,.95), inset 0 -7px 9px rgba(40,32,20,.2), 0 2px 4px rgba(0,0,0,.14); border: 1px solid rgba(255,255,255,.82); display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 6px; opacity: 1; pointer-events: none; z-index: 2; }
-.pdice-flat i { width: 8.5px; height: 8.5px; border-radius: 50%; background: radial-gradient(circle at 30% 28%, #9aa3b2, var(--d-pip) 52%, #07090c); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), inset 0 -1px 1px rgba(0,0,0,.35), 0 1px 1.5px rgba(0,0,0,.45); place-self: center; }
-.pdice.rolling .pdice-flat { opacity: 0; }
-.pdice.rolling .cube { opacity: 1; }
-.pdice.show-flat .pdice-flat { opacity: 1; }
-.pdice.show-flat:not(.rolling) .cube { opacity: 0; } /* idle: crisp flat face; rolling: 3D cube */
-.pdice .f1 { transform: translateZ(22px); } .pdice .f6 { transform: rotateY(180deg) translateZ(22px); }
-.pdice .f2 { transform: rotateY(90deg) translateZ(22px); } .pdice .f5 { transform: rotateY(-90deg) translateZ(22px); }
-.pdice .f3 { transform: rotateX(90deg) translateZ(22px); } .pdice .f4 { transform: rotateX(-90deg) translateZ(22px); }
+/* Corner die: flat-first WebView-safe (Capacitor blanks filter+3D <button> as a black tile). */
+.pdice {
+  width: 44px; height: 44px; flex: none; position: relative; border-radius: 11px;
+  touch-action: none; padding: 0; margin: 0;
+  /* Kill native <button> chrome — Android WebView paints an opaque dark rounded rect otherwise */
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  border: 1.5px solid rgba(255,255,255,.95);
+  /* Cream face ON THE BUTTON so paint never depends on a child layer */
+  background: #fbfaf6 !important;
+  background-color: #fbfaf6 !important;
+  background-image: linear-gradient(160deg, #ffffff 0%, #fbfaf6 55%, #ebe4d6 100%) !important;
+  color: #1f232b;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.95), inset 0 -5px 7px rgba(40,32,20,.14), 0 4px 10px rgba(0,0,0,.28);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+  /* Never use filter here — compositing bug with children on WebView */
+  filter: none !important;
+}
+.pdice:disabled {
+  cursor: default;
+  opacity: 1; /* keep face readable on opponent seats */
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  background: #fbfaf6 !important;
+  background-color: #fbfaf6 !important;
+}
+.pdice .cube,
+.pdice .face { display: none !important; visibility: hidden !important; pointer-events: none !important; }
+.pdice-flat {
+  position: absolute; inset: 0; z-index: 2; box-sizing: border-box;
+  border-radius: 10px;
+  display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 6px;
+  background: transparent !important; /* button already paints cream */
+  border: 0;
+  box-shadow: none;
+  opacity: 1 !important;
+  pointer-events: none;
+}
+.pdice-flat i {
+  width: 8.5px; height: 8.5px; border-radius: 50%; place-self: center;
+  background: #1f232b !important;
+  background-color: #1f232b !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 1px rgba(0,0,0,.3);
+}
+.pdice.rolling .pdice-flat,
+.pdice.show-flat .pdice-flat { opacity: 1 !important; }
+.pdice .f1, .pdice .f2, .pdice .f3, .pdice .f4, .pdice .f5, .pdice .f6 { transform: none; }
 .face.f1 i { grid-area: 2 / 2; }
 .face.f2 i:nth-child(1) { grid-area: 1 / 1; } .face.f2 i:nth-child(2) { grid-area: 3 / 3; }
 .face.f3 i:nth-child(1) { grid-area: 1 / 1; } .face.f3 i:nth-child(2) { grid-area: 2 / 2; } .face.f3 i:nth-child(3) { grid-area: 3 / 3; }
@@ -411,7 +444,7 @@ body.light .tutorial-card { background: rgba(250,249,245,.98); }
 .confetti-piece:nth-child(3n) { width: 5px; height: 5px; border-radius: 50%; }
 @keyframes winner-confetti { 0% { opacity: 0; transform: translate3d(0,0,0) rotate(0) scale(.7); } 12% { opacity: 1; } 100% { opacity: 0; transform: translate3d(var(--confetti-x),var(--confetti-y),0) rotate(var(--confetti-spin)) scale(.75); } }
 @media (prefers-reduced-motion: reduce) {
-  .pdice, .pdice::before, .pdice .cube { animation: none !important; transition: none !important; }
+  .pdice, .pdice::before, .pdice .cube, .pdice-flat { animation: none !important; transition: none !important; }
   #winner-confetti { display: none !important; }
   #r-rank li.winner, #r-rank li.rank-row, .confetti-piece, .pod.active, .turn-banner.is-mine, .pc.is-turn::before, .pc.sel::before { animation: none !important; }
   .tutorial-card, .tutorial-intro-card { animation: none !important; transition: none !important; }
