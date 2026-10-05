@@ -10,7 +10,7 @@
   var BOARDS = [
     // Original IDs and palettes are kept intact for existing saves.
     { id: 'graphite', name: 'Graphite', price: 0, dark: true,
-      bg: '#12151b', page: '#171b22', board: '#1f242d', cell: '#2a303b', cellEdge: '#353d4a', ink: '#e8ebf1', muted: '#8a93a3', center: '#262c36',
+      bg: '#10131a', page: '#151a22', board: '#1c222c', cell: '#2c3340', cellEdge: '#3d4656', ink: '#eef1f6', muted: '#929bab', center: '#232a35',
       seats: ['#ff6f61', '#2fc49d', '#f4b740', '#4d82ff'] },
     { id: 'linen', name: 'Linen', price: 0, dark: false,
       bg: '#ece8e1', page: '#f3f0ea', board: '#fbfaf7', cell: '#ffffff', cellEdge: '#ddd6cb', ink: '#23262c', muted: '#7d7a73', center: '#f1ede6',
@@ -22,10 +22,10 @@
       bg: '#0a0f1f', page: '#0e1428', board: '#121a33', cell: '#1a2446', cellEdge: '#2b3a6a', ink: '#e6ecff', muted: '#8f9bc4', center: '#16204a',
       seats: ['#ff5d8f', '#27e0b3', '#ffd166', '#5c8bff'], glow: true },
     { id: 'midnight', name: 'Midnight', price: 0, dark: true,
-      bg: '#06080f', page: '#0b0e16', board: '#121722', cell: '#1e2636', cellEdge: '#3a4458', ink: '#f5f8fc', muted: '#9aa6bb', center: '#171d2a',
+      bg: '#05070e', page: '#090d15', board: '#101621', cell: '#1c2536', cellEdge: '#445166', ink: '#f7fafd', muted: '#a0adc2', center: '#151c2a',
       seats: ['#ff5f52', '#22d4a8', '#ffc453', '#6aa8ff'] },
     { id: 'timber', name: 'Classic Wood', price: 0, dark: false,
-      bg: '#5f4328', page: '#745334', board: '#b9844f', cell: '#f7e8cb', cellEdge: '#9a6b38', ink: '#2a1b10', muted: '#6f5436', center: '#e4c693',
+      bg: '#5a3f25', page: '#6f4e30', board: '#b07a45', cell: '#f8ebcf', cellEdge: '#8f6230', ink: '#271910', muted: '#6a5033', center: '#e0c28a',
       seats: ['#c23c2e', '#1f8051', '#d68c14', '#215394'] },
     { id: 'galaxy', name: 'Galaxy', price: 600, dark: true,
       bg: '#0b0b1d', page: '#12132a', board: '#1b1d3b', cell: '#25294d', cellEdge: '#454976', ink: '#f0efff', muted: '#a5a8d1', center: '#202448', glow: true,

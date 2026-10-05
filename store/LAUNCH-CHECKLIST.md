@@ -1,3 +1,8 @@
+## v1.5.4 update — board graphics polish
+
+- **Upload:** `offline-ludo-v1.5.4.aab` (version 1.5.4, **versionCode 11**), wahi upload key.
+- Visual only: board texture/lighting, lanes, stars, arrows, yards, home center. Arrow jump +4 and other rules unchanged.
+
 ## v1.5.3 update — Arrow jump +4
 
 - **Upload:** `offline-ludo-v1.5.3.aab` (version 1.5.3, **versionCode 10**), wahi upload key.

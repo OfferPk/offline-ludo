@@ -256,39 +256,52 @@
   var BASE_ORIGIN = [[0, 0], [0, 9], [9, 9], [9, 0]]; // [row, col] of each seat's 6x6 base
   function paintBoardTexture(ctx, sz, b, c) {
     var wood = b.id === 'timber' || b.id === 'walnut';
-    var g = ctx.createRadialGradient(sz * 0.32, sz * 0.28, c, sz * 0.55, sz * 0.6, sz * 0.9);
-    g.addColorStop(0, mix(b.board, 'w', wood ? 0.14 : 0.08));
-    g.addColorStop(0.55, b.board);
-    g.addColorStop(1, mix(b.board, 'b', wood ? 0.22 : 0.16));
+    var dark = !!b.dark;
+    var g = ctx.createRadialGradient(sz * 0.3, sz * 0.26, c * 0.8, sz * 0.55, sz * 0.62, sz * 0.95);
+    g.addColorStop(0, mix(b.board, 'w', wood ? 0.18 : (dark ? 0.12 : 0.1)));
+    g.addColorStop(0.45, b.board);
+    g.addColorStop(1, mix(b.board, 'b', wood ? 0.28 : (dark ? 0.22 : 0.14)));
     rr(ctx, 0, 0, sz, sz, c * 0.7); ctx.fillStyle = g; ctx.fill();
     ctx.save();
     rr(ctx, 0, 0, sz, sz, c * 0.7); ctx.clip();
     if (wood) {
-      for (var i = 0; i < 18; i++) {
-        var y = (i + 0.4) * (sz / 18);
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.bezierCurveTo(sz * 0.35, y + c * 0.08, sz * 0.65, y - c * 0.06, sz, y + c * 0.04);
-        ctx.strokeStyle = alpha(mix(b.board, i % 2 ? 'b' : 'w', 0.18), i % 3 ? 0.08 : 0.14);
-        ctx.lineWidth = Math.max(1, c * 0.045); ctx.stroke();
+      for (var i = 0; i < 22; i++) {
+        var y = (i + 0.35) * (sz / 22);
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.bezierCurveTo(sz * 0.32, y + c * 0.1, sz * 0.68, y - c * 0.08, sz, y + c * 0.05);
+        ctx.strokeStyle = alpha(mix(b.board, i % 2 ? 'b' : 'w', 0.22), i % 3 ? 0.1 : 0.16);
+        ctx.lineWidth = Math.max(1, c * (0.04 + (i % 5) * 0.012)); ctx.stroke();
       }
+      // soft specular band across the timber
+      var sheen = ctx.createLinearGradient(0, 0, sz, sz * 0.35);
+      sheen.addColorStop(0, alpha(mix(b.board, 'w', 0.45), 0.0));
+      sheen.addColorStop(0.45, alpha(mix(b.board, 'w', 0.5), 0.1));
+      sheen.addColorStop(1, alpha(mix(b.board, 'w', 0.35), 0.0));
+      ctx.fillStyle = sheen; ctx.fillRect(0, 0, sz, sz);
     } else {
-      for (var j = 0; j < 36; j++) {
+      for (var j = 0; j < 48; j++) {
         var px = ((j * 97) % 100) / 100 * sz, py = ((j * 53) % 100) / 100 * sz;
-        ctx.beginPath(); ctx.arc(px, py, c * (0.08 + (j % 4) * 0.04), 0, Math.PI * 2);
-        ctx.fillStyle = alpha(mix(b.board, j % 2 ? 'w' : 'b', 0.35), 0.05); ctx.fill();
+        ctx.beginPath(); ctx.arc(px, py, c * (0.07 + (j % 5) * 0.035), 0, Math.PI * 2);
+        ctx.fillStyle = alpha(mix(b.board, j % 2 ? 'w' : 'b', dark ? 0.4 : 0.32), dark ? 0.06 : 0.05); ctx.fill();
       }
       var felt = ctx.createLinearGradient(0, 0, sz, sz);
-      felt.addColorStop(0, alpha(mix(b.board, 'w', 0.2), 0.08));
-      felt.addColorStop(1, alpha(mix(b.board, 'b', 0.25), 0.1));
+      felt.addColorStop(0, alpha(mix(b.board, 'w', 0.28), dark ? 0.1 : 0.08));
+      felt.addColorStop(0.5, alpha(mix(b.board, 'b', 0.1), 0.04));
+      felt.addColorStop(1, alpha(mix(b.board, 'b', 0.32), dark ? 0.14 : 0.1));
       ctx.fillStyle = felt; ctx.fillRect(0, 0, sz, sz);
+      // faint vignette so tokens read against Graphite/Midnight
+      var vig = ctx.createRadialGradient(sz * 0.5, sz * 0.5, sz * 0.2, sz * 0.5, sz * 0.5, sz * 0.72);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, alpha(mix(b.board, 'b', 0.55), dark ? 0.22 : 0.08));
+      ctx.fillStyle = vig; ctx.fillRect(0, 0, sz, sz);
     }
     ctx.restore();
-    // rim bevel
+    // rim bevel — consistent light/dark on every theme
     rr(ctx, 1.5, 1.5, sz - 3, sz - 3, c * 0.68);
-    ctx.lineWidth = Math.max(2, c * 0.08);
-    ctx.strokeStyle = alpha(mix(b.board, 'w', 0.35), 0.35); ctx.stroke();
-    rr(ctx, 3, 3, sz - 6, sz - 6, c * 0.62);
-    ctx.lineWidth = Math.max(1.5, c * 0.05);
-    ctx.strokeStyle = alpha(mix(b.board, 'b', 0.4), 0.45); ctx.stroke();
+    ctx.lineWidth = Math.max(2.2, c * 0.09);
+    ctx.strokeStyle = alpha(mix(b.board, 'w', dark ? 0.42 : 0.38), dark ? 0.4 : 0.45); ctx.stroke();
+    rr(ctx, 3.2, 3.2, sz - 6.4, sz - 6.4, c * 0.62);
+    ctx.lineWidth = Math.max(1.6, c * 0.055);
+    ctx.strokeStyle = alpha(mix(b.board, 'b', 0.5), dark ? 0.55 : 0.4); ctx.stroke();
   }
   function drawBoard(cv, sz, b, rules, active, view) {
     var dpr = Math.min(window.devicePixelRatio || 1, 3);
@@ -299,34 +312,37 @@
     // soft drop shadow under the board (drawn into canvas so canvas box-shadow can stay light)
     ctx.save();
     rr(ctx, c * 0.12, c * 0.22, sz - c * 0.24, sz - c * 0.18, c * 0.75);
-    ctx.fillStyle = 'rgba(0,0,0,.32)'; ctx.shadowColor = 'rgba(0,0,0,.52)'; ctx.shadowBlur = c * 1.25; ctx.shadowOffsetY = c * 0.22; ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.36)'; ctx.shadowColor = 'rgba(0,0,0,.58)'; ctx.shadowBlur = c * 1.4; ctx.shadowOffsetY = c * 0.26; ctx.fill();
     ctx.restore();
     paintBoardTexture(ctx, sz, b, c);
     ctx.save(); ctx.translate(sz / 2, sz / 2); ctx.rotate((view || 0) * Math.PI / 2); ctx.translate(-sz / 2, -sz / 2);
     for (var s = 0; s < 4; s++) {
       var o = BASE_ORIGIN[s], x = o[1] * c, y = o[0] * c, col = b.seats[s];
       ctx.globalAlpha = active && !active[s] ? 0.3 : 1;
+      // outer base plate shadow for consistent depth on Midnight/Wood/Graphite
+      rr(ctx, x + gap * 1.6 + 1.2, y + gap * 1.6 + 2, 6 * c - gap * 3.2, 6 * c - gap * 3.2, c * 0.55);
+      ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fill();
       var g = ctx.createLinearGradient(x, y, x + 6 * c, y + 6 * c);
-      g.addColorStop(0, mix(col, 'w', 0.16)); g.addColorStop(0.45, col); g.addColorStop(1, mix(col, 'b', 0.22));
+      g.addColorStop(0, mix(col, 'w', 0.22)); g.addColorStop(0.4, col); g.addColorStop(1, mix(col, 'b', 0.28));
       rr(ctx, x + gap * 1.6, y + gap * 1.6, 6 * c - gap * 3.2, 6 * c - gap * 3.2, c * 0.55);
       ctx.fillStyle = g; ctx.fill();
-      ctx.lineWidth = Math.max(1.7, c * 0.07); ctx.strokeStyle = alpha(mix(col, 'w', 0.48), 0.55); ctx.stroke();
-      rr(ctx, x + c * 0.9, y + c * 0.9, 4.2 * c, 4.2 * c, c * 0.48);
-      var yard = ctx.createRadialGradient(x + 2.7 * c, y + 2.4 * c, c * 0.35, x + 3 * c, y + 3 * c, c * 3.2);
-      yard.addColorStop(0, mix(b.center, 'w', 0.14)); yard.addColorStop(0.55, b.center); yard.addColorStop(1, mix(b.center, 'b', 0.12));
+      ctx.lineWidth = Math.max(1.9, c * 0.075); ctx.strokeStyle = alpha(mix(col, 'w', 0.55), 0.62); ctx.stroke();
+      rr(ctx, x + c * 0.88, y + c * 0.88, 4.24 * c, 4.24 * c, c * 0.5);
+      var yard = ctx.createRadialGradient(x + 2.55 * c, y + 2.25 * c, c * 0.3, x + 3 * c, y + 3.1 * c, c * 3.35);
+      yard.addColorStop(0, mix(b.center, 'w', 0.18)); yard.addColorStop(0.5, b.center); yard.addColorStop(1, mix(b.center, 'b', 0.18));
       ctx.fillStyle = yard; ctx.fill();
-      ctx.lineWidth = Math.max(1.2, c * 0.05); ctx.strokeStyle = rgba(col, 0.42); ctx.stroke();
+      ctx.lineWidth = Math.max(1.35, c * 0.055); ctx.strokeStyle = rgba(col, 0.5); ctx.stroke();
       L.BASE_SPOTS[s].forEach(function (p) {
         var cx = (p[1] + 0.5) * c, cy = (p[0] + 0.5) * c;
-        ctx.beginPath(); ctx.arc(cx, cy + c * 0.05, c * 0.52, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fill();
-        ctx.beginPath(); ctx.arc(cx, cy, c * 0.48, 0, Math.PI * 2);
-        var nest = ctx.createRadialGradient(cx - c * 0.12, cy - c * 0.14, c * 0.05, cx, cy, c * 0.48);
-        nest.addColorStop(0, rgba(col, 0.32)); nest.addColorStop(1, rgba(col, 0.12));
+        ctx.beginPath(); ctx.arc(cx, cy + c * 0.06, c * 0.54, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,.26)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, c * 0.49, 0, Math.PI * 2);
+        var nest = ctx.createRadialGradient(cx - c * 0.14, cy - c * 0.16, c * 0.04, cx, cy, c * 0.5);
+        nest.addColorStop(0, rgba(col, 0.38)); nest.addColorStop(0.55, rgba(col, 0.16)); nest.addColorStop(1, rgba(col, 0.08));
         ctx.fillStyle = nest; ctx.fill();
-        ctx.lineWidth = Math.max(1.6, c * 0.085); ctx.strokeStyle = alpha(mix(col, 'w', 0.15), 0.95); ctx.stroke();
-        ctx.beginPath(); ctx.arc(cx - c * 0.12, cy - c * 0.14, c * 0.12, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fill();
+        ctx.lineWidth = Math.max(1.7, c * 0.09); ctx.strokeStyle = alpha(mix(col, 'w', 0.22), 0.98); ctx.stroke();
+        ctx.beginPath(); ctx.arc(cx - c * 0.13, cy - c * 0.15, c * 0.13, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fill();
       });
     }
     ctx.globalAlpha = 1;
@@ -334,16 +350,16 @@
       var x = rc[1] * c + gap / 2, y = rc[0] * c + gap / 2, w = c - gap, h = c - gap;
       if (raised) {
         ctx.save();
-        rr(ctx, x + 0.7, y + 1.35, w, h, c * 0.18); ctx.fillStyle = 'rgba(0,0,0,.24)'; ctx.fill();
+        rr(ctx, x + 0.85, y + 1.55, w, h, c * 0.18); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
         ctx.restore();
       }
-      rr(ctx, x, y, w, h, c * 0.18); ctx.fillStyle = fill; ctx.fill();
+      rr(ctx, x, y, w, h, c * 0.17); ctx.fillStyle = fill; ctx.fill();
       if (edge) {
-        ctx.lineWidth = Math.max(1.15, c * 0.05); ctx.strokeStyle = edge; ctx.stroke();
+        ctx.lineWidth = Math.max(1.25, c * 0.055); ctx.strokeStyle = edge; ctx.stroke();
         ctx.save();
-        rr(ctx, x + 0.8, y + 0.8, w - 1.6, h - 1.6, c * 0.14);
-        ctx.strokeStyle = alpha(mix(fill.indexOf('rgb') === 0 ? b.cell : (fill[0] === '#' ? fill : b.cell), 'w', 0.5), 0.22);
-        ctx.lineWidth = 1; ctx.stroke();
+        rr(ctx, x + 0.9, y + 0.9, w - 1.8, h - 1.8, c * 0.13);
+        ctx.strokeStyle = alpha(mix(fill.indexOf('rgb') === 0 ? b.cell : (fill[0] === '#' ? fill : b.cell), 'w', b.dark ? 0.55 : 0.48), b.dark ? 0.28 : 0.26);
+        ctx.lineWidth = 1.05; ctx.stroke();
         ctx.restore();
       }
     }
@@ -361,32 +377,37 @@
         ctx.beginPath(); ctx.moveTo(-c * 0.18, -c * 0.2); ctx.lineTo(c * 0.12, 0); ctx.lineTo(-c * 0.18, c * 0.2);
         ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke(); ctx.restore();
       } else if (isStar) {
-        star(ctx, cx + 0.45, cy + 0.8, c * 0.32, c * 0.14);
-        ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
-        star(ctx, cx, cy, c * 0.32, c * 0.14);
+        star(ctx, cx + 0.5, cy + 0.9, c * 0.34, c * 0.145);
+        ctx.fillStyle = 'rgba(0,0,0,.32)'; ctx.fill();
+        star(ctx, cx, cy, c * 0.34, c * 0.145);
         if (rules && rules.safeSquares) {
-          var sg = ctx.createRadialGradient(cx - c * 0.06, cy - c * 0.08, c * 0.02, cx, cy, c * 0.3);
-          sg.addColorStop(0, mix(b.muted, 'w', 0.7)); sg.addColorStop(1, rgba(b.muted.length === 7 ? b.muted : '#888888', 0.98));
+          var sg = ctx.createRadialGradient(cx - c * 0.08, cy - c * 0.1, c * 0.02, cx, cy, c * 0.34);
+          sg.addColorStop(0, mix(b.muted, 'w', b.dark ? 0.82 : 0.75));
+          sg.addColorStop(0.55, mix(b.muted, 'w', 0.35));
+          sg.addColorStop(1, rgba(b.muted.length === 7 ? b.muted : '#888888', 0.98));
           ctx.fillStyle = sg; ctx.fill();
-          ctx.lineWidth = Math.max(1, c * 0.04); ctx.strokeStyle = alpha(mix(b.muted, 'w', 0.4), 0.7); ctx.stroke();
+          ctx.lineWidth = Math.max(1.15, c * 0.045); ctx.strokeStyle = alpha(mix(b.muted, 'w', 0.55), 0.85); ctx.stroke();
         } else {
-          ctx.lineWidth = 1.2; ctx.strokeStyle = rgba(b.muted, 0.4); ctx.stroke();
+          ctx.lineWidth = 1.3; ctx.strokeStyle = rgba(b.muted, 0.45); ctx.stroke();
         }
       }
       if (rules && rules.arrows && L.ARROW_SQUARES.indexOf(a) >= 0) {
         ctx.save(); ctx.translate(cx, cy);
         var nx2 = L.TRACK_CELLS[(a + 1) % 52]; ctx.rotate(Math.atan2(nx2[0] - rc[0], nx2[1] - rc[1]));
-        // soft plate + clearer chevron so one-way tiles read at a glance
-        rr(ctx, -c * 0.34, -c * 0.3, c * 0.68, c * 0.6, c * 0.14);
-        ctx.fillStyle = alpha(mix(b.cell, b.dark ? 'w' : 'b', b.dark ? 0.12 : 0.1), 0.78); ctx.fill();
-        ctx.lineWidth = Math.max(1, c * 0.04); ctx.strokeStyle = alpha('#f0b429', 0.35); ctx.stroke();
+        // plate + amber chevron (readable on Midnight, Wood, Graphite)
+        rr(ctx, -c * 0.36, -c * 0.32, c * 0.72, c * 0.64, c * 0.15);
+        ctx.fillStyle = alpha(mix(b.cell, b.dark ? 'w' : 'b', b.dark ? 0.16 : 0.12), 0.86); ctx.fill();
+        ctx.lineWidth = Math.max(1.15, c * 0.045); ctx.strokeStyle = alpha('#f5c04a', b.dark ? 0.5 : 0.42); ctx.stroke();
+        // soft under-glow
+        ctx.beginPath(); ctx.arc(c * 0.02, 0, c * 0.22, 0, Math.PI * 2);
+        ctx.fillStyle = alpha('#f0b429', 0.18); ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(-c * 0.22, -c * 0.2); ctx.lineTo(c * 0.24, 0); ctx.lineTo(-c * 0.22, c * 0.2);
-        ctx.lineTo(-c * 0.06, 0); ctx.closePath();
-        var ag = ctx.createLinearGradient(-c * 0.2, -c * 0.15, c * 0.22, c * 0.1);
-        ag.addColorStop(0, '#ffe08a'); ag.addColorStop(0.45, '#f0b429'); ag.addColorStop(1, '#c48410');
+        ctx.moveTo(-c * 0.24, -c * 0.22); ctx.lineTo(c * 0.26, 0); ctx.lineTo(-c * 0.24, c * 0.22);
+        ctx.lineTo(-c * 0.05, 0); ctx.closePath();
+        var ag = ctx.createLinearGradient(-c * 0.22, -c * 0.18, c * 0.24, c * 0.12);
+        ag.addColorStop(0, '#fff1b0'); ag.addColorStop(0.4, '#f0b429'); ag.addColorStop(1, '#b8740c');
         ctx.fillStyle = ag; ctx.fill();
-        ctx.lineWidth = Math.max(1.3, c * 0.055); ctx.strokeStyle = 'rgba(40,24,0,.78)'; ctx.stroke();
+        ctx.lineWidth = Math.max(1.4, c * 0.06); ctx.strokeStyle = 'rgba(35,20,0,.82)'; ctx.stroke();
         ctx.restore();
       }
     });
@@ -398,7 +419,7 @@
     // soft well under the finish diamond
     ctx.beginPath(); ctx.arc(mc, mc, c * 2.05, 0, Math.PI * 2);
     var well = ctx.createRadialGradient(mc, mc, c * 0.4, mc, mc, c * 2.1);
-    well.addColorStop(0, alpha(mix(b.board, 'b', 0.35), 0.35));
+    well.addColorStop(0, alpha(mix(b.board, 'b', 0.42), b.dark ? 0.42 : 0.28));
     well.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = well; ctx.fill();
     for (s = 0; s < 4; s++) {
@@ -409,9 +430,9 @@
       ctx.beginPath(); ctx.moveTo(t0[0], t0[1]); ctx.lineTo(t1[0], t1[1]); ctx.lineTo(mc, mc); ctx.closePath();
       var mx = (t0[0] + t1[0]) / 2, my = (t0[1] + t1[1]) / 2;
       var gg = ctx.createLinearGradient(mx, my, mc, mc);
-      gg.addColorStop(0, mix(b.seats[s], 'w', 0.28));
-      gg.addColorStop(0.42, b.seats[s]);
-      gg.addColorStop(1, mix(b.seats[s], 'b', 0.34));
+      gg.addColorStop(0, mix(b.seats[s], 'w', 0.34));
+      gg.addColorStop(0.4, b.seats[s]);
+      gg.addColorStop(1, mix(b.seats[s], 'b', 0.38));
       ctx.fillStyle = gg; ctx.fill();
       ctx.lineWidth = Math.max(1.8, gap * 1.15); ctx.strokeStyle = alpha(mix(b.seats[s], 'b', 0.45), 0.9); ctx.stroke();
       ctx.save();
