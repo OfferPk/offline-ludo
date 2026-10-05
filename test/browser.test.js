@@ -247,14 +247,16 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
     const coreBySeat = Object.fromEntries(seats.map(s => [s, getComputedStyle(document.querySelector('.pc[data-seat="' + s + '"]')).getPropertyValue('--pccore').trim()]));
     const first = tokens[0], svg = first && first.querySelector('.gem-token'), shadow = svg && svg.querySelector('.gem-shadow');
     const gradient = svg && svg.querySelector('radialGradient');
-    return { ready, seats, outline: svg && svg.querySelector('.gem-body').getAttribute('d'), glint: svg && svg.querySelector('.gem-glint').getAttribute('d'),
+    const body = svg && svg.querySelector('.gem-body');
+    return { ready, seats, tag: body && body.tagName, radius: body && body.getAttribute('r'), glint: svg && svg.querySelector('.gem-glint') && svg.querySelector('.gem-glint').getAttribute('d'),
+      rim: !!(svg && svg.querySelector('.gem-rim-outer')), emboss: !!(svg && svg.querySelector('.gem-num-hi')),
       coreStops: gradient ? [...gradient.querySelectorAll('stop')].map(stop => stop.getAttribute('stop-color')) : [],
       shadowFilter: shadow ? getComputedStyle(shadow).filter : '', shadowOpacity: shadow ? getComputedStyle(shadow).opacity : '',
       colors: [...new Set(seats.map(s => getComputedStyle(document.querySelector('.pc[data-seat="' + s + '"]')).getPropertyValue('--pc').trim()))], coreBySeat };
   });
-  ok(gemCheck.ready && gemCheck.colors.length === gemCheck.seats.length && gemCheck.coreBySeat['1'] === '#a0ffd2' && gemCheck.coreBySeat['3'] === '#a9ddff', 'faceted gems, layered gradients, player-colored pads, and Jade/Cobalt core hues are legible at board size');
-  ok(gemCheck.outline === 'M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z' && gemCheck.glint === 'M6.1 5.2 10.4 2.8 8.2 6.8 6.8 7.5Z', 'tapered gemstone silhouette and sharp diagonal glint stay crisp');
-  ok(gemCheck.coreStops[0] === '#fff' && gemCheck.coreStops.includes('var(--pccore)') && gemCheck.shadowFilter.includes('blur(') && Number(gemCheck.shadowOpacity) < .9, 'white-hot radial core glows inside the gem over a soft diffused board shadow');
+  ok(gemCheck.ready && gemCheck.colors.length === gemCheck.seats.length && gemCheck.coreBySeat['1'] === '#a0ffd2' && gemCheck.coreBySeat['3'] === '#a9ddff', 'circular hero tokens, layered gradients, player-colored pads, and Jade/Cobalt core hues are legible at board size');
+  ok(gemCheck.tag === 'circle' && Number(gemCheck.radius) >= 7 && gemCheck.rim && gemCheck.emboss && gemCheck.glint, 'circular crystal body, metallic rim, embossed numeral, and reflection glint stay crisp');
+  ok(gemCheck.coreStops[0] === '#fff' && gemCheck.coreStops.includes('var(--pccore)') && gemCheck.shadowFilter.includes('blur(') && Number(gemCheck.shadowOpacity) < .9, 'white-hot radial core glows inside the crystal over a soft contact shadow');
   await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
 
   // ---------- Star-style stacked rolls: 6, 6, 3 ----------

@@ -20,6 +20,17 @@
   var UI_CHROME = { timber: { dark: true, ink: '#fdf5e6', muted: '#ead6b4' } };
   var LIGHT_MUTED_DEEPEN = 0.3; // light skins: pull --muted toward black for >= 4.5:1 subtitle contrast
   var CORE_LIGHTS = ['#ffd0c1', '#a0ffd2', '#ffe7a3', '#a9ddff'];
+  /* Phase 1 hero token materials (original Crossfour art — no third-party names/assets).
+   * Seat: 0 Coral/ruby+rose-gold, 1 Jade/emerald+silver-green, 2 Saffron/gold+golden, 3 Cobalt/sapphire+silver-blue.
+   * Hook (v1.7.1+): TOKEN_EVOLUTION_LEVELS Lv1 Basic→Lv5 Legendary can multiply glow/particles/badge per token. */
+  var TOKEN_MAT = [
+    { id: 'ruby', rim0: '#ffe8de', rim1: '#e8a090', rim2: '#9a4034', glassHi: '#ffb0a0', glassMid: '#e85a48', glassLo: '#8a2820' },
+    { id: 'emerald', rim0: '#f2fff8', rim1: '#b5dcc8', rim2: '#2f5e48', glassHi: '#a8ffe0', glassMid: '#1fc49a', glassLo: '#0a6a4c' },
+    { id: 'gold', rim0: '#fff8d6', rim1: '#e8c050', rim2: '#8a6410', glassHi: '#ffe9a0', glassMid: '#f0b828', glassLo: '#9a6810' },
+    { id: 'sapphire', rim0: '#eef4ff', rim1: '#a8c4e8', rim2: '#2a4e82', glassHi: '#b8d8ff', glassMid: '#3d7ef0', glassLo: '#143a78' }
+  ];
+  // Placeholder for Phase 2 evolution (do not unlock in v1.7.0):
+  // var TOKEN_EVOLUTION = { maxLevel: 5, labels: ['Basic','Polished','Elite','Mythic','Legendary'] };
   var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, MOVE_DECIDE_MS = 4000, FREE_UNDOS = 3;
   var PHRASES = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!'];
 
@@ -706,38 +717,54 @@
       for (var i = 0; i < G.st.pieces[s].length; i++) {
         var el = document.createElement('button'); el.type = 'button'; el.className = 'pc';
         var tokNum = i + 1;
+        /* v1.7.0 Phase 1: circular 3D layered hero token (metallic rim + crystal body + embossed 1–4).
+         * Evolution levels / skin sets / Legendary profile badges: deferred to v1.7.1+. */
+        var mat = TOKEN_MAT[s] || TOKEN_MAT[0];
+        var gid = s + '-' + i;
         el.innerHTML = '<i class="jugnu" aria-hidden="true"></i><svg class="gem-token" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-          '<defs><linearGradient id="gem-body-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--pcl)" stop-opacity=".98"/><stop offset=".38" stop-color="var(--pcd)" stop-opacity=".95"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity="1"/></linearGradient>' +
-          '<linearGradient id="gem-sheen-' + s + '-' + i + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".68"/><stop offset=".32" stop-color="#fff" stop-opacity=".22"/><stop offset=".62" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient>' +
-          '<linearGradient id="gem-metal-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".4" stop-color="var(--pcl)" stop-opacity=".42"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity=".62"/></linearGradient>' +
-          '<linearGradient id="gem-rim-lit-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".55" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="var(--pcl)" stop-opacity=".15"/></linearGradient>' +
-          '<radialGradient id="gem-core-' + s + '-' + i + '" cx="48%" cy="38%" r="64%"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".16" stop-color="var(--pccore)" stop-opacity="1"/><stop offset=".52" stop-color="var(--pccore)" stop-opacity=".78"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient>' +
-          '<radialGradient id="gem-jugnu-' + s + '-' + i + '" cx="50%" cy="42%" r="55%"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".35" stop-color="var(--pccore)" stop-opacity=".7"/><stop offset="1" stop-color="var(--pc)" stop-opacity="0"/></radialGradient></defs>' +
-          '<ellipse class="gem-jugnu-glow" style="fill:url(#gem-jugnu-' + s + '-' + i + ')" cx="12" cy="11" rx="11.2" ry="11.8"/>' +
-          '<ellipse class="gem-ground" cx="12" cy="20.4" rx="10.6" ry="3.35"/>' +
-          '<path class="gem-pad" d="M5.1 17.05 18.9 17.05 17.25 22.65 6.75 22.65Z"/>' +
-          '<ellipse class="gem-shadow" cx="12" cy="21.25" rx="8.2" ry="1.7"/>' +
-          '<path class="gem-body" style="fill:url(#gem-body-' + s + '-' + i + ')" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
-          '<path class="gem-rim-outer" d="M12 1.2 19.05 5.05 16.9 12.55 12 18.55 7.1 12.55 4.95 5.05Z"/>' +
-          '<path class="gem-rim" style="stroke:url(#gem-rim-lit-' + s + '-' + i + ')" d="M12 1.55 18.7 5.2 16.65 12.35 12 17.95 7.35 12.35 5.3 5.2Z"/>' +
-          '<path class="gem-facet gem-facet-light" d="M12 1.1 12 13.6 7 12.6 4.8 5Z"/>' +
-          '<path class="gem-facet gem-facet-dark" d="M12 1.1 19.2 5 17 12.6 12 13.6Z"/>' +
-          '<path class="gem-facet gem-facet-side" d="M7 12.6 12 13.6 9.5 16.3Z"/>' +
-          '<path class="gem-facet gem-facet-base" d="M7 12.6 12 13.6 17 12.6 12 18.7Z"/>' +
-          '<path class="gem-sheen" style="fill:url(#gem-sheen-' + s + '-' + i + ')" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
-          '<path class="gem-bevel" style="stroke:url(#gem-metal-' + s + '-' + i + ')" d="M12 1.7 18.4 5.25 16.5 12.2 12 17.5 7.5 12.2 5.6 5.25Z"/>' +
-          '<ellipse class="gem-core" style="fill:url(#gem-core-' + s + '-' + i + ')" cx="12" cy="8.85" rx="3.35" ry="4.35"/>' +
-          '<ellipse class="gem-glint-soft" cx="8.85" cy="5.9" rx="3.9" ry="2.45"/>' +
-          '<path class="gem-glint" d="M5.75 4.95 10.65 2.4 8.4 6.85 6.45 7.5Z"/>' +
-          '<path class="gem-spec" d="M7.05 3.75 11.2 1.95 10.6 3.4 7.95 4.95Z"/>' +
-          '<circle class="gem-num-disc" cx="12" cy="11.15" r="4.15"/>' +
-          '<text class="gem-num" x="12" y="13.05" text-anchor="middle">' + tokNum + '</text>' +
-          '<circle class="gem-shield" cx="12" cy="10.2" r="9.3"/>' +
-          '<path class="gem-shield-glint" d="M6.1 8.2c1.2-3.4 4-5.1 7.3-5.3"/>' +
-          '<path class="gem-frost-wash" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
-          '<path class="gem-frost-crack" d="m14.4 4.6-2 3.2 1.5 1.6-2.2 2.3 1.2 2.6-2.1 2.1"/>' +
+          '<defs>' +
+          '<linearGradient id="gem-metal-' + gid + '" x1="0" y1="0" x2="1" y2="1">' +
+            '<stop offset="0" stop-color="var(--pcrim0)"/><stop offset=".42" stop-color="var(--pcrim1)"/><stop offset="1" stop-color="var(--pcrim2)"/></linearGradient>' +
+          '<linearGradient id="gem-rim-lit-' + gid + '" x1="0" y1="0" x2="1" y2="1">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".5" stop-color="var(--pcrim0)" stop-opacity=".55"/><stop offset="1" stop-color="var(--pcrim2)" stop-opacity=".85"/></linearGradient>' +
+          '<radialGradient id="gem-body-' + gid + '" cx="38%" cy="32%" r="72%">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".92"/><stop offset=".18" stop-color="var(--pcglassHi)" stop-opacity=".98"/>' +
+            '<stop offset=".55" stop-color="var(--pcglassMid)" stop-opacity=".96"/><stop offset="1" stop-color="var(--pcglassLo)" stop-opacity="1"/></radialGradient>' +
+          '<linearGradient id="gem-sheen-' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".72"/><stop offset=".38" stop-color="#fff" stop-opacity=".18"/><stop offset=".7" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient>' +
+          '<radialGradient id="gem-core-' + gid + '" cx="48%" cy="40%" r="58%">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".2" stop-color="var(--pccore)" stop-opacity="1"/><stop offset=".65" stop-color="var(--pccore)" stop-opacity=".55"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient>' +
+          '<radialGradient id="gem-jugnu-' + gid + '" cx="50%" cy="42%" r="55%">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".35" stop-color="var(--pccore)" stop-opacity=".65"/><stop offset="1" stop-color="var(--pc)" stop-opacity="0"/></radialGradient>' +
+          '<linearGradient id="gem-num-plate-' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".45" stop-color="#0c0e12" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity=".72"/></linearGradient>' +
+          '</defs>' +
+          '<ellipse class="gem-jugnu-glow" style="fill:url(#gem-jugnu-' + gid + ')" cx="12" cy="11" rx="11.2" ry="11.8"/>' +
+          '<ellipse class="gem-pad" cx="12" cy="20.55" rx="9.2" ry="2.55"/>' +
+          '<ellipse class="gem-shadow" cx="12" cy="21.15" rx="8.1" ry="1.65"/>' +
+          '<circle class="gem-rim-outer" style="fill:url(#gem-metal-' + gid + ')" cx="12" cy="11" r="10.05"/>' +
+          '<circle class="gem-rim" style="stroke:url(#gem-rim-lit-' + gid + ')" cx="12" cy="11" r="10.05"/>' +
+          '<circle class="gem-bevel" style="stroke:url(#gem-metal-' + gid + ')" cx="12" cy="11" r="8.55"/>' +
+          '<circle class="gem-body" style="fill:url(#gem-body-' + gid + ')" cx="12" cy="11" r="7.95"/>' +
+          '<circle class="gem-sheen" style="fill:url(#gem-sheen-' + gid + ')" cx="12" cy="11" r="7.95"/>' +
+          '<ellipse class="gem-core" style="fill:url(#gem-core-' + gid + ')" cx="12" cy="10.2" rx="4.1" ry="4.35"/>' +
+          '<ellipse class="gem-glint-soft" cx="9.1" cy="7.6" rx="3.6" ry="2.2"/>' +
+          '<path class="gem-glint" d="M6.4 6.2C8.2 4.2 11.2 3.4 13.6 4.1c-1.9.2-3.5 1.1-4.6 2.7-0.7 1-1 2.1-.9 3.2L6.4 6.2Z"/>' +
+          '<path class="gem-spec" d="M7.6 5.5 11.2 4.1 10.4 5.6 8.2 6.7Z"/>' +
+          '<circle class="gem-num-disc" style="fill:url(#gem-num-plate-' + gid + ')" cx="12" cy="12.05" r="3.55"/>' +
+          '<circle class="gem-num-bevel" cx="12" cy="12.05" r="3.55"/>' +
+          '<text class="gem-num-shadow" x="12.35" y="13.55" text-anchor="middle">' + tokNum + '</text>' +
+          '<text class="gem-num" x="12" y="13.2" text-anchor="middle">' + tokNum + '</text>' +
+          '<text class="gem-num-hi" x="11.7" y="12.85" text-anchor="middle">' + tokNum + '</text>' +
+          '<circle class="gem-shield" cx="12" cy="11" r="9.2"/>' +
+          '<path class="gem-shield-glint" d="M6.2 8.4c1.2-3.2 3.9-4.9 7.1-5.1"/>' +
+          '<circle class="gem-frost-wash" cx="12" cy="11" r="7.95"/>' +
+          '<path class="gem-frost-crack" d="m14.2 5.8-1.8 2.8 1.4 1.4-2 2.1 1.1 2.3-1.9 1.9"/>' +
           '</svg><i class="crown">' + ART.icon('crown', 16) + '</i>';
         el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45)); el.style.setProperty('--pccore', CORE_LIGHTS[s]);
+        el.style.setProperty('--pcrim0', mat.rim0); el.style.setProperty('--pcrim1', mat.rim1); el.style.setProperty('--pcrim2', mat.rim2);
+        el.style.setProperty('--pcglassHi', mat.glassHi); el.style.setProperty('--pcglassMid', mat.glassMid); el.style.setProperty('--pcglassLo', mat.glassLo);
+        el.dataset.mat = mat.id; el.dataset.evo = '1'; /* Phase 2: raise dataset.evo 1–5 for evolution visuals */
         el.style.setProperty('--jugnu-delay', ((s * 0.37 + i * 0.55) % 2.8).toFixed(2) + 's');
         el.dataset.seat = s; el.dataset.piece = i; el.dataset.num = String(tokNum);
         el.setAttribute('aria-label', NAMES[s] + ' token ' + tokNum);
@@ -1404,23 +1431,26 @@
   function bolt(x, y) { if (!fxOk()) return; var e = fxEl('bolt', x, y); e.innerHTML = ART.icon('zap', 40); setTimeout(function () { e.remove(); }, 700); }
   function iconPop(x, y, id, cls) { if (!fxOk()) return; var e = fxEl('iconpop ' + (cls || ''), x, y); e.innerHTML = ART.icon(id, 30); setTimeout(function () { e.remove(); }, 900); }
   function shake() { if (!fxOk()) return; var w = $('board-wrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); }
-  /** Soft kill/capture splash — particles + shockwave + radial splash (transform-only). */
+  /** Stronger kill/capture FX (~0.5–0.8s): impact shockwave + settle glow; transform/opacity only. */
   function killBurst(x, y, attackerCol, victimCol) {
     if (!fxOk()) return;
-    burst(x, y, victimCol || attackerCol, 20);
-    burst(x, y, attackerCol, 12);
-    for (var i = 0; i < 8; i++) {
-      var drop = fxEl('burst burst-splash', x, y), a = i / 8 * Math.PI * 2 + 0.2, d = CELL * (0.7 + (i % 3) * 0.35);
+    burst(x, y, victimCol || attackerCol, 26);
+    burst(x, y, attackerCol, 16);
+    for (var i = 0; i < 12; i++) {
+      var drop = fxEl('burst burst-splash', x, y), a = i / 12 * Math.PI * 2 + 0.15, d = CELL * (0.75 + (i % 4) * 0.32);
       drop.style.background = i % 2 ? attackerCol : (victimCol || attackerCol);
       drop.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px');
       drop.style.setProperty('--dy', (Math.sin(a) * d).toFixed(1) + 'px');
-      setTimeout(function (el) { el.remove(); }.bind(null, drop), 780);
+      setTimeout(function (el) { el.remove(); }.bind(null, drop), 820);
     }
     ring(x, y, attackerCol, 'ring-shock');
+    ring(x, y, '#fff', 'ring-shock ring-shock-outer');
     var flash = fxEl('kill-flash', x, y); flash.style.setProperty('--rc', attackerCol);
     var splash = fxEl('kill-splash', x, y); splash.style.setProperty('--rc', attackerCol);
-    setTimeout(function () { flash.remove(); }, 480);
-    setTimeout(function () { splash.remove(); }, 580);
+    var settle = fxEl('kill-settle', x, y); settle.style.setProperty('--rc', attackerCol);
+    setTimeout(function () { flash.remove(); }, 520);
+    setTimeout(function () { splash.remove(); }, 700);
+    setTimeout(function () { settle.remove(); }, 820);
   }
   /** Six-roll flourish: pop + glow on die, stack chips animate in via render. */
   function sixFlourish(seat) {
