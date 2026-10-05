@@ -20,24 +20,23 @@
   var UI_CHROME = { timber: { dark: true, ink: '#fdf5e6', muted: '#ead6b4' } };
   var LIGHT_MUTED_DEEPEN = 0.3; // light skins: pull --muted toward black for >= 4.5:1 subtitle contrast
   var CORE_LIGHTS = ['#ffd0c1', '#a0ffd2', '#ffe7a3', '#a9ddff'];
-  /* Phase 1 hero token materials (original Crossfour art — no third-party names/assets).
+  /* Hero token materials (original Crossfour art — no third-party names/assets).
    * Seat: 0 Coral/ruby+rose-gold, 1 Jade/emerald+silver-green, 2 Saffron/gold+golden, 3 Cobalt/sapphire+silver-blue.
-   * Hook (v1.7.1+): TOKEN_EVOLUTION_LEVELS Lv1 Basic→Lv5 Legendary can multiply glow/particles/badge per token. */
+   * Token Evolution Lv1 Basic→Lv5 Legendary multiplies gloss/glow/particles/badge (cosmetic only). */
   var TOKEN_MAT = [
     { id: 'ruby', rim0: '#ffe8de', rim1: '#e8a090', rim2: '#9a4034', glassHi: '#ffb0a0', glassMid: '#e85a48', glassLo: '#8a2820' },
     { id: 'emerald', rim0: '#f2fff8', rim1: '#b5dcc8', rim2: '#2f5e48', glassHi: '#a8ffe0', glassMid: '#1fc49a', glassLo: '#0a6a4c' },
     { id: 'gold', rim0: '#fff8d6', rim1: '#e8c050', rim2: '#8a6410', glassHi: '#ffe9a0', glassMid: '#f0b828', glassLo: '#9a6810' },
     { id: 'sapphire', rim0: '#eef4ff', rim1: '#a8c4e8', rim2: '#2a4e82', glassHi: '#b8d8ff', glassMid: '#3d7ef0', glassLo: '#143a78' }
   ];
-  // Placeholder for Phase 2 evolution (do not unlock in v1.7.0):
-  // var TOKEN_EVOLUTION = { maxLevel: 5, labels: ['Basic','Polished','Elite','Mythic','Legendary'] };
+  var TOKEN_EVOLUTION = window.TokenEvolution;
   var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, MOVE_DECIDE_MS = 4000, FREE_UNDOS = 3;
   var PHRASES = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!'];
 
   // ---------------- save ----------------
   function defaults() {
     return {
-      coins: 0, xp: 0, owned: { boards: ['graphite', 'linen', 'midnight', 'timber'], dice: ['ivory'] }, board: 'graphite', dice: 'ivory',
+      coins: 0, xp: 0, tokenEvo: 1, tokenEvoUnlocked: 1, owned: { boards: ['graphite', 'linen', 'midnight', 'timber'], dice: ['ivory'] }, board: 'graphite', dice: 'ivory',
       settings: { sound: true, haptics: true, auto: true, fast: false, undo: true, timer: false, chat: true },
       rules: L.normRules({}),
       setup: {
@@ -118,6 +117,11 @@
     if (isRecord(raw.owned)) {
       ['boards', 'dice'].forEach(function (kind) { s.owned[kind] = window.SkinShop.normalizeOwned(raw.owned[kind], d.owned[kind]); });
     }
+    if (TOKEN_EVOLUTION) {
+      s.tokenEvoUnlocked = TOKEN_EVOLUTION.clampLevel(safeCounter(raw.tokenEvoUnlocked, d.tokenEvoUnlocked) || 1);
+      s.tokenEvo = TOKEN_EVOLUTION.clampLevel(safeCounter(raw.tokenEvo, d.tokenEvo) || 1);
+      if (s.tokenEvo > s.tokenEvoUnlocked) s.tokenEvo = s.tokenEvoUnlocked;
+    } else { s.tokenEvo = 1; s.tokenEvoUnlocked = 1; }
     s.board = SK.BOARDS.some(function (x) { return x.id === raw.board; }) ? raw.board : d.board;
     s.dice = SK.DICE.some(function (x) { return x.id === raw.dice; }) ? raw.dice : d.dice;
     if (isRecord(raw.settings)) Object.keys(d.settings).forEach(function (k) { s.settings[k] = typeof raw.settings[k] === 'boolean' ? raw.settings[k] : d.settings[k]; });
@@ -155,6 +159,7 @@
   function validSave(s) {
     if (!isRecord(s) || !Object.prototype.hasOwnProperty.call(s, 'game') || !isCount(s.coins) || !isCount(s.xp) || !isRecord(s.owned) || !Array.isArray(s.owned.boards) || !Array.isArray(s.owned.dice) ||
         !s.owned.boards.every(function (id) { return typeof id === 'string' && id.length <= 32; }) || !s.owned.dice.every(function (id) { return typeof id === 'string' && id.length <= 32; }) ||
+        !isInt(s.tokenEvo, 1, 5) || !isInt(s.tokenEvoUnlocked, 1, 5) || s.tokenEvo > s.tokenEvoUnlocked ||
         !SK.BOARDS.some(function (x) { return x.id === s.board; }) || !SK.DICE.some(function (x) { return x.id === s.dice; }) || !isRecord(s.settings) ||
         !isRecord(s.rules) || !isRecord(s.setup) || !isRecord(s.stats) || !isRecord(s.ad) || !(s.game === null || validGame(s.game))) return false;
     if (!Object.keys(defaults().settings).every(function (k) { return typeof s.settings[k] === 'boolean'; })) return false;
@@ -176,6 +181,7 @@
   });
   var loadResult = saveStore.load();
   var save = normalizeSave(loadResult.data) || defaults();
+  if (TOKEN_EVOLUTION) TOKEN_EVOLUTION.applyNormalize(save);
   loadResult.data = save;
   var saveWriteFailed = false;
   var lastSaveError = null;
@@ -717,11 +723,15 @@
       for (var i = 0; i < G.st.pieces[s].length; i++) {
         var el = document.createElement('button'); el.type = 'button'; el.className = 'pc';
         var tokNum = i + 1;
-        /* v1.7.0 Phase 1: circular 3D layered hero token (metallic rim + crystal body + embossed 1–4).
-         * Evolution levels / skin sets / Legendary profile badges: deferred to v1.7.1+. */
+        /* Circular 3D layered hero token + Token Evolution (gloss/glow/particles/badge). */
         var mat = TOKEN_MAT[s] || TOKEN_MAT[0];
+        var evoLv = evoLevelForSeat(s);
+        var evoMeta = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.levelOf(evoLv) : { gloss: 1, glow: 1, particles: 0, badge: false, name: 'Basic' };
         var gid = s + '-' + i;
-        el.innerHTML = '<i class="jugnu" aria-hidden="true"></i><svg class="gem-token" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+        var badgeHtml = evoMeta.badge
+          ? '<span class="evo-badge" data-evo-badge="' + evoLv + '" title="' + evoMeta.name + '" aria-hidden="true">' + (evoLv >= 5 ? '★' : '✦') + '</span>'
+          : '';
+        el.innerHTML = '<i class="jugnu" aria-hidden="true"></i>' + badgeHtml + '<svg class="gem-token" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
           '<defs>' +
           '<linearGradient id="gem-metal-' + gid + '" x1="0" y1="0" x2="1" y2="1">' +
             '<stop offset="0" stop-color="var(--pcrim0)"/><stop offset=".42" stop-color="var(--pcrim1)"/><stop offset="1" stop-color="var(--pcrim2)"/></linearGradient>' +
@@ -764,7 +774,9 @@
         el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45)); el.style.setProperty('--pccore', CORE_LIGHTS[s]);
         el.style.setProperty('--pcrim0', mat.rim0); el.style.setProperty('--pcrim1', mat.rim1); el.style.setProperty('--pcrim2', mat.rim2);
         el.style.setProperty('--pcglassHi', mat.glassHi); el.style.setProperty('--pcglassMid', mat.glassMid); el.style.setProperty('--pcglassLo', mat.glassLo);
-        el.dataset.mat = mat.id; el.dataset.evo = '1'; /* Phase 2: raise dataset.evo 1–5 for evolution visuals */
+        el.style.setProperty('--evo-gloss', String(evoMeta.gloss));
+        el.style.setProperty('--evo-glow', String(evoMeta.glow));
+        el.dataset.mat = mat.id; el.dataset.evo = String(evoLv);
         el.style.setProperty('--jugnu-delay', ((s * 0.37 + i * 0.55) % 2.8).toFixed(2) + 's');
         el.dataset.seat = s; el.dataset.piece = i; el.dataset.num = String(tokNum);
         el.setAttribute('aria-label', NAMES[s] + ' token ' + tokNum);
@@ -871,6 +883,12 @@
   function humans(st) { return st.players.filter(function (s) { return st.seats[s].type === 'human'; }); }
   function hasAI(st) { return st.players.some(function (s) { return st.seats[s].type === 'ai'; }); }
   function isHuman(s) { return G && G.st.seats[s] && G.st.seats[s].type === 'human'; }
+  /** Cosmetics: evolution applies to human seats (online: local view only). AI stays Basic. */
+  function evoLevelForSeat(s) {
+    if (!TOKEN_EVOLUTION || !isHuman(s)) return 1;
+    if (G && G.online && G.view != null && s !== G.view) return 1;
+    return TOKEN_EVOLUTION.clampLevel(save.tokenEvo || 1);
+  }
   function nameOf(s) { var st = G.st; var named = st.seats[s] && st.seats[s].name; if (named) return named; if (st.seats[s].type === 'human' && humans(st).length === 1) return 'You'; return NAMES[s]; }
   function levelOf(s) { var pl = G.st.seats[s]; if (pl.type === 'remote') return 'Online'; return pl.type === 'human' ? (humans(G.st).length === 1 ? 'Lv ' + L.levelFromXp(save.xp).level : 'P' + (humans(G.st).indexOf(s) + 1)) : LEVEL_NAMES[pl.level]; }
   function undoActive() { return !!(G && G.undo && G.undo.until > Date.now()); }
@@ -1519,15 +1537,19 @@
     floatAt(x, y - CELL * 0.55, 'Out!', 'float-yard');
     setTimeout(function () { flash.remove(); }, 650);
   }
-  /** Tiny hop sparkles at each step landing. */
-  function hopStepFx(x, y, col) {
+  /** Tiny hop sparkles at each step landing. Extra particles scale with Token Evolution. */
+  function hopStepFx(x, y, col, evoParticles) {
     if (!fxOk()) return;
-    for (var k = 0; k < 3; k++) {
-      var sp = fxEl('hop-spark', x, y), a = -Math.PI / 2 + (k - 1) * 0.7, d = CELL * 0.28;
-      sp.style.setProperty('--rc', k === 1 ? '#fff' : (col || '#fff'));
+    var extra = Math.max(0, Math.min(5, evoParticles | 0));
+    var n = 3 + extra;
+    for (var k = 0; k < n; k++) {
+      var sp = fxEl('hop-spark' + (extra ? ' evo-spark' : ''), x, y);
+      var a = -Math.PI / 2 + (k - (n - 1) / 2) * (0.55 + extra * 0.04);
+      var d = CELL * (0.28 + (k % 3) * 0.04 + extra * 0.02);
+      sp.style.setProperty('--rc', k % 3 === 1 ? '#fff' : (col || '#fff'));
       sp.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px');
       sp.style.setProperty('--dy', (Math.sin(a) * d - 4).toFixed(1) + 'px');
-      setTimeout(function (el) { el.remove(); }.bind(null, sp), 420);
+      setTimeout(function (el) { el.remove(); }.bind(null, sp), 420 + extra * 40);
     }
   }
   /** Home-stretch / finish-lane sparkles while a token climbs the column. */
@@ -1610,7 +1632,7 @@
           piecePos[id] = points[k];
           if (!prefersReducedMotion()) {
             el.classList.remove('land'); void el.offsetWidth; el.classList.add('land');
-            hopStepFx(points[k].x, points[k].y, seatColor(s));
+            hopStepFx(points[k].x, points[k].y, seatColor(s), evoLevelForSeat(s) > 1 && TOKEN_EVOLUTION ? TOKEN_EVOLUTION.levelOf(evoLevelForSeat(s)).particles : 0);
             if (from < 0 && k === 0) yardExitFx(s, points[k]);
             var stepPos = path[k];
             if (stepPos >= L.COL0 && stepPos < L.HOME) homeLaneFx(points[k].x, points[k].y, seatColor(s), false);
@@ -1959,12 +1981,18 @@
       ['quick', 'team', 'arrow', 'friendly'].forEach(function (m) { if (st.mode === m) { S[m][0]++; if (best === 1) S[m][1]++; } });
       if (st.players.length === 2) { S.duel[0]++; if (best === 1) S.duel[1]++; } else if (st.players.length === 4) { S.four[0]++; if (best === 1) S.four[1]++; }
       var previousBoards = save.owned.boards.slice(), previousDice = save.owned.dice.slice();
+      var previousEvoU = save.tokenEvoUnlocked, previousEvo = save.tokenEvo;
       var newlyUnlocked = window.SkinShop.collectEligible(save, SK);
+      var evoGranted = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.collectEligible(save) : [];
       gate.matchCompleted();
       if (!persist()) {
         save.owned.boards = previousBoards; save.owned.dice = previousDice;
-      } else if (newlyUnlocked.length) {
-        toast('Achievement unlocked: ' + newlyUnlocked.map(function (x) { return x.name; }).join(', '), 3000);
+        save.tokenEvoUnlocked = previousEvoU; save.tokenEvo = previousEvo;
+      } else {
+        var notes = [];
+        if (newlyUnlocked.length) notes.push('Achievement unlocked: ' + newlyUnlocked.map(function (x) { return x.name; }).join(', '));
+        if (evoGranted.length) notes.push('Token Evolution: ' + evoGranted.map(function (x) { return 'Lv' + x.level + ' ' + x.name; }).join(', '));
+        if (notes.length) toast(notes.join(' · '), 3200);
       }
       if (!isHuman(st.ranking[0])) aiReact('win', st.ranking[0]);
       if (gate.canShow(Date.now())) Ads.prepareInterstitial();
@@ -2185,10 +2213,75 @@
     if (it.unlock === 'wins') return 'Locked · ' + it.threshold + ' wins';
     return 'Locked';
   }
+  function evoRequirement(meta, unlock) {
+    if (meta.level === 1) return 'Included · starter crystal';
+    if (unlock && unlock.ok && unlock.free) return 'Ready · ' + meta.winsRequired + ' wins reached (free)';
+    if (unlock && unlock.ok) return 'Unlock · ' + meta.coinCost.toLocaleString('en-US') + ' coins (or ' + meta.winsRequired + ' wins free)';
+    if (unlock && unlock.reason === 'locked') {
+      return 'Need ' + unlock.needCoins.toLocaleString('en-US') + ' more coins or ' + unlock.needWins + ' more wins';
+    }
+    return 'Earn ' + meta.coinCost.toLocaleString('en-US') + ' coins or ' + meta.winsRequired + ' wins';
+  }
+  function renderTokenEvolution() {
+    if (!TOKEN_EVOLUTION) return;
+    var granted = TOKEN_EVOLUTION.collectEligible(save);
+    if (granted.length) persist();
+    var grid = $('skin-grid');
+    var noteTop = document.createElement('p');
+    noteTop.className = 'note evo-intro';
+    noteTop.textContent = 'Token Evolution is cosmetic only. Unlock with match wins (free) or coins. Applies to your tokens in offline and online matches.';
+    grid.appendChild(noteTop);
+    TOKEN_EVOLUTION.LEVELS.forEach(function (meta) {
+      var st = TOKEN_EVOLUTION.state(meta.level, save);
+      var el = document.createElement('div');
+      el.className = 'skin evo-card' + (st.selected ? ' on' : '') + (!st.owned && !st.isNext ? ' is-locked' : '');
+      el.dataset.id = meta.id; el.dataset.evoLevel = String(meta.level);
+      var prev = document.createElement('div');
+      prev.className = 'evo-prev'; prev.setAttribute('role', 'img'); prev.setAttribute('aria-label', 'Lv' + meta.level + ' ' + meta.name);
+      prev.dataset.evo = String(meta.level);
+      prev.innerHTML = '<i class="jugnu" aria-hidden="true"></i>' +
+        (meta.badge ? '<span class="evo-badge" data-evo-badge="' + meta.level + '" aria-hidden="true">' + (meta.level >= 5 ? '★' : '✦') + '</span>' : '') +
+        '<span class="evo-prev-gem" data-mat="ruby"></span>' +
+        '<span class="evo-prev-lvl">Lv' + meta.level + '</span>';
+      prev.style.setProperty('--evo-gloss', String(meta.gloss));
+      prev.style.setProperty('--evo-glow', String(meta.glow));
+      prev.style.setProperty('--pc', '#e85a48');
+      prev.style.setProperty('--pccore', '#ffd0c1');
+      el.appendChild(prev);
+      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = 'Lv' + meta.level + ' · ' + meta.name; el.appendChild(nm);
+      var note = document.createElement('small'); note.className = 'skin-note'; note.textContent = meta.blurb + ' · ' + evoRequirement(meta, st.unlock); el.appendChild(note);
+      var b = document.createElement('button');
+      b.className = 'btn ' + (st.selected ? 'plate' : st.owned || st.canUnlock ? 'primary' : 'plate');
+      if (st.selected) { b.textContent = 'In use'; b.disabled = true; }
+      else if (st.owned) b.textContent = 'Use';
+      else if (st.canUnlock && st.unlock.free) b.textContent = 'Unlock free · ' + meta.winsRequired + ' wins';
+      else if (st.canUnlock) b.textContent = 'Unlock · ' + meta.coinCost.toLocaleString('en-US') + ' coins';
+      else if (st.isNext) { b.textContent = 'Need coins or wins'; b.disabled = true; }
+      else { b.textContent = 'Locked'; b.disabled = true; }
+      b.setAttribute('aria-label', meta.name + ': ' + b.textContent);
+      b.addEventListener('click', function () {
+        var result;
+        if (st.owned) result = TOKEN_EVOLUTION.select(save, meta.level, persist);
+        else if (st.canUnlock) result = TOKEN_EVOLUTION.unlockNext(save, persist);
+        else return;
+        if (!result.ok) {
+          if (result.reason === 'save-failed') toast('Could not save Token Evolution. Check device storage.', 2600);
+          else if (result.reason === 'locked') toast('Need more coins or wins for ' + meta.name + '.', 2200);
+          return;
+        }
+        if (result.spent > 0) SFX.coin(); else SFX.unlock ? SFX.unlock() : SFX.click();
+        renderSkins(); setCoins();
+        if (!$('game').classList.contains('hidden')) { buildPods(); buildTiles(); buildPieces(); layout(); render(); }
+        if (result.level && !st.owned) toast('Token Evolution Lv' + result.level + ' ' + result.name + (result.free ? ' (free)' : ''), 2400);
+      });
+      el.appendChild(b); grid.appendChild(el);
+    });
+  }
   function renderSkins() {
     setCoins();
     each($('skin-tabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === skinTab); });
     var grid = $('skin-grid'); grid.innerHTML = '';
+    if (skinTab === 'tokens') { renderTokenEvolution(); return; }
     var list = skinTab === 'boards' ? SK.BOARDS : SK.DICE;
     list.forEach(function (it) {
       var state = window.SkinShop.state(it, save, skinTab);

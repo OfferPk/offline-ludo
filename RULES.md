@@ -57,7 +57,11 @@ Tokens are circular **3D layered hero pieces** (original Crossfour art): metalli
 body, bevel and reflection, soft contact shadow, and an embossed raised number **1–4**. Seat materials:
 Coral = ruby + rose-gold rim, Jade = emerald + silver/green rim, Saffron = gold crystal + golden rim,
 Cobalt = sapphire + silver/blue rim. A soft firefly-style (jugnu) glow pulses tastefully — cosmetic only.
-(Token evolution levels Lv1–Lv5 ship in a later release.)
+
+**Token Evolution** (Skins → Tokens): Lv1 Basic → Lv2 Polished → Lv3 Elite → Lv4 Mythic → Lv5 Legendary.
+Each level upgrades gloss, glow, hop particles, and (from Mythic) a small badge. Unlock the next level
+with soft currency (**coins**) or lifetime **match wins** (free path). Selection is stored in local save
+and applies to your human tokens in offline and online matches. No IAP required for the base path.
 
 ## Decision countdown (offline)
 

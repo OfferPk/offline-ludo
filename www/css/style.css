@@ -327,8 +327,8 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc::after { content: ""; position: absolute; left: 2%; bottom: -10%; width: 96%; height: 26%; border: 1px solid var(--pc); border-radius: 50%; opacity: 0; transform: scale(.68); pointer-events: none; }
 .pc.land::after { animation: gem-ripple .44s ease-out both; }
 @keyframes gem-ripple { from { opacity: .72; transform: scale(.58); box-shadow: 0 0 6px var(--pc); } to { opacity: 0; transform: scale(1.42); box-shadow: 0 0 14px var(--pc); } }
-/* v1.7.0 Phase 1: circular 3D layered hero tokens (metallic rim + crystal/glass body + embossed 1–4).
-   Original Crossfour art only. Evolution Lv1–Lv5 visuals hook via [data-evo] later (v1.7.1). */
+/* Circular 3D layered hero tokens (metallic rim + crystal/glass body + embossed 1–4).
+   Original Crossfour art only. Token Evolution Lv1–Lv5 via [data-evo]. */
 .pc .gem-token { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none;
   filter: drop-shadow(0 7px 3.2px rgba(0,0,0,.58)) drop-shadow(0 2.5px 1.2px rgba(0,0,0,.38)) drop-shadow(0 1px 0 rgba(255,255,255,.28)); }
 .pc .gem-ground { fill: var(--pc); opacity: .3; filter: blur(1.5px); }
@@ -389,8 +389,57 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc.done .gem-token { filter: drop-shadow(0 3px 2.2px rgba(0,0,0,.42)) drop-shadow(0 0 6px rgba(255,230,140,.62)); }
 .pc.done .gem-body { stroke: rgba(255,236,170,.95); stroke-width: .7; }
 .pc.done::after { content: ''; position: absolute; left: 50%; top: 52%; width: 128%; height: 128%; transform: translate(-50%, -50%); border-radius: 50%; border: 1.5px solid rgba(255,220,120,.55); box-shadow: inset 0 0 6px rgba(255,230,150,.35), 0 0 8px rgba(255,200,80,.25); pointer-events: none; }
-/* data-evo hooks reserved for v1.7.1 evolution levels (no visual change in Phase 1) */
-.pc[data-evo="1"] .gem-token { /* Basic — Phase 1 default */ }
+/* Token Evolution Lv1–Lv5: gloss, glow, badge (particles via hop FX). Original Crossfour art only. */
+.pc[data-evo="1"] .gem-token { filter: drop-shadow(0 7px 3.2px rgba(0,0,0,.58)) drop-shadow(0 2.5px 1.2px rgba(0,0,0,.38)) drop-shadow(0 1px 0 rgba(255,255,255,.28)); }
+.pc[data-evo="2"] .gem-token { filter: drop-shadow(0 7px 3.2px rgba(0,0,0,.58)) drop-shadow(0 2.5px 1.2px rgba(0,0,0,.38)) drop-shadow(0 1px 0 rgba(255,255,255,.42)) drop-shadow(0 0 4px rgba(255,255,255,.22)); }
+.pc[data-evo="2"] .gem-sheen { opacity: calc(.78 * var(--evo-gloss, 1.18)); }
+.pc[data-evo="2"] .jugnu { opacity: calc(.38 * var(--evo-glow, 1.25)); }
+.pc[data-evo="2"] .gem-jugnu-glow { opacity: calc(.48 * var(--evo-glow, 1.25)); }
+.pc[data-evo="3"] .gem-token { filter: drop-shadow(0 7px 3.4px rgba(0,0,0,.58)) drop-shadow(0 2.5px 1.2px rgba(0,0,0,.38)) drop-shadow(0 1px 0 rgba(255,255,255,.5)) drop-shadow(0 0 7px rgba(255,255,255,.32)) drop-shadow(0 0 12px color-mix(in srgb, var(--pccore) 55%, transparent)); }
+.pc[data-evo="3"] .gem-sheen { opacity: .92; mix-blend-mode: soft-light; }
+.pc[data-evo="3"] .gem-glint { opacity: 1; filter: drop-shadow(0 0 2.4px rgba(255,255,255,1)); }
+.pc[data-evo="3"] .jugnu { opacity: .52; filter: blur(2.2px) saturate(1.15); }
+.pc[data-evo="3"] .gem-jugnu-glow { opacity: .7; }
+.pc[data-evo="4"] .gem-token { filter: drop-shadow(0 8px 3.6px rgba(0,0,0,.6)) drop-shadow(0 1px 0 rgba(255,255,255,.55)) drop-shadow(0 0 9px rgba(255,255,255,.4)) drop-shadow(0 0 16px color-mix(in srgb, var(--pccore) 70%, transparent)); }
+.pc[data-evo="4"] .gem-sheen { opacity: 1; }
+.pc[data-evo="4"] .gem-core { filter: drop-shadow(0 0 5px var(--pccore)) drop-shadow(0 0 10px rgba(255,255,255,.45)); }
+.pc[data-evo="4"] .jugnu { opacity: .6; filter: blur(2.4px) saturate(1.25); }
+.pc[data-evo="4"] .gem-jugnu-glow { opacity: .82; }
+.pc[data-evo="5"] .gem-token { filter: drop-shadow(0 9px 4px rgba(0,0,0,.62)) drop-shadow(0 1px 0 rgba(255,255,255,.62)) drop-shadow(0 0 12px rgba(255,240,180,.55)) drop-shadow(0 0 20px color-mix(in srgb, var(--pccore) 80%, #ffd24a)); }
+.pc[data-evo="5"] .gem-sheen { opacity: 1; mix-blend-mode: soft-light; }
+.pc[data-evo="5"] .gem-body { stroke: rgba(255,245,200,.9); stroke-width: .65; }
+.pc[data-evo="5"] .gem-core { filter: drop-shadow(0 0 6px var(--pccore)) drop-shadow(0 0 14px rgba(255,230,140,.55)); }
+.pc[data-evo="5"] .jugnu { opacity: .7; filter: blur(2.6px) saturate(1.35); animation-duration: 2.6s; }
+.pc[data-evo="5"] .gem-jugnu-glow { opacity: .95; animation-duration: 2.6s; }
+.pc .evo-badge { position: absolute; right: -6%; top: -4%; z-index: 5; width: 38%; height: 38%; display: grid; place-items: center;
+  font-size: calc(var(--cell) * .28); font-weight: 900; line-height: 1; color: #1a1206;
+  background: radial-gradient(circle at 35% 30%, #fff6c8 0%, #f0c040 45%, #b07a10 100%);
+  border: 1.5px solid rgba(255,255,255,.85); border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0,0,0,.45), 0 0 6px rgba(255,200,60,.55); pointer-events: none; }
+.pc .evo-badge[data-evo-badge="5"] { background: radial-gradient(circle at 35% 30%, #fff 0%, #ffe08a 40%, #e8a020 78%, #8a4a08 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5), 0 0 10px rgba(255,210,80,.85); }
+.hop-spark.evo-spark { width: 7px; height: 7px; border-radius: 50%; box-shadow: 0 0 6px var(--rc, #fff); }
+.evo-prev { position: relative; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 40% 32%, #3a3030, #16141a 70%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.2), 0 6px 14px rgba(0,0,0,.35); }
+.evo-prev .jugnu { position: absolute; inset: -8%; border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, var(--pccore) 0%, var(--pc) 36%, transparent 70%);
+  opacity: calc(.35 * var(--evo-glow, 1)); filter: blur(2px); pointer-events: none; }
+.evo-prev-gem { width: 52px; height: 52px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #fff 0%, #ffb0a0 22%, #e85a48 55%, #8a2820 100%);
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.7), inset 0 -4px 8px rgba(0,0,0,.35), 0 0 calc(6px * var(--evo-glow, 1)) rgba(255,180,140,.55);
+  border: 2.5px solid #e8a090; position: relative; z-index: 1; }
+.evo-prev[data-evo="2"] .evo-prev-gem { box-shadow: inset 0 2px 0 rgba(255,255,255,.8), inset 0 -4px 8px rgba(0,0,0,.35), 0 0 10px rgba(255,200,160,.65); }
+.evo-prev[data-evo="3"] .evo-prev-gem { box-shadow: inset 0 2px 0 rgba(255,255,255,.9), 0 0 14px rgba(255,210,170,.75); }
+.evo-prev[data-evo="4"] .evo-prev-gem, .evo-prev[data-evo="5"] .evo-prev-gem {
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.95), 0 0 18px rgba(255,220,120,.85); }
+.evo-prev .evo-badge { position: absolute; right: 2px; top: 2px; z-index: 3; width: 22px; height: 22px; font-size: 11px; }
+.evo-prev-lvl { position: absolute; bottom: 4px; z-index: 2; font-size: 10px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px #000; }
+.evo-card.is-locked { opacity: .72; }
+.evo-intro { margin: 0 0 4px; grid-column: 1 / -1; }
+@media (prefers-reduced-motion: reduce) {
+  .pc[data-evo] .jugnu, .pc[data-evo] .gem-jugnu-glow, .pc[data-evo] .gem-core { animation: none !important; }
+}
 .burst { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 2px; pointer-events: none; animation: burst .6s ease-out forwards; }
 @keyframes burst { from { transform: translate(0,0) rotate(0) scale(1); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) rotate(260deg) scale(.3); opacity: 0; } }
 .ring { position: absolute; width: calc(var(--cell) * 2); height: calc(var(--cell) * 2); margin: calc(var(--cell) * -1) 0 0 calc(var(--cell) * -1); border-radius: 50%; border: 3px solid var(--rc, #fff); pointer-events: none; animation: ring .5s ease-out forwards; }
