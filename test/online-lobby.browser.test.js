@@ -356,14 +356,14 @@ function startLocalServer() {
                 if (!room || room.status !== 'active' || match.state.phase !== 'active') return Promise.resolve({ data: null, error: { message: 'Chess game is not active', code: '55000' } });
                 if (isOffer) {
                   if (match.draw_offer) return Promise.resolve({ data: null, error: { message: 'A draw offer is already pending', code: '55000' } });
-                  match.draw_offer = { offered_by: Number(member.seat), position_version: Number(match.version), position_key: window.LudoChess.positionKey(match.state) };
+                  match.draw_offer = { offered_by: Number(member.seat), position_version: Number(match.version) };
                 } else {
                   const offer = match.draw_offer;
                   if (!offer) return Promise.resolve({ data: null, error: { message: 'There is no pending draw offer', code: '55000' } });
                   if (args.p_response === 'withdraw' && Number(member.seat) !== Number(offer.offered_by)) return Promise.resolve({ data: null, error: { message: 'Only the player who offered the draw can withdraw it', code: '42501' } });
                   if (['accept', 'decline'].includes(args.p_response) && Number(member.seat) === Number(offer.offered_by)) return Promise.resolve({ data: null, error: { message: 'Only the other player can respond to this draw offer', code: '42501' } });
                   if (!['accept', 'decline', 'withdraw'].includes(args.p_response)) return Promise.resolve({ data: null, error: { message: 'Match action is invalid', code: '22023' } });
-                  if (Number(offer.position_version) !== Number(match.version) - 1 || offer.position_key !== window.LudoChess.positionKey(match.state)) return Promise.resolve({ data: null, error: { message: 'Draw offer is stale; refresh and try again', code: '40001' } });
+                  if (Number(offer.position_version) !== Number(match.version) - 1) return Promise.resolve({ data: null, error: { message: 'Draw offer is stale; refresh and try again', code: '40001' } });
                   if (args.p_response === 'accept') {
                     match.state = Object.assign({}, match.state, { phase: 'over', result: 'draw_agreement', winner: null });
                     room.status = 'completed';
@@ -770,7 +770,7 @@ function startLocalServer() {
     async function seedOpponentDrawOffer() {
       const version = await page.evaluate(() => {
         const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches[0];
-        match.draw_offer = { offered_by: 1, position_version: match.version, position_key: window.LudoChess.positionKey(match.state) };
+        match.draw_offer = { offered_by: 1, position_version: match.version };
         match.version++;
         backend.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
         return match.version;

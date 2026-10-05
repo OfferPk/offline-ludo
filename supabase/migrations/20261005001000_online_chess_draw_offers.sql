@@ -17,18 +17,22 @@ begin
       check (
         draw_offer is null or (
           pg_catalog.jsonb_typeof(draw_offer) = 'object'
+          and draw_offer ? 'offered_by'
+          and draw_offer ? 'position_version'
+          and draw_offer ? 'created_at'
           and draw_offer->>'offered_by' in ('0', '1')
           and pg_catalog.jsonb_typeof(draw_offer->'position_version') = 'number'
           and (draw_offer->>'position_version') ~ '^[0-9]+$'
-          and pg_catalog.jsonb_typeof(draw_offer->'position_key') = 'string'
+          and pg_catalog.jsonb_typeof(draw_offer->'created_at') = 'string'
         )
       );
   end if;
 end;
 $$;
 
--- Any committed move or terminal result invalidates the offer. State-changing
--- RPCs already lock the match row, so this runs in the same transaction.
+-- Any committed state change, terminal result, or independent version advance
+-- invalidates an existing offer. The locked row version still distinguishes the
+-- offer's own version advance from a later action, in the same transaction.
 create or replace function private.ludo_chess_clear_draw_offer_on_state_change()
 returns trigger
 language plpgsql
@@ -36,8 +40,9 @@ set search_path = ''
 as $$
 begin
   if new.state->>'phase' = 'over'
-     or private.ludo_chess_position_key(new.state)
-          is distinct from private.ludo_chess_position_key(old.state) then
+     or new.state is distinct from old.state
+     or (new.version is distinct from old.version
+         and new.draw_offer is not distinct from old.draw_offer) then
     new.draw_offer := null;
   end if;
   return new;
@@ -47,7 +52,7 @@ revoke all on function private.ludo_chess_clear_draw_offer_on_state_change() fro
 
 drop trigger if exists ludo_chess_matches_clear_draw_offer on public.ludo_chess_matches;
 create trigger ludo_chess_matches_clear_draw_offer
-  before update of state on public.ludo_chess_matches
+  before update of state, version, draw_offer on public.ludo_chess_matches
   for each row execute function private.ludo_chess_clear_draw_offer_on_state_change();
 
 -- A room-level cancellation also cancels any pending offer. The match row is
@@ -138,7 +143,6 @@ begin
   v_draw_offer := pg_catalog.jsonb_build_object(
     'offered_by', v_seat,
     'position_version', v_version,
-    'position_key', private.ludo_chess_position_key(v_state),
     'created_at', now()
   );
   v_new_version := v_version + 1;
@@ -219,8 +223,7 @@ begin
   if v_draw_offer is null then raise exception 'There is no pending draw offer' using errcode = '55000'; end if;
 
   v_offer_seat := (v_draw_offer->>'offered_by')::integer;
-  if coalesce((v_draw_offer->>'position_version')::bigint, -1) <> v_version - 1
-     or v_draw_offer->>'position_key' is distinct from private.ludo_chess_position_key(v_state) then
+  if coalesce((v_draw_offer->>'position_version')::bigint, -1) <> v_version - 1 then
     raise exception 'Draw offer is stale; refresh and try again' using errcode = '40001';
   end if;
   if p_response = 'withdraw' and v_seat <> v_offer_seat then

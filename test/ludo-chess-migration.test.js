@@ -55,8 +55,8 @@ const offerBody = drawSql.slice(offerStart, offerEnd);
 const respondStart = drawSql.indexOf('create or replace function public.respond_ludo_chess_draw(');
 const respondEnd = drawSql.indexOf('$$;', respondStart);
 const respondBody = drawSql.slice(respondStart, respondEnd);
-ok(/add column if not exists draw_offer jsonb/i.test(drawSql) && /position_version/i.test(drawSql) && /position_key/i.test(drawSql), 'pending offers are stored on the authoritative match row and bound to its position/version');
-ok(/create trigger ludo_chess_matches_clear_draw_offer[\s\S]*?before update of state on public\.ludo_chess_matches/i.test(drawSql) && /new\.state->>'phase' = 'over'[\s\S]*?new\.draw_offer := null/i.test(drawSql) && /private\.ludo_chess_position_key\(new\.state\)[\s\S]*?is distinct from private\.ludo_chess_position_key\(old\.state\)/i.test(drawSql), 'a committed move or terminal game state clears the pending offer atomically');
+ok(/add column if not exists draw_offer jsonb/i.test(drawSql) && /position_version/i.test(drawSql) && !/position_key|ludo_chess_position_key/i.test(drawSql), 'pending offers are stored on the authoritative match row and bound to its locked position version without an external helper');
+ok(/create trigger ludo_chess_matches_clear_draw_offer[\s\S]*?before update of state, version, draw_offer on public\.ludo_chess_matches/i.test(drawSql) && /new\.state->>'phase' = 'over'[\s\S]*?new\.state is distinct from old\.state[\s\S]*?new\.version is distinct from old\.version[\s\S]*?new\.draw_offer is not distinct from old\.draw_offer[\s\S]*?new\.draw_offer := null/i.test(drawSql) && !/ludo_chess_position_key/i.test(drawSql), 'a committed move, version change, or terminal result clears the pending offer atomically without a PR #14 helper');
 ok(/new\.status = 'cancelled'[\s\S]*?update public\.ludo_chess_matches[\s\S]*?draw_offer = null/i.test(drawSql), 'room cancellation clears any pending offer');
 for (const fn of ['offer_ludo_chess_draw', 'respond_ludo_chess_draw']) {
   ok(new RegExp('create or replace function public\\.' + fn + '\\(', 'i').test(drawSql), fn + ' is a dedicated server RPC');
@@ -73,4 +73,5 @@ ok(/p_response = 'accept' then[\s\S]*?end if;[\s\S]*?update public\.ludo_chess_m
 ok(!/currency_ledger|wallets|post_currency_transaction/i.test(drawSql), 'draw offers do not alter currency or wallet behavior');
 ok(/if p_expected_version <> v_version then[\s\S]*?raise exception 'Match state is stale/i.test(respondBody), 'stale draw responses are rejected before offer-side effects');
 ok(/update public\.match_history[\s\S]*?where room_id = p_room_id and status = 'active'/i.test(respondBody), 'draw acceptance updates the production active-history row');
+ok(/coalesce\(\(v_draw_offer->>'position_version'\)::bigint, -1\) <> v_version - 1/i.test(respondBody), 'responses reject offers bound to an obsolete locked match version');
 console.log('\nLudo Chess database and integration static tests passed (' + checks + ' checks).');
