@@ -151,9 +151,10 @@ actually happen at that moment.
   (15% per level) of a second spin where the better result is kept. It resets when one of your tokens is captured.
 - **Revenge Charge**: when one of your tokens is captured you get a Revenge Charge (shown under your name).
   Your next tile spin shows **two different results and you pick one**.
-- **Lucky Charge** (5 pips): +1 per tile spin, +1 more on a Danger tile, +1 at a ×3 streak and +1 when far
-  behind (tiles charge at most once per turn); +1 for every capture. At **5/5** tap **MEGA** next to your die
-  before a roll to spin the **Mega Wheel**. The meter then empties.
+- **Lucky Charge** (5 pips): +1 per tile spin, +1 more on a Danger tile or when far behind, and never more
+  than +2 from one spin (tiles charge at most once per turn); +1 for every capture. A ×3 streak no longer
+  adds charge (it already improves the wheel). At **5/5** tap **MEGA** next to your die before a roll to
+  spin the **Mega Wheel**. The meter then empties.
 
 | Mega Wheel | Effect |
 |---|---|
@@ -169,7 +170,7 @@ actually happen at that moment.
 A token that captures **2 rival tokens** becomes **King** (gold crown) for **3 of its owner's turns** or until
 it is captured or gets home. A King moves **+1 square** when that fits (and still lands exactly) and is
 **immune to Chaos effects** (Bomb, Swap, Zap, Freeze, Storm). It can still be captured by a normal landing:
-capturing a King fills the attacker's Lucky Charge to **5/5** (a Mega spin).
+capturing a King adds **+2** Lucky Charge on top of the normal capture (3 in total from empty), not an instant Mega.
 
 ### Stored powers
 
@@ -192,16 +193,16 @@ From `npm test` (1000 simulated games per setting, computer vs computer):
 
 | | Lucky Chaos | Star (classic mode) |
 |---|---|---|
-| 1 v 1 Hard beats Easy | 91.9% | 91.9% |
-| 1 v 1 Hard beats Normal | 67.5% | – |
-| 1 v 1 Normal beats Easy | 84.6% | – |
-| 4 players: one Hard vs three Easy wins (fair share 25%) | 77.0% | 78.5% |
-| 4 players: one Hard vs three Normal / one Normal vs three Easy | 42.8% / 64.6% | – |
-| Average 1 v 1 game | 148 rolls / 106 turns | 174 rolls / 137 turns |
-| Average 4-player game | 438 rolls / 306 turns | 557 rolls / 427 turns |
-| Leader at 50% progress still wins (1 v 1 / 4 players) | 71.4% / 55.2% | 65.7% / 58.1% |
+| 1 v 1 Hard beats Easy | 89.8% | 91.9% |
+| 1 v 1 Hard beats Normal | 70.9% | – |
+| 1 v 1 Normal beats Easy | 82.2% | – |
+| 4 players: one Hard vs three Easy wins (fair share 25%) | 77.7% | 78.5% |
+| 4 players: one Hard vs three Normal / one Normal vs three Easy | 42.9% / 65.1% | – |
+| Average 1 v 1 game | 152 rolls / 111 turns | 174 rolls / 137 turns |
+| Average 4-player game | 445 rolls / 313 turns | 557 rolls / 427 turns |
+| Leader at 50% progress still wins (1 v 1 / 4 players) | 67.0% / 56.7% | 65.7% / 58.1% |
 
-About 9.5 Mega spins and 2.4 Kings per 1 v 1 game (27 and 10 in 4-player games). Every simulated game
+About 7.0 Mega spins and 1.9 Kings per 1 v 1 game (22.5 and 9.6 in 4-player games), after capping one tile at +2 charge and making a King capture +2 rather than a full meter. Every simulated game
 (1000 each with 2, 3 and 4 players, all levels and house-rule sets) finished with a winner.
 
 There is **no entry fee, stake or bet** in Lucky Chaos Ludo (or anywhere in the game). The wheels only

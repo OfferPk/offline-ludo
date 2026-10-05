@@ -137,6 +137,11 @@ t('Danger Tiles: 50/50 Boost or Chaos wheel (4000 activations), +2 charge, stron
   assert.ok(Math.abs(boost / N - 0.5) < 0.03, 'boost share ' + boost / N);
 });
 // ---- Charge meter and Mega Wheel ----
+t('one tile spin grants at most 2 charge even when Danger, streak and a comeback would stack', () => {
+  const st = game(); st.lk.streak[ME] = 3; st.pieces[0] = [40, 40, 40, 40]; st.pieces[1] = [40, 40, 40, 40]; st.pieces[2] = [40, 40, 40, 40];
+  st.pieces[ME][0] = rel(ME, 6) - 3; setMove(st, ME, 3);
+  L.move(st, 0, 3); assert.ok(st.lk.charge[ME] <= 2, 'charge ' + st.lk.charge[ME]);
+});
 t('Lucky Charge: +1 per capture, +1 per tile (once per turn), capped at 5; Mega only at 5/5 before a roll', () => {
   const st = game(); land(st, 4, 'extra'); assert.strictEqual(st.lk.charge[ME], 1);
   st.pieces[ME][1] = rel(ME, 17) - 2; setMove(st, ME, 2); L.move(st, 1, 2, 'extra'); assert.strictEqual(st.lk.charge[ME], 1, 'once per turn');
@@ -170,10 +175,10 @@ t('King lasts 3 of its owner\'s turns after being crowned, then expires', () => 
   for (let k = 0; k < 3; k++) { assert.ok(L.isKing(st, ME, 0), 'still King ' + k); while (st.turn !== ME) L.nextTurn(st); L.nextTurn(st); }
   assert.ok(!L.isKing(st, ME, 0));
 });
-t('capturing a King fills the attacker\'s meter to 5/5 (Mega ready) and removes the crown', () => {
+t('capturing a King adds +2 charge on top of the capture and removes the crown, without filling Mega', () => {
   const st = game(); st.pieces[ME][0] = rel(ME, 20); st.lk.kills[ME][0] = 2; L.checkKing(st, ME, 0);
   st.pieces[0][0] = 17; setMove(st, 0, 3); const r = L.move(st, 0, 3);
-  assert.ok(r.kingCaptured); assert.strictEqual(st.lk.charge[0], 5); assert.ok(!L.isKing(st, ME, 0)); assert.strictEqual(st.pieces[ME][0], -1);
+  assert.ok(r.kingCaptured); assert.strictEqual(st.lk.charge[0], 3); assert.ok(!L.canMega(st, 0)); assert.ok(!L.isKing(st, ME, 0)); assert.strictEqual(st.pieces[ME][0], -1);
 });
 // ---- powers cap ----
 t('stored powers: max 2 per player, never two of the same', () => {

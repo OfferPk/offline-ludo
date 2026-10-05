@@ -371,7 +371,7 @@
       if (byseat != null) {
         st.lk.revenge[t.seat] = true; st.lk.streak[t.seat] = 0; // Revenge Charge; Lucky Streak resets
         addCharge(st, byseat, 1);
-        if (wasKing) { st.lk.charge[byseat] = MAX_CHARGE; st.lk.kingFall = { by: byseat, seat: t.seat, piece: t.piece, at: st.turnCount }; }
+        if (wasKing) { addCharge(st, byseat, 2); st.lk.kingFall = { by: byseat, seat: t.seat, piece: t.piece, at: st.turnCount }; }
         if (bypiece != null) st.lk.kills[byseat][bypiece]++;
       }
     }
@@ -700,8 +700,9 @@
     var kind = danger ? (fo.kind || (rngNext(st) < 0.5 ? 'boost' : 'chaos')) : tile.kind;
     tile.until = st.turnCount + 2 * activeLeft(st).length; // inactive for 2 rounds
     st.stats[seat].events++;
-    // Lucky Charge: +1 per activation, +1 on a Danger tile, +1 at the top Lucky Streak, +1 when far behind (comeback)
-    var gain = 1 + (danger ? 1 : 0) + (lk.streak[seat] >= MAX_STREAK ? 1 : 0) + (comebackLevel(st, seat) >= 2 ? 1 : 0);
+    // Lucky Charge: +1 per activation, +1 on a Danger tile, +1 when far behind. Capped at 2 so one spin cannot fill Mega.
+    var gain = 1 + (danger ? 1 : 0) + (comebackLevel(st, seat) >= 2 ? 1 : 0);
+    if (gain > 2) gain = 2;
     if (lk.tg) gain = 0; // charge from tiles: once per turn (captures still add +1 each)
     lk.tg = true;
     addCharge(st, seat, gain);

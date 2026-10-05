@@ -31,7 +31,7 @@
 - **4 Danger tiles "High Risk / High Reward"** (peeli-kaali dhaariyan, **!!**): 50/50 Boost ya Chaos wheel, aur nateeje zyada taqatwar (Jump +5, 2 extra rolls, Big Bomb, Back 5).
 - **Lucky Streak** (aag ka nishaan ×1–×3): har spin par barhta hai, behtar nateeje ka chance; apni goti pitne par zero. **Revenge Charge:** goti pitne ke baad agle spin par **2 nateeje, aap ek chuno**.
 - **Lucky Charge meter (5 dabbe):** spin aur capture se bharta hai. **5/5** par dice ke saath **MEGA** button: Mega Wheel (Rocket, Free Token, Royal Guard, Double Turn, Storm, Crown). Taqatwar magar game ka faisla nahin karta.
-- **King goti (taaj):** jo goti 2 dushman gotiyan maare wo 3 baariyon tak King: +1 qadam aur Chaos se mehfooz. King ko maarne wale ka meter seedha 5/5.
+- **King goti (taaj):** jo goti 2 dushman gotiyan maare wo 3 baariyon tak King: +1 qadam aur Chaos se mehfooz. King ko maarne se meter +2 (capture ke sath), seedha 5/5 nahi.
 - **Stored powers:** zyada se zyada 2, ek jaisi do nahin. Swap / Wild Jump / Revenge par **3 second** faisla; waqt khatam ho to best option khud chun liya jata hai (computer foran faisla karta hai).
 - **Insaaf:** home lane wali goti ko kuch nahin hota, Bomb/Storm sirf 3 khane peeche (base nahin), 40+ khane wali goti par Zap sirf 6 peeche, safe squares/shield/King mehfooz. Peeche reh jane wale player ko thori (capped) madad.
 - **1 v 1 aur 4 players, computer (Easy/Normal/Hard) ya Pass & Play.** Computer bhi powers, Mega Wheel aur King ka sahi istemal karta hai. Game mein **How to play** page aur `RULES.md` update.
