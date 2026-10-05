@@ -373,17 +373,71 @@
       yard.addColorStop(0, mix(b.center, 'w', 0.18)); yard.addColorStop(0.5, b.center); yard.addColorStop(1, mix(b.center, 'b', 0.18));
       ctx.fillStyle = yard; ctx.fill();
       ctx.lineWidth = Math.max(1.35, c * 0.055); ctx.strokeStyle = rgba(col, 0.5); ctx.stroke();
-      L.BASE_SPOTS[s].forEach(function (p) {
+      // Yard pads: inset wells + seat rim light + numeral plates (original Crossfour style)
+      L.BASE_SPOTS[s].forEach(function (p, spotIdx) {
         var cx = (p[1] + 0.5) * c, cy = (p[0] + 0.5) * c;
-        ctx.beginPath(); ctx.arc(cx, cy + c * 0.06, c * 0.54, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,0,0,.26)'; ctx.fill();
-        ctx.beginPath(); ctx.arc(cx, cy, c * 0.49, 0, Math.PI * 2);
-        var nest = ctx.createRadialGradient(cx - c * 0.14, cy - c * 0.16, c * 0.04, cx, cy, c * 0.5);
-        nest.addColorStop(0, rgba(col, 0.38)); nest.addColorStop(0.55, rgba(col, 0.16)); nest.addColorStop(1, rgba(col, 0.08));
-        ctx.fillStyle = nest; ctx.fill();
-        ctx.lineWidth = Math.max(1.7, c * 0.09); ctx.strokeStyle = alpha(mix(col, 'w', 0.22), 0.98); ctx.stroke();
-        ctx.beginPath(); ctx.arc(cx - c * 0.13, cy - c * 0.15, c * 0.13, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.fill();
+        var R = c * 0.54, num = spotIdx + 1;
+        // soft contact shadow
+        ctx.beginPath(); ctx.arc(cx + c * 0.015, cy + c * 0.09, R * 1.08, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,' + (b.dark ? '.45' : '.26') + ')'; ctx.fill();
+        // seat-tinted outer halo (soft rim light)
+        ctx.beginPath(); ctx.arc(cx, cy, R * 1.18, 0, Math.PI * 2);
+        var halo = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R * 1.18);
+        halo.addColorStop(0, 'rgba(0,0,0,0)');
+        halo.addColorStop(0.5, rgba(col, b.dark ? 0.1 : 0.06));
+        halo.addColorStop(1, rgba(col, b.dark ? 0.42 : 0.28));
+        ctx.fillStyle = halo; ctx.fill();
+        // recessed bowl (inset well) — deeper center, seat-tinted walls
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        var well = ctx.createRadialGradient(cx - R * 0.18, cy - R * 0.26, R * 0.02, cx, cy + R * 0.12, R);
+        well.addColorStop(0, alpha(mix(b.center, 'b', b.dark ? 0.55 : 0.28), 0.98));
+        well.addColorStop(0.35, alpha(mix(b.center, 'b', b.dark ? 0.42 : 0.2), 0.98));
+        well.addColorStop(0.72, rgba(col, b.dark ? 0.34 : 0.24));
+        well.addColorStop(1, alpha(mix(col, 'b', 0.38), 0.96));
+        ctx.fillStyle = well; ctx.fill();
+        // carved lip: dark bottom arc for depth
+        ctx.beginPath(); ctx.arc(cx, cy + R * 0.04, R * 0.88, 0.08 * Math.PI, 0.92 * Math.PI);
+        ctx.strokeStyle = 'rgba(0,0,0,' + (b.dark ? '.55' : '.32') + ')';
+        ctx.lineWidth = Math.max(1.8, c * 0.075); ctx.stroke();
+        // bright seat-colored rim ring
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2);
+        ctx.lineWidth = Math.max(2.4, c * 0.11);
+        ctx.strokeStyle = alpha(mix(col, 'w', b.dark ? 0.5 : 0.32), 0.98); ctx.stroke();
+        // thin inner highlight ring
+        ctx.beginPath(); ctx.arc(cx, cy, R * 0.84, 0, Math.PI * 2);
+        ctx.lineWidth = Math.max(1.1, c * 0.045);
+        ctx.strokeStyle = alpha(mix(col, 'w', 0.72), b.dark ? 0.42 : 0.32); ctx.stroke();
+        // top sheen (WebView-safe arc; original Crossfour)
+        ctx.beginPath(); ctx.arc(cx - R * 0.2, cy - R * 0.28, R * 0.28, 0, Math.PI * 2);
+        var sheen = ctx.createRadialGradient(cx - R * 0.2, cy - R * 0.28, 0, cx - R * 0.2, cy - R * 0.28, R * 0.3);
+        sheen.addColorStop(0, 'rgba(255,255,255,' + (b.dark ? '.38' : '.48') + ')');
+        sheen.addColorStop(0.5, 'rgba(255,255,255,.1)');
+        sheen.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = sheen; ctx.fill();
+        // numeral plate (high-contrast readable 1–4)
+        var pr = R * 0.4;
+        ctx.beginPath(); ctx.arc(cx, cy + R * 0.02, pr, 0, Math.PI * 2);
+        var plate = ctx.createLinearGradient(cx - pr, cy - pr, cx + pr, cy + pr * 1.15);
+        plate.addColorStop(0, alpha(mix(col, 'w', 0.28), b.dark ? 0.92 : 0.82));
+        plate.addColorStop(0.42, alpha(mix(b.center, 'b', b.dark ? 0.62 : 0.4), 0.96));
+        plate.addColorStop(1, alpha(mix(col, 'b', 0.28), 0.92));
+        ctx.fillStyle = plate; ctx.fill();
+        ctx.lineWidth = Math.max(1.3, c * 0.055);
+        ctx.strokeStyle = alpha(mix(col, 'w', 0.65), 0.95); ctx.stroke();
+        // plate micro-sheen
+        ctx.beginPath(); ctx.arc(cx - pr * 0.28, cy - pr * 0.22, pr * 0.42, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,255,255,' + (b.dark ? '.2' : '.28') + ')'; ctx.fill();
+        // outlined numeral
+        ctx.save();
+        ctx.font = '900 ' + Math.max(12, Math.round(c * 0.46)) + 'px Inter, system-ui, "Segoe UI", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = Math.max(2.6, c * 0.1);
+        ctx.strokeStyle = 'rgba(6,8,12,.88)';
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeText(String(num), cx, cy + R * 0.05);
+        ctx.fillText(String(num), cx, cy + R * 0.05);
+        ctx.restore();
       });
     }
     ctx.globalAlpha = 1;

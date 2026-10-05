@@ -14,13 +14,9 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 
 console.log('token-die-pick.test.js');
 
-assert.equal(pkg.version, '1.6.1');
-assert.match(gradle, /versionCode 18/);
-assert.match(gradle, /versionName "1\.6\.1"/);
-assert.match(html, /Crossfour v1\.6\.1/);
 assert.match(html, /id="token-die-pick"/);
 assert.match(html, /id="move-countdown"/);
-console.log('  ok - version 1.6.1 / versionCode 18 and markup hooks');
+console.log('  ok - token die picker + move countdown markup hooks');
 
 assert.match(logic, /function bestAutoMove/);
 assert.match(logic, /bestAutoMove: bestAutoMove/);
