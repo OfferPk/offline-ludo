@@ -15,13 +15,17 @@ const SK = require(path.join(root, 'www/js/themes.js'));
 
 console.log('light-contrast.test.js');
 
-assert.equal(pkg.version, '1.6.4');
-assert.match(gradle, /versionCode 21\b/);
-assert.match(gradle, /versionName "1\.6\.4"/);
-assert.match(html, /Crossfour v1\.6\.4/);
+// Version moves forward with each release (v1.6.5 = versionCode 22); light contrast must remain.
+const [lMaj, lMin, lPat] = pkg.version.split('.').map(Number);
+assert.ok(lMaj > 1 || (lMaj === 1 && (lMin > 6 || (lMin === 6 && lPat >= 4))), 'version >= 1.6.4');
+const lCode = Number((gradle.match(/versionCode (\d+)/) || [])[1]);
+assert.ok(lCode >= 21, 'versionCode >= 21');
+const lEsc = pkg.version.replace(/\./g, '\\.');
+assert.match(gradle, new RegExp('versionName "' + lEsc + '"'));
+assert.match(html, new RegExp('Crossfour v' + lEsc));
 assert.doesNotMatch(html, /\?v=1\.6\.3/);
-assert.match(html, /css\/style\.css\?v=1\.6\.4/);
-console.log('  ok - version 1.6.4 / versionCode 21, cache-busted assets');
+assert.match(html, new RegExp('css/style\\.css\\?v=' + lEsc));
+console.log('  ok - version ' + pkg.version + ' / versionCode ' + lCode + ' (>= 1.6.4 / 21), cache-busted assets');
 
 // Pull the UI token tables straight out of game.js (applySkin) so the test tracks the shipped code.
 const grab = (re, what) => { const m = re.exec(game); assert.ok(m, what + ' present in game.js'); return m[1]; };
