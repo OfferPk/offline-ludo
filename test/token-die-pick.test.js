@@ -9,6 +9,7 @@ const game = fs.readFileSync(path.join(root, 'www/js/game.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'www/css/style.css'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'www/index.html'), 'utf8');
 const logic = fs.readFileSync(path.join(root, 'www/js/logic.js'), 'utf8');
+const tokenSystem = fs.readFileSync(path.join(root, 'www/js/token-system.js'), 'utf8');
 const gradle = fs.readFileSync(path.join(root, 'android/app/build.gradle'), 'utf8');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
@@ -42,7 +43,8 @@ assert.match(css, /\.pc\.picking/);
 assert.match(css, /gem-rim/);
 console.log('  ok - premium picker/countdown/token CSS present');
 
-assert.match(game, /gem-num/);
+assert.match(game, /TokenSystem\.svgMarkup/);
+assert.match(tokenSystem, /class="gem-num number-/);
 assert.match(game, /jugnu/);
 assert.match(game, /dataset\.num/);
 assert.match(css, /jugnu-pulse/);

@@ -61,13 +61,12 @@ const LEVEL_NAMES = ['basic', 'polished', 'elite', 'mythic', 'legendary'];
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('#home:not(.hidden)');
 
-    // Unlock all levels via coins path for preview shots
+    // Seed a completed-match-only local fixture for level preview shots.
     await page.evaluate(() => {
       const s = window.__cf.save;
-      s.coins = 10000;
-      s.stats.won = 100;
       s.tokenEvoUnlocked = 1;
       s.tokenEvo = 1;
+      s.tokenProgress = { completed: 20, roomCompletions: [] };
       window.TokenEvolution.collectEligible(s);
       window.__cf.persist();
     });
@@ -76,8 +75,9 @@ const LEVEL_NAMES = ['basic', 'polished', 'elite', 'mythic', 'legendary'];
     await page.waitForSelector('#skins:not(.hidden)');
     await page.click('#skin-tabs [data-tab="tokens"]');
     await sleep(200);
-    const evoCards = await page.$$eval('#skin-grid .evo-card', els => els.length);
-    ok(evoCards === 5, '5 evolution cards in Skins → Tokens');
+    const evoCards = await page.$$eval('#token-wardrobe .token-level-step', els => els.length);
+    ok(evoCards === 5, '5 accessible evolution levels in the unified Token 2.0 wardrobe');
+    ok(await page.$$eval('#token-wardrobe .token-level-step', els => els.length === 5 && els.every(el => !el.disabled)), 'all five screenshot levels are unlocked by the free completion fixture');
     await shot('skins-tokens');
 
     await page.click('#skins .close');

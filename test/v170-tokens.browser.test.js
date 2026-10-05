@@ -103,13 +103,13 @@ function startLocalServer() {
         const svg = el.querySelector('.gem-token');
         const body = svg && svg.querySelector('.gem-body');
         bySeat[s] = bySeat[s] || {
-          mat: el.dataset.mat,
+          mat: el.dataset.material,
           evo: el.dataset.evo,
           rim: !!(svg && svg.querySelector('.gem-rim-outer')),
           circle: body && body.tagName === 'circle',
           r: body && body.getAttribute('r'),
           num: el.querySelector('.gem-num') && el.querySelector('.gem-num').textContent,
-          emboss: !!(el.querySelector('.gem-num-hi') && el.querySelector('.gem-num-shadow')),
+          emboss: !!(el.querySelector('.gem-num-rim') && el.querySelector('.gem-num-disc') && el.querySelector('.gem-num')),
           jugnu: !!el.querySelector('.jugnu'),
           rim0: getComputedStyle(el).getPropertyValue('--pcrim0').trim(),
           glass: getComputedStyle(el).getPropertyValue('--pcglassMid').trim()
@@ -124,7 +124,7 @@ function startLocalServer() {
       };
     });
     ok(probe.count === 16, '16 tokens on 4-player board');
-    ok(probe.mats['0'] === 'ruby' && probe.mats['1'] === 'emerald' && probe.mats['2'] === 'gold' && probe.mats['3'] === 'sapphire', 'per-seat materials');
+    ok(Object.values(probe.mats).sort().join(',') === 'emerald,gold,ruby,sapphire', 'all four players receive distinct Ruby, Gold, Emerald, and Sapphire materials');
     ok(probe.allCircular && probe.allEvo1, 'circular rim/crystal/emboss/jugnu; evo hook at Lv1');
     ok(!!probe.sample.rim0 && !!probe.sample.glass, 'material CSS vars applied');
 
