@@ -18,7 +18,7 @@
  * reaching home each give a bonus roll (toggles), 6 to leave base, exact roll to reach home.
  *
  * Modes: 'classic', 'mystery', 'lucky' (Lucky Chaos Ludo), 'quick' (2 tokens), 'team' (2v2, partners
- *        opposite), 'arrow' (one-way arrow squares) and 'friendly' (no captures).
+ *        opposite), 'arrow' (land on arrow → jump 4, path captures) and 'friendly' (no captures).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -30,6 +30,7 @@
   var START_SQUARES = [0, 13, 26, 39];
   var STAR_SQUARES = [8, 21, 34, 47];
   var ARROW_SQUARES = [4, 17, 30, 43]; // board number 4 on each side (absolute index 4, then +13). Not the old 2/7 squares.
+  var ARROW_JUMP = 4; // land on arrow → advance exactly this many squares (no chaining)
   var DEFAULT_RULES = { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true, arrows: false, noCapture: false };
   var LEVELS = ['easy', 'medium', 'hard'];
   var MODES = ['classic', 'mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'];
@@ -195,8 +196,6 @@
   function capturesAt(st, seat, abs) {
     if (st.mode === 'friendly' || st.rules.noCapture) return [];
     if (st.rules.safeSquares && isSafeAbs(abs)) return [];
-    // Arrow mode: arrow tiles are shelters (you only rest there when a ride cannot complete)
-    if (st.mode === 'arrow' && ARROW_SQUARES.indexOf(abs) >= 0) return [];
     return tokensAt(st, abs, seat).filter(function (t) {
       if (isShielded(st, t.seat, t.piece)) return false;
       if (st.mode === 'team' && teamOf(t.seat) === teamOf(seat)) return false; // partners are not captured
@@ -211,46 +210,72 @@
     if (p === CIRCLE) return 0;
     return p + 1;
   }
-  /** Squares visited moving `n` forward from p (null if it would overshoot home). */
-  /** One extra clockwise square when a step lands on an arrow. Null if arrows are off, blocked or it would overshoot home. No chaining.
-   *  Arrow mode fair play: a forced ride never captures — if the extra square would dump onto a capturable rival, stay on the arrow. */
-  function rideArrow(st, seat, c, enter) {
-    if (!st || !arrowsOn(st) || !onTrack(c) || ARROW_SQUARES.indexOf(absOf(seat, c)) < 0) return null;
-    var extra = stepFwd(c, enter);
-    if (extra === null) return null;
-    if (onTrack(extra) && opponentBlockAt(st, seat, absOf(seat, extra))) return null;
-    if (st.mode === 'arrow' && onTrack(extra) && capturesAt(st, seat, absOf(seat, extra)).length) return null;
-    return extra;
+  /** Exact 4-square forward path from an arrow square. Null if the jump cannot complete (overshoot home or block). No arrow chaining inside the jump. */
+  function arrowJumpPath(st, seat, fromArrow, enter) {
+    var path = [], c = fromArrow;
+    for (var k = 0; k < ARROW_JUMP; k++) {
+      c = stepFwd(c, enter);
+      if (c === null) return null;
+      if (onTrack(c) && opponentBlockAt(st, seat, absOf(seat, c))) return null;
+      path.push(c);
+    }
+    return path;
   }
+  /** Squares visited moving `n` forward from p (null if it would overshoot home).
+   *  Landing on an arrow (pass or exact) jumps exactly ARROW_JUMP squares and ends the move there (no chaining). */
   function pathOf(p, n, enter, st, seat) {
     var out = [], c = p;
     for (var k = 0; k < n; k++) {
       c = stepFwd(c, enter); if (c === null) return null; out.push(c);
-      var extra = rideArrow(st, seat, c, enter);
-      if (extra !== null) { out.push(extra); c = extra; }
+      if (st && arrowsOn(st) && onTrack(c) && ARROW_SQUARES.indexOf(absOf(seat, c)) >= 0) {
+        var jump = arrowJumpPath(st, seat, c, enter);
+        if (jump) {
+          for (var j = 0; j < jump.length; j++) out.push(jump[j]);
+          return out; // stop on the jump destination — no further die steps, no second arrow
+        }
+        // jump blocked/overshoot: remain on the arrow
+      }
     }
     return out;
+  }
+  /** Captures for a move path: normal landing capture, plus every square of an arrow jump (arrow land + 4 ahead). Safe squares still protect. */
+  function capturesOnPath(st, seat, path) {
+    var caps = [], seen = {};
+    function add(abs) {
+      capturesAt(st, seat, abs).forEach(function (t) {
+        var id = t.seat + ':' + t.piece;
+        if (!seen[id]) { seen[id] = 1; caps.push(t); }
+      });
+    }
+    if (!path || !path.length) return caps;
+    var arrowIdx = -1;
+    for (var i = 0; i < path.length; i++) {
+      if (onTrack(path[i]) && ARROW_SQUARES.indexOf(absOf(seat, path[i])) >= 0) { arrowIdx = i; break; }
+    }
+    if (st && arrowsOn(st) && arrowIdx >= 0 && path.length >= arrowIdx + 1 + ARROW_JUMP) {
+      for (var j = arrowIdx; j < path.length; j++) if (onTrack(path[j])) add(absOf(seat, path[j]));
+    } else {
+      var to = path[path.length - 1];
+      if (onTrack(to)) add(absOf(seat, to));
+    }
+    return caps;
   }
 
   /** Legal move for token `piece` of `seat` with die value v (or null). */
   function moveFor(st, seat, piece, v) {
     var p = st.pieces[seat][piece], path, to;
     if (p === HOME || isFrozen(st, seat, piece)) return null;
-    if (p < 0) {
-      // Arrow fair play: when clearly behind, a 5 also leaves base (deterministic comeback; no dice nudge)
-      var leaveOk = v === 6 || (st.mode === 'arrow' && v === 5 && comebackLevel(st, seat) >= 1);
-      if (!leaveOk) return null; path = [0];
-    }
+    if (p < 0) { if (v !== 6) return null; path = [0]; }
     else {
       var kg = st.lk && isKing(st, seat, piece);  // King's stride: +1 square when it fits
       path = (kg && pathOf(p, v + 1, canEnter(st, seat), st, seat)) || pathOf(p, v, canEnter(st, seat), st, seat); if (!path) return null; // exact roll needed to reach home
     }
     to = path[path.length - 1];
     for (var k = 0; k < path.length; k++) if (onTrack(path[k]) && opponentBlockAt(st, seat, absOf(seat, path[k]))) return null; // blocks can't be passed or landed on
-    var caps = onTrack(to) ? capturesAt(st, seat, absOf(seat, to)) : [];
+    var caps = capturesOnPath(st, seat, path);
     var tile = tileAt(st, to, seat);
     return { seat: seat, piece: piece, v: v, from: p, to: to, path: path, captures: caps, leave: p < 0, finish: to === HOME,
-      entersHomeColumn: p <= CIRCLE && to >= COL0 && to < HOME, tile: tile ? tile.kind : null, stride: p >= 0 && path.length === v + 1 };
+      entersHomeColumn: p <= CIRCLE && to >= COL0 && to < HOME, tile: tile ? tile.kind : null, stride: !!(st.lk && isKing(st, seat, piece) && p >= 0 && path.length === v + 1) };
   }
   /** Legal moves for `seat` with die value v. */
   function legalMoves(st, seat, v) {
@@ -421,8 +446,6 @@
     var p = st.pieces[seat][piece], path = [], c = p, enter = canEnter(st, seat);
     for (var k = 0; k < n; k++) {
       var nx = stepFwd(c, enter); if (nx === null) break; path.push(nx); c = nx;
-      var extra = rideArrow(st, seat, c, enter);
-      if (extra !== null) { path.push(extra); c = extra; }
     }
     while (path.length && onTrack(path[path.length - 1]) && opponentBlockAt(st, seat, absOf(seat, path[path.length - 1]))) path.pop();
     return path;
@@ -983,7 +1006,7 @@
     var fromThreat = onTrack(m.from) && !shielded && !inBlock(st, seat, m.piece) ? threatsTo(st, seat, absOf(seat, m.from)) : 0;
     if (onTrack(m.to)) {
       var a = absOf(seat, m.to);
-      if ((st.rules.safeSquares && isSafeAbs(a)) || (st.mode === 'arrow' && ARROW_SQUARES.indexOf(a) >= 0)) sc += 30;
+      if (st.rules.safeSquares && isSafeAbs(a)) sc += 30;
       // danger check on the board after the move (captured tokens are gone)
       var saved = m.captures.map(function (c) { var v = st.pieces[c.seat][c.piece]; st.pieces[c.seat][c.piece] = -1; return v; });
       var old = st.pieces[seat][m.piece]; st.pieces[seat][m.piece] = m.to;
@@ -1018,7 +1041,7 @@
     if (m.finish) sc += 50;
     if (m.leave) sc += 40;
     if (m.entersHomeColumn) sc += 25;
-    if (onTrack(m.to) && ((st.rules.safeSquares && isSafeAbs(absOf(m.seat, m.to))) || (st.mode === 'arrow' && ARROW_SQUARES.indexOf(absOf(m.seat, m.to)) >= 0))) sc += 10;
+    if (onTrack(m.to) && st.rules.safeSquares && isSafeAbs(absOf(m.seat, m.to))) sc += 10;
     sc += tileValue(st, m, 'medium');
     sc += (advance(m.to) - advance(m.from)) * 0.5;
     return sc;
@@ -1093,7 +1116,7 @@
   function clone(st) { return JSON.parse(JSON.stringify(st)); }
 
   return {
-    TRACK: TRACK, LAST_TRACK: LAST_TRACK, CIRCLE: CIRCLE, COL0: COL0, HOME: HOME, PIECES: PIECES, START_SQUARES: START_SQUARES, STAR_SQUARES: STAR_SQUARES, ARROW_SQUARES: ARROW_SQUARES,
+    TRACK: TRACK, LAST_TRACK: LAST_TRACK, CIRCLE: CIRCLE, COL0: COL0, HOME: HOME, PIECES: PIECES, START_SQUARES: START_SQUARES, STAR_SQUARES: STAR_SQUARES, ARROW_SQUARES: ARROW_SQUARES, ARROW_JUMP: ARROW_JUMP,
     DEFAULT_RULES: DEFAULT_RULES, LEVELS: LEVELS, MODES: MODES, BOOST_TILES: BOOST_TILES, CHAOS_TILES: CHAOS_TILES, WHEELS: WHEELS, EVENT_INFO: EVENT_INFO,
     TRACK_CELLS: TRACK_CELLS, HOME_COLS: HOME_COLS, BASE_SPOTS: BASE_SPOTS, HOME_SPOTS: HOME_SPOTS, rot: rot,
     cellOf: cellOf, absOf: absOf, posFromAbs: posFromAbs, onTrack: onTrack, isSafeAbs: isSafeAbs, advance: advance, rngNext: rngNext, rollDie: rollDie,

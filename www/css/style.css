@@ -256,7 +256,10 @@ body.light .seg { background: rgba(0,0,0,.06); }
 @keyframes pulse { 0%, 100% { transform: scale(.9); opacity: .95; } 50% { transform: scale(1.12); opacity: .35; } }
 .pc.is-shielded { box-shadow: 0 0 0 2px #8fe0ff, 0 0 12px 3px rgba(111,211,255,.85), 0 4px 8px rgba(0,0,0,.45); }
 .pc.is-frozen { outline: 2px dashed #cfefff; outline-offset: 1px; }
-.pc.done { opacity: .9; }
+.pc.done { opacity: 1; z-index: 3; }
+.pc.done .gem-token { filter: drop-shadow(0 2px 2px rgba(0,0,0,.4)) drop-shadow(0 0 5px rgba(255,230,140,.55)); }
+.pc.done .gem-body { stroke: rgba(255,236,170,.95); stroke-width: 1.35; }
+.pc.done::after { content: ''; position: absolute; left: 50%; top: 52%; width: 128%; height: 128%; transform: translate(-50%, -50%); border-radius: 50%; border: 1.5px solid rgba(255,220,120,.55); box-shadow: inset 0 0 6px rgba(255,230,150,.35), 0 0 8px rgba(255,200,80,.25); pointer-events: none; }
 .burst { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 2px; pointer-events: none; animation: burst .6s ease-out forwards; }
 @keyframes burst { from { transform: translate(0,0) rotate(0) scale(1); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) rotate(260deg) scale(.3); opacity: 0; } }
 .ring { position: absolute; width: calc(var(--cell) * 2); height: calc(var(--cell) * 2); margin: calc(var(--cell) * -1) 0 0 calc(var(--cell) * -1); border-radius: 50%; border: 3px solid var(--rc, #fff); pointer-events: none; animation: ring .5s ease-out forwards; }

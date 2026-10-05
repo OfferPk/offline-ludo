@@ -34,61 +34,57 @@ t('Arrow: each player starts with one token already on the start square', () => 
   assert.ok(quick.pieces[0].every(p => p === -1), 'quick still starts every token in base');
 });
 
-t('Arrow: landing or passing both ride one extra clockwise square', () => {
+t('Arrow: land or pass jumps exactly 4 squares and stops (no chain)', () => {
   const st = L.newGame([H, A(), null, null], {}, 4, 'arrow');
   assert.ok(st.rules.arrows);
-  assert.strictEqual(st.pieces[0][0], 0);
-  assert.deepStrictEqual(L.legalMoves(st, 0, 1).find(m => m.from === -1), undefined);
+  assert.strictEqual(L.ARROW_JUMP, 4);
   assert.deepStrictEqual(L.ARROW_SQUARES, [4, 17, 30, 43]);
   st.pieces[0][0] = 3;
   const land = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
-  assert.deepStrictEqual(land.path, [4, 5], 'landing on board number 4 rides to 5');
+  assert.deepStrictEqual(land.path, [4, 5, 6, 7, 8], 'land on arrow → jump +4 to stop');
+  assert.strictEqual(land.to, 8);
+  // Destination of the jump is a star, not another arrow — and pathOf ends after the jump anyway
+  assert.ok(L.STAR_SQUARES.indexOf(L.absOf(0, land.to)) >= 0);
+  assert.ok(L.ARROW_SQUARES.indexOf(L.absOf(0, land.to)) < 0);
   st.pieces[0][0] = 2;
   const pass = L.legalMoves(st, 0, 2).find(m => m.piece === 0);
-  assert.deepStrictEqual(pass.path, [3, 4, 5], 'passing through board number 4 also rides to 5');
+  assert.deepStrictEqual(pass.path, [3, 4, 5, 6, 7, 8], 'passing through arrow also jumps +4 and ends');
+  // Remaining die pips after a jump are not walked (roll 3 from 2 would only need 2 to reach arrow)
+  st.pieces[0][0] = 2;
+  const big = L.legalMoves(st, 0, 3).find(m => m.piece === 0);
+  assert.deepStrictEqual(big.path, [3, 4, 5, 6, 7, 8], 'after jump the move ends — no extra die steps');
   const classic = L.newGame([H, A(), null, null], { arrows: true }, 4, 'classic');
   classic.pieces[0][0] = 3;
-  assert.deepStrictEqual(L.legalMoves(classic, 0, 1)[0].path, [4, 5], 'arrow house rule works in classic');
+  assert.deepStrictEqual(L.legalMoves(classic, 0, 1)[0].path, [4, 5, 6, 7, 8], 'house-rule arrows use the same jump');
 });
 
-
-t('Arrow fair play: forced ride never captures; arrow tiles are safe; trailing leaves on 5', () => {
+t('Arrow: jump captures on path; safe stop protects; starter still out', () => {
   const st = L.newGame([H, A(), null, null], {}, 4, 'arrow');
-  // Place rival on the square after seat 0 arrow (abs 4 -> ride to abs 5)
-  const afterArrowAbs = 5;
-  st.pieces[0][0] = 3; // one step from own relative arrow at 4
-  st.pieces[1][0] = L.posFromAbs(1, afterArrowAbs);
-  const dump = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
-  assert.ok(dump, 'move still legal');
-  assert.deepStrictEqual(dump.path, [4], 'ride cancelled — stay on arrow instead of capturing');
-  assert.strictEqual(dump.to, 4);
-  assert.strictEqual(dump.captures.length, 0, 'no capture from forced ride');
-  // Token resting on arrow is safe
-  st.pieces[0][0] = 4;
-  st.pieces[1][0] = L.posFromAbs(1, L.absOf(0, 3)); // rival one behind arrow
-  // rival at abs of seat0 pos 3 — better: put attacker on abs just before arrow
-  const arrowAbs = 4;
-  st.pieces[1][0] = L.posFromAbs(1, (arrowAbs - 1 + 52) % 52);
-  const ontoArrow = L.legalMoves(st, 1, 1).find(m => m.piece === 0);
-  assert.ok(ontoArrow);
-  assert.strictEqual(ontoArrow.captures.length, 0, 'cannot capture a token resting on an arrow tile');
-  // Classic + arrows house rule still captures on ride (unchanged)
-  const classic = L.newGame([H, A(), null, null], { arrows: true }, 4, 'classic');
-  classic.pieces[0][0] = 3;
-  classic.pieces[1][0] = L.posFromAbs(1, afterArrowAbs);
-  const classicRide = L.legalMoves(classic, 0, 1).find(m => m.piece === 0);
-  assert.deepStrictEqual(classicRide.path, [4, 5], 'classic house-rule arrows still ride');
-  assert.ok(classicRide.captures.length >= 1, 'classic house-rule ride may still capture');
-  // Trailing: make seat 0 clearly behind so comebackLevel >= 1
+  assert.strictEqual(st.pieces[0][0], 0, 'starter token already on start');
+  // Rival on an intermediate jump square (abs 6)
+  st.pieces[0][0] = 3;
+  st.pieces[1][0] = L.posFromAbs(1, 6);
+  const mid = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
+  assert.ok(mid.captures.some(c => c.seat === 1 && c.piece === 0), 'captures rival on jump path');
+  // Rival on the stop (abs 8 = star) — safe when safeSquares on
+  st.pieces[1][0] = L.posFromAbs(1, 8);
+  const stopSafe = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
+  assert.strictEqual(stopSafe.captures.length, 0, 'safe square on stop protects');
+  // With safeSquares off, stop can capture
+  const unsafe = L.newGame([H, A(), null, null], { safeSquares: false }, 4, 'arrow');
+  unsafe.pieces[0][0] = 3;
+  unsafe.pieces[1][0] = L.posFromAbs(1, 8);
+  const stopHit = L.legalMoves(unsafe, 0, 1).find(m => m.piece === 0);
+  assert.ok(stopHit.captures.some(c => c.seat === 1), 'stop captures when safe squares are off');
+  // Rival on the arrow tile itself is also captured when landing
+  st.pieces[1][0] = L.posFromAbs(1, 4);
+  const onArrow = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
+  assert.ok(onArrow.captures.some(c => c.seat === 1), 'landing on arrow captures a rival sitting there');
+  // No soft leave-on-5
   const behind = L.newGame([H, A(), null, null], {}, 11, 'arrow');
-  behind.pieces[0] = [0, -1, -1, -1];
-  behind.pieces[1] = [40, 35, 30, 25]; // leader far ahead
-  assert.ok(L.comebackLevel(behind, 0) >= 1, 'seat 0 is behind');
-  assert.ok(L.legalMoves(behind, 0, 5).some(m => m.leave), 'trailing Arrow player leaves base on a 5');
-  assert.ok(!L.legalMoves(behind, 1, 5).some(m => m.leave), 'leader still needs a 6');
-  const even = L.newGame([H, A(), null, null], {}, 4, 'classic');
-  even.pieces[0] = [-1, -1, -1, -1];
-  assert.strictEqual(L.legalMoves(even, 0, 5).length, 0, 'classic unchanged: 5 never leaves');
+  behind.pieces[0] = [-1, -1, -1, -1];
+  behind.pieces[1] = [40, 35, 30, 25];
+  assert.strictEqual(L.legalMoves(behind, 0, 5).length, 0, 'Arrow still needs a 6 to leave base (no soft 5)');
 });
 
 t('Friendly and the noCapture rule never capture', () => {
@@ -156,7 +152,7 @@ t(GAMES + ' Arrow games all end', () => {
   const r = sims('arrow', [null, A('medium'), null, A('hard')], GAMES);
   console.log('     arrow avg', r.rolls.toFixed(0), 'rolls, max', r.max);
 });
-t('Arrow fair play: Hard still beats Easy in a short series', () => {
+t('Arrow: Hard still beats Easy in a short series', () => {
   const N = Math.min(80, GAMES);
   let hardWins = 0;
   for (let i = 0; i < N; i++) {
@@ -165,7 +161,7 @@ t('Arrow fair play: Hard still beats Easy in a short series', () => {
     if (st.ranking[0] === 1) hardWins++;
   }
   console.log('     arrow Hard vs Easy: Hard won', hardWins, '/', N);
-  assert.ok(hardWins >= Math.ceil(N * 0.55), 'Hard should still win a clear majority vs Easy under Arrow fair play');
+  assert.ok(hardWins >= Math.ceil(N * 0.55), 'Hard should still win a clear majority vs Easy with Arrow jumps');
 });
 t(GAMES + ' Friendly games all end with zero captures', () => {
   const r = sims('friendly', [A('easy'), A('hard'), null, A('medium')], GAMES);

@@ -1,3 +1,8 @@
+## v1.5.3 update — Arrow jump +4
+
+- **Upload:** `offline-ludo-v1.5.3.aab` (version 1.5.3, **versionCode 10**), wahi upload key.
+- Arrow: land on ➡ → exactly 4 forward, path/stop captures (safe protect), no chain. Soft v1.5.2 Arrow-only rules removed. Starter token still out.
+
 ## v1.5.2 update — Arrow fair play + board polish
 
 - **Upload:** `offline-ludo-v1.5.2.aab` (version 1.5.2, **versionCode 9**), wahi upload key.

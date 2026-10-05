@@ -391,34 +391,68 @@
       }
     });
     for (s = 0; s < 4; s++) L.HOME_COLS[s].forEach(function (rc, k) {
-      cell(rc, rgba(b.seats[s], 0.5 + k * 0.1), alpha(mix(b.seats[s], 'b', 0.2), 0.45), true);
+      cell(rc, rgba(b.seats[s], 0.48 + k * 0.12), alpha(mix(b.seats[s], 'b', 0.28), 0.55), true);
     });
     var m0 = 6 * c, m1 = 9 * c, mc = 7.5 * c;
     var tri = [[[m0, m0], [m0, m1]], [[m0, m0], [m1, m0]], [[m1, m0], [m1, m1]], [[m0, m1], [m1, m1]]];
+    // soft well under the finish diamond
+    ctx.beginPath(); ctx.arc(mc, mc, c * 2.05, 0, Math.PI * 2);
+    var well = ctx.createRadialGradient(mc, mc, c * 0.4, mc, mc, c * 2.1);
+    well.addColorStop(0, alpha(mix(b.board, 'b', 0.35), 0.35));
+    well.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = well; ctx.fill();
     for (s = 0; s < 4; s++) {
-      ctx.beginPath(); ctx.moveTo(tri[s][0][0], tri[s][0][1]); ctx.lineTo(tri[s][1][0], tri[s][1][1]); ctx.lineTo(mc, mc); ctx.closePath();
-      var gg = ctx.createLinearGradient(tri[s][0][0], tri[s][0][1], mc, mc);
-      gg.addColorStop(0, mix(b.seats[s], 'w', 0.12)); gg.addColorStop(0.55, b.seats[s]); gg.addColorStop(1, mix(b.seats[s], 'b', 0.28));
+      var t0 = tri[s][0], t1 = tri[s][1];
+      // drop shadow under each home triangle
+      ctx.beginPath(); ctx.moveTo(t0[0] + 1.2, t0[1] + 1.8); ctx.lineTo(t1[0] + 1.2, t1[1] + 1.8); ctx.lineTo(mc + 0.6, mc + 1.4); ctx.closePath();
+      ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(t0[0], t0[1]); ctx.lineTo(t1[0], t1[1]); ctx.lineTo(mc, mc); ctx.closePath();
+      var mx = (t0[0] + t1[0]) / 2, my = (t0[1] + t1[1]) / 2;
+      var gg = ctx.createLinearGradient(mx, my, mc, mc);
+      gg.addColorStop(0, mix(b.seats[s], 'w', 0.28));
+      gg.addColorStop(0.42, b.seats[s]);
+      gg.addColorStop(1, mix(b.seats[s], 'b', 0.34));
       ctx.fillStyle = gg; ctx.fill();
-      ctx.lineWidth = Math.max(1.5, gap); ctx.strokeStyle = alpha(mix(b.board, 'b', 0.2), 0.85); ctx.stroke();
+      ctx.lineWidth = Math.max(1.8, gap * 1.15); ctx.strokeStyle = alpha(mix(b.seats[s], 'b', 0.45), 0.9); ctx.stroke();
       ctx.save();
-      ctx.beginPath(); ctx.moveTo(tri[s][0][0], tri[s][0][1]); ctx.lineTo(tri[s][1][0], tri[s][1][1]); ctx.lineTo(mc, mc); ctx.closePath();
+      ctx.beginPath(); ctx.moveTo(t0[0], t0[1]); ctx.lineTo(t1[0], t1[1]); ctx.lineTo(mc, mc); ctx.closePath();
       ctx.clip();
-      ctx.strokeStyle = alpha(mix(b.seats[s], 'w', 0.55), 0.35);
-      ctx.lineWidth = Math.max(1, c * 0.04);
-      ctx.beginPath(); ctx.moveTo(tri[s][0][0], tri[s][0][1]); ctx.lineTo(mc, mc); ctx.stroke();
+      // edge highlight toward the outer rim
+      ctx.strokeStyle = alpha(mix(b.seats[s], 'w', 0.7), 0.55);
+      ctx.lineWidth = Math.max(1.4, c * 0.055);
+      ctx.beginPath(); ctx.moveTo(t0[0], t0[1]); ctx.lineTo(t1[0], t1[1]); ctx.stroke();
+      // finish chevron pointing into the hub
+      var ax = mx * 0.55 + mc * 0.45, ay = my * 0.55 + mc * 0.45;
+      var ang = Math.atan2(mc - my, mc - mx);
+      ctx.translate(ax, ay); ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.moveTo(c * 0.22, 0); ctx.lineTo(-c * 0.12, -c * 0.16); ctx.lineTo(-c * 0.02, 0); ctx.lineTo(-c * 0.12, c * 0.16);
+      ctx.closePath();
+      ctx.fillStyle = alpha('#fff', 0.72); ctx.fill();
+      ctx.lineWidth = Math.max(1, c * 0.035); ctx.strokeStyle = alpha(mix(b.seats[s], 'b', 0.5), 0.55); ctx.stroke();
       ctx.restore();
     }
-    ctx.beginPath(); ctx.arc(mc, mc, c * 0.46, 0, Math.PI * 2);
-    var hub = ctx.createRadialGradient(mc - c * 0.1, mc - c * 0.12, c * 0.05, mc, mc, c * 0.46);
-    hub.addColorStop(0, mix(b.board, 'w', 0.12)); hub.addColorStop(1, b.board);
+    // concentric finish rings + hub badge
+    ctx.beginPath(); ctx.arc(mc, mc, c * 0.72, 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(1.5, c * 0.05); ctx.strokeStyle = alpha(mix(b.board, 'w', 0.25), 0.35); ctx.stroke();
+    ctx.beginPath(); ctx.arc(mc, mc, c * 0.52, 0, Math.PI * 2);
+    var hub = ctx.createRadialGradient(mc - c * 0.12, mc - c * 0.14, c * 0.04, mc, mc, c * 0.52);
+    hub.addColorStop(0, mix(b.board, 'w', 0.22));
+    hub.addColorStop(0.55, b.board);
+    hub.addColorStop(1, mix(b.board, 'b', 0.28));
     ctx.fillStyle = hub; ctx.fill();
-    ctx.lineWidth = Math.max(1.5, c * 0.05); ctx.strokeStyle = alpha(mix(b.board, 'w', 0.3), 0.4); ctx.stroke();
+    ctx.lineWidth = Math.max(2, c * 0.06); ctx.strokeStyle = alpha(mix(b.board, 'w', 0.45), 0.65); ctx.stroke();
+    ctx.beginPath(); ctx.arc(mc, mc, c * 0.38, 0, Math.PI * 2);
+    ctx.lineWidth = Math.max(1.2, c * 0.04); ctx.strokeStyle = alpha('#fff', 0.18); ctx.stroke();
     ctx.save(); ctx.translate(mc, mc); ctx.rotate(Math.PI / 4);
     for (s = 0; s < 4; s++) {
-      ctx.fillStyle = b.seats[s];
-      var q = c * 0.14;
-      ctx.fillRect((s % 2 ? 0.02 : -1.02) * q * 1.6, (s < 2 ? -1.02 : 0.02) * q * 1.6, q * 1.5, q * 1.5);
+      var q = c * 0.13;
+      var bx = (s % 2 ? 0.06 : -1.06) * q * 1.55, by = (s < 2 ? -1.06 : 0.06) * q * 1.55;
+      rr(ctx, bx, by, q * 1.45, q * 1.45, q * 0.28);
+      var tg = ctx.createLinearGradient(bx, by, bx + q, by + q);
+      tg.addColorStop(0, mix(b.seats[s], 'w', 0.35)); tg.addColorStop(1, mix(b.seats[s], 'b', 0.15));
+      ctx.fillStyle = tg; ctx.fill();
+      ctx.lineWidth = 1; ctx.strokeStyle = alpha('#fff', 0.35); ctx.stroke();
     }
     ctx.restore();
     ctx.restore();
@@ -544,8 +578,9 @@
       g.forEach(function (si, idx) {
         var s = si[0], i = si[1], id = s + '-' + i, el = pieceEls[s][i];
         if (!el || moving[id]) return;
-        var p = st.pieces[s][i], c = center(L.cellOf(s, p, i)), sc = 1;
+        var p = st.pieces[s][i], c = center(L.cellOf(s, p, i)), sc = p === L.HOME ? 1.08 : 1;
         if (n > 1) { var off = CLUSTER[Math.min(n, 4)][Math.min(idx, 3)]; c.x += off[0] * CELL; c.y += off[1] * CELL; }
+        if (p === L.HOME) { c.x += (idx - (n - 1) / 2) * CELL * 0.02; c.y += (idx - (n - 1) / 2) * CELL * 0.02; }
         if (instant) { el.style.transition = 'none'; place(el, c.x, c.y, sc); void el.offsetWidth; el.style.transition = ''; }
         else place(el, c.x, c.y, sc);
         el.classList.toggle('done', p === L.HOME);
@@ -1374,7 +1409,7 @@
     var entering = !isOpen('result');
     var teamWin = st.mode === 'team', tName = function (seat) { return L.teamOf(seat) ? 'Jade & Cobalt' : 'Coral & Saffron'; };
     $('r-title').textContent = teamWin ? (tName(winner) + ' win') : single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
-    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: 1 token starts on the board. One-way tiles ride +1 clockwise (no chaining, no capture from a forced ride). Arrow tiles are safe. When behind, a 5 also leaves base.', friendly: 'FRIENDLY · ' };
+    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: 1 token starts on the board. Land on an arrow → jump exactly 4 squares and stop. Captures along the jump (safe squares protect). No chaining.', friendly: 'FRIENDLY · ' };
     $('r-kicker').textContent = (MODE_KICK[st.mode] || '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
     var sec = Math.round((G.elapsed || 0) / 1000), mm = Math.floor(sec / 60), ss = sec % 60;
     $('r-meta').textContent = (G.moves || 0) + ' moves · ' + mm + ':' + (ss < 10 ? '0' : '') + ss;
@@ -1448,7 +1483,7 @@
       lucky: 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.',
       quick: 'Quick Ludo: 2 tokens each on the normal board. Same rules (6 to leave base, exact home, safe squares) so matches finish much faster. 1 v 1 or more.',
       team: 'Team Ludo, 2v2. Partners sit opposite: Coral with Saffron, Jade with Cobalt. A team wins when both partners have every token home. You cannot capture your partner.',
-      arrow: 'Arrow Ludo: 1 starter token out. Forced rides never capture; arrow tiles are safe. When behind, a 5 leaves base. Amber one-way tiles on board number 4.',
+      arrow: 'Arrow Ludo: 1 starter token out. Land on amber arrow → jump +4 and stop. Path captures; safe squares protect; no chain.',
       friendly: 'Friendly: captures are off. It is a pure race home. The app stays 13+.'
     };
     $('mode-note').textContent = NOTES[setupMode] || 'Classic Ludo on a clean board.';

@@ -221,11 +221,9 @@ pass & play. In 300 simulated 1 v 1 games the average was about 86 rolls (a 4-to
 capture your partner, and a partner's block does not stop you. Pass & play, or you with a computer partner against
 two computers, or four computers. An opponent who finishes their own tokens first does not win the match.
 
-**Arrow Ludo.** Each player starts with **one token already on their start square**, so they can move on any roll without waiting for a 6 for that starter token (other tokens still need a 6 to leave base, unless the fair-play note below applies). Amber one-way arrows on board number 4 of each side (absolute squares 4, 17, 30 and 43 — one per side, symmetric), always pointing
-clockwise, which is the only direction tokens move. Stepping onto an arrow, whether the die **lands** there or
-**passes through**, carries the token one extra square clockwise. Rides do **not** chain. You cannot choose to stop on an arrow unless the ride cannot complete.
+**Arrow Ludo.** Each player starts with **one token already on their start square**, so they can move on any roll without waiting for a 6 for that starter token (other tokens still need a 6 to leave base). Amber one-way arrows on board number 4 of each side (absolute squares 4, 17, 30 and 43 — one per side, symmetric).
 
-**Arrow fair play (Arrow mode only, v1.5.2):** (1) A forced ride **never captures** — if the extra square would capture a rival, the token stays on the arrow instead. (2) Arrow tiles are **safe** while a token rests on them. (3) When a player is clearly behind on board progress (same gap bands as Lucky's comeback meter), a **5 or 6** leaves base. Hard AI still outplays Easy; the comeback only softens runaway starts. Turning on "Arrow tiles" as a house rule in Classic keeps the older ride-and-capture behaviour. The home column has no arrows.
+When a token **lands on** an arrow (whether the die ends there or the path steps onto it), it immediately **jumps exactly 4 squares forward** along the track and **stops** on that destination. Opponent tokens on the squares in between — and on the stop, if it is not a safe square — are **captured**. The jump does **not** chain: even if the destination were another arrow, the token stays there. If the jump cannot complete (would overshoot home, or a block is in the way), the token stays on the arrow. Safe squares (starts and stars) still protect as usual. The home column has no arrows. The same arrows are a house rule ("Arrow tiles") and use this jump when turned on for other modes.
 
 **Friendly.** Captures are off: landing on a rival does nothing. It is a pure race home. The same switch is the
 house rule "No captures". The app stays **13+** even in this mode.
