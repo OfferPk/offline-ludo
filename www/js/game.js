@@ -20,7 +20,7 @@
   var UI_CHROME = { timber: { dark: true, ink: '#fdf5e6', muted: '#ead6b4' } };
   var LIGHT_MUTED_DEEPEN = 0.3; // light skins: pull --muted toward black for >= 4.5:1 subtitle contrast
   var CORE_LIGHTS = ['#ffd0c1', '#a0ffd2', '#ffe7a3', '#a9ddff'];
-  /* Hero token materials (original Crossfour art — no third-party names/assets).
+  /* Tall pawn token materials (original Crossfour art — no third-party names/assets).
    * Seat: 0 Coral/ruby+rose-gold, 1 Jade/emerald+silver-green, 2 Saffron/gold+golden, 3 Cobalt/sapphire+silver-blue.
    * Token Evolution Lv1 Basic→Lv5 Legendary multiplies gloss/glow/particles/badge (cosmetic only). */
   var TOKEN_MAT = [
@@ -723,7 +723,8 @@
       for (var i = 0; i < G.st.pieces[s].length; i++) {
         var el = document.createElement('button'); el.type = 'button'; el.className = 'pc';
         var tokNum = i + 1;
-        /* Circular 3D layered hero token + Token Evolution (gloss/glow/particles/badge). */
+        /* Tall classic Ludo pawn (vertical body + rounded head + wider base).
+         * Original Crossfour crystal materials. Token Evolution kept. No third-party game artwork. */
         var mat = TOKEN_MAT[s] || TOKEN_MAT[0];
         var evoLv = evoLevelForSeat(s);
         var evoMeta = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.levelOf(evoLv) : { gloss: 1, glow: 1, particles: 0, badge: false, name: 'Basic' };
@@ -731,45 +732,52 @@
         var badgeHtml = evoMeta.badge
           ? '<span class="evo-badge" data-evo-badge="' + evoLv + '" title="' + evoMeta.name + '" aria-hidden="true">' + (evoLv >= 5 ? '★' : '✦') + '</span>'
           : '';
-        el.innerHTML = '<i class="jugnu" aria-hidden="true"></i>' + badgeHtml + '<svg class="gem-token" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+        /* Silhouette paths (viewBox 0 0 24 36): outer rim + inset crystal body. */
+        var pawnOuter = 'M12 1.15C8.05 1.15 4.9 4.15 4.9 7.75c0 2.45 1.35 4.55 3.4 5.7C6.95 14.2 6.2 15.45 6.2 17v4.55c0 1.35-1.35 2.35-2.9 3.4C1.4 26.35.4 28 .6 30.15.85 32.55 4.2 33.9 12 33.9s11.15-1.35 11.4-3.75c.2-2.15-.8-3.8-2.7-5.05-1.55-1.05-2.9-2.05-2.9-3.4V17c0-1.55-.75-2.8-2.1-3.55 2.05-1.15 3.4-3.25 3.4-5.7C19.1 4.15 15.95 1.15 12 1.15Z';
+        var pawnBody = 'M12 2.45C8.85 2.45 6.3 4.85 6.3 7.75c0 2.1 1.15 3.9 2.95 4.9-.95.55-1.55 1.55-1.55 2.75v4.35c0 1.05-.95 1.9-2.25 2.8-1.55 1.05-2.35 2.25-2.2 3.85.2 1.85 2.85 2.95 9.75 2.95s9.55-1.1 9.75-2.95c.15-1.6-.65-2.8-2.2-3.85-1.3-.9-2.25-1.75-2.25-2.8V15.4c0-1.2-.6-2.2-1.55-2.75 1.8-1 2.95-2.8 2.95-4.9C17.7 4.85 15.15 2.45 12 2.45Z';
+        el.innerHTML = '<i class="jugnu" aria-hidden="true"></i>' + badgeHtml + '<svg class="gem-token" viewBox="0 0 24 36" aria-hidden="true" focusable="false">' +
           '<defs>' +
           '<linearGradient id="gem-metal-' + gid + '" x1="0" y1="0" x2="1" y2="1">' +
             '<stop offset="0" stop-color="var(--pcrim0)"/><stop offset=".42" stop-color="var(--pcrim1)"/><stop offset="1" stop-color="var(--pcrim2)"/></linearGradient>' +
-          '<linearGradient id="gem-rim-lit-' + gid + '" x1="0" y1="0" x2="1" y2="1">' +
-            '<stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".5" stop-color="var(--pcrim0)" stop-opacity=".55"/><stop offset="1" stop-color="var(--pcrim2)" stop-opacity=".85"/></linearGradient>' +
-          '<radialGradient id="gem-body-' + gid + '" cx="38%" cy="32%" r="72%">' +
-            '<stop offset="0" stop-color="#fff" stop-opacity=".92"/><stop offset=".18" stop-color="var(--pcglassHi)" stop-opacity=".98"/>' +
-            '<stop offset=".55" stop-color="var(--pcglassMid)" stop-opacity=".96"/><stop offset="1" stop-color="var(--pcglassLo)" stop-opacity="1"/></radialGradient>' +
+          '<linearGradient id="gem-rim-lit-' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".45" stop-color="var(--pcrim0)" stop-opacity=".55"/><stop offset="1" stop-color="var(--pcrim2)" stop-opacity=".9"/></linearGradient>' +
+          '<radialGradient id="gem-body-' + gid + '" cx="38%" cy="22%" r="78%">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".92"/><stop offset=".16" stop-color="var(--pcglassHi)" stop-opacity=".98"/>' +
+            '<stop offset=".52" stop-color="var(--pcglassMid)" stop-opacity=".96"/><stop offset="1" stop-color="var(--pcglassLo)" stop-opacity="1"/></radialGradient>' +
           '<linearGradient id="gem-sheen-' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
-            '<stop offset="0" stop-color="#fff" stop-opacity=".72"/><stop offset=".38" stop-color="#fff" stop-opacity=".18"/><stop offset=".7" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".28"/></linearGradient>' +
-          '<radialGradient id="gem-core-' + gid + '" cx="48%" cy="40%" r="58%">' +
-            '<stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".2" stop-color="var(--pccore)" stop-opacity="1"/><stop offset=".65" stop-color="var(--pccore)" stop-opacity=".55"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient>' +
-          '<radialGradient id="gem-jugnu-' + gid + '" cx="50%" cy="42%" r="55%">' +
-            '<stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset=".35" stop-color="var(--pccore)" stop-opacity=".65"/><stop offset="1" stop-color="var(--pc)" stop-opacity="0"/></radialGradient>' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".78"/><stop offset=".28" stop-color="#fff" stop-opacity=".22"/><stop offset=".62" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".32"/></linearGradient>' +
+          '<radialGradient id="gem-core-' + gid + '" cx="48%" cy="38%" r="58%">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".22" stop-color="var(--pccore)" stop-opacity="1"/><stop offset=".7" stop-color="var(--pccore)" stop-opacity=".45"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient>' +
+          '<radialGradient id="gem-jugnu-' + gid + '" cx="50%" cy="36%" r="58%">' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".88"/><stop offset=".32" stop-color="var(--pccore)" stop-opacity=".6"/><stop offset="1" stop-color="var(--pc)" stop-opacity="0"/></radialGradient>' +
           '<linearGradient id="gem-num-plate-' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
-            '<stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset=".45" stop-color="#0c0e12" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity=".72"/></linearGradient>' +
+            '<stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".45" stop-color="#0c0e12" stop-opacity=".55"/><stop offset="1" stop-color="#000" stop-opacity=".74"/></linearGradient>' +
+          '<linearGradient id="gem-collar-' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+            '<stop offset="0" stop-color="var(--pcrim0)"/><stop offset=".5" stop-color="var(--pcrim1)"/><stop offset="1" stop-color="var(--pcrim2)"/></linearGradient>' +
           '</defs>' +
-          '<ellipse class="gem-jugnu-glow" style="fill:url(#gem-jugnu-' + gid + ')" cx="12" cy="11" rx="11.2" ry="11.8"/>' +
-          '<ellipse class="gem-pad" cx="12" cy="20.55" rx="9.2" ry="2.55"/>' +
-          '<ellipse class="gem-shadow" cx="12" cy="21.15" rx="8.1" ry="1.65"/>' +
-          '<circle class="gem-rim-outer" style="fill:url(#gem-metal-' + gid + ')" cx="12" cy="11" r="10.05"/>' +
-          '<circle class="gem-rim" style="stroke:url(#gem-rim-lit-' + gid + ')" cx="12" cy="11" r="10.05"/>' +
-          '<circle class="gem-bevel" style="stroke:url(#gem-metal-' + gid + ')" cx="12" cy="11" r="8.55"/>' +
-          '<circle class="gem-body" style="fill:url(#gem-body-' + gid + ')" cx="12" cy="11" r="7.95"/>' +
-          '<circle class="gem-sheen" style="fill:url(#gem-sheen-' + gid + ')" cx="12" cy="11" r="7.95"/>' +
-          '<ellipse class="gem-core" style="fill:url(#gem-core-' + gid + ')" cx="12" cy="10.2" rx="4.1" ry="4.35"/>' +
-          '<ellipse class="gem-glint-soft" cx="9.1" cy="7.6" rx="3.6" ry="2.2"/>' +
-          '<path class="gem-glint" d="M6.4 6.2C8.2 4.2 11.2 3.4 13.6 4.1c-1.9.2-3.5 1.1-4.6 2.7-0.7 1-1 2.1-.9 3.2L6.4 6.2Z"/>' +
-          '<path class="gem-spec" d="M7.6 5.5 11.2 4.1 10.4 5.6 8.2 6.7Z"/>' +
-          '<circle class="gem-num-disc" style="fill:url(#gem-num-plate-' + gid + ')" cx="12" cy="12.05" r="3.55"/>' +
-          '<circle class="gem-num-bevel" cx="12" cy="12.05" r="3.55"/>' +
-          '<text class="gem-num-shadow" x="12.35" y="13.55" text-anchor="middle">' + tokNum + '</text>' +
-          '<text class="gem-num" x="12" y="13.2" text-anchor="middle">' + tokNum + '</text>' +
-          '<text class="gem-num-hi" x="11.7" y="12.85" text-anchor="middle">' + tokNum + '</text>' +
-          '<circle class="gem-shield" cx="12" cy="11" r="9.2"/>' +
-          '<path class="gem-shield-glint" d="M6.2 8.4c1.2-3.2 3.9-4.9 7.1-5.1"/>' +
-          '<circle class="gem-frost-wash" cx="12" cy="11" r="7.95"/>' +
-          '<path class="gem-frost-crack" d="m14.2 5.8-1.8 2.8 1.4 1.4-2 2.1 1.1 2.3-1.9 1.9"/>' +
+          '<ellipse class="gem-jugnu-glow" style="fill:url(#gem-jugnu-' + gid + ')" cx="12" cy="16" rx="11.4" ry="16.2"/>' +
+          '<ellipse class="gem-pad" cx="12" cy="33.35" rx="10.2" ry="2.35"/>' +
+          '<ellipse class="gem-shadow" cx="12" cy="33.85" rx="8.6" ry="1.45"/>' +
+          '<path class="gem-rim-outer" style="fill:url(#gem-metal-' + gid + ')" d="' + pawnOuter + '"/>' +
+          '<path class="gem-rim" style="stroke:url(#gem-rim-lit-' + gid + ')" fill="none" d="' + pawnOuter + '"/>' +
+          '<path class="gem-bevel" style="stroke:url(#gem-metal-' + gid + ')" fill="none" d="' + pawnBody + '"/>' +
+          '<path class="gem-body" style="fill:url(#gem-body-' + gid + ')" d="' + pawnBody + '"/>' +
+          '<path class="gem-sheen" style="fill:url(#gem-sheen-' + gid + ')" d="' + pawnBody + '"/>' +
+          '<ellipse class="gem-collar" style="fill:url(#gem-collar-' + gid + ')" cx="12" cy="13.35" rx="5.35" ry="1.55"/>' +
+          '<ellipse class="gem-collar-lit" cx="12" cy="12.95" rx="4.55" ry=".85"/>' +
+          '<ellipse class="gem-core" style="fill:url(#gem-core-' + gid + ')" cx="12" cy="7.35" rx="3.55" ry="3.7"/>' +
+          '<ellipse class="gem-glint-soft" cx="9.6" cy="5.35" rx="2.85" ry="1.85"/>' +
+          '<path class="gem-glint" d="M7.2 4.4C8.7 2.85 11.2 2.2 13.3 2.85c-1.55.15-2.9.95-3.8 2.25-.55.85-.8 1.75-.7 2.65L7.2 4.4Z"/>' +
+          '<path class="gem-spec" d="M8.15 3.85 11.1 2.7 10.4 4.05 8.55 4.95Z"/>' +
+          '<ellipse class="gem-num-disc" style="fill:url(#gem-num-plate-' + gid + ')" cx="12" cy="18.85" rx="3.35" ry="3.55"/>' +
+          '<ellipse class="gem-num-bevel" cx="12" cy="18.85" rx="3.35" ry="3.55"/>' +
+          '<text class="gem-num-shadow" x="12.35" y="20.45" text-anchor="middle">' + tokNum + '</text>' +
+          '<text class="gem-num" x="12" y="20.1" text-anchor="middle">' + tokNum + '</text>' +
+          '<text class="gem-num-hi" x="11.7" y="19.75" text-anchor="middle">' + tokNum + '</text>' +
+          '<path class="gem-shield" d="' + pawnBody + '"/>' +
+          '<path class="gem-shield-glint" d="M7.4 5.6c1.1-2.6 3.4-4 6.2-4.2"/>' +
+          '<path class="gem-frost-wash" d="' + pawnBody + '"/>' +
+          '<path class="gem-frost-crack" d="m13.9 4.6-1.5 2.4 1.15 1.15-1.7 1.85.95 2-1.65 1.65"/>' +
           '</svg><i class="crown">' + ART.icon('crown', 16) + '</i>';
         el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45)); el.style.setProperty('--pccore', CORE_LIGHTS[s]);
         el.style.setProperty('--pcrim0', mat.rim0); el.style.setProperty('--pcrim1', mat.rim1); el.style.setProperty('--pcrim2', mat.rim2);
@@ -2241,7 +2249,7 @@
       prev.dataset.evo = String(meta.level);
       prev.innerHTML = '<i class="jugnu" aria-hidden="true"></i>' +
         (meta.badge ? '<span class="evo-badge" data-evo-badge="' + meta.level + '" aria-hidden="true">' + (meta.level >= 5 ? '★' : '✦') + '</span>' : '') +
-        '<span class="evo-prev-gem" data-mat="ruby"></span>' +
+        '<span class="evo-prev-gem evo-prev-pawn" data-mat="ruby" aria-hidden="true"></span>' +
         '<span class="evo-prev-lvl">Lv' + meta.level + '</span>';
       prev.style.setProperty('--evo-gloss', String(meta.gloss));
       prev.style.setProperty('--evo-glow', String(meta.glow));

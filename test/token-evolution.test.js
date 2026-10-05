@@ -1,4 +1,4 @@
-// v1.7.1 Token Evolution: levels, unlock (coins/wins), selection, version + non-regression.
+// v1.7.2 Token Evolution (tall pawns): levels, unlock (coins/wins), selection, version + non-regression.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -20,10 +20,10 @@ const ok = (c, m) => { assert.ok(c, m); checks++; console.log('  ok -', m); };
 
 console.log('token-evolution.test.js');
 
-ok(pkg.version === '1.7.1', 'package version 1.7.1');
-ok(/versionCode 25/.test(gradle) && /versionName "1\.7\.1"/.test(gradle), 'gradle versionCode 25 / 1.7.1');
-ok(/Crossfour v1\.7\.1/.test(html) && /css\/style\.css\?v=1\.7\.1/.test(html), 'footer + asset cache-bust 1.7.1');
-ok(/token-evolution\.js\?v=1\.7\.1/.test(html), 'token-evolution.js script tagged');
+ok(pkg.version === '1.7.2', 'package version 1.7.2');
+ok(/versionCode 26/.test(gradle) && /versionName "1\.7\.2"/.test(gradle), 'gradle versionCode 26 / 1.7.2');
+ok(/Crossfour v1\.7\.2/.test(html) && /css\/style\.css\?v=1\.7\.2/.test(html), 'footer + asset cache-bust 1.7.2');
+ok(/token-evolution\.js\?v=1\.7\.2/.test(html), 'token-evolution.js script tagged');
 ok(/data-tab="tokens"/.test(html) && />Tokens</.test(html), 'Skins Tokens tab present');
 
 ok(Evo.maxLevel === 5 && Evo.LEVELS.length === 5, '5 evolution levels');

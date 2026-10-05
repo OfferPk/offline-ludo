@@ -53,10 +53,11 @@ off in Settings. Undo is only offered for human rolls.
 
 ## Tokens
 
-Tokens are circular **3D layered hero pieces** (original Crossfour art): metallic outer rim, crystal/glass
-body, bevel and reflection, soft contact shadow, and an embossed raised number **1–4**. Seat materials:
-Coral = ruby + rose-gold rim, Jade = emerald + silver/green rim, Saffron = gold crystal + golden rim,
-Cobalt = sapphire + silver/blue rim. A soft firefly-style (jugnu) glow pulses tastefully — cosmetic only.
+Tokens are tall classic **Ludo pawn pieces** (original Crossfour art): rounded head, vertical body, wider
+base, metallic outer rim, crystal/glass body, collar band, bevel and reflection, soft contact shadow, and
+an embossed raised number **1–4** on the body. Seat materials: Coral = ruby + rose-gold rim, Jade = emerald
++ silver/green rim, Saffron = gold crystal + golden rim, Cobalt = sapphire + silver/blue rim. A soft
+firefly-style (jugnu) glow pulses tastefully — cosmetic only. Silhouette idea only — original Crossfour art; no third-party game artwork.
 
 **Token Evolution** (Skins → Tokens): Lv1 Basic → Lv2 Polished → Lv3 Elite → Lv4 Mythic → Lv5 Legendary.
 Each level upgrades gloss, glow, hop particles, and (from Mythic) a small badge. Unlock the next level
