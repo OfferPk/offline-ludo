@@ -15,7 +15,7 @@ const SK = require(path.join(root, 'www/js/themes.js'));
 
 console.log('light-contrast.test.js');
 
-// Version moves forward with each release (v1.6.5 = versionCode 22); light contrast must remain.
+// Version moves forward with each release (v1.6.6 = versionCode 23); light contrast must remain.
 const [lMaj, lMin, lPat] = pkg.version.split('.').map(Number);
 assert.ok(lMaj > 1 || (lMaj === 1 && (lMin > 6 || (lMin === 6 && lPat >= 4))), 'version >= 1.6.4');
 const lCode = Number((gradle.match(/versionCode (\d+)/) || [])[1]);

@@ -37,7 +37,7 @@ test('multi-step hops are eased in legal path order and end at the exact path en
   });
   assert.ok(el.classList.contains('hop'));
   frames.tick(0); frames.tick(50);
-  assert.match(el.style.transform, /scale\(1\.045,0\.945\)/, 'mid-hop has modest stretch/squash');
+  assert.match(el.style.transform, /scale\(1\.070,0\.910\)/, 'mid-hop has bounce stretch/squash');
   frames.tick(100); frames.tick(100); frames.tick(150); frames.tick(200); frames.tick(200); frames.tick(250); frames.tick(300);
   assert.deepStrictEqual(steps, [0, 1, 2]);
   assert.deepStrictEqual(endpoints, [

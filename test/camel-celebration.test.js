@@ -17,7 +17,7 @@ const C = require(path.join(root, 'www/js/celebration.js'));
 
 console.log('camel-celebration.test.js');
 
-// Version moves forward with each release (v1.6.5 = versionCode 22); the camel wiring must remain.
+// Version moves forward with each release (v1.6.6 = versionCode 23); the camel wiring must remain.
 const [cMaj, cMin, cPat] = pkg.version.split('.').map(Number);
 assert.ok(cMaj > 1 || (cMaj === 1 && (cMin > 6 || (cMin === 6 && cPat >= 3))), 'version >= 1.6.3');
 const vCode = Number((gradle.match(/versionCode (\d+)/) || [])[1]);

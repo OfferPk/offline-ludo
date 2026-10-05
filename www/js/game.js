@@ -976,10 +976,10 @@
       var lkb = el.querySelector('.lkb'); if (lkb) lkb.innerHTML = lk && rank < 0 ? luckyBadges(st, s) : '';
       var chips = el.querySelector('.chips'), html = '', selDone = false;
       if (lk && rank < 0 && !(active && st.phase === 'move')) html = luckyPowers(st, s, active);
-      if (active) st.queue.forEach(function (v) {
+      if (active) st.queue.forEach(function (v, qi) {
         var usable = st.phase === 'move' && chipMoves(v).length > 0, sel = usable && v === G.sel && !selDone;
         if (sel) selDone = true;
-        html += '<button class="chip-v' + (usable ? '' : ' dim') + (sel ? ' sel' : '') + (v > 6 ? ' dbl' : '') + '" data-v="' + v + '">' + v + '</button>';
+        html += '<button class="chip-v chip-in' + (usable ? '' : ' dim') + (sel ? ' sel' : '') + (v > 6 ? ' dbl' : '') + '" data-v="' + v + '" style="animation-delay:' + (qi * 45) + 'ms">' + v + '</button>';
       });
       chips.innerHTML = html;
       var humanRoll = active && st.phase === 'roll' && isHuman(s) && !busy;
@@ -1404,56 +1404,126 @@
   function bolt(x, y) { if (!fxOk()) return; var e = fxEl('bolt', x, y); e.innerHTML = ART.icon('zap', 40); setTimeout(function () { e.remove(); }, 700); }
   function iconPop(x, y, id, cls) { if (!fxOk()) return; var e = fxEl('iconpop ' + (cls || ''), x, y); e.innerHTML = ART.icon(id, 30); setTimeout(function () { e.remove(); }, 900); }
   function shake() { if (!fxOk()) return; var w = $('board-wrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); }
-  /** Soft kill/capture burst — more particles + shockwave, still transform-only. */
+  /** Soft kill/capture splash — particles + shockwave + radial splash (transform-only). */
   function killBurst(x, y, attackerCol, victimCol) {
     if (!fxOk()) return;
-    burst(x, y, victimCol || attackerCol, 18);
-    burst(x, y, attackerCol, 10);
+    burst(x, y, victimCol || attackerCol, 20);
+    burst(x, y, attackerCol, 12);
+    for (var i = 0; i < 8; i++) {
+      var drop = fxEl('burst burst-splash', x, y), a = i / 8 * Math.PI * 2 + 0.2, d = CELL * (0.7 + (i % 3) * 0.35);
+      drop.style.background = i % 2 ? attackerCol : (victimCol || attackerCol);
+      drop.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px');
+      drop.style.setProperty('--dy', (Math.sin(a) * d).toFixed(1) + 'px');
+      setTimeout(function (el) { el.remove(); }.bind(null, drop), 780);
+    }
     ring(x, y, attackerCol, 'ring-shock');
     var flash = fxEl('kill-flash', x, y); flash.style.setProperty('--rc', attackerCol);
+    var splash = fxEl('kill-splash', x, y); splash.style.setProperty('--rc', attackerCol);
     setTimeout(function () { flash.remove(); }, 480);
+    setTimeout(function () { splash.remove(); }, 580);
   }
-  /** Six-roll flourish on the active die pod. */
+  /** Six-roll flourish: pop + glow on die, stack chips animate in via render. */
   function sixFlourish(seat) {
     if (!fxOk()) return;
     var die = diceBtn(seat), pod = podEl(seat);
-    if (die) { die.classList.remove('six-pop'); void die.offsetWidth; die.classList.add('six-pop'); later(function () { if (die) die.classList.remove('six-pop'); }, 900); }
+    if (die) {
+      die.classList.remove('six-pop', 'six-glow'); void die.offsetWidth;
+      die.classList.add('six-pop', 'six-glow');
+      later(function () { if (die) die.classList.remove('six-pop', 'six-glow'); }, 1600);
+    }
     if (pod) {
       var r = pod.getBoundingClientRect(), br = $('board-wrap').getBoundingClientRect();
       var x = r.left + r.width / 2 - br.left, y = r.top + r.height / 2 - br.top;
-      burst(x, y, seatColor(seat), 12);
+      burst(x, y, seatColor(seat), 14);
+      burst(x, y, '#ffd24a', 6);
       floatAt(x, y - 18, '6!', 'float-six');
     }
   }
-  /** Safe-square landing pulse under the token. */
+  /** Safe-square landing pulse + sparkles under the token. */
   function safePulse(x, y, col) {
     if (!fxOk()) return;
-    var e = fxEl('safe-pulse', x, y); e.style.setProperty('--rc', col || '#fff');
+    var c = col || '#fff';
+    var e = fxEl('safe-pulse', x, y); e.style.setProperty('--rc', c);
     setTimeout(function () { e.remove(); }, 700);
+    for (var k = 0; k < 7; k++) {
+      var sp = fxEl('safe-spark', x, y), ang = k / 7 * Math.PI * 2, d = CELL * (0.45 + (k % 3) * 0.18);
+      sp.style.setProperty('--rc', k % 2 ? c : '#fff6c8');
+      sp.style.setProperty('--dx', (Math.cos(ang) * d).toFixed(1) + 'px');
+      sp.style.setProperty('--dy', (Math.sin(ang) * d).toFixed(1) + 'px');
+      setTimeout(function (el) { el.remove(); }.bind(null, sp), 750);
+    }
   }
-  /** Arrow jump whoosh along the jump path. */
+  /** Arrow jump whoosh + stronger trail along the jump path. */
   function arrowWhoosh(seat, piece, path) {
     if (!fxOk() || !path || path.length < 2) return;
-    var from = center(L.cellOf(seat, path[path.length - 1 - (L.ARROW_JUMP || 4)], piece));
+    var jump = L.ARROW_JUMP || 4;
+    var from = center(L.cellOf(seat, path[path.length - 1 - jump], piece));
     var to = center(L.cellOf(seat, path[path.length - 1], piece));
-    var e = fxEl('arrow-whoosh', from.x, from.y);
-    e.style.setProperty('--rc', seatColor(seat));
-    e.style.setProperty('--wx', (to.x - from.x).toFixed(1) + 'px');
-    e.style.setProperty('--wy', (to.y - from.y).toFixed(1) + 'px');
-    setTimeout(function () { e.remove(); }, 520);
-    ring(to.x, to.y, seatColor(seat), 'ring-whoosh');
+    var col = seatColor(seat), dx = to.x - from.x, dy = to.y - from.y;
+    function streak(cls, delay) {
+      var e = fxEl('arrow-whoosh' + (cls ? ' ' + cls : ''), from.x, from.y);
+      e.style.setProperty('--rc', col);
+      e.style.setProperty('--wx', dx.toFixed(1) + 'px');
+      e.style.setProperty('--wy', dy.toFixed(1) + 'px');
+      if (delay) e.style.animationDelay = delay + 'ms';
+      setTimeout(function () { e.remove(); }, 700);
+    }
+    streak('', 0); streak('trail', 40);
+    for (var t = 1; t <= 5; t++) {
+      var u = t / 6, dot = fxEl('arrow-trail-dot', from.x + dx * u, from.y + dy * u);
+      dot.style.setProperty('--rc', col);
+      dot.style.setProperty('--dx', (dx * 0.12).toFixed(1) + 'px');
+      dot.style.setProperty('--dy', (dy * 0.12).toFixed(1) + 'px');
+      setTimeout(function (el) { el.remove(); }.bind(null, dot), 620);
+    }
+    ring(to.x, to.y, col, 'ring-whoosh');
+    burst(to.x, to.y, col, 8);
+  }
+  /** Yard exit flourish when a token leaves base. */
+  function yardExitFx(seat, at) {
+    if (!fxOk() || !at) return;
+    var col = seatColor(seat), x = at.x, y = at.y;
+    var flash = fxEl('yard-burst', x, y); flash.style.setProperty('--rc', col);
+    ring(x, y, col, 'ring-yard');
+    burst(x, y, col, 10);
+    floatAt(x, y - CELL * 0.55, 'Out!', 'float-yard');
+    setTimeout(function () { flash.remove(); }, 650);
+  }
+  /** Tiny hop sparkles at each step landing. */
+  function hopStepFx(x, y, col) {
+    if (!fxOk()) return;
+    for (var k = 0; k < 3; k++) {
+      var sp = fxEl('hop-spark', x, y), a = -Math.PI / 2 + (k - 1) * 0.7, d = CELL * 0.28;
+      sp.style.setProperty('--rc', k === 1 ? '#fff' : (col || '#fff'));
+      sp.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px');
+      sp.style.setProperty('--dy', (Math.sin(a) * d - 4).toFixed(1) + 'px');
+      setTimeout(function (el) { el.remove(); }.bind(null, sp), 420);
+    }
+  }
+  /** Home-stretch / finish-lane sparkles while a token climbs the column. */
+  function homeLaneFx(x, y, col, finish) {
+    if (!fxOk()) return;
+    var c = col || '#ffd24a', n = finish ? 10 : 5;
+    for (var k = 0; k < n; k++) {
+      var sp = fxEl('lane-spark', x, y), a = k / n * Math.PI * 2, d = CELL * (0.35 + (k % 3) * 0.12);
+      sp.style.setProperty('--rc', k % 2 ? c : '#fff6c8');
+      sp.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px');
+      sp.style.setProperty('--dy', (Math.sin(a) * d - (finish ? 6 : 2)).toFixed(1) + 'px');
+      setTimeout(function (el) { el.remove(); }.bind(null, sp), 780);
+    }
+    if (finish) ring(x, y, c, 'ring-home-gold');
   }
   /** Token reaches home — mini celebration. */
   function homeCelebrate(seat, at) {
     if (!fxOk()) return;
     var col = seatColor(seat), x = at ? at.x : 7.5 * CELL, y = at ? at.y : 7.5 * CELL;
-    burst(x, y, col, 20);
-    burst(x, y, '#ffd24a', 8);
+    burst(x, y, col, 22);
+    burst(x, y, '#ffd24a', 10);
     ring(x, y, col, 'ring-home');
     ring(x, y, '#ffd24a', 'ring-home-gold');
     floatAt(x, y - CELL * 0.7, 'Home!', 'float-home');
-    var tok = null; // sparkles only
-    for (var k = 0; k < 6; k++) {
+    homeLaneFx(x, y, col, true);
+    for (var k = 0; k < 8; k++) {
       var sp = fxEl('home-spark', x, y);
       sp.style.setProperty('--dx', ((k % 2 ? 1 : -1) * (12 + k * 7)) + 'px');
       sp.style.setProperty('--dy', (-18 - k * 10) + 'px');
@@ -1461,14 +1531,24 @@
       setTimeout(function (el) { el.remove(); }.bind(null, sp), 900);
     }
   }
-  /** Smooth turn-change flash on the turn banner / active pod. */
+  /** Smooth turn-change flash on the turn banner / active seat pulse. */
   function turnChangeFx(seat) {
     if (!fxOk() || seat == null || seat === lastTurnFx) return;
     lastTurnFx = seat;
     var banner = $('turn-banner');
     if (banner) { banner.classList.remove('turn-swap'); void banner.offsetWidth; banner.classList.add('turn-swap'); later(function () { if (banner) banner.classList.remove('turn-swap'); }, 650); }
     var pod = podEl(seat);
-    if (pod) { pod.classList.remove('turn-arrive'); void pod.offsetWidth; pod.classList.add('turn-arrive'); later(function () { if (pod) pod.classList.remove('turn-arrive'); }, 700); }
+    if (pod) {
+      pod.classList.remove('turn-arrive', 'turn-pulse'); void pod.offsetWidth;
+      pod.classList.add('turn-arrive', 'turn-pulse');
+      pod.style.setProperty('--pc', seatColor(seat));
+      later(function () { if (pod) pod.classList.remove('turn-arrive', 'turn-pulse'); }, 900);
+      var av = pod.querySelector('.avatar');
+      if (av) {
+        var r = av.getBoundingClientRect(), br = $('board-wrap').getBoundingClientRect();
+        ring(r.left + r.width / 2 - br.left, r.top + r.height / 2 - br.top, seatColor(seat), 'ring-seat');
+      }
+    }
   }
 
   function animatePath(s, i, from, path, cb) {
@@ -1494,11 +1574,17 @@
     function interrupted() { release(true); }
     try {
       entry.cancel = PathAnimation.animate({
-        el: el, start: origin, points: points, duration: stepMs(), arcHeight: CELL * 0.34,
+        el: el, start: origin, points: points, duration: stepMs(), arcHeight: CELL * 0.42,
         reducedMotion: prefersReducedMotion(),
         onStep: function (k) {
           piecePos[id] = points[k];
-          if (!prefersReducedMotion()) { el.classList.remove('land'); void el.offsetWidth; el.classList.add('land'); }
+          if (!prefersReducedMotion()) {
+            el.classList.remove('land'); void el.offsetWidth; el.classList.add('land');
+            hopStepFx(points[k].x, points[k].y, seatColor(s));
+            if (from < 0 && k === 0) yardExitFx(s, points[k]);
+            var stepPos = path[k];
+            if (stepPos >= L.COL0 && stepPos < L.HOME) homeLaneFx(points[k].x, points[k].y, seatColor(s), false);
+          }
           if (from < 0 && k === 0) SFX.leave(); else SFX.step(k);
           if (SFX.crystal) SFX.crystal(k);
         },
@@ -1544,7 +1630,8 @@
     render(); persist();
     animatePath(s, piece, res.from, res.path, function () {
       var c = piecePos[s + '-' + piece] || { x: 0, y: 0 }, pause = 260;
-      if (res.arrowJump) { arrowWhoosh(s, piece, res.path); pause = Math.max(pause, 420); }
+      if (res.arrowJump) { arrowWhoosh(s, piece, res.path); pause = Math.max(pause, 480); }
+      if (res.entersHomeColumn || (res.to >= L.COL0 && res.to < L.HOME)) { homeLaneFx(c.x, c.y, seatColor(s), !!res.finish); pause = Math.max(pause, 360); }
       if (!res.finish && !res.captures.length && L.onTrack(res.to) && st.rules.safeSquares && L.isSafeAbs(L.absOf(s, res.to))) {
         safePulse(c.x, c.y, seatColor(s));
       }

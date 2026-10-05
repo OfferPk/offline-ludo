@@ -111,7 +111,7 @@
           var eased = linear * linear * (3 - 2 * linear);
           var arc = Math.sin(Math.PI * eased);
           var point = { x: from.x + (to.x - from.x) * eased, y: from.y + (to.y - from.y) * eased };
-          apply(point, arcHeight * arc, 1 + 0.045 * arc, 1 - 0.055 * arc);
+          apply(point, arcHeight * arc, 1 + 0.07 * arc, 1 - 0.09 * arc);
           if (linear < 1) { schedule(frame); return; }
           apply(to, 0, 1, 1);
           stepSound(index);
