@@ -272,8 +272,16 @@
     for (var k = 0; k < path.length; k++) if (onTrack(path[k]) && opponentBlockAt(st, seat, absOf(seat, path[k]))) return null; // blocks can't be passed or landed on
     var caps = capturesOnPath(st, seat, path);
     var tile = tileAt(st, to, seat);
+    var jumped = !!(st && arrowsOn(st) && path.length === (p < 0 ? 1 : v) + ARROW_JUMP);
+    // King stride uses v+1 die steps before optional jump
+    if (st && arrowsOn(st) && p >= 0 && st.lk && isKing(st, seat, piece) && path.length === (v + 1) + ARROW_JUMP) jumped = true;
+    if (jumped) {
+      var landAt = path[path.length - 1 - ARROW_JUMP];
+      if (!(onTrack(landAt) && ARROW_SQUARES.indexOf(absOf(seat, landAt)) >= 0)) jumped = false;
+    }
     return { seat: seat, piece: piece, v: v, from: p, to: to, path: path, captures: caps, leave: p < 0, finish: to === HOME,
-      entersHomeColumn: p <= CIRCLE && to >= COL0 && to < HOME, tile: tile ? tile.kind : null, stride: !!(st.lk && isKing(st, seat, piece) && p >= 0 && path.length === v + 1) };
+      entersHomeColumn: p <= CIRCLE && to >= COL0 && to < HOME, tile: tile ? tile.kind : null, stride: !!(st.lk && isKing(st, seat, piece) && p >= 0 && path.length === v + 1),
+      arrowJump: jumped };
   }
   /** Legal moves for `seat` with die value v. */
   function legalMoves(st, seat, v) {

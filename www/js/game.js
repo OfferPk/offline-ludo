@@ -801,9 +801,12 @@
       var humanRoll = active && st.phase === 'roll' && isHuman(s) && !busy;
       var dz = el.querySelector('.pdice'); dz.disabled = !humanRoll; dz.classList.toggle('ready', humanRoll);
       // Keep a visible face while idle (and for non-rolling seats during another player's roll)
-      if (!(busy && s === (G.actor != null ? G.actor : st.turn) && st.phase === 'roll')) {
+      // Always keep a visible pip face on corner dice except mid-roll animation for the roller
+      var rollingNow = busy && s === (G.actor != null ? G.actor : st.turn) && st.phase === 'roll' && dz.classList.contains('rolling');
+      if (!rollingNow) {
         setDiceFace(s, st.faces && st.faces[s] ? st.faces[s] : 1, true);
         dz.classList.add('show-flat');
+        dz.classList.remove('rolling');
       }
       var bt = el.querySelector('.boost-tag'), b = st.boost[s];
       bt.classList.toggle('hidden', !b); bt.innerHTML = b === 'double' ? '×2' : b === 'choose' ? '1-6' : '';
@@ -823,8 +826,13 @@
       banner.classList.toggle('is-mine', !over && isHuman(s));
     }
     if (over) lbl.innerHTML = 'Match over';
-    else lbl.innerHTML = '<span class="dot" style="background:' + seatColor(s) + '"></span>' + (isHuman(s) ? (nameOf(s) === 'You' ? 'Your turn' : NAMES[s] + "'s turn") : NAMES[s] + ' is playing') +
-      (st.mode === 'mystery' ? '<span class="mode-tag">Mystery</span>' : st.mode === 'lucky' ? '<span class="mode-tag lucky">Lucky Chaos</span>' : st.mode === 'quick' ? '<span class="mode-tag">Quick</span>' : st.mode === 'team' ? '<span class="mode-tag">Team</span>' : st.mode === 'arrow' ? '<span class="mode-tag">Arrows</span>' : st.mode === 'friendly' ? '<span class="mode-tag">Friendly</span>' : '');
+    else {
+      var faceV = Math.min(6, Math.max(1, +(st.faces && st.faces[s]) || 1));
+      var modeTag = st.mode === 'mystery' ? '<span class="mode-tag">Mystery</span>' : st.mode === 'lucky' ? '<span class="mode-tag lucky">Lucky Chaos</span>' : st.mode === 'quick' ? '<span class="mode-tag">Quick</span>' : st.mode === 'team' ? '<span class="mode-tag">Team</span>' : st.mode === 'arrow' ? '<span class="mode-tag">Arrows</span>' : st.mode === 'friendly' ? '<span class="mode-tag">Friendly</span>' : '';
+      var who = isHuman(s) ? (nameOf(s) === 'You' ? 'Your turn' : NAMES[s] + "'s turn") : NAMES[s] + ' is playing';
+      // Banner die: always show last/current face with pips (never a blank seat-color circle)
+      lbl.innerHTML = '<span class="banner-die f' + faceV + '" data-face="' + faceV + '" style="--pc:' + seatColor(s) + '" aria-label="Die showing ' + faceV + '">' + flatPipsHTML(faceV) + '</span><span class="turn-who">' + who + '</span>' + modeTag;
+    }
     var hint = '';
     if (!over && st.phase === 'choose') hint = isHuman(st.turn) ? 'Make your choice' : NAMES[st.turn] + ' is choosing…';
     else if (!over && isHuman(s) && !busy) {
@@ -1464,7 +1472,7 @@
     var entering = !isOpen('result');
     var teamWin = st.mode === 'team', tName = function (seat) { return L.teamOf(seat) ? 'Jade & Cobalt' : 'Coral & Saffron'; };
     $('r-title').textContent = teamWin ? (tName(winner) + ' win') : single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
-    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: 1 token starts on the board. Only an exact land on an arrow jumps +4 (passing over does not). Captures along the jump; safe squares protect; no chaining.', friendly: 'FRIENDLY · ' };
+    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: 1 token starts on the board. Jump +4 only if the die move ends on an arrow — passing over is normal Ludo.', friendly: 'FRIENDLY · ' };
     $('r-kicker').textContent = (MODE_KICK[st.mode] || '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
     var sec = Math.round((G.elapsed || 0) / 1000), mm = Math.floor(sec / 60), ss = sec % 60;
     $('r-meta').textContent = (G.moves || 0) + ' moves · ' + mm + ':' + (ss < 10 ? '0' : '') + ss;

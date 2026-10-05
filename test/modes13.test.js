@@ -34,6 +34,42 @@ t('Arrow: each player starts with one token already on the start square', () => 
   assert.ok(quick.pieces[0].every(p => p === -1), 'quick still starts every token in base');
 });
 
+t('Arrow: distance-to-arrow — land jumps, overshoot does not', () => {
+  const st = L.newGame([H, A(), null, null], {}, 4, 'arrow');
+  // Arrow sits at relative 4. Place token N squares before it.
+  function fromBefore(nBefore) {
+    st.pieces[0][0] = 4 - nBefore;
+    return st.pieces[0][0];
+  }
+  // N=4: from 0, roll 4 lands on arrow → jump; roll 5/6 pass
+  fromBefore(4);
+  const land = L.legalMoves(st, 0, 4).find(m => m.piece === 0);
+  assert.ok(land.arrowJump, 'roll=distance lands on arrow and jumps');
+  assert.strictEqual(land.to, 8);
+  const p1 = L.legalMoves(st, 0, 5).find(m => m.piece === 0);
+  assert.ok(!p1.arrowJump, 'roll=distance+1 must not jump');
+  assert.strictEqual(p1.to, 5, 'ends on the normal 5th square past the arrow');
+  const p2 = L.legalMoves(st, 0, 6).find(m => m.piece === 0);
+  assert.ok(!p2.arrowJump, 'roll=distance+2 must not jump');
+  assert.strictEqual(p2.to, 6);
+  // N=3: from 1, roll 3 jumps; roll 4 ends on 5
+  fromBefore(3);
+  const l3 = L.legalMoves(st, 0, 3).find(m => m.piece === 0);
+  assert.ok(l3.arrowJump);
+  assert.strictEqual(l3.to, 8);
+  const o4 = L.legalMoves(st, 0, 4).find(m => m.piece === 0);
+  assert.ok(!o4.arrowJump);
+  assert.strictEqual(o4.to, 5);
+  // Apply move: roll 5 from 0 must leave token on 5 (no jump teleport)
+  fromBefore(4);
+  st.phase = 'roll'; st.turn = 0; st.queue = []; st.sixes = 0; st.bonus = 0;
+  L.roll(st, 5);
+  const mv = st.moves.find(m => m.piece === 0);
+  assert.strictEqual(mv.to, 5);
+  L.move(st, 0, 5);
+  assert.strictEqual(st.pieces[0][0], 5, 'after applying roll 5, token sits past the arrow');
+});
+
 t('Arrow: exact land jumps +4; passing over does not', () => {
   const st = L.newGame([H, A(), null, null], {}, 4, 'arrow');
   assert.ok(st.rules.arrows);

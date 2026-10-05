@@ -1,3 +1,9 @@
+## v1.5.6 update — banner die + Arrow land-only proof
+
+- **Upload:** `offline-ludo-v1.5.6.aab` (version 1.5.6, **versionCode 13**), wahi upload key.
+- Banner die shows last face with pips during AI turns. Arrow: jump only on exact land (pass-over = normal). Pages cache-bust `?v=1.5.6`.
+- Ludo Chess (PR #18 + polish): home card, mobile-centered board, clearer taps/highlights. No chess rule changes.
+
 ## v1.5.5 update — Arrow land-only + dice face fix
 
 - **Upload:** `offline-ludo-v1.5.5.aab` (version 1.5.5, **versionCode 12**), wahi upload key.

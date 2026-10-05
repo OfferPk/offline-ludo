@@ -121,7 +121,7 @@ body.light .seg { background: rgba(0,0,0,.06); }
 
 /* ---------------- game ---------------- */
 .turn-label { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
-.turn-label .dot { width: 12px; height: 12px; border-radius: 50%; }
+.turn-label .banner-die { width: 22px; height: 22px; border-radius: 6px; flex: none; }
 .mode-tag { font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; background: linear-gradient(90deg, #2a86e0, #8e3fe0); color: #fff; }
 #stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 6px 4px; min-height: 0; position: relative; }
 
@@ -207,7 +207,28 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .turn-banner.is-live { background: linear-gradient(180deg, rgba(255,255,255,.06), transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--turn-color) 35%, transparent); }
 .turn-banner.is-mine { animation: turn-banner-pulse 1.5s ease-in-out infinite; }
 .turn-label { display: inline-flex; align-items: center; gap: 7px; font-weight: 800; font-size: 14px; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.turn-label .dot { width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 3px color-mix(in srgb, var(--turn-color) 28%, transparent); flex: none; }
+.turn-label .banner-die {
+  width: 22px; height: 22px; border-radius: 6px; flex: none;
+  display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 3px; box-sizing: border-box;
+  background: linear-gradient(155deg, #ffffff 0%, var(--d-face) 42%, var(--d-edge) 100%);
+  border: 1px solid rgba(255,255,255,.85);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -3px 4px rgba(40,32,20,.18), 0 0 0 2px color-mix(in srgb, var(--pc, var(--turn-color)) 35%, transparent);
+}
+.turn-label .banner-die i {
+  width: 4px; height: 4px; border-radius: 50%; place-self: center;
+  background: radial-gradient(circle at 30% 28%, #9aa3b2, var(--d-pip) 52%, #07090c);
+  box-shadow: inset 0 0.5px 0 rgba(255,255,255,.4), 0 0.5px 1px rgba(0,0,0,.4);
+}
+.turn-label .banner-die.f1 i { grid-area: 2 / 2; }
+.turn-label .banner-die.f2 i:nth-child(1) { grid-area: 1 / 1; } .turn-label .banner-die.f2 i:nth-child(2) { grid-area: 3 / 3; }
+.turn-label .banner-die.f3 i:nth-child(1) { grid-area: 1 / 1; } .turn-label .banner-die.f3 i:nth-child(2) { grid-area: 2 / 2; } .turn-label .banner-die.f3 i:nth-child(3) { grid-area: 3 / 3; }
+.turn-label .banner-die.f4 i:nth-child(1), .turn-label .banner-die.f5 i:nth-child(1), .turn-label .banner-die.f6 i:nth-child(1) { grid-area: 1 / 1; }
+.turn-label .banner-die.f4 i:nth-child(2), .turn-label .banner-die.f5 i:nth-child(2), .turn-label .banner-die.f6 i:nth-child(2) { grid-area: 1 / 3; }
+.turn-label .banner-die.f4 i:nth-child(3), .turn-label .banner-die.f5 i:nth-child(3), .turn-label .banner-die.f6 i:nth-child(3) { grid-area: 3 / 1; }
+.turn-label .banner-die.f4 i:nth-child(4), .turn-label .banner-die.f5 i:nth-child(4), .turn-label .banner-die.f6 i:nth-child(4) { grid-area: 3 / 3; }
+.turn-label .banner-die.f5 i:nth-child(5) { grid-area: 2 / 2; }
+.turn-label .banner-die.f6 i:nth-child(5) { grid-area: 2 / 1; } .turn-label .banner-die.f6 i:nth-child(6) { grid-area: 2 / 3; }
+.turn-label .turn-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .turn-label .mode-tag { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .turn-label .mode-tag.lucky { color: #ffd383; background: rgba(244,183,64,.14); }
 @keyframes turn-banner-pulse { 0%, 100% { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--turn-color) 30%, transparent); } 50% { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--turn-color) 70%, transparent), 0 0 16px color-mix(in srgb, var(--turn-color) 28%, transparent); } }
