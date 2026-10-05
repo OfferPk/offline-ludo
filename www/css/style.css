@@ -353,10 +353,10 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc .gem-jugnu-glow { opacity: .55; mix-blend-mode: screen; animation: jugnu-glow 3.2s ease-in-out infinite; animation-delay: var(--jugnu-delay, 0s); pointer-events: none; }
 @keyframes jugnu-pulse { 0%, 100% { opacity: .28; transform: translate(-50%, -50%) scale(.92); } 50% { opacity: .58; transform: translate(-50%, -50%) scale(1.08); } }
 @keyframes jugnu-glow { 0%, 100% { opacity: .32; } 50% { opacity: .72; } }
-/* Token id 1–4: high-contrast disc + outlined numeral, readable on all seat colors */
-.pc .gem-num-disc { fill: rgba(12, 14, 18, .55); stroke: rgba(255,255,255,.88); stroke-width: .7; }
-.pc .gem-num { fill: #fff; font-family: Inter, system-ui, "Segoe UI", sans-serif; font-size: 6.6px; font-weight: 900; letter-spacing: -.04em;
-  paint-order: stroke fill; stroke: rgba(8,10,14,.92); stroke-width: 1.15px; stroke-linejoin: round; dominant-baseline: alphabetic; pointer-events: none; }
+/* Token id 1–4: a deeper crystal badge keeps the outlined numeral legible on every seat color. */
+.pc .gem-num-disc { fill: rgba(8, 14, 22, .72); stroke: rgba(255,255,255,.98); stroke-width: .82; }
+.pc .gem-num { fill: #fff; font-family: Inter, system-ui, "Segoe UI", sans-serif; font-size: 7.1px; font-weight: 900; letter-spacing: -.04em;
+  paint-order: stroke fill; stroke: rgba(5,8,14,.98); stroke-width: 1.35px; stroke-linejoin: round; dominant-baseline: alphabetic; pointer-events: none; }
 .pc.is-frozen .jugnu, .pc.is-frozen .gem-jugnu-glow { animation: none; opacity: .12; }
 .pc.done .jugnu { opacity: .35; filter: blur(2px) saturate(1.2); }
 .pc .gem-shield { fill: #c9f2ff; fill-opacity: .16; stroke: #c9f2ff; stroke-opacity: .8; stroke-width: .7; opacity: 0; transition: opacity .16s; }

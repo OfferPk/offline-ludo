@@ -349,6 +349,19 @@
     cv.width = Math.round(sz * dpr); cv.height = Math.round(sz * dpr);
     var ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     var c = sz / 15, gap = Math.max(1.2, c * 0.08);
+    function luminance(hex) {
+      function channel(value) { value /= 255; return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4); }
+      var red = channel(parseInt(hex.slice(1, 3), 16));
+      var green = channel(parseInt(hex.slice(3, 5), 16));
+      var blue = channel(parseInt(hex.slice(5, 7), 16));
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    }
+    // Judge marker contrast from the actual track surface: some dark-page skins use light cells.
+    var lightTrack = luminance(b.cell) > 0.52;
+    var safeCore = lightTrack ? '#263d52' : '#eff9ff';
+    var safeMid = lightTrack ? '#4a6479' : '#b9e7f8';
+    var safeRim = lightTrack ? '#354e64' : '#80b0cd';
+    var safeEdge = lightTrack ? '#fff' : '#17364d';
     ctx.clearRect(0, 0, sz, sz);
     // soft drop shadow under the board (drawn into canvas so canvas box-shadow can stay light)
     ctx.save();
@@ -399,7 +412,7 @@
         ctx.lineWidth = Math.max(1.4, c * 0.065); ctx.strokeStyle = edge; ctx.stroke();
         ctx.save();
         rr(ctx, x + 0.85, y + 0.85, w - 1.7, h - 1.7, c * 0.12);
-        ctx.strokeStyle = alpha(mix(fill.indexOf('rgb') === 0 ? b.cell : (fill[0] === '#' ? fill : b.cell), 'w', b.dark ? 0.6 : 0.52), b.dark ? 0.34 : 0.3);
+        ctx.strokeStyle = alpha(mix(fill.indexOf('rgb') === 0 ? b.cell : (fill[0] === '#' ? fill : b.cell), lightTrack ? 'b' : 'w', lightTrack ? 0.38 : 0.6), lightTrack ? 0.3 : 0.34);
         ctx.lineWidth = 1.15; ctx.stroke();
         // bottom lip for carved depth
         ctx.beginPath();
@@ -437,7 +450,7 @@
     L.TRACK_CELLS.forEach(function (rc, a) {
       var startOf = L.START_SQUARES.indexOf(a), isStar = L.STAR_SQUARES.indexOf(a) >= 0;
       var isDanger = !!(rules && rules.arrows && L.ARROW_DANGER_SQUARES && L.ARROW_DANGER_SQUARES.indexOf(a) >= 0 && startOf < 0 && !isStar);
-      if (startOf >= 0) cell(rc, b.seats[startOf], alpha(mix(b.seats[startOf], 'b', 0.25), 0.55), true);
+      if (startOf >= 0) cell(rc, b.seats[startOf], alpha(mix(b.seats[startOf], lightTrack ? 'b' : 'w', 0.32), 0.86), true);
       else if (isDanger) cell(rc, DANGER_FILL, DANGER_EDGE, true);
       else cell(rc, b.cell, b.cellEdge, true);
       var cx = (rc[1] + 0.5) * c, cy = (rc[0] + 0.5) * c;
@@ -446,26 +459,27 @@
         ctx.save(); ctx.translate(cx, cy);
         var nx = L.TRACK_CELLS[(a + 1) % 52]; ctx.rotate(Math.atan2(nx[0] - rc[0], nx[1] - rc[1]));
         ctx.beginPath(); ctx.moveTo(-c * 0.16, -c * 0.22); ctx.lineTo(c * 0.14, 0); ctx.lineTo(-c * 0.16, c * 0.22);
-        ctx.lineWidth = Math.max(1.8, c * 0.1); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.stroke();
+        // The outlined chevron marks the exact entry/start cell without changing its footprint.
+        ctx.lineWidth = Math.max(3, c * 0.14); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(8,14,22,.68)'; ctx.stroke();
         ctx.beginPath(); ctx.moveTo(-c * 0.18, -c * 0.2); ctx.lineTo(c * 0.12, 0); ctx.lineTo(-c * 0.18, c * 0.2);
-        ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke(); ctx.restore();
+        ctx.lineWidth = Math.max(1.8, c * 0.09); ctx.strokeStyle = 'rgba(255,255,255,.98)'; ctx.stroke(); ctx.restore();
       } else if (isStar) {
-        star(ctx, cx + 0.55, cy + 1.05, c * 0.36, c * 0.15);
+        star(ctx, cx + 0.55, cy + 1.05, c * 0.38, c * 0.15);
         ctx.fillStyle = 'rgba(0,0,0,.36)'; ctx.fill();
-        star(ctx, cx, cy, c * 0.36, c * 0.15);
+        star(ctx, cx, cy, c * 0.38, c * 0.15);
         if (rules && rules.safeSquares) {
-          var sg = ctx.createRadialGradient(cx - c * 0.1, cy - c * 0.12, c * 0.02, cx, cy, c * 0.36);
-          sg.addColorStop(0, mix(b.muted, 'w', b.dark ? 0.88 : 0.8));
-          sg.addColorStop(0.45, mix(b.muted, 'w', 0.42));
-          sg.addColorStop(1, rgba(b.muted.length === 7 ? b.muted : '#888888', 0.98));
+          var sg = ctx.createRadialGradient(cx - c * 0.1, cy - c * 0.12, c * 0.02, cx, cy, c * 0.38);
+          sg.addColorStop(0, safeCore);
+          sg.addColorStop(0.52, safeMid);
+          sg.addColorStop(1, safeRim);
           ctx.fillStyle = sg; ctx.fill();
-          ctx.lineWidth = Math.max(1.35, c * 0.055); ctx.strokeStyle = alpha(mix(b.muted, 'w', 0.65), 0.92); ctx.stroke();
+          ctx.lineWidth = Math.max(1.8, c * 0.075); ctx.strokeStyle = safeEdge; ctx.stroke();
           // inner cut highlight
           star(ctx, cx, cy, c * 0.22, c * 0.09);
-          ctx.lineWidth = Math.max(1, c * 0.035); ctx.strokeStyle = alpha('#fff', b.dark ? 0.28 : 0.22); ctx.stroke();
+          ctx.lineWidth = Math.max(1, c * 0.035); ctx.strokeStyle = alpha(lightTrack ? '#fff' : '#142b3d', 0.58); ctx.stroke();
         } else {
-          ctx.lineWidth = 1.4; ctx.strokeStyle = rgba(b.muted, 0.5); ctx.stroke();
+          ctx.lineWidth = Math.max(1.7, c * 0.07); ctx.strokeStyle = alpha(lightTrack ? '#354c61' : '#e9f7ff', 0.88); ctx.stroke();
         }
       }
       if (rules && rules.arrows && L.ARROW_SQUARES.indexOf(a) >= 0) {
@@ -496,7 +510,7 @@
       }
     });
     for (s = 0; s < 4; s++) L.HOME_COLS[s].forEach(function (rc, k) {
-      cell(rc, rgba(b.seats[s], 0.48 + k * 0.12), alpha(mix(b.seats[s], 'b', 0.28), 0.55), true);
+      cell(rc, rgba(b.seats[s], 0.56 + k * 0.085), alpha(mix(b.seats[s], lightTrack ? 'b' : 'w', 0.3), 0.78), true);
     });
     var m0 = 6 * c, m1 = 9 * c, mc = 7.5 * c;
     var tri = [[[m0, m0], [m0, m1]], [[m0, m0], [m1, m0]], [[m1, m0], [m1, m1]], [[m0, m1], [m1, m1]]];
