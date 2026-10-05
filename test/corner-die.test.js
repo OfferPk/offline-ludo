@@ -13,7 +13,10 @@ assert.ok(!/\.pdice\s*\{[^}]*filter\s*:\s*(?!none)/s.test(css.split('/* Corner d
   /filter:\s*none\s*!important/.test(css),
   '.pdice must not use decorative CSS filter');
 assert.ok(/display:\s*none\s*!important/.test(css), '3D cube must be display:none');
-assert.ok(/background(?:-color)?:\s*#fbfaf6/.test(css), 'cream face on .pdice');
+assert.ok(/background(?:-color)?:\s*(?:var\(--d-face,?\s*)?#fbfaf6/.test(css) || /#fbfaf6/.test(css.split('.pdice')[1].split('.pdice:disabled')[0]),
+  'cream face / --d-face ivory fallback on .pdice');
+assert.ok(/filter:\s*none\s*!important/.test(css), '.pdice keeps filter:none');
+assert.ok(/@keyframes toss/.test(css) && /translateY\(-24px\)/.test(css), 'longer physics-like toss keyframes');
 assert.ok(game.includes("die.classList.add('rolling')"), 'rolling class on die button');
 assert.ok(!/pod\.classList\.add\('rolling'\)/.test(game), 'must not put rolling on .pod');
 const logic = fs.readFileSync(path.join(__dirname, '..', 'www/js/logic.js'), 'utf8');
