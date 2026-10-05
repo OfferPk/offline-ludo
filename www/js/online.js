@@ -57,6 +57,8 @@
       config.publishableKey.indexOf('YOUR_') !== 0;
   }
   function emailPasswordEnabled() { return config.emailPasswordEnabled === true; }
+  function anonymousChessEnabled() { return config.anonymousChessEnabled === true; }
+  function isAnonymousUser(user) { return !!((user || currentUser) && (user || currentUser).is_anonymous === true); }
   function authRedirectUrl() {
     return isNative() ? 'com.offerpk.offlineludo://auth-callback' : window.location.origin + window.location.pathname;
   }
@@ -150,14 +152,15 @@
     if (!client) {
       announce('Connecting to the online sign-in service…');
       ensureClient().then(function () {
-        if (currentUser) refreshAccount();
-        if (pendingInvite && currentUser) joinInvite(pendingInvite);
+        if (currentUser && !isAnonymousUser()) refreshAccount();
+        else if (currentUser) restoreActiveRoom();
+        if (pendingInvite && currentUser && !isAnonymousUser()) joinInvite(pendingInvite);
       }).catch(function (error) { announce('Online sign-in could not load: ' + errorText(error), true); });
     } else if (currentUser) {
-      refreshAccount();
+      if (!isAnonymousUser()) refreshAccount();
       if (!pendingInvite) restoreActiveRoom();
     }
-    if (pendingInvite && currentUser) joinInvite(pendingInvite);
+    if (pendingInvite && currentUser && !isAnonymousUser()) joinInvite(pendingInvite);
   }
   function closeOnline() {
     screen.classList.add('hidden');
@@ -170,17 +173,32 @@
     $('online-signup').classList.toggle('hidden', chessMode);
     $('online-email-signup-note').classList.toggle('hidden', chessMode);
     $('online-guest-chess-option').classList.toggle('hidden', !chessMode);
+    $('online-guest-online-option').classList.toggle('hidden', !chessMode || !anonymousChessEnabled() || !!currentUser);
+    $('online-guest-takeover-control').classList.toggle('hidden', !chessMode || !anonymousChessEnabled() || !currentUser || !!currentRoom || !!currentRoomId || recoveryMode);
     $('online-auth-title').textContent = chessMode ? 'Online Chess' : 'Sign in with email';
   }
   function renderAccount() {
     var signedIn = !!currentUser;
+    var anonymous = isAnonymousUser();
+    var accountUser = signedIn && !anonymous;
     var recovering = !!recoveryMode;
     updateChessAuthControls();
     authPanel.classList.toggle('hidden', signedIn || recovering);
     recoveryPanel.classList.toggle('hidden', !recovering);
-    accountPanel.classList.toggle('hidden', !signedIn || recovering);
+    accountPanel.classList.toggle('hidden', !accountUser || recovering);
     roomPanel.classList.toggle('hidden', !signedIn || recovering);
-    $('online-signout').disabled = !signedIn;
+    $('online-signout').disabled = !accountUser;
+    $('online-guest-room-controls').classList.toggle('hidden', !anonymous || recovering);
+    $('online-guest-create-room').classList.toggle('hidden', !anonymous || !!currentRoom || !!currentRoomId || recovering);
+    $('online-guest-takeover-control').classList.toggle('hidden', !anonymousChessEnabled() || !signedIn || !chessModeSelected() || !!currentRoom || !!currentRoomId || recovering);
+    $('online-room-options').classList.toggle('hidden', anonymous);
+    $('online-mode-note').classList.toggle('hidden', anonymous);
+    $('online-quick-match').parentNode.classList.toggle('hidden', anonymous);
+    $('online-join-row').classList.toggle('hidden', anonymous);
+    $('online-invite-label').classList.toggle('hidden', anonymous);
+    $('online-invite-code').parentNode.classList.toggle('hidden', anonymous);
+    $('online-ready').classList.toggle('hidden', anonymous);
+    $('online-start-room').classList.toggle('hidden', anonymous);
     ['online-signin', 'online-signup', 'online-reset-request'].forEach(function (id) {
       $(id).disabled = !client || !emailPasswordEnabled();
     });
@@ -190,7 +208,9 @@
         ? 'Online rooms are not configured in this build. You can still play Chess locally as a guest against the computer.'
         : 'Waiting for the Online Ludo Supabase URL and publishable key. Offline play remains available.';
     } else if (chessModeSelected()) {
-      $('online-config-note').textContent = 'Play a local guest game against the computer, or sign in with an existing account for online human rooms.';
+      $('online-config-note').textContent = anonymousChessEnabled()
+        ? 'Play locally as a guest, use the separately gated server guest Chess flow, or sign in with an existing account for online human rooms.'
+        : 'Play a local guest game against the computer, or sign in with an existing account for online human rooms.';
     } else if (!emailPasswordEnabled()) {
       $('online-config-note').textContent = 'Email/password sign-in is disabled for this project. Offline play remains available.';
     } else {
@@ -208,6 +228,12 @@
       if (chessModeSelected()) announce('Play Chess as a guest against the computer, or sign in for online human rooms.');
       else if (client && emailPasswordEnabled()) announce('Sign in to create or join online rooms.');
       else if (client) announce('Online Ludo email/password authentication is not enabled.', true);
+      return;
+    }
+    if (anonymous) {
+      $('online-wallet-coins').textContent = '—';
+      $('online-wallet-diamonds').textContent = '—';
+      if (screen && !screen.classList.contains('hidden')) announce('Guest session · Chess room membership only. No profile, wallet, currency, or referral privileges.');
       return;
     }
     $('online-profile-name').value = '';
@@ -288,7 +314,11 @@
       .finally(function () { $('online-recovery-submit').disabled = !client || !recoveryMode; });
   }
   function refreshAccount() {
-    if (!client || !currentUser) return Promise.resolve();
+    if (!client || !currentUser || isAnonymousUser()) {
+      $('online-wallet-coins').textContent = '—';
+      $('online-wallet-diamonds').textContent = '—';
+      return Promise.resolve();
+    }
     var requestedUserId = currentUser.id;
     return Promise.all([
       client.from('profiles').select('handle,display_name').eq('id', currentUser.id).maybeSingle(),
@@ -342,11 +372,17 @@
     var room = currentRoom;
     var card = $('online-room-card');
     card.classList.toggle('hidden', !room);
-    if (!room) { $('online-chess-resume').classList.add('hidden'); renderMatch(); return; }
+    if (!room) {
+      $('online-guest-room-controls').classList.toggle('hidden', !isAnonymousUser());
+      $('online-guest-create-room').classList.toggle('hidden', !isAnonymousUser() || !!currentRoomId);
+      $('online-guest-takeover-control').classList.toggle('hidden', !anonymousChessEnabled() || !currentUser || !chessModeSelected() || !!currentRoomId);
+      $('online-leave-room').textContent = isAnonymousUser() ? 'Exit guest game' : 'Leave room';
+      $('online-chess-resume').classList.add('hidden'); renderMatch(); return;
+    }
     if (room.status === 'completed' || room.status === 'cancelled' || (room.matchState && room.matchState.state && room.matchState.state.phase === 'over')) setRoomConnectionState('ended');
     $('online-room-mode').textContent = modeLabel(room.mode) + ' · ' + room.capacity + ' seats';
     $('online-room-status').textContent = room.status === 'active'
-      ? (room.matchState ? (room.mode === 'ludo_chess' ? 'Ludo Chess is active. Legal moves and match state are validated by the server.' : 'Online Classic match is active. Dice and moves are validated by the server.') : 'This table predates the current online gameplay update. Create a new table to play online.')
+      ? (room.matchState ? (room.mode === 'ludo_chess' && room.botSeat ? 'Guest Chess is active. The server makes computer replies; a human may claim the open seat at a committed turn boundary.' : room.mode === 'ludo_chess' ? 'Ludo Chess is active. Legal moves and match state are validated by the server.' : 'Online Classic match is active. Dice and moves are validated by the server.') : 'This table predates the current online gameplay update. Create a new table to play online.')
       : room.status === 'completed' ? 'This table is complete.' : room.status === 'cancelled' ? 'This table was cancelled.' : 'Waiting for players to join and ready up.';
     $('online-invite-code').value = room.inviteCode || '';
     $('online-start-room').classList.toggle('hidden', room.status !== 'waiting' || room.created_by !== (currentUser && currentUser.id));
@@ -359,10 +395,14 @@
       var playerName = document.createElement('b');
       playerName.textContent = member.displayName || member.handle || 'Player';
       var playerState = document.createElement('small');
-      playerState.textContent = 'Seat ' + (member.seat + 1) + ' · ' + (member.ready ? 'Ready' : 'Not ready') + (member.role === 'host' ? ' · Host' : '');
+      playerState.textContent = 'Seat ' + (Number(member.seat) + 1) + ' · ' + (member.isBot ? 'Server computer · open to a human' : member.ready ? 'Ready' : 'Not ready') + (member.role === 'host' ? ' · Host' : '');
       item.append(playerName, playerState);
       $('online-room-roster').appendChild(item);
     });
+    $('online-guest-room-controls').classList.toggle('hidden', !isAnonymousUser());
+    $('online-guest-create-room').classList.toggle('hidden', !isAnonymousUser() || !!currentRoomId);
+    $('online-guest-takeover-control').classList.toggle('hidden', !anonymousChessEnabled() || !currentUser || !chessModeSelected() || !!currentRoomId);
+    $('online-leave-room').textContent = isAnonymousUser() ? 'Exit guest game' : 'Leave room';
     $('online-chess-resume').classList.toggle('hidden', !(room.mode === 'ludo_chess' && room.matchState && room.matchState.state && chessPlayViewDismissed));
     renderMatch();
   }
@@ -377,6 +417,12 @@
     var offer = room.matchState && room.matchState.draw_offer || null;
     var member = room.roster.find(function (candidate) { return candidate.user_id === (currentUser && currentUser.id); });
     var isActive = room.status === 'active' && state.phase === 'active';
+    if (room.botSeat) {
+      ['online-chess-offer-draw', 'online-chess-withdraw-draw', 'online-chess-accept-draw', 'online-chess-decline-draw']
+        .forEach(function (id) { $(id).classList.add('hidden'); $(id).disabled = true; });
+      $('online-chess-draw-status').textContent = 'Draw offers are unavailable while the computer seat is open. A human takeover enables normal draw offers.';
+      return;
+    }
     var isOfferer = !!(offer && member && Number(offer.offered_by) === Number(member.seat));
     var hasOffer = !!offer;
     var canAct = isActive && isSynchronized && !pendingMatchAction;
@@ -799,12 +845,16 @@
     var requestedRoomId = currentRoomId;
     var userId = currentUser.id;
     var requestSequence = ++roomRefreshSequence;
+    var botSeatRead = anonymousChessEnabled() || isAnonymousUser()
+      ? client.from('ludo_chess_bot_seats').select('seat,bot_kind').eq('room_id', requestedRoomId)
+      : Promise.resolve({ data: [], error: null });
     return Promise.all([
       client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').eq('id', requestedRoomId).maybeSingle(),
       client.from('room_members').select('user_id,seat,role,ready').eq('room_id', requestedRoomId),
       client.from('room_invites').select('invite_code').eq('room_id', requestedRoomId).limit(1).maybeSingle(),
       client.from('match_states').select('room_id,version,state,updated_at').eq('room_id', requestedRoomId).maybeSingle(),
-      client.from('ludo_chess_matches').select('room_id,version,state,draw_offer,updated_at').eq('room_id', requestedRoomId).maybeSingle()
+      client.from('ludo_chess_matches').select('room_id,version,state,draw_offer,updated_at').eq('room_id', requestedRoomId).maybeSingle(),
+      botSeatRead
     ]).then(function (results) {
       if (results.some(function (result) { return result.error; })) throw results.filter(function (result) { return result.error; })[0].error;
       if (!results[0].data) {
@@ -819,11 +869,20 @@
         throw notMember;
       }
       var ids = roster.map(function (member) { return member.user_id; });
-      return client.from('profiles').select('id,display_name,handle').in('id', ids).then(function (profileResult) {
+      var profileRead = isAnonymousUser()
+        ? Promise.resolve({ data: [], error: null })
+        : client.from('profiles').select('id,display_name,handle').in('id', ids);
+      return profileRead.then(function (profileResult) {
         if (profileResult.error) throw profileResult.error;
         if (requestSequence !== roomRefreshSequence || currentRoomId !== requestedRoomId || !currentUser || currentUser.id !== userId) return null;
         var profiles = {};
         (profileResult.data || []).forEach(function (profile) { profiles[profile.id] = profile; });
+        var botSeat = results[5].data && results[5].data[0] || null;
+        var visibleRoster = roster.map(function (member) {
+          var profile = profiles[member.user_id] || {};
+          return Object.assign({}, member, { displayName: profile.display_name, handle: profile.handle });
+        });
+        if (botSeat) visibleRoster.push({ user_id: 'server-computer:' + requestedRoomId, seat: Number(botSeat.seat), role: 'bot', ready: true, displayName: 'Computer', handle: '', isBot: true });
         var existingRoom = currentRoom && currentRoom.id === requestedRoomId ? currentRoom : null;
         var serverMatchState = results[0].data.mode === 'ludo_chess' ? (results[4].data || null) : (results[3].data || null);
         if (existingRoom && existingRoom.matchState && serverMatchState && Number(existingRoom.matchState.version) > Number(serverMatchState.version)) serverMatchState = existingRoom.matchState;
@@ -833,10 +892,8 @@
           status: roomStatus,
           inviteCode: results[2].data ? results[2].data.invite_code : '',
           matchState: serverMatchState,
-          roster: roster.map(function (member) {
-            var profile = profiles[member.user_id] || {};
-            return Object.assign({}, member, { displayName: profile.display_name, handle: profile.handle });
-          })
+          botSeat: botSeat,
+          roster: visibleRoster
         });
         var mine = roster.filter(function (member) { return member.user_id === userId; })[0];
         currentRoom.myReady = !!mine.ready;
@@ -881,6 +938,9 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: 'room_id=eq.' + roomId }, refreshRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_states', filter: 'room_id=eq.' + roomId }, refreshRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ludo_chess_matches', filter: 'room_id=eq.' + roomId }, refreshRoom);
+    if (anonymousChessEnabled() || isAnonymousUser()) {
+      channel.on('postgres_changes', { event: '*', schema: 'public', table: 'ludo_chess_bot_seats', filter: 'room_id=eq.' + roomId }, refreshRoom);
+    }
     channel.roomId = roomId;
     channel.userId = userId;
     roomChannel = channel;
@@ -1013,6 +1073,70 @@
       .then(attachRoom)
       .catch(function (error) { announce('Could not join room: ' + errorText(error), true); });
   }
+  function startOnlineGuestChess() {
+    if (!anonymousChessEnabled()) return announce('Online guest Chess is not enabled in this build. The local guest game remains available.', true);
+    if (currentUser && !isAnonymousUser()) return announce('Sign out of the account before starting an anonymous guest game.', true);
+    announce('Starting a server-backed guest Chess session…');
+    return ensureClient().then(function () {
+      if (currentUser && isAnonymousUser()) return currentUser;
+      return client.auth.getSession().then(function (result) {
+        if (result.error) throw result.error;
+        var session = result.data && result.data.session;
+        if (session && session.user) {
+          applyAuthSession('GET_SESSION', session);
+          if (isAnonymousUser(session.user)) return session.user;
+          throw new Error('Sign out of the account before starting an anonymous guest game.');
+        }
+        return client.auth.signInAnonymously().then(function (signInResult) {
+          if (signInResult.error) throw signInResult.error;
+          var nextSession = signInResult.data && signInResult.data.session;
+          if (!nextSession || !isAnonymousUser(nextSession.user)) throw new Error('Anonymous sign-in did not return a guest session.');
+          currentUser = nextSession.user;
+          renderAccount();
+          return currentUser;
+        });
+      });
+    }).then(function () {
+      var requestId;
+      try { requestId = sessionStorage.getItem('crossfour.online.guest-room-request') || ''; } catch (_) { requestId = ''; }
+      if (!requestId) {
+        requestId = makeActionId();
+        try { sessionStorage.setItem('crossfour.online.guest-room-request', requestId); } catch (_) {}
+      }
+      return callRpc('create_guest_ludo_chess_room', { p_action_id: requestId }).then(function (result) {
+        try { sessionStorage.removeItem('crossfour.online.guest-room-request'); } catch (_) {}
+        return attachRoom(result);
+      });
+    }).then(function () {
+      announce('Guest Chess is online. The server makes legal computer replies; another player can take the open seat between committed turns. No profile or wallet is used.');
+    }).catch(function (error) {
+      announce('Online guest Chess could not start: ' + errorText(error) + '. The local guest game remains available; anonymous Auth and the guest Chess migrations must be enabled separately.', true);
+    });
+  }
+  function joinOpenGuestChess() {
+    if (!client || !currentUser || currentRoomId) return announce('Leave the current room before joining an open guest Chess game.', true);
+    var attempts = 0;
+    function attemptTakeover() {
+      attempts++;
+      return callRpc('find_ludo_chess_bot_room', {}).then(function (candidate) {
+        if (!candidate.room_id) throw new Error('No open guest Chess games are available right now.');
+        return callRpc('takeover_ludo_chess_bot_room', {
+          p_room_id: candidate.room_id,
+          p_expected_version: Number(candidate.version),
+          p_action_id: makeActionId()
+        });
+      }).then(function (result) {
+        return attachRoom(result).then(function () {
+          announce('You took the computer seat at a committed turn boundary. The server preserved the match position.');
+        });
+      }).catch(function (error) {
+        if (attempts < 3 && error && ['40001', '55000', '23505', 'P0002'].indexOf(error.code) >= 0) return attemptTakeover();
+        announce('Could not join an open guest Chess game: ' + errorText(error), true);
+      });
+    }
+    announce('Finding an open guest Chess game…');
+    return attemptTakeover();
+  }
   function handleNativeCallback(url) {
     if (!url) return Promise.resolve();
     var parsed;
@@ -1060,6 +1184,9 @@
       signInWithPassword();
     });
     $('online-signup').addEventListener('click', signUpWithPassword);
+    $('online-play-online-guest').addEventListener('click', startOnlineGuestChess);
+    $('online-guest-create-room').addEventListener('click', startOnlineGuestChess);
+    $('online-join-guest-chess').addEventListener('click', joinOpenGuestChess);
     $('online-reset-request').addEventListener('click', requestPasswordReset);
     $('online-recovery-form').addEventListener('submit', updateRecoveredPassword);
     $('online-mode').addEventListener('change', updateRoomModeOptions);
@@ -1185,14 +1312,19 @@
       $('online-chess-screen-title').focus({ preventScroll: true });
     });
     $('online-leave-room').addEventListener('click', function () {
-      if (!currentRoomId) return;
+      var wasAnonymous = isAnonymousUser();
+      if (!currentRoomId) {
+        if (wasAnonymous && client) client.auth.signOut().catch(function (error) { announce('Guest sign-out failed: ' + errorText(error), true); });
+        return;
+      }
       callRpc('leave_room', { p_room_id: currentRoomId })
         .then(function () {
           clearRoomSelection(true);
+          if (wasAnonymous) return client.auth.signOut().then(function (result) { if (result.error) throw result.error; });
           announce('You left the room.');
           return refreshHistory();
         })
-        .catch(function (error) { announce('Could not leave room: ' + errorText(error), true); });
+        .catch(function (error) { announce((wasAnonymous ? 'Guest exit failed: ' : 'Could not leave room: ') + errorText(error), true); });
     });
     function refreshAfterReconnect() {
       if (!currentUser || !client || screen.classList.contains('hidden')) return;
@@ -1237,11 +1369,13 @@
   function startUserSession() {
     if (!currentUser || recoveryMode) return;
     var userId = currentUser.id;
-    refreshAccount();
-    subscribeWallet();
-    subscribeProfile();
+    if (!isAnonymousUser()) {
+      refreshAccount();
+      subscribeWallet();
+      subscribeProfile();
+    }
     subscribeHistory();
-    if (pendingInvite && !handlingPendingInvite) {
+    if (pendingInvite && !isAnonymousUser() && !handlingPendingInvite) {
       handlingPendingInvite = true;
       joinInvite(pendingInvite).finally(function () { handlingPendingInvite = false; });
     } else {

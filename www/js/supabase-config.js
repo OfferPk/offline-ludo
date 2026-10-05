@@ -2,5 +2,6 @@
 window.CROSSFOUR_SUPABASE_CONFIG = Object.freeze({
   url: 'https://exggyvbsqhoasrqgzerf.supabase.co',
   publishableKey: "sb_publishable_dbs4E8kHepkfwkkorCwTuA_qa1RR1UL",
-  emailPasswordEnabled: true
+  emailPasswordEnabled: true,
+  anonymousChessEnabled: false
 });
