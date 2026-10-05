@@ -47,7 +47,7 @@ Full rules: **[RULES.md](RULES.md)** (also in the game under **Rules**). In shor
 
 ## Chess guest play
 
-The home screen offers **Play Chess as Guest** for a local game against the computer. It needs no email, account, room, or internet connection and does not touch online membership, cloud wallets, coins, or account progression. **Online Chess with a human remains a separate signed-in room**; the local guest game cannot be transferred or have its computer seat replaced by a joining player.
+The home screen offers **Play Chess as Guest** for a local game against the computer. It needs no email, account, room, or internet connection and does not create a Supabase Auth identity or touch online membership, cloud wallets, coins, or account progression. That local match cannot be transferred. A separate **online guest vs computer with human seat takeover** flow is implemented behind `anonymousChessEnabled: false`; do not enable it until the two documented additive migrations and Supabase Auth configuration are reviewed and applied. The existing email/password account flow remains intact. See the [guest Auth isolation and rollout boundary](docs/online-backend-setup.md#guest-chess-and-human-opponents).
 
 ## Online backend status
 
