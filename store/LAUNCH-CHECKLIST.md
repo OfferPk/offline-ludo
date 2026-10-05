@@ -1,3 +1,8 @@
+## v1.5.5 update — Arrow land-only + dice face fix
+
+- **Upload:** `offline-ludo-v1.5.5.aab` (version 1.5.5, **versionCode 12**), wahi upload key.
+- Arrow jump only when move ends on arrow; pass-over = normal. Dice never blank after roll.
+
 ## v1.5.4 update — board graphics polish
 
 - **Upload:** `offline-ludo-v1.5.4.aab` (version 1.5.4, **versionCode 11**), wahi upload key.

@@ -18,7 +18,7 @@
  * reaching home each give a bonus roll (toggles), 6 to leave base, exact roll to reach home.
  *
  * Modes: 'classic', 'mystery', 'lucky' (Lucky Chaos Ludo), 'quick' (2 tokens), 'team' (2v2, partners
- *        opposite), 'arrow' (land on arrow → jump 4, path captures) and 'friendly' (no captures).
+ *        opposite), 'arrow' (exact land on arrow → jump 4, path captures) and 'friendly' (no captures).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -222,23 +222,22 @@
     return path;
   }
   /** Squares visited moving `n` forward from p (null if it would overshoot home).
-   *  Landing on an arrow (pass or exact) jumps exactly ARROW_JUMP squares and ends the move there (no chaining). */
+   *  Arrow jump ONLY if the die move ENDS exactly on an arrow (passing over an arrow mid-path does nothing). */
   function pathOf(p, n, enter, st, seat) {
     var out = [], c = p;
     for (var k = 0; k < n; k++) {
       c = stepFwd(c, enter); if (c === null) return null; out.push(c);
-      if (st && arrowsOn(st) && onTrack(c) && ARROW_SQUARES.indexOf(absOf(seat, c)) >= 0) {
-        var jump = arrowJumpPath(st, seat, c, enter);
-        if (jump) {
-          for (var j = 0; j < jump.length; j++) out.push(jump[j]);
-          return out; // stop on the jump destination — no further die steps, no second arrow
-        }
-        // jump blocked/overshoot: remain on the arrow
+    }
+    if (st && arrowsOn(st) && onTrack(c) && ARROW_SQUARES.indexOf(absOf(seat, c)) >= 0) {
+      var jump = arrowJumpPath(st, seat, c, enter);
+      if (jump) {
+        for (var j = 0; j < jump.length; j++) out.push(jump[j]);
       }
+      // if jump blocked/overshoot: remain on the arrow (already last square of out)
     }
     return out;
   }
-  /** Captures for a move path: normal landing capture, plus every square of an arrow jump (arrow land + 4 ahead). Safe squares still protect. */
+  /** Captures: normal landing, or arrow-land + jump path when a jump was appended (path longer by ARROW_JUMP after an arrow). */
   function capturesOnPath(st, seat, path) {
     var caps = [], seen = {};
     function add(abs) {
@@ -248,16 +247,15 @@
       });
     }
     if (!path || !path.length) return caps;
-    var arrowIdx = -1;
-    for (var i = 0; i < path.length; i++) {
-      if (onTrack(path[i]) && ARROW_SQUARES.indexOf(absOf(seat, path[i])) >= 0) { arrowIdx = i; break; }
+    if (st && arrowsOn(st) && path.length > ARROW_JUMP) {
+      var landIdx = path.length - 1 - ARROW_JUMP;
+      if (landIdx >= 0 && onTrack(path[landIdx]) && ARROW_SQUARES.indexOf(absOf(seat, path[landIdx])) >= 0) {
+        for (var j = landIdx; j < path.length; j++) if (onTrack(path[j])) add(absOf(seat, path[j]));
+        return caps;
+      }
     }
-    if (st && arrowsOn(st) && arrowIdx >= 0 && path.length >= arrowIdx + 1 + ARROW_JUMP) {
-      for (var j = arrowIdx; j < path.length; j++) if (onTrack(path[j])) add(absOf(seat, path[j]));
-    } else {
-      var to = path[path.length - 1];
-      if (onTrack(to)) add(absOf(seat, to));
-    }
+    var to = path[path.length - 1];
+    if (onTrack(to)) add(absOf(seat, to));
     return caps;
   }
 

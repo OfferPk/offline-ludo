@@ -34,57 +34,54 @@ t('Arrow: each player starts with one token already on the start square', () => 
   assert.ok(quick.pieces[0].every(p => p === -1), 'quick still starts every token in base');
 });
 
-t('Arrow: land or pass jumps exactly 4 squares and stops (no chain)', () => {
+t('Arrow: exact land jumps +4; passing over does not', () => {
   const st = L.newGame([H, A(), null, null], {}, 4, 'arrow');
   assert.ok(st.rules.arrows);
   assert.strictEqual(L.ARROW_JUMP, 4);
   assert.deepStrictEqual(L.ARROW_SQUARES, [4, 17, 30, 43]);
+  st.pieces[0][0] = 0;
+  const land4 = L.legalMoves(st, 0, 4).find(m => m.piece === 0);
+  assert.deepStrictEqual(land4.path, [1, 2, 3, 4, 5, 6, 7, 8], 'roll 4 lands on arrow then jumps +4');
+  assert.strictEqual(land4.to, 8);
+  const pass5 = L.legalMoves(st, 0, 5).find(m => m.piece === 0);
+  assert.deepStrictEqual(pass5.path, [1, 2, 3, 4, 5], 'roll 5 passes over arrow — normal stop on 5');
+  assert.strictEqual(pass5.to, 5);
+  const pass6 = L.legalMoves(st, 0, 6).find(m => m.piece === 0);
+  assert.deepStrictEqual(pass6.path, [1, 2, 3, 4, 5, 6], 'roll 6 passes over arrow — normal stop on 6');
+  assert.strictEqual(pass6.to, 6);
   st.pieces[0][0] = 3;
-  const land = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
-  assert.deepStrictEqual(land.path, [4, 5, 6, 7, 8], 'land on arrow → jump +4 to stop');
-  assert.strictEqual(land.to, 8);
-  // Destination of the jump is a star, not another arrow — and pathOf ends after the jump anyway
-  assert.ok(L.STAR_SQUARES.indexOf(L.absOf(0, land.to)) >= 0);
-  assert.ok(L.ARROW_SQUARES.indexOf(L.absOf(0, land.to)) < 0);
-  st.pieces[0][0] = 2;
-  const pass = L.legalMoves(st, 0, 2).find(m => m.piece === 0);
-  assert.deepStrictEqual(pass.path, [3, 4, 5, 6, 7, 8], 'passing through arrow also jumps +4 and ends');
-  // Remaining die pips after a jump are not walked (roll 3 from 2 would only need 2 to reach arrow)
-  st.pieces[0][0] = 2;
-  const big = L.legalMoves(st, 0, 3).find(m => m.piece === 0);
-  assert.deepStrictEqual(big.path, [3, 4, 5, 6, 7, 8], 'after jump the move ends — no extra die steps');
+  const land1 = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
+  assert.deepStrictEqual(land1.path, [4, 5, 6, 7, 8], 'exact land from one square behind jumps');
   const classic = L.newGame([H, A(), null, null], { arrows: true }, 4, 'classic');
-  classic.pieces[0][0] = 3;
-  assert.deepStrictEqual(L.legalMoves(classic, 0, 1)[0].path, [4, 5, 6, 7, 8], 'house-rule arrows use the same jump');
+  classic.pieces[0][0] = 0;
+  assert.deepStrictEqual(L.legalMoves(classic, 0, 5)[0].path, [1, 2, 3, 4, 5], 'house-rule arrows also require exact land');
+  assert.deepStrictEqual(L.legalMoves(classic, 0, 4)[0].path, [1, 2, 3, 4, 5, 6, 7, 8], 'house-rule exact land still jumps');
 });
 
 t('Arrow: jump captures on path; safe stop protects; starter still out', () => {
   const st = L.newGame([H, A(), null, null], {}, 4, 'arrow');
   assert.strictEqual(st.pieces[0][0], 0, 'starter token already on start');
-  // Rival on an intermediate jump square (abs 6)
   st.pieces[0][0] = 3;
   st.pieces[1][0] = L.posFromAbs(1, 6);
   const mid = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
   assert.ok(mid.captures.some(c => c.seat === 1 && c.piece === 0), 'captures rival on jump path');
-  // Rival on the stop (abs 8 = star) — safe when safeSquares on
   st.pieces[1][0] = L.posFromAbs(1, 8);
   const stopSafe = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
   assert.strictEqual(stopSafe.captures.length, 0, 'safe square on stop protects');
-  // With safeSquares off, stop can capture
   const unsafe = L.newGame([H, A(), null, null], { safeSquares: false }, 4, 'arrow');
   unsafe.pieces[0][0] = 3;
   unsafe.pieces[1][0] = L.posFromAbs(1, 8);
   const stopHit = L.legalMoves(unsafe, 0, 1).find(m => m.piece === 0);
   assert.ok(stopHit.captures.some(c => c.seat === 1), 'stop captures when safe squares are off');
-  // Rival on the arrow tile itself is also captured when landing
   st.pieces[1][0] = L.posFromAbs(1, 4);
   const onArrow = L.legalMoves(st, 0, 1).find(m => m.piece === 0);
   assert.ok(onArrow.captures.some(c => c.seat === 1), 'landing on arrow captures a rival sitting there');
-  // No soft leave-on-5
-  const behind = L.newGame([H, A(), null, null], {}, 11, 'arrow');
-  behind.pieces[0] = [-1, -1, -1, -1];
-  behind.pieces[1] = [40, 35, 30, 25];
-  assert.strictEqual(L.legalMoves(behind, 0, 5).length, 0, 'Arrow still needs a 6 to leave base (no soft 5)');
+  // Pass-over must NOT capture via jump
+  st.pieces[0][0] = 0;
+  st.pieces[1][0] = L.posFromAbs(1, 6);
+  const noJumpCap = L.legalMoves(st, 0, 5).find(m => m.piece === 0);
+  assert.strictEqual(noJumpCap.to, 5);
+  assert.strictEqual(noJumpCap.captures.length, 0, 'passing over arrow does not jump-capture');
 });
 
 t('Friendly and the noCapture rule never capture', () => {

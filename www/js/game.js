@@ -492,7 +492,16 @@
   var piecePos = {};
   var moving = {};
   var activeMotions = {};
-  function cubeHTML() { var h = '<div class="cube">'; for (var f = 1; f <= 6; f++) { h += '<div class="face f' + f + '">'; for (var k = 0; k < f; k++) h += '<i></i>'; h += '</div>'; } return h + '</div>'; }
+  function flatPipsHTML(v) {
+    var n = Math.min(6, Math.max(1, v || 1)), h = '';
+    for (var k = 0; k < n; k++) h += '<i></i>';
+    return h;
+  }
+  function cubeHTML() {
+    var h = '<div class="cube" aria-hidden="true">';
+    for (var f = 1; f <= 6; f++) { h += '<div class="face f' + f + '">'; for (var k = 0; k < f; k++) h += '<i></i>'; h += '</div>'; }
+    return h + '</div><div class="pdice-flat f1" data-face="1">' + flatPipsHTML(1) + '</div>';
+  }
   function podEl(seat) { return document.querySelector('.pod[data-slot="' + slotOf(seat) + '"]'); }
   function buildPods() {
     each(document.querySelectorAll('.pod'), function (el) {
@@ -791,6 +800,11 @@
       chips.innerHTML = html;
       var humanRoll = active && st.phase === 'roll' && isHuman(s) && !busy;
       var dz = el.querySelector('.pdice'); dz.disabled = !humanRoll; dz.classList.toggle('ready', humanRoll);
+      // Keep a visible face while idle (and for non-rolling seats during another player's roll)
+      if (!(busy && s === (G.actor != null ? G.actor : st.turn) && st.phase === 'roll')) {
+        setDiceFace(s, st.faces && st.faces[s] ? st.faces[s] : 1, true);
+        dz.classList.add('show-flat');
+      }
       var bt = el.querySelector('.boost-tag'), b = st.boost[s];
       bt.classList.toggle('hidden', !b); bt.innerHTML = b === 'double' ? '×2' : b === 'choose' ? '1-6' : '';
       var pieceMoves = !over && active && isHuman(s) && st.phase === 'move' && !busy ? (G.sel != null && chipMoves(G.sel).length ? chipMoves(G.sel) : st.moves) : [];
@@ -927,17 +941,37 @@
   var spins = [0, 0, 0, 0];
   function cubeOf(s) { var p = podEl(s); return p ? p.querySelector('.cube') : null; }
   function setDiceFace(s, v, instant) {
-    var f = FACE[Math.min(6, Math.max(1, v || 1))], cube = cubeOf(s); if (!cube) return;
-    if (instant) cube.style.transitionDuration = '0ms';
-    cube.style.transform = 'rotateX(' + (f[0] + 720 * spins[s]) + 'deg) rotateY(' + (f[1] + 360 * spins[s]) + 'deg)';
+    var n = Math.min(6, Math.max(1, +v || 1)), f = FACE[n], pod = podEl(s), cube = pod && pod.querySelector('.cube'), flat = pod && pod.querySelector('.pdice-flat');
+    if (!cube && !flat) return;
+    // Keep spin counters small so WebView transforms stay stable (huge deg can blank faces)
+    if (spins[s] > 20) spins[s] = spins[s] % 4;
+    if (cube) {
+      if (instant) cube.style.transitionDuration = '0ms';
+      cube.style.transform = 'rotateX(' + (f[0] + 720 * spins[s]) + 'deg) rotateY(' + (f[1] + 360 * spins[s]) + 'deg)';
+    }
+    if (flat) {
+      flat.dataset.face = String(n);
+      flat.className = 'pdice-flat f' + n;
+      flat.innerHTML = flatPipsHTML(n);
+    }
+    if (pod) pod.dataset.face = String(n);
   }
   function prefersReducedMotion() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
   function animateDice(s, v, cb) {
-    var cube = cubeOf(s), reduced = prefersReducedMotion(), dur = reduced ? 0 : save.settings.fast ? 560 : 920;
+    var cube = cubeOf(s), pod = podEl(s), reduced = prefersReducedMotion(), dur = reduced ? 0 : save.settings.fast ? 560 : 920;
     spins[s]++;
-    if (cube) { cube.style.transitionDuration = dur + 'ms'; setDiceFace(s, v); var pd = cube.parentNode; pd.classList.remove('rolling'); if (!reduced) { void pd.offsetWidth; pd.classList.add('rolling'); } }
+    if (pod) {
+      pod.classList.remove('rolling', 'show-flat');
+      if (!reduced) { void pod.offsetWidth; pod.classList.add('rolling'); }
+    }
+    if (cube) { cube.style.transitionDuration = dur + 'ms'; setDiceFace(s, v); }
+    else setDiceFace(s, v, true);
     SFX.roll();
-    later(function () { SFX.land(v === 6); haptic('light'); cb(); }, dur);
+    later(function () {
+      if (pod) { pod.classList.remove('rolling'); pod.classList.add('show-flat'); }
+      setDiceFace(s, v, true); // snap idle face so it never stays blank mid-rotation
+      SFX.land(v === 6); haptic('light'); cb();
+    }, dur);
   }
 
   function openPicker() {
@@ -1430,7 +1464,7 @@
     var entering = !isOpen('result');
     var teamWin = st.mode === 'team', tName = function (seat) { return L.teamOf(seat) ? 'Jade & Cobalt' : 'Coral & Saffron'; };
     $('r-title').textContent = teamWin ? (tName(winner) + ' win') : single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
-    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: 1 token starts on the board. Land on an arrow → jump exactly 4 squares and stop. Captures along the jump (safe squares protect). No chaining.', friendly: 'FRIENDLY · ' };
+    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: 1 token starts on the board. Only an exact land on an arrow jumps +4 (passing over does not). Captures along the jump; safe squares protect; no chaining.', friendly: 'FRIENDLY · ' };
     $('r-kicker').textContent = (MODE_KICK[st.mode] || '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
     var sec = Math.round((G.elapsed || 0) / 1000), mm = Math.floor(sec / 60), ss = sec % 60;
     $('r-meta').textContent = (G.moves || 0) + ' moves · ' + mm + ':' + (ss < 10 ? '0' : '') + ss;
@@ -1504,7 +1538,7 @@
       lucky: 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.',
       quick: 'Quick Ludo: 2 tokens each on the normal board. Same rules (6 to leave base, exact home, safe squares) so matches finish much faster. 1 v 1 or more.',
       team: 'Team Ludo, 2v2. Partners sit opposite: Coral with Saffron, Jade with Cobalt. A team wins when both partners have every token home. You cannot capture your partner.',
-      arrow: 'Arrow Ludo: 1 starter token out. Land on amber arrow → jump +4 and stop. Path captures; safe squares protect; no chain.',
+      arrow: 'Arrow Ludo: 1 starter token out. Exact land on amber arrow → jump +4. Passing over an arrow is normal movement.',
       friendly: 'Friendly: captures are off. It is a pure race home. The app stays 13+.'
     };
     $('mode-note').textContent = NOTES[setupMode] || 'Classic Ludo on a clean board.';
