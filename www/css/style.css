@@ -56,7 +56,7 @@ body.has-banner .screen { padding-bottom: calc(var(--sab) + max(var(--banner-h),
 .mode-card.mode-mystery { --mode-color: 186,142,255; }
 .mode-card.mode-pass { --mode-color: 89,220,180; }
 .mode-card:hover { border-color: rgba(var(--mode-color),.72); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 10px 24px rgba(0,0,0,.17), 0 0 21px rgba(var(--mode-color),.18); transform: translateY(-1px); }
-.mode-card:active { transform: scale(.985); }
+.mode-card:active { transform: scale(.97); opacity: .94; }
 .mode-card:focus-visible, .home-row .btn:focus-visible { outline: 3px solid #9ad9ff; outline-offset: 3px; }
 .mode-card-icon { width: 32px; height: 32px; flex: none; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.11); border-radius: 11px; color: #a8e2ff; background: linear-gradient(145deg, rgba(84,180,255,.2), rgba(117,93,221,.12)); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
 .mode-card-icon svg { width: 21px; height: 21px; display: block; }
@@ -1356,7 +1356,7 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .howto-card { --howto: 72,224,214; grid-column: 1 / -1; box-sizing: border-box; width: 100%; display: flex; flex-direction: column; border-radius: 16px; overflow: hidden; color: var(--ink); border: 1px solid rgba(var(--howto),.34); background: linear-gradient(120deg, rgba(var(--howto),.12), rgba(87,138,191,.08) 55%, rgba(255,255,255,.03)); box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 8px 22px rgba(0,0,0,.14), 0 0 14px rgba(var(--howto),.10); backdrop-filter: blur(12px); transition: border-color .14s ease, box-shadow .14s ease; }
 .howto-card:hover, .howto-card.is-open { border-color: rgba(var(--howto),.62); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 10px 24px rgba(0,0,0,.17), 0 0 18px rgba(var(--howto),.16); }
 .howto-open { appearance: none; width: 100%; min-height: 56px; margin: 0; padding: 9px 13px; display: flex; align-items: center; gap: 11px; border: 0; border-radius: 15px; color: var(--ink); background: transparent; font: inherit; text-align: start; cursor: pointer; }
-.howto-open:active { transform: scale(.99); }
+.howto-open:active { transform: scale(.97); opacity: .94; }
 .howto-open:focus-visible { outline: 3px solid #9ad9ff; outline-offset: -3px; }
 .howto-open-mark { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 11px; color: #8ff2ea; border: 1px solid rgba(255,255,255,.11); background: linear-gradient(145deg, rgba(var(--howto),.26), rgba(84,140,255,.14)); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
 .howto-open-mark svg { width: 22px; height: 22px; display: block; }
@@ -1418,43 +1418,82 @@ body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-
   .token-die-card, .move-countdown.pulse, .pc.picking::before, .pc .jugnu, .pc .gem-jugnu-glow, .pc .gem-core { animation: none !important; }
 }
 
-/* ---- v1.6.1 feel-good FX (transform/opacity only; WebView-safe) ---- */
+/* ---- v1.6.6 feel-good FX (transform/opacity only; WebView-safe; respects reduced-motion) ---- */
 .burst { box-shadow: 0 0 6px rgba(255,255,255,.35); }
 .burst-star { width: 5px; height: 5px; border-radius: 50%; opacity: .95; }
+.burst-splash { width: 7px; height: 7px; border-radius: 50% 40% 55% 45%; box-shadow: 0 0 8px rgba(255,255,255,.45); animation-duration: .72s; }
 .ring-shock { border-width: 4px; animation-duration: .55s; }
 .ring-whoosh { border-style: dashed; animation-duration: .45s; }
 .ring-home { border-width: 3.5px; animation-duration: .65s; }
 .ring-home-gold { border-width: 2px; opacity: .9; animation-duration: .8s; animation-delay: .06s; }
+.ring-yard { border-width: 3px; border-style: solid; animation-duration: .7s; }
+.ring-seat { border-width: 2.5px; animation-duration: .75s; }
 .kill-flash { position: absolute; width: calc(var(--cell) * 1.6); height: calc(var(--cell) * 1.6); margin: calc(var(--cell) * -.8) 0 0 calc(var(--cell) * -.8); border-radius: 50%; pointer-events: none;
   background: radial-gradient(circle, rgba(255,255,255,.55) 0%, transparent 68%); animation: kill-flash .42s ease-out forwards; }
+.kill-splash { position: absolute; width: calc(var(--cell) * 2.1); height: calc(var(--cell) * 2.1); margin: calc(var(--cell) * -1.05) 0 0 calc(var(--cell) * -1.05); border-radius: 50%; pointer-events: none;
+  border: 3px solid color-mix(in srgb, var(--rc, #fff) 75%, #fff); box-shadow: 0 0 16px color-mix(in srgb, var(--rc, #fff) 45%, transparent);
+  animation: kill-splash .55s cubic-bezier(.2,.8,.2,1) forwards; }
 @keyframes kill-flash { from { transform: scale(.4); opacity: .85; } to { transform: scale(1.55); opacity: 0; } }
+@keyframes kill-splash { 0% { transform: scale(.35); opacity: .9; } 55% { opacity: .55; } 100% { transform: scale(1.35); opacity: 0; } }
 .float-kill { color: #ffe6a8; font-size: 15px; text-shadow: 0 2px 8px rgba(0,0,0,.7), 0 0 12px rgba(255,160,40,.55); }
 .float-six { color: #fff6c8; font-size: 22px; font-weight: 900; text-shadow: 0 2px 10px rgba(0,0,0,.65), 0 0 14px rgba(255,200,60,.7); }
 .float-home { color: #fff0b0; font-size: 16px; text-shadow: 0 2px 10px rgba(0,0,0,.65), 0 0 16px rgba(255,210,74,.65); }
 .float-home.big { font-size: 18px; }
+.float-yard { color: #dff7ff; font-size: 13px; text-shadow: 0 2px 8px rgba(0,0,0,.65), 0 0 10px rgba(120,210,255,.55); }
 .pdice.six-pop { animation: six-pop .85s cubic-bezier(.2,.85,.25,1); }
+.pdice.six-glow { box-shadow: 0 0 0 2px rgba(255,220,120,.55), 0 0 18px 4px rgba(255,200,60,.55), inset 0 1px 0 rgba(255,255,255,.55) !important; animation: six-glow 1.4s ease-in-out 2; }
 @keyframes six-pop { 0% { transform: scale(1); } 35% { transform: scale(1.14) translateY(-3px); } 70% { transform: scale(.98); } 100% { transform: scale(1); } }
+@keyframes six-glow { 0%, 100% { filter: brightness(1); } 40% { filter: brightness(1.22); } 70% { filter: brightness(1.08); } }
+.chip-v.chip-in { animation: chip-in .38s cubic-bezier(.2,.85,.25,1.15) both; }
+@keyframes chip-in { 0% { transform: translateY(8px) scale(.55); opacity: 0; } 65% { transform: translateY(-2px) scale(1.08); opacity: 1; } 100% { transform: none; opacity: 1; } }
 .safe-pulse { position: absolute; width: calc(var(--cell) * 1.35); height: calc(var(--cell) * 1.35); margin: calc(var(--cell) * -.675) 0 0 calc(var(--cell) * -.675); border-radius: 50%; pointer-events: none;
   border: 2.5px solid var(--rc, #fff); box-shadow: 0 0 0 0 rgba(255,255,255,.35); animation: safe-pulse .65s ease-out forwards; }
+.safe-spark { position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; pointer-events: none; background: var(--rc, #fff);
+  box-shadow: 0 0 6px var(--rc, #fff); animation: safe-spark .7s ease-out forwards; }
 @keyframes safe-pulse { 0% { transform: scale(.55); opacity: .9; } 100% { transform: scale(1.35); opacity: 0; } }
-.arrow-whoosh { position: absolute; width: calc(var(--cell) * .55); height: calc(var(--cell) * .22); margin: calc(var(--cell) * -.11) 0 0 calc(var(--cell) * -.275); border-radius: 999px; pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--rc, #fff), transparent); opacity: .85;
-  animation: arrow-whoosh .48s cubic-bezier(.2,.7,.2,1) forwards; }
-@keyframes arrow-whoosh { from { transform: translate(0,0) scaleX(.4); opacity: .9; } to { transform: translate(var(--wx), var(--wy)) scaleX(1.3); opacity: 0; } }
+@keyframes safe-spark { from { transform: translate(0,0) scale(1); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) scale(.25); opacity: 0; } }
+.arrow-whoosh { position: absolute; width: calc(var(--cell) * .7); height: calc(var(--cell) * .26); margin: calc(var(--cell) * -.13) 0 0 calc(var(--cell) * -.35); border-radius: 999px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--rc, #fff), transparent); opacity: .95;
+  animation: arrow-whoosh .52s cubic-bezier(.15,.75,.2,1) forwards; box-shadow: 0 0 10px color-mix(in srgb, var(--rc, #fff) 55%, transparent); }
+.arrow-whoosh.trail { width: calc(var(--cell) * .95); height: calc(var(--cell) * .16); opacity: .7; animation-duration: .62s; animation-delay: .04s;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--rc, #fff) 70%, transparent), transparent); }
+.arrow-trail-dot { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; pointer-events: none; background: var(--rc, #fff);
+  box-shadow: 0 0 8px var(--rc, #fff); animation: arrow-trail-dot .55s ease-out forwards; }
+@keyframes arrow-whoosh { from { transform: translate(0,0) scaleX(.35); opacity: .95; } to { transform: translate(var(--wx), var(--wy)) scaleX(1.45); opacity: 0; } }
+@keyframes arrow-trail-dot { from { transform: translate(0,0) scale(1); opacity: .9; } to { transform: translate(var(--dx), var(--dy)) scale(.2); opacity: 0; } }
+.hop-spark { position: absolute; width: 4px; height: 4px; margin: -2px 0 0 -2px; border-radius: 50%; pointer-events: none; background: var(--rc, #fff);
+  opacity: .85; animation: hop-spark .38s ease-out forwards; }
+@keyframes hop-spark { from { transform: translate(0,0) scale(1); opacity: .9; } to { transform: translate(var(--dx), var(--dy)) scale(.2); opacity: 0; } }
+.pc.hop { z-index: 7; }
+.pc.land::after { animation: gem-ripple .5s ease-out both; }
+.yard-burst { position: absolute; width: calc(var(--cell) * 1.5); height: calc(var(--cell) * 1.5); margin: calc(var(--cell) * -.75) 0 0 calc(var(--cell) * -.75); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--rc, #fff) 55%, transparent) 0%, transparent 70%);
+  animation: yard-burst .6s ease-out forwards; }
+@keyframes yard-burst { from { transform: scale(.4); opacity: .85; } to { transform: scale(1.5); opacity: 0; } }
 .home-spark { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; pointer-events: none; animation: home-spark .85s ease-out forwards; }
+.lane-spark { position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-radius: 50%; pointer-events: none;
+  background: var(--rc, #ffd24a); box-shadow: 0 0 7px var(--rc, #ffd24a); animation: lane-spark .7s ease-out forwards; }
 @keyframes home-spark { from { transform: translate(0,0) scale(1); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) scale(.3); opacity: 0; } }
+@keyframes lane-spark { from { transform: translate(0,0) scale(1.1); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) scale(.2); opacity: 0; } }
 .turn-banner.turn-swap { animation: turn-swap .55s cubic-bezier(.2,.8,.2,1); }
 @keyframes turn-swap { 0% { transform: translateY(-4px); opacity: .55; } 55% { transform: translateY(0); opacity: 1; } 100% { transform: none; } }
 .pod.turn-arrive { animation: turn-arrive .65s cubic-bezier(.2,.85,.25,1); }
+.pod.turn-pulse .avatar { animation: seat-pulse .85s cubic-bezier(.2,.85,.25,1); }
 @keyframes turn-arrive { 0% { transform: scale(.96); } 40% { transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes seat-pulse { 0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--pc, #fff) 0%, transparent); }
+  35% { transform: scale(1.08); box-shadow: 0 0 0 6px color-mix(in srgb, var(--pc, #fff) 35%, transparent); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 transparent; } }
 .tool:active, .pdice:active, .chip-v:active, .token-die-v:active { transform: scale(.94); opacity: .92; }
 .btn.primary:active { transform: scale(.96); filter: brightness(1.05); }
-/* win confetti already present — slightly fuller default piece motion */
+.mode-card, .howto-open { transition: transform .12s ease, opacity .12s ease, border-color .14s ease, box-shadow .14s ease; }
 .confetti-piece { will-change: transform, opacity; }
 @media (prefers-reduced-motion: reduce) {
-  .kill-flash, .safe-pulse, .arrow-whoosh, .home-spark, .pdice.six-pop,
-  .turn-banner.turn-swap, .pod.turn-arrive, .ring-shock, .ring-whoosh, .ring-home, .ring-home-gold { animation: none !important; opacity: 0 !important; }
-  .tool:active, .pdice:active, .chip-v:active { transform: none; }
+  .kill-flash, .kill-splash, .safe-pulse, .safe-spark, .arrow-whoosh, .arrow-trail-dot, .home-spark, .lane-spark,
+  .hop-spark, .yard-burst, .pdice.six-pop, .pdice.six-glow, .chip-v.chip-in,
+  .turn-banner.turn-swap, .pod.turn-arrive, .pod.turn-pulse .avatar,
+  .ring-shock, .ring-whoosh, .ring-home, .ring-home-gold, .ring-yard, .ring-seat { animation: none !important; opacity: 0 !important; }
+  .chip-v.chip-in { opacity: 1 !important; transform: none !important; }
+  .tool:active, .pdice:active, .chip-v:active, .mode-card:active, .howto-open:active { transform: none; opacity: 1; }
 }
 
 /* ---------------- v1.6.3 · Gulaab Camel win celebration (original art) ---------------- */

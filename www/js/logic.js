@@ -533,7 +533,8 @@
     if (m.captures.length && st.rules.bonusOnCapture) st.bonus++;
     if (m.finish) { st.stats[seat].home++; clearEffects(st, seat, piece); if (st.rules.bonusOnHome) st.bonus++; }
     var res = { seat: seat, piece: piece, v: m.v, from: m.from, to: m.to, path: m.path, captures: m.captures, finish: m.finish, event: null, finishedPlayer: false, over: false, next: null,
-      stride: !!m.stride, crowned: null, kingCaptured: kingCaps.length > 0 };
+      stride: !!m.stride, crowned: null, kingCaptured: kingCaps.length > 0,
+      leave: !!m.leave, entersHomeColumn: !!m.entersHomeColumn, arrowJump: !!m.arrowJump };
     if (st.lk && m.captures.length && checkKing(st, seat, piece)) res.crowned = { seat: seat, piece: piece };
     var tile = !m.finish ? tileAt(st, m.to, seat) : null;
     if (tile) res.event = st.mode === 'lucky' ? luckyActivate(st, tile, seat, piece, forcedEvent) : applyEvent(st, tile, seat, piece, forcedEvent);

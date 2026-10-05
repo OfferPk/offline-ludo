@@ -12,7 +12,7 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 
 console.log('yard-pads.test.js');
 
-// Version moves forward with each release (v1.6.5 = versionCode 22); yard pads must remain.
+// Version moves forward with each release (v1.6.6 = versionCode 23); yard pads must remain.
 const [maj, min, pat] = pkg.version.split('.').map(Number);
 assert.ok(maj > 1 || (maj === 1 && (min > 6 || (min === 6 && pat >= 2))), 'version >= 1.6.2');
 const code = Number((gradle.match(/versionCode (\d+)/) || [])[1]);
