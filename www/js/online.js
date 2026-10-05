@@ -17,6 +17,10 @@
   var selectedChessSquare = -1;
   var selectedChessMoves = [];
   var pendingChessPromotion = null;
+  var chessPlayViewDismissed = false;
+  var chessMoveHistoryCache = { roomId: '', version: null, rows: [], captures: [] };
+  var chessAnnouncementRoomId = '';
+  var chessAnnouncementVersion = null;
   var capacityBeforeChess = '2';
   var recoveryMode = false;
   var roomChannel = null;
@@ -113,6 +117,8 @@
     selectedChessSquare = -1;
     selectedChessMoves = [];
     pendingChessPromotion = null;
+    chessPlayViewDismissed = false;
+    chessMoveHistoryCache = { roomId: '', version: null, rows: [], captures: [] };
     if (clearStoredState) {
       sessionStorage.removeItem('crossfour.online.pending-match-action');
       sessionStorage.removeItem('crossfour.online.room');
@@ -316,7 +322,7 @@
     var room = currentRoom;
     var card = $('online-room-card');
     card.classList.toggle('hidden', !room);
-    if (!room) return;
+    if (!room) { $('online-chess-resume').classList.add('hidden'); renderMatch(); return; }
     if (room.status === 'completed' || room.status === 'cancelled' || (room.matchState && room.matchState.state && room.matchState.state.phase === 'over')) setRoomConnectionState('ended');
     $('online-room-mode').textContent = modeLabel(room.mode) + ' · ' + room.capacity + ' seats';
     $('online-room-status').textContent = room.status === 'active'
@@ -337,11 +343,15 @@
       item.append(playerName, playerState);
       $('online-room-roster').appendChild(item);
     });
+    $('online-chess-resume').classList.toggle('hidden', !(room.mode === 'ludo_chess' && room.matchState && room.matchState.state && chessPlayViewDismissed));
     renderMatch();
   }
-  function chessSeatName(room, seat) {
+  function chessPlayerName(room, seat) {
     var member = room.roster.find(function (candidate) { return Number(candidate.seat) === Number(seat); });
-    return (Number(seat) === 0 ? 'Red' : 'Blue') + ' · ' + ((member && (member.displayName || member.handle)) || 'Player');
+    return (member && (member.displayName || member.handle)) || 'Player';
+  }
+  function chessSeatName(room, seat) {
+    return (Number(seat) === 0 ? 'Red' : 'Blue') + ' · ' + chessPlayerName(room, seat);
   }
   function chessResultLabel(state, room) {
     var labels = {
@@ -351,6 +361,132 @@
     };
     var text = labels[state.result] || 'Game complete';
     return state.winner === 0 || state.winner === 1 ? text + ' · ' + chessSeatName(room, state.winner) + ' wins' : text;
+  }
+  function chessStateAnnouncement(state, room) {
+    if (state.phase === 'over') return chessResultLabel(state, room);
+    var last = state.last_move;
+    if (!last || !window.LudoChess) return chessSeatName(room, state.turn) + ' to move.';
+    var chess = window.LudoChess;
+    var mover = 1 - Number(state.turn);
+    var message = chessSeatName(room, mover) + ' moved from ' + chess.coord(Number(last.from)) + ' to ' + chess.coord(Number(last.to));
+    if (last.capture) message += ' and captured a piece';
+    if (last.promotion) message += ' and promoted a pawn';
+    if (state.check) message += ' and gave check';
+    message += '. ' + chessSeatName(room, state.turn) + ' to move.';
+    return message;
+  }
+  function chessMoveHistory(state, room, version) {
+    var roomId = room && room.id || '';
+    if (chessMoveHistoryCache.roomId === roomId && chessMoveHistoryCache.version === version) return chessMoveHistoryCache;
+    var chess = window.LudoChess, derived = chess && chess.movesFromPositionHistory ? chess.movesFromPositionHistory(state) : { complete: false, moves: [], reason: 'Complete server move history is unavailable.' };
+    var rows = [], captures = [];
+    derived.moves.forEach(function (entry) {
+      var row = rows.find(function (candidate) { return candidate.number === entry.number; });
+      if (!row) { row = { number: entry.number, red: '', blue: '' }; rows.push(row); }
+      row[entry.color === 0 ? 'red' : 'blue'] = derived.complete ? entry.san : entry.coordinate;
+      if (entry.capture && entry.capturedPiece) captures.push({ by: entry.color, piece: entry.capturedPiece });
+    });
+    if (!derived.moves.length && state && state.last_move && chess) {
+      var last = state.last_move, lastMover = 1 - Number(state.turn);
+      var lastNumber = Math.max(1, (Number(state.fullmove) || 1) - (lastMover === 1 ? 1 : 0));
+      var fallback = { number: lastNumber, red: '', blue: '' };
+      fallback[lastMover === 0 ? 'red' : 'blue'] = chess.coord(Number(last.from)) + (last.capture || last.en_passant ? '×' : '–') + chess.coord(Number(last.to)) + (last.promotion ? '=' + String(last.promotion).toUpperCase() : '') + (state.result === 'checkmate' ? '#' : state.check ? '+' : '');
+      rows.push(fallback);
+    }
+    rows.sort(function (a, b) { return a.number - b.number; });
+    chessMoveHistoryCache = { roomId: roomId, version: version, rows: rows, captures: captures, complete: !!derived.complete, reason: derived.reason || '' };
+    return chessMoveHistoryCache;
+  }
+  function renderChessMoveHistory(state, room, version) {
+    var list = $('online-chess-move-list'), empty = $('online-chess-move-empty'), history = chessMoveHistory(state, room, version), rows = history.rows;
+    var count = rows.reduce(function (total, row) { return total + (row.red ? 1 : 0) + (row.blue ? 1 : 0); }, 0);
+    $('online-chess-history-notation').textContent = history.complete ? 'Standard algebraic notation (SAN)' : 'Coordinate notation · incomplete server history';
+    list.setAttribute('aria-label', history.complete ? 'Move list in standard algebraic chess notation' : 'Verified coordinate moves; the full move history is unavailable');
+    $('online-chess-copy-pgn').disabled = !history.complete;
+    $('online-chess-copy-pgn').title = history.complete ? 'Copy the verified complete game as PGN; download it if clipboard access is unavailable.' : 'PGN export requires a complete, verifiable server move history.';
+    $('online-chess-pgn-status').textContent = history.complete
+      ? (count ? 'PGN ready · full server history verified.' : 'PGN ready · Red moves first.')
+      : (history.reason || 'PGN unavailable because the server did not provide a complete move history.');
+    list.replaceChildren();
+    rows.forEach(function (row, index) {
+      if (!row || (!row.red && !row.blue)) return;
+      var item = document.createElement('li'); item.className = index === rows.length - 1 ? 'is-latest' : '';
+      var number = document.createElement('span'); number.className = 'chess-move-number'; number.textContent = String(row.number) + '.';
+      var red = document.createElement('span'); red.className = 'red-move'; red.textContent = row.red || '—';
+      var blue = document.createElement('span'); blue.className = 'blue-move'; blue.textContent = row.blue || '—';
+      item.append(number, red, blue);
+      if (index === rows.length - 1) item.setAttribute('aria-current', 'step');
+      list.appendChild(item);
+    });
+    $('online-chess-move-count').textContent = count + (count === 1 ? ' move' : ' moves');
+    if (!count) empty.textContent = history.complete ? 'No moves yet. Red makes the first move.' : 'No complete move could be verified. PGN export is unavailable.';
+    empty.classList.toggle('hidden', count > 0);
+    if (count > 0) list.scrollTop = list.scrollHeight;
+  }
+  function downloadChessPgn(pgn) {
+    if (typeof Blob !== 'function' || !window.URL || typeof window.URL.createObjectURL !== 'function') throw new Error('File export is unavailable in this browser.');
+    var blob = new Blob([pgn], { type: 'application/vnd.chess-pgn; charset=utf-8' });
+    var url = window.URL.createObjectURL(blob), link = document.createElement('a');
+    var roomName = String(currentRoomId || 'game').replace(/[^a-z0-9_-]/gi, '-');
+    link.href = url; link.download = 'ludo-chess-' + roomName + '.pgn'; link.hidden = true;
+    document.body.appendChild(link); link.click(); link.remove();
+    window.setTimeout(function () { window.URL.revokeObjectURL(url); }, 1000);
+    $('online-chess-pgn-status').textContent = 'Clipboard access was unavailable; the PGN file was downloaded.';
+  }
+  function copyChessPgn() {
+    if (!currentRoom || !currentRoom.matchState || !currentRoom.matchState.state || !window.LudoChess) return;
+    try {
+      var state = currentRoom.matchState.state;
+      var pgn = window.LudoChess.exportPgn(state, { red: chessPlayerName(currentRoom, 0), blue: chessPlayerName(currentRoom, 1) });
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return downloadChessPgn(pgn);
+      navigator.clipboard.writeText(pgn).then(function () {
+        $('online-chess-pgn-status').textContent = 'PGN copied to clipboard.';
+      }).catch(function () { try { downloadChessPgn(pgn); } catch (error) { $('online-chess-pgn-status').textContent = 'PGN could not be copied or downloaded: ' + errorText(error); } });
+    } catch (error) {
+      $('online-chess-pgn-status').textContent = 'PGN export unavailable: ' + errorText(error);
+    }
+  }
+  function renderCapturedPieces(captures, capturingSeat, targetId) {
+    var target = $(targetId), glyphs = { q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }, counts = {}, total = 0;
+    target.replaceChildren();
+    (captures || []).forEach(function (capture) {
+      if (Number(capture.by) !== Number(capturingSeat)) return;
+      var piece = String(capture.piece || ''), type = piece.toLowerCase();
+      if (!glyphs[type]) return;
+      var key = (piece === piece.toUpperCase() ? 'red-' : 'blue-') + type;
+      counts[key] = (counts[key] || 0) + 1; total++;
+    });
+    ['red-', 'blue-'].forEach(function (side) {
+      ['q', 'r', 'b', 'n', 'p'].forEach(function (type) {
+        var count = counts[side + type];
+        if (!count) return;
+        var colorName = side === 'red-' ? 'Red' : 'Blue';
+        var token = document.createElement('span'); token.className = 'chess-captured-piece ' + (side === 'red-' ? 'red-piece' : 'blue-piece');
+        token.textContent = glyphs[type] + (count > 1 ? ' ×' + count : '');
+        token.setAttribute('aria-label', count + ' captured ' + colorName.toLowerCase() + ' ' + (count === 1 ? window.LudoChess.pieceName(type) : window.LudoChess.pieceName(type) + 's'));
+        target.appendChild(token);
+      });
+    });
+    if (!total) target.textContent = '—';
+    target.setAttribute('aria-label', total ? total + ' captured pieces' : 'No pieces captured yet');
+  }
+  function setChessPlayScreen(open) {
+    var playScreen = $('online-chess-screen'), roomCard = $('online-room-card'), panel = $('online-match-panel');
+    var connection = $('online-room-connection'), leave = $('online-leave-room'), retry = $('online-match-retry');
+    var network = $('online-chess-network'), headerActions = $('online-chess-header-actions'), roomHeaderActions = roomCard.querySelector('.online-room-actions');
+    var onlineBody = playScreen.parentNode.querySelector('.online-body'), onlineTopbar = playScreen.parentNode.querySelector('.online-topbar');
+    var entering = open && playScreen.classList.contains('hidden');
+    if (open) {
+      playScreen.appendChild(panel); network.appendChild(connection); headerActions.appendChild(leave); $('online-chess-actions').appendChild(retry);
+      playScreen.classList.remove('hidden'); playScreen.setAttribute('aria-hidden', 'false');
+      onlineBody.setAttribute('aria-hidden', 'true'); onlineTopbar.setAttribute('aria-hidden', 'true');
+      if (entering) $('online-chess-screen-title').focus({ preventScroll: true });
+    } else {
+      roomCard.appendChild(panel); roomCard.insertBefore(connection, $('online-invite-code').parentNode);
+      roomHeaderActions.appendChild(leave); $('online-match-actions').appendChild(retry);
+      playScreen.classList.add('hidden'); playScreen.setAttribute('aria-hidden', 'true');
+      onlineBody.removeAttribute('aria-hidden'); onlineTopbar.removeAttribute('aria-hidden');
+    }
   }
   function chooseChessSquare(index, state, isMyTurn) {
     if (!isMyTurn || state.phase !== 'active' || pendingMatchAction || pendingChessPromotion || roomConnectionState !== 'connected' || !window.LudoChess) return;
@@ -380,15 +516,21 @@
     var chess = window.LudoChess;
     if (!chess || !state || typeof state.board !== 'string' || state.board.length !== 64) return;
     var board = $('online-chess-board');
+    var activeSquare = board.contains(document.activeElement) ? Number(document.activeElement.dataset.square) : -1;
+    var restoreFocus = Number.isInteger(activeSquare) && activeSquare >= 0 && activeSquare < 64;
+    var focusIndex = restoreFocus ? activeSquare : (selectedChessSquare >= 0 ? selectedChessSquare : (state.last_move && Number.isInteger(state.last_move.to) ? state.last_move.to : 0));
     var chars = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚', P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔' };
     if (!isMyTurn || state.phase !== 'active' || pendingMatchAction) {
       selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
     }
     $('online-chess-red').classList.toggle('is-turn', state.phase === 'active' && Number(state.turn) === 0);
     $('online-chess-blue').classList.toggle('is-turn', state.phase === 'active' && Number(state.turn) === 1);
-    var redName = chessSeatName(room, 0), blueName = chessSeatName(room, 1);
-    $('online-chess-red').querySelector('b').textContent = redName;
-    $('online-chess-blue').querySelector('b').textContent = blueName;
+    var redName = chessPlayerName(room, 0), blueName = chessPlayerName(room, 1);
+    var myMember = room.roster.find(function (member) { return member.user_id === (currentUser && currentUser.id); });
+    $('online-chess-red-name').textContent = redName;
+    $('online-chess-blue-name').textContent = blueName;
+    $('online-chess-red-role').textContent = 'Red pieces · ' + (myMember && Number(myMember.seat) === 0 ? 'you' : 'opponent');
+    $('online-chess-blue-role').textContent = 'Blue pieces · ' + (myMember && Number(myMember.seat) === 1 ? 'you' : 'opponent');
     $('online-chess-status').textContent = state.phase === 'over'
       ? chessResultLabel(state, room)
       : chessSeatName(room, state.turn) + (isMyTurn ? ' · your move' : ' · waiting for their move') + (state.check ? ' · Check!' : '');
@@ -399,27 +541,58 @@
     $('online-chess-resign').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || !!pendingMatchAction);
     $('online-chess-promotion').classList.toggle('hidden', !pendingChessPromotion || !!pendingMatchAction);
     board.replaceChildren();
-    for (var index = 0; index < 64; index++) {
-      var row = Math.floor(index / 8), col = index % 8, piece = state.board[index];
-      var cell = document.createElement('button');
-      cell.type = 'button'; cell.role = 'gridcell'; cell.dataset.square = String(index);
-      cell.className = 'online-chess-square ' + ((row + col) % 2 ? 'dark' : 'light');
-      if (selectedChessSquare === index) cell.classList.add('is-selected');
-      var legal = selectedChessMoves.find(function (move) { return move.to === index; });
-      if (legal) { cell.classList.add('is-legal'); if (state.board[index] !== '.' || legal.enPassant) cell.classList.add('is-capture'); }
-      if (state.last_move && (state.last_move.from === index || state.last_move.to === index)) cell.classList.add(state.last_move.from === index ? 'last-from' : 'last-to');
-      var label = piece === '.' ? 'empty' : (window.LudoChess.colorOf(piece) === 0 ? 'Red ' : 'Blue ') + chess.pieceName(piece);
-      cell.setAttribute('aria-label', label + ' on ' + chess.coord(index) + ((selectedChessSquare === index) ? ', selected' : '') + (legal ? ', legal destination' : ''));
-      if ((row === 7 || col === 0) && piece === '.') {
-        var coord = document.createElement('span'); coord.className = 'square-coord'; coord.textContent = (col === 0 ? String(8 - row) : '') + (row === 7 ? String.fromCharCode(97 + col) : ''); cell.appendChild(coord);
+    for (var row = 0; row < 8; row++) {
+      var rowElement = document.createElement('div');
+      rowElement.className = 'online-chess-row';
+      rowElement.setAttribute('role', 'row'); rowElement.setAttribute('aria-rowindex', String(row + 1));
+      for (var col = 0; col < 8; col++) {
+        var index = row * 8 + col, piece = state.board[index];
+        var cell = document.createElement('button');
+        cell.type = 'button'; cell.setAttribute('role', 'gridcell'); cell.dataset.square = String(index);
+        cell.tabIndex = index === focusIndex ? 0 : -1;
+        cell.setAttribute('aria-colindex', String(col + 1));
+        cell.setAttribute('aria-selected', String(selectedChessSquare === index));
+        cell.setAttribute('aria-disabled', String(!isMyTurn || state.phase !== 'active' || !!pendingMatchAction || roomConnectionState !== 'connected'));
+        cell.className = 'online-chess-square ' + ((row + col) % 2 ? 'dark' : 'light');
+        var checkedKing = state.check ? state.board.indexOf(Number(state.turn) === 0 ? 'K' : 'k') : -1;
+        if (index === checkedKing) cell.classList.add('is-check');
+        if (selectedChessSquare === index) cell.classList.add('is-selected');
+        var legal = selectedChessMoves.find(function (move) { return move.to === index; });
+        if (legal) { cell.classList.add('is-legal'); if (state.board[index] !== '.' || legal.enPassant) cell.classList.add('is-capture'); }
+        if (state.last_move && (state.last_move.from === index || state.last_move.to === index)) cell.classList.add(state.last_move.from === index ? 'last-from' : 'last-to');
+        var label = piece === '.' ? 'Empty square' : (window.LudoChess.colorOf(piece) === 0 ? 'Red ' : 'Blue ') + chess.pieceName(piece);
+        cell.setAttribute('aria-label', label + ' on ' + chess.coord(index) + ((selectedChessSquare === index) ? ', selected' : '') + (legal ? ', legal destination' : '') + (index === checkedKing ? ', in check' : ''));
+        if (col === 0) {
+          var rank = document.createElement('span'); rank.className = 'square-coord rank-coord'; rank.textContent = String(8 - row); cell.appendChild(rank);
+        }
+        if (row === 7) {
+          var file = document.createElement('span'); file.className = 'square-coord file-coord'; file.textContent = String.fromCharCode(97 + col); cell.appendChild(file);
+        }
+        if (piece !== '.') {
+          var glyph = document.createElement('span'); glyph.className = 'online-chess-piece ' + (window.LudoChess.colorOf(piece) === 0 ? 'red-piece' : 'blue-piece');
+          glyph.textContent = chars[piece]; glyph.setAttribute('aria-hidden', 'true'); cell.appendChild(glyph);
+        }
+        cell.addEventListener('focus', function (focusedCell) { return function () {
+          board.querySelectorAll('[data-square]').forEach(function (square) { square.tabIndex = square === focusedCell ? 0 : -1; });
+        }; }(cell));
+        cell.addEventListener('click', function (squareIndex) { return function () { chooseChessSquare(squareIndex, state, isMyTurn); }; }(index));
+        cell.addEventListener('keydown', function (squareRow, squareCol) { return function (event) {
+          var directions = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] };
+          var delta = directions[event.key];
+          if (!delta) return;
+          event.preventDefault();
+          var nextRow = squareRow + delta[0], nextCol = squareCol + delta[1];
+          if (nextRow < 0 || nextRow > 7 || nextCol < 0 || nextCol > 7) return;
+          var nextCell = board.querySelector('[data-square="' + (nextRow * 8 + nextCol) + '"]');
+          if (nextCell) nextCell.focus();
+        }; }(row, col));
+        rowElement.appendChild(cell);
       }
-      if (piece !== '.') {
-        var glyph = document.createElement('span'); glyph.className = 'online-chess-piece ' + (window.LudoChess.colorOf(piece) === 0 ? 'red-piece' : 'blue-piece');
-        glyph.textContent = chars[piece]; glyph.setAttribute('aria-hidden', 'true'); cell.appendChild(glyph);
-      }
-      cell.disabled = !isMyTurn || state.phase !== 'active' || !!pendingMatchAction;
-      cell.addEventListener('click', function (squareIndex) { return function () { chooseChessSquare(squareIndex, state, isMyTurn); }; }(index));
-      board.appendChild(cell);
+      board.appendChild(rowElement);
+    }
+    if (restoreFocus) {
+      var focusTarget = board.querySelector('[data-square="' + focusIndex + '"]');
+      if (focusTarget) focusTarget.focus({ preventScroll: true });
     }
   }
   function renderMatch() {
@@ -428,9 +601,30 @@
     var record = room && room.matchState;
     var show = !!(room && (room.status === 'active' || room.status === 'completed') && record && record.state);
     panel.classList.toggle('hidden', !show);
-    if (!show) { $('online-chess-play').classList.add('hidden'); return; }
+    if (!show) {
+      $('online-chess-play').classList.add('hidden');
+      $('online-chess-resume').classList.add('hidden');
+      panel.classList.remove('is-chess-match');
+      setChessPlayScreen(false);
+      chessAnnouncementRoomId = ''; chessAnnouncementVersion = null; $('online-chess-announcement').textContent = '';
+      return;
+    }
     var state = record.state;
     var isChess = room.mode === 'ludo_chess';
+    if (isChess) {
+      var nextChessVersion = Number(record.version);
+      if (chessAnnouncementRoomId !== room.id) {
+        chessAnnouncementRoomId = room.id; chessAnnouncementVersion = nextChessVersion; $('online-chess-announcement').textContent = '';
+      } else if (Number.isFinite(nextChessVersion) && nextChessVersion > Number(chessAnnouncementVersion)) {
+        $('online-chess-announcement').textContent = chessStateAnnouncement(state, room);
+        chessAnnouncementVersion = nextChessVersion;
+      }
+    } else {
+      chessAnnouncementRoomId = ''; chessAnnouncementVersion = null; $('online-chess-announcement').textContent = '';
+    }
+    panel.classList.toggle('is-chess-match', isChess);
+    $('online-chess-resume').classList.toggle('hidden', !isChess || !chessPlayViewDismissed);
+    setChessPlayScreen(isChess && !chessPlayViewDismissed);
     var isSynchronized = roomConnectionState === 'connected';
     var myMember = room.roster.find(function (member) { return member.user_id === (currentUser && currentUser.id); });
     var turnMember = room.roster.find(function (member) { return Number(member.seat) === Number(state.turn); });
@@ -452,6 +646,9 @@
     $('online-chess-resign').disabled = !isSynchronized;
     $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) { button.disabled = !isSynchronized; });
     if (isChess) {
+      renderChessMoveHistory(state, room, record.version);
+      renderCapturedPieces(chessMoveHistoryCache.captures, 0, 'online-chess-red-captured');
+      renderCapturedPieces(chessMoveHistoryCache.captures, 1, 'online-chess-blue-captured');
       renderChessBoard(state, room, isMyTurn);
       return;
     }
@@ -889,6 +1086,17 @@
     });
     $('online-chess-claim-draw').addEventListener('click', function () { submitMatchAction('claim_ludo_chess_draw', {}); });
     $('online-chess-resign').addEventListener('click', function () { submitMatchAction('resign_ludo_chess', {}); });
+    $('online-chess-copy-pgn').addEventListener('click', copyChessPgn);
+    $('online-chess-back').addEventListener('click', function () {
+      chessPlayViewDismissed = true;
+      renderMatch();
+      $('online-chess-resume').focus({ preventScroll: true });
+    });
+    $('online-chess-resume').addEventListener('click', function () {
+      chessPlayViewDismissed = false;
+      renderMatch();
+      $('online-chess-screen-title').focus({ preventScroll: true });
+    });
     $('online-leave-room').addEventListener('click', function () {
       if (!currentRoomId) return;
       callRpc('leave_room', { p_room_id: currentRoomId })

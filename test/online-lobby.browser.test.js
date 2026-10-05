@@ -65,13 +65,14 @@ function startLocalServer() {
       else request.abort().catch(() => {});
     });
     await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => { window.__mockClipboardText = text; } } });
       let resumeFixture = null;
       try { resumeFixture = JSON.parse(sessionStorage.getItem('crossfour.online.test-fixture') || 'null'); } catch (_) {}
       const state = window.__mockBackend = {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
         removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
         delayNextRead: null,
-        actionResponses: {}, rollCount: 0,
+        actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false,
         tables: resumeFixture && resumeFixture.tables || {
           profiles: [
             { id: 'user-one', handle: 'alice123', display_name: 'Alice' },
@@ -303,11 +304,36 @@ function startLocalServer() {
                 state.emit('match_states', { event: 'UPDATE', new: match });
               } else if (name === 'ludo_chess_move') {
                 const match = state.tables.ludo_chess_matches.find(row => row.room_id === args.p_room_id);
-                const nextState = window.LudoChess.applyMove(match.state, { from: args.p_from, to: args.p_to, promotion: args.p_promotion });
+                const request = { type: 'chess_move', expected_version: args.p_expected_version, from: args.p_from, to: args.p_to, promotion: args.p_promotion };
+                const actorId = state.session && state.session.user && state.session.user.id;
+                const prior = state.chessActionResponses[args.p_action_id];
+                if (prior) {
+                  if (prior.actorId !== actorId || JSON.stringify(prior.request) !== JSON.stringify(request)) {
+                    return Promise.resolve({ data: null, error: { message: 'Action ID was reused for a different request', code: '23505' } });
+                  }
+                  data = Object.assign({}, prior.response, { duplicate: true });
+                  return Promise.resolve({ data, error: null });
+                }
+                if (state.forceChessStale || Number(args.p_expected_version) !== Number(match.version)) {
+                  if (state.forceChessStale) {
+                    state.forceChessStale = false;
+                    match.version++;
+                    state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+                  }
+                  return Promise.resolve({ data: null, error: { message: 'Match state is stale; refresh and try again', code: '40001' } });
+                }
+                let nextState;
+                try { nextState = window.LudoChess.applyMove(match.state, { from: args.p_from, to: args.p_to, promotion: args.p_promotion }); }
+                catch (error) { return Promise.resolve({ data: null, error: { message: error.message, code: '22023' } }); }
                 match.version++;
                 match.state = nextState;
                 data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
+                state.chessActionResponses[args.p_action_id] = { actorId, request, response: data };
                 state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+                if (state.dropChessResponseAfterCommit) {
+                  state.dropChessResponseAfterCommit = false;
+                  return Promise.resolve({ data: null, error: { message: 'The response was lost after the server applied the move' } });
+                }
               } else if (name === 'leave_room') {
                 state.tables.room_members = state.tables.room_members.filter(row => !(row.room_id === args.p_room_id && row.user_id === 'user-one'));
                 state.activeRoomId = null;
@@ -432,17 +458,209 @@ function startLocalServer() {
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     await page.click('#online-start-room');
     await page.waitForFunction(() => !document.querySelector('#online-chess-play').classList.contains('hidden') && document.querySelectorAll('#online-chess-board [data-square]').length === 64);
+    assert.equal(await page.$eval('#online-chess-screen', el => !el.classList.contains('hidden') && el.getAttribute('aria-hidden') === 'false'), true, 'an active Chess room opens the dedicated accessible play screen');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'online-chess-screen-title', 'opening the play screen moves focus to its visible title');
+    assert.match(await page.$eval('#online-chess-screen-title', el => getComputedStyle(el).outlineStyle), /solid/, 'the focused screen title has a visible focus indicator');
+    assert.equal(await page.$eval('#online-match-panel', el => el.parentElement.id), 'online-chess-screen', 'the Chess match panel is moved into the focused screen without duplicating state');
+    assert.equal(await page.$eval('#online-chess-red-clock', el => el.textContent.trim()), 'Untimed', 'the UI does not invent a clock absent from server match state');
+    assert.equal(await page.$eval('#online-chess-resign', el => !el.classList.contains('hidden')), true, 'the active player sees the existing resignation control');
+    assert.equal(await page.$eval('#online-chess-screen-title', el => el.textContent), 'Ludo Chess', 'the play screen has a clear accessible title');
+    const boardSemantics = await page.evaluate(() => {
+      const board = document.querySelector('#online-chess-board');
+      return { role: board.getAttribute('role'), rowCount: board.getAttribute('aria-rowcount'), colCount: board.getAttribute('aria-colcount'), describedBy: board.getAttribute('aria-describedby'), rows: [...board.children].map(row => ({ role: row.getAttribute('role'), index: row.getAttribute('aria-rowindex'), cells: row.children.length })), firstSquareRole: board.querySelector('[data-square="0"]').getAttribute('role'), firstSquareName: board.querySelector('[data-square="0"]').getAttribute('aria-label'), firstSquareDisabled: board.querySelector('[data-square="0"]').getAttribute('aria-disabled'), firstSquareSelected: board.querySelector('[data-square="0"]').getAttribute('aria-selected') };
+    });
+    assert.equal(boardSemantics.role + ':' + boardSemantics.rowCount + ':' + boardSemantics.colCount, 'grid:8:8', 'the board exposes an 8-by-8 ARIA grid');
+    assert.equal(boardSemantics.rows.length, 8, 'the Chess grid has eight explicit accessible rows');
+    assert.ok(boardSemantics.rows.every((row, index) => row.role === 'row' && row.index === String(index + 1) && row.cells === 8), 'each grid row exposes its index and eight squares');
+    assert.equal(boardSemantics.firstSquareRole, 'gridcell', 'each square exposes the gridcell role');
+    assert.match(boardSemantics.firstSquareName, /(?:Red|Blue) rook on a8/, 'each square has a spoken piece and coordinate name');
+    assert.equal(boardSemantics.firstSquareDisabled, 'false', 'the active player can act on their own turn');
+    assert.equal(boardSemantics.firstSquareSelected, 'false', 'square selection state is exposed to assistive technology');
+    assert.match(await page.$eval('#online-chess-board-instructions', el => el.textContent), /arrow keys[\s\S]*Enter or Space/i, 'keyboard instructions describe board navigation and activation');
+    const liveSemantics = await page.evaluate(() => ['online-chess-status', 'online-chess-announcement', 'online-room-connection'].map(id => { const el = document.getElementById(id); return [el.getAttribute('role'), el.getAttribute('aria-live'), el.getAttribute('aria-atomic')]; }));
+    assert.ok(liveSemantics.every(parts => parts[0] === 'status' && parts[1] === 'polite' && parts[2] === 'true'), 'turn, move-result, and connection updates use polite atomic status announcements');
+    assert.match(await page.$eval('#online-chess-status', el => el.textContent), /Alice.*your move/, 'the current turn is announced with the player name');
+    assert.equal(await page.$$eval('#online-chess-board [data-square][tabindex="0"]', cells => cells.length), 1, 'the chess grid uses a single roving keyboard tab stop');
+    await page.focus('#online-chess-board [data-square="52"]');
+    assert.equal(await page.$eval('#online-chess-board [data-square="52"]', el => el.tabIndex), 0, 'the focused square becomes the roving tab stop');
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.square), '53', 'arrow keys move keyboard focus across board squares');
+    assert.equal(await page.$eval('#online-chess-board [data-square="53"]', el => el.tabIndex), 0, 'arrow navigation moves the single tab stop with focus');
+    assert.equal(await page.$eval('#online-chess-board [data-square="52"]', el => el.tabIndex), -1, 'the previous square leaves the tab sequence');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'online-chess-resign', 'Tab exits the grid to the next visible control');
+    await page.keyboard.down('Shift');
+    await page.keyboard.press('Tab');
+    await page.keyboard.up('Shift');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.square), '53', 'Shift+Tab re-enters the grid at its current roving tab stop');
+    const mobileBoard = await page.evaluate(() => ({ board: document.querySelector('#online-chess-board').getBoundingClientRect().width, viewport: innerWidth, square: document.querySelector('#online-chess-board [data-square]').getBoundingClientRect().width, overflow: document.documentElement.scrollWidth > innerWidth }));
+    assert.equal(mobileBoard.overflow, false, 'the Chess screen has no horizontal overflow on a phone viewport');
+    assert.ok(mobileBoard.board <= mobileBoard.viewport && mobileBoard.square >= 35, 'the mobile board fits the screen with practical touch targets');
+    const touchTargets = await page.evaluate(() => ['#online-chess-back', '#online-leave-room', '#online-chess-resign'].map(selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { selector, width: r.width, height: r.height }; }));
+    assert.ok(touchTargets.every(target => target.width >= 24 && target.height >= 44), 'room navigation and gameplay actions have WCAG-sized mobile tap targets: ' + JSON.stringify(touchTargets));
+    const contrast = await page.evaluate(() => {
+      function rgb(value) { return value.match(/[\d.]+/g).slice(0, 3).map(Number).map(channel => channel / 255); }
+      function luminance(value) { const channels = rgb(value).map(channel => channel <= .04045 ? channel / 12.92 : Math.pow((channel + .055) / 1.055, 2.4)); return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2]; }
+      function ratio(foreground, background) { const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a); return (values[0] + .05) / (values[1] + .05); }
+      const light = document.querySelector('#online-chess-board [data-square="52"]');
+      const dark = document.querySelector('#online-chess-board [data-square="56"]');
+      const lightCoordinate = document.querySelector('#online-chess-board [data-square="0"]');
+      return {
+        lightCoordinate: ratio(getComputedStyle(lightCoordinate.querySelector('.square-coord')).color, getComputedStyle(lightCoordinate).backgroundColor),
+        darkCoordinate: ratio(getComputedStyle(dark.querySelector('.square-coord')).color, getComputedStyle(dark).backgroundColor),
+        lightPieceEdge: ratio(getComputedStyle(light.querySelector('.online-chess-piece')).webkitTextStrokeColor, getComputedStyle(light).backgroundColor),
+        darkPieceEdge: ratio(getComputedStyle(dark.querySelector('.online-chess-piece')).webkitTextStrokeColor, getComputedStyle(dark).backgroundColor),
+        focus: { outline: getComputedStyle(document.activeElement).outlineColor, shadow: getComputedStyle(document.activeElement).boxShadow }
+      };
+    });
+    assert.ok(contrast.lightCoordinate >= 4.5 && contrast.darkCoordinate >= 4.5, 'board coordinates meet 4.5:1 text contrast on both square tones');
+    assert.ok(contrast.lightPieceEdge >= 3 && contrast.darkPieceEdge >= 3, 'piece outlines meet 3:1 non-text contrast on both square tones');
+    assert.match(contrast.focus.outline, /255, 245, 223/, 'focused squares use a high-contrast light outline');
+    assert.match(contrast.focus.shadow, /inset/, 'focused squares also use a contrasting inner outline');
+    await page.setViewport({ width: 320, height: 780, isMobile: true, hasTouch: true });
+    const compactBoard = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth > innerWidth, square: document.querySelector('#online-chess-board [data-square]').getBoundingClientRect().width }));
+    assert.equal(compactBoard.overflow, false, 'the board remains within a narrow 320px phone viewport');
+    assert.ok(compactBoard.square >= 24, 'even the narrow phone layout retains accessible square tap targets');
+    await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
     assert.equal(await page.$eval('#online-chess-board [data-square="52"] .online-chess-piece', el => el.classList.contains('red-piece')), true, 'seat zero is rendered as Red Ludo-colored pieces');
     await page.click('#online-chess-board [data-square="52"]');
     await page.waitForSelector('#online-chess-board [data-square="36"].is-legal');
     await page.click('#online-chess-board [data-square="36"]');
     await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 1' && document.querySelector('#online-match-turn').textContent.includes('Blue · Bobby Live'));
+    assert.match(await page.$eval('#online-chess-announcement', el => el.textContent), /Red · Alice(?: Online)? moved from e2 to e4\. Blue · Bobby Live to move\./, 'an accepted move result is announced with its coordinates and the next player');
+    assert.deepEqual(await page.$eval('#online-chess-board [data-square="52"]', el => ({ disabled: el.disabled, ariaDisabled: el.getAttribute('aria-disabled') })), { disabled: false, ariaDisabled: 'true' }, 'opponent-turn squares are announced disabled but remain focusable');
+    await page.focus('#online-chess-board [data-square="52"]');
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.evaluate(() => document.activeElement.dataset.square), '53', 'arrow navigation remains available while waiting for the opponent');
+    const waitingRpcCount = await page.evaluate(() => window.__mockBackend.rpcCalls.length);
+    await page.click('#online-chess-board [data-square="53"]');
+    assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.length), waitingRpcCount, 'aria-disabled board squares cannot submit an out-of-turn action');
+    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /1\.\s*e4/, 'the move list shows SAN reconstructed from server position history');
+    assert.match(await page.$eval('#online-chess-history-notation', el => el.textContent), /standard algebraic notation/i, 'the move-list format is explicitly identified as SAN');
+    assert.equal(await page.$eval('#online-chess-copy-pgn', el => el.disabled), false, 'PGN export is enabled only after the complete initial-to-current history verifies');
+    await page.click('#online-chess-copy-pgn');
+    await page.waitForFunction(() => document.querySelector('#online-chess-pgn-status').textContent === 'PGN copied to clipboard.');
+    const firstPgn = await page.evaluate(() => window.__mockClipboardText);
+    assert.match(firstPgn, /\[Event "Ludo Chess"\][\s\S]*\[Result "\*"\][\s\S]*1\. e4 \*/, 'copy action exports the verified SAN game as PGN without inventing a result');
+    assert.equal(await page.$eval('#online-chess-board [data-square="52"]', el => el.classList.contains('last-from')), true, 'the board marks the origin square of the latest move');
+    assert.equal(await page.$eval('#online-chess-board [data-square="36"]', el => el.classList.contains('last-to')), true, 'the board marks the destination square of the latest move');
     const chessCall = await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'ludo_chess_move'));
     assert.equal(chessCall.args.p_from, 52, 'Chess RPC receives the selected source square');
     assert.equal(chessCall.args.p_to, 36, 'Chess RPC receives a locally legal destination square');
     assert.equal(chessCall.args.p_expected_version, 0, 'Chess action uses the observed authoritative state version');
     assert.equal(Object.hasOwn(chessCall.args, 'p_die'), false, 'Chess RPC does not accept any client-generated dice value');
     assert.ok((await page.evaluate(() => window.__mockBackend.snapshot())).channels.some(channel => channel.tables.includes('ludo_chess_matches')), 'Chess state is subscribed through Realtime');
+
+    async function seedPromotionPosition(color) {
+      const version = await page.evaluate(color => {
+        const backend = window.__mockBackend;
+        const match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+        backend.tables.room_members.filter(member => member.room_id === match.room_id).forEach(member => { member.seat = member.user_id === 'user-one' ? color : 1 - color; });
+        const position = window.LudoChess.initialState();
+        const board = Array(64).fill('.');
+        board[60] = 'K'; board[4] = 'k';
+        if (color === 0) board[8] = 'P'; else board[55] = 'p';
+        position.board = board.join(''); position.turn = color; position.phase = 'active'; position.castling = ''; position.en_passant = -1;
+        position.halfmove = 0; position.fullmove = 1; position.last_move = null; position.winner = null; position.result = null; position.check = false;
+        position.position_history = [window.LudoChess.positionKey(position)];
+        match.version++; match.state = position;
+        backend.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+        return match.version;
+      }, color);
+      await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + value, {}, version);
+      await page.waitForFunction(value => document.querySelector('#online-chess-status').textContent.includes((value === 0 ? 'Red' : 'Blue') + ' · Alice Online · your move'), {}, color);
+      return version;
+    }
+
+    for (const choice of ['q', 'r', 'b', 'n']) {
+      const version = await seedPromotionPosition(0);
+      await page.click('#online-chess-board [data-square="8"]');
+      await page.waitForSelector('#online-chess-board [data-square="0"].is-legal');
+      const destinationHit = await page.evaluate(() => {
+        const cell = document.querySelector('#online-chess-board [data-square="0"]'), rect = cell.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        return { reachable: hit === cell || cell.contains(hit), headerPosition: getComputedStyle(document.querySelector('.online-chess-header')).position };
+      });
+      assert.equal(destinationHit.reachable, true, 'the top-rank promotion destination is not covered by screen chrome on mobile');
+      assert.equal(destinationHit.headerPosition, 'relative', 'the play-screen header scrolls with content instead of overlaying board cells');
+      await page.click('#online-chess-board [data-square="0"]');
+      const chooser = await page.waitForFunction(() => {
+        const group = document.querySelector('#online-chess-promotion');
+        return !group.classList.contains('hidden') ? group : false;
+      }, { timeout: 10000 });
+      assert.ok(await chooser.evaluate(el => el.getAttribute('role') === 'group' && el.getAttribute('aria-label') === 'Choose a promotion piece'), 'the visible mobile promotion chooser is a named accessible group');
+      const choices = await page.$$eval('#online-chess-promotion [data-promotion]', buttons => buttons.map(button => ({ piece: button.dataset.promotion, name: button.getAttribute('aria-label'), height: button.getBoundingClientRect().height, disabled: button.disabled })));
+      assert.deepEqual(choices.map(button => [button.piece, button.name]), [['q', 'Queen'], ['r', 'Rook'], ['b', 'Bishop'], ['n', 'Knight']], 'the chooser offers accessible Queen, Rook, Bishop, and Knight options');
+      assert.ok(choices.every(button => button.height >= 44 && !button.disabled), 'each promotion choice has a 44px touch target while synchronized');
+      if (choice === 'q') await page.evaluate(() => { window.__mockBackend.dropChessResponseAfterCommit = true; });
+      await page.click('#online-chess-promotion [data-promotion="' + choice + '"]');
+      if (choice === 'q') {
+        await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Retry uses the same action ID.'));
+        const firstAttempt = await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => call.name === 'ludo_chess_move').at(-1).args);
+        assert.equal(firstAttempt.p_promotion, choice, 'the Queen choice reaches the authoritative move RPC unchanged');
+        await page.click('#online-match-retry');
+        await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('The server confirmed this was already applied.'));
+        const retried = await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => call.name === 'ludo_chess_move').slice(-2).map(call => call.args));
+        assert.deepEqual(retried[1], retried[0], 'a retry after a lost response reuses the same promotion, version, and action ID');
+      } else {
+        await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + (value + 1), {}, version);
+      }
+      const result = await page.evaluate(() => {
+        const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+        const call = backend.rpcCalls.filter(item => item.name === 'ludo_chess_move').at(-1);
+        return { piece: match.state.board[0], version: match.version, args: call.args };
+      });
+      assert.equal(result.piece, choice.toUpperCase(), 'the server-returned Red board contains the selected ' + choice.toUpperCase());
+      assert.equal(result.version, version + 1, 'duplicate promotion retries advance the authoritative state only once');
+      assert.deepEqual([result.args.p_from, result.args.p_to, result.args.p_promotion, result.args.p_expected_version], [8, 0, choice, version], 'the exact Red source, destination, choice, and observed version are sent');
+    }
+
+    const staleVersion = await seedPromotionPosition(0);
+    await page.click('#online-chess-board [data-square="8"]');
+    await page.waitForSelector('#online-chess-board [data-square="0"].is-legal');
+    await page.click('#online-chess-board [data-square="0"]');
+    await page.evaluate(() => { window.__mockBackend.forceChessStale = true; });
+    await page.click('#online-chess-promotion [data-promotion="b"]');
+    await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Refresh the state and try again.'));
+    await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + (value + 1), {}, staleVersion);
+    const staleState = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+      const call = backend.rpcCalls.filter(item => item.name === 'ludo_chess_move').at(-1);
+      return { board: match.state.board, action: sessionStorage.getItem('crossfour.online.pending-match-action'), args: call.args };
+    });
+    assert.equal(staleState.board[8], 'P', 'a stale promotion request leaves the pawn and server board unchanged');
+    assert.equal(staleState.board[0], '.', 'stale choices never alter the authoritative destination square');
+    assert.equal(staleState.action, null, 'the client clears a rejected stale action instead of retrying it indefinitely');
+    assert.equal(staleState.args.p_promotion, 'b', 'the stale request still carries its explicit Bishop choice for server validation');
+
+    const blueVersion = await seedPromotionPosition(1);
+    const blueOrientation = await page.evaluate(() => ({
+      label: document.querySelector('#online-chess-board').getAttribute('aria-label'),
+      top: [...document.querySelector('#online-chess-board').children[0].children].map(square => Number(square.dataset.square)),
+      bottom: [...document.querySelector('#online-chess-board').children[7].children].map(square => Number(square.dataset.square)),
+      blue: document.querySelector('#online-chess-board [data-square="55"] .online-chess-piece').classList.contains('blue-piece'),
+      redKing: document.querySelector('#online-chess-board [data-square="60"] .online-chess-piece').classList.contains('red-piece'),
+      blueRole: document.querySelector('#online-chess-blue-role').textContent
+    }));
+    assert.match(blueOrientation.label, /Red side at bottom/);
+    assert.deepEqual(blueOrientation.top, [0, 1, 2, 3, 4, 5, 6, 7], 'Blue sees the same standard rank-8-at-top board orientation');
+    assert.deepEqual(blueOrientation.bottom, [56, 57, 58, 59, 60, 61, 62, 63], 'Blue sees the Red home rank at the bottom of the board');
+    assert.equal(blueOrientation.blue, true, 'the Blue pawn remains correctly colored on h2');
+    assert.equal(blueOrientation.redKing, true, 'the Red king remains correctly colored at the bottom');
+    assert.match(blueOrientation.blueRole, /Blue pieces · you/);
+    await page.click('#online-chess-board [data-square="55"]');
+    await page.waitForSelector('#online-chess-board [data-square="63"].is-legal');
+    await page.click('#online-chess-board [data-square="63"]');
+    await page.waitForFunction(() => !document.querySelector('#online-chess-promotion').classList.contains('hidden'));
+    await page.click('#online-chess-promotion [data-promotion="n"]');
+    await page.waitForFunction(value => document.querySelector('#online-match-version').textContent === 'Version ' + (value + 1), {}, blueVersion);
+    const blueResult = await page.evaluate(() => {
+      const backend = window.__mockBackend, match = backend.tables.ludo_chess_matches.find(row => row.room_id === backend.activeRoomId);
+      const call = backend.rpcCalls.filter(item => item.name === 'ludo_chess_move').at(-1);
+      return { piece: match.state.board[63], args: call.args };
+    });
+    assert.equal(blueResult.piece, 'n', 'the Blue Knight underpromotion is applied with lowercase Blue piece notation');
+    assert.deepEqual([blueResult.args.p_from, blueResult.args.p_to, blueResult.args.p_promotion, blueResult.args.p_expected_version], [55, 63, 'n', blueVersion], 'the Blue Knight underpromotion reaches the RPC with correct board coordinates and version');
 
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
@@ -605,21 +823,67 @@ function startLocalServer() {
 
     await seedAndReload('ludo_chess', false);
     await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats' && document.querySelector('#online-match-version').textContent === 'Version 4');
-    assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.room')), 'resume-ludo_chess', 'room recovery discovers an active Chess match when no room ID was persisted');
+    assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.room')), 'resume-ludo_chess', 'room recovery discovers an active Chess room when no room ID was persisted');
     assert.equal(await page.$eval('#online-room-connection', el => el.dataset.state), 'connected', 'discovered Chess room synchronizes its authoritative state');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const match = state.tables.ludo_chess_matches[0];
+      let position = match.state;
+      position = window.LudoChess.applyMove(position, { from: 52, to: 36, promotion: null });
+      position = window.LudoChess.applyMove(position, { from: 11, to: 27, promotion: null });
+      position = window.LudoChess.applyMove(position, { from: 36, to: 27, promotion: null });
+      match.version = 5;
+      match.state = position;
+      state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 5' && document.querySelector('#online-chess-move-list').textContent.includes('exd5'));
+    assert.match(await page.$eval('#online-chess-announcement', el => el.textContent), /moved from e4 to d5 and captured a piece/, 'an authoritative opponent-state update announces the captured move');
+    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /1\.\s*e4[\s\S]*d5[\s\S]*2\.\s*exd5/, 'history reconstructs numbered SAN and captures from synchronized position snapshots');
+    assert.equal(await page.$eval('#online-chess-red-captured', el => el.getAttribute('aria-label')), '1 captured pieces', 'capture tray counts the exact captured piece from match history');
+    await page.click('#online-chess-copy-pgn');
+    await page.waitForFunction(() => document.querySelector('#online-chess-pgn-status').textContent === 'PGN copied to clipboard.');
+    assert.match(await page.evaluate(() => window.__mockClipboardText), /1\. e4 d5 2\. exd5 \*/, 'PGN copy preserves fullmove numbers and capture SAN');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const match = state.tables.ludo_chess_matches[0];
+      match.state.position_history = match.state.position_history.slice(1);
+      match.version++;
+      state.emit('ludo_chess_matches', { event: 'UPDATE', new: match });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 6' && document.querySelector('#online-chess-history-notation').textContent.includes('incomplete'));
+    assert.equal(await page.$eval('#online-chess-copy-pgn', el => el.disabled), true, 'PGN export is disabled when the server history is truncated');
+    assert.match(await page.$eval('#online-chess-pgn-status', el => el.textContent), /complete server move history is unavailable/i, 'the UI explains the missing complete server history');
+    assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /d7–d5[\s\S]*e4×d5/, 'a partial history retains only verified coordinate moves instead of manufacturing SAN or PGN');
+    const previewDir = path.resolve(__dirname, '../../artifacts/ludo-chess-play');
+    fs.mkdirSync(previewDir, { recursive: true });
+    await page.screenshot({ path: path.join(previewDir, 'mobile.png') });
+    await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+    await page.waitForFunction(() => innerWidth >= 901 && getComputedStyle(document.querySelector('.online-chess-stage')).gridTemplateColumns.trim().split(/\s+/).length === 2);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'the Chess screen has no horizontal overflow on desktop');
+    await page.screenshot({ path: path.join(previewDir, 'desktop.png') });
+    await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    await page.click('#online-chess-back');
+    await page.waitForFunction(() => document.querySelector('#online-chess-screen').classList.contains('hidden') && !document.querySelector('#online-chess-resume').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online-match-panel', el => el.parentElement.id), 'online-room-card', 'Room details returns the same live panel to the lobby without leaving the game');
+    await page.click('#online-chess-resume');
+    await page.waitForFunction(() => !document.querySelector('#online-chess-screen').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online-match-panel', el => el.parentElement.id), 'online-chess-screen', 'the same match can be resumed from the lobby');
     await page.evaluate(() => {
       const state = window.__mockBackend;
       const channel = state.channels.find(item => item.name === 'crossfour-room-resume-ludo_chess' && !item.removed);
       channel.statusCallback('CHANNEL_ERROR');
     });
     await page.waitForFunction(() => document.querySelector('#online-room-connection').dataset.state === 'reconnecting');
+    assert.match(await page.$eval('#online-room-connection', el => el.textContent), /Reconnecting/);
+    assert.equal(await page.$eval('#online-room-connection', el => el.getAttribute('aria-live') + ':' + el.getAttribute('aria-atomic')), 'polite:true', 'reconnection changes are exposed as complete polite live updates');
     await page.evaluate(() => {
       const state = window.__mockBackend;
-      state.tables.ludo_chess_matches[0].version = 5;
+      state.tables.ludo_chess_matches[0].version = 6;
       const channel = state.channels.find(item => item.name === 'crossfour-room-resume-ludo_chess' && !item.removed);
       channel.statusCallback('SUBSCRIBED');
     });
-    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 5' && document.querySelector('#online-room-connection').dataset.state === 'connected');
+    await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 6' && document.querySelector('#online-room-connection').dataset.state === 'connected');
+    assert.match(await page.$eval('#online-room-connection', el => el.textContent), /Connected/);
     assert.equal(await page.evaluate(() => window.__mockBackend.channels.filter(channel => channel.name === 'crossfour-room-resume-ludo_chess' && !channel.removed).length), 1, 'Chess reconnect rejoins the same single room channel');
 
     await page.evaluate(() => {

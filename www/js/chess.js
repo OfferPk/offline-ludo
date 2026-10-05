@@ -213,6 +213,170 @@
   function coord(index) {
     return String.fromCharCode(97 + index % 8) + String(8 - Math.floor(index / 8));
   }
+  function sanForMove(state, move, after, legal) {
+    var moves = legal || legalMoves(state);
+    var selected = moves.find(function (candidate) {
+      return candidate.from === move.from && candidate.to === move.to && (candidate.promotion || null) === (move.promotion || null);
+    });
+    if (!selected) throw new Error('That move is not legal.');
+    after = after || rawApply(state, selected);
+    var piece = state.board[selected.from], kind = piece.toLowerCase(), capture = !!selected.enPassant || state.board[selected.to] !== '.';
+    var notation = '';
+    if (selected.castle) notation = selected.castle === 'king' ? 'O-O' : 'O-O-O';
+    else {
+      if (kind !== 'p') {
+        notation = kind.toUpperCase();
+        var rivals = moves.filter(function (candidate) {
+          return candidate.from !== selected.from && candidate.to === selected.to &&
+            state.board[candidate.from] !== '.' && state.board[candidate.from].toLowerCase() === kind;
+        });
+        if (rivals.length) {
+          var file = selected.from % 8, rank = Math.floor(selected.from / 8);
+          var sharesFile = rivals.some(function (candidate) { return candidate.from % 8 === file; });
+          var sharesRank = rivals.some(function (candidate) { return Math.floor(candidate.from / 8) === rank; });
+          if (!sharesFile) notation += String.fromCharCode(97 + file);
+          else if (!sharesRank) notation += String(8 - rank);
+          else notation += coord(selected.from);
+        }
+      } else if (capture) notation += String.fromCharCode(97 + selected.from % 8);
+      if (capture) notation += 'x';
+      notation += coord(selected.to);
+      if (selected.promotion) notation += '=' + selected.promotion.toUpperCase();
+    }
+    var check = inCheck(after, after.turn);
+    if (check) notation += legalMoves(after).length === 0 ? '#' : '+';
+    return notation;
+  }
+  function positionFromKey(key, fullmove) {
+    if (typeof key !== 'string') return null;
+    var parts = key.split('|');
+    if (parts.length !== 4 || !/^[prnbqkPRNBQK.]{64}$/.test(parts[0]) || (parts[1] !== '0' && parts[1] !== '1')) return null;
+    if ((parts[0].match(/K/g) || []).length !== 1 || (parts[0].match(/k/g) || []).length !== 1) return null;
+    if (parts[2] !== '-' && (!/^[KQkq]+$/.test(parts[2]) || new Set(parts[2]).size !== parts[2].length)) return null;
+    if (!/^-?\d+$/.test(parts[3])) return null;
+    var enPassant = Number(parts[3]);
+    if (!Number.isInteger(enPassant) || enPassant < -1 || enPassant > 63) return null;
+    return { protocol: 1, mode: 'ludo_chess', board: parts[0], turn: Number(parts[1]), phase: 'active',
+      castling: parts[2] === '-' ? '' : parts[2], en_passant: enPassant, halfmove: 0, fullmove: fullmove,
+      position_history: [key], last_move: null, winner: null, result: null, check: false };
+  }
+  function movesFromPositionHistory(state) {
+    var result = { complete: false, moves: [], reason: 'Complete server move history is unavailable.' };
+    if (!state || typeof state.board !== 'string' || state.board.length !== 64 ||
+        (state.turn !== 0 && state.turn !== 1) || !Number.isInteger(state.fullmove) || state.fullmove < 1 ||
+        !Array.isArray(state.position_history) || !state.position_history.length) return result;
+    var keys = state.position_history, positions = keys.map(function (key) { return positionFromKey(key, 1); });
+    if (positions.some(function (position) { return !position; })) {
+      result.reason = 'Server position history contains an invalid snapshot.';
+      return result;
+    }
+    if (positionKey(state) !== keys[keys.length - 1]) {
+      result.reason = 'Server position history does not end at the current position.';
+      return result;
+    }
+    var blackMoves = 0;
+    for (var turnIndex = 0; turnIndex < keys.length - 1; turnIndex++) {
+      if (positions[turnIndex].turn === 1) blackMoves++;
+      if (positions[turnIndex + 1].turn !== 1 - positions[turnIndex].turn) {
+        result.reason = 'Server position history is missing or reorders a ply.';
+        return result;
+      }
+    }
+    var firstMoveNumber = state.fullmove - blackMoves;
+    if (firstMoveNumber < 1) {
+      result.reason = 'Server position history has inconsistent move numbering.';
+      return result;
+    }
+    var coordinateMoves = [], moveNumber = firstMoveNumber;
+    for (var ply = 0; ply < keys.length - 1; ply++) {
+      var before = positionFromKey(keys[ply], moveNumber), targetKey = keys[ply + 1];
+      var legal = legalMoves(before), matches = [];
+      legal.forEach(function (candidate) {
+        if (positionKey(rawApply(before, candidate)) === targetKey) matches.push(candidate);
+      });
+      if (matches.length !== 1) {
+        result.reason = 'A server position transition cannot be verified as one legal move.';
+        return result;
+      }
+      var selected = matches[0], after = rawApply(before, selected);
+      after.check = inCheck(after, after.turn);
+      var capture = !!selected.enPassant || before.board[selected.to] !== '.';
+      var capturedAt = selected.enPassant ? selected.to + (before.turn === 0 ? 8 : -8) : selected.to;
+      coordinateMoves.push({ number: moveNumber, color: before.turn, from: selected.from, to: selected.to,
+        promotion: selected.promotion || null, capture: capture, enPassant: !!selected.enPassant, castle: selected.castle || null,
+        san: sanForMove(before, selected, after, legal),
+        coordinate: coord(selected.from) + (capture ? '×' : '–') + coord(selected.to) + (selected.promotion ? '=' + selected.promotion.toUpperCase() : ''),
+        capturedPiece: capture ? before.board[capturedAt] : null });
+      if (before.turn === 1) moveNumber++;
+    }
+    var startKey = positionKey(initialState());
+    var expectedPlies = (state.fullmove - 1) * 2 + state.turn;
+    var complete = keys[0] === startKey && keys.length === expectedPlies + 1;
+    if (complete) {
+      var replay = initialState(), sanMoves = [];
+      for (var index = 1; index < keys.length; index++) {
+        var beforeReplay = replay, candidates = legalMoves(beforeReplay).filter(function (candidate) {
+          return positionKey(rawApply(beforeReplay, candidate)) === keys[index];
+        });
+        if (candidates.length !== 1) { complete = false; break; }
+        var next = applyMove(beforeReplay, candidates[0]);
+        if (positionKey(next) !== keys[index]) { complete = false; break; }
+        var historyMove = coordinateMoves[index - 1];
+        sanMoves.push(Object.assign({}, historyMove, { san: sanForMove(beforeReplay, candidates[0], next, legalMoves(beforeReplay)) }));
+        replay = next;
+      }
+      if (complete && (positionKey(replay) !== positionKey(state) || replay.fullmove !== state.fullmove || replay.turn !== state.turn ||
+          (Number.isInteger(state.halfmove) && replay.halfmove !== state.halfmove) ||
+          (typeof state.check === 'boolean' && replay.check !== state.check) ||
+          (state.last_move && (!replay.last_move || state.last_move.from !== replay.last_move.from || state.last_move.to !== replay.last_move.to ||
+            (state.last_move.promotion || null) !== (replay.last_move.promotion || null) || !!state.last_move.capture !== !!replay.last_move.capture ||
+            !!state.last_move.en_passant !== !!replay.last_move.en_passant || (state.last_move.castle || null) !== (replay.last_move.castle || null))) ||
+          (replay.phase === 'over' && state.phase !== 'over') ||
+          (state.result === 'checkmate' && replay.result !== 'checkmate') ||
+          (replay.result === 'checkmate' && state.result !== 'checkmate'))) complete = false;
+      if (complete) {
+        result.complete = true;
+        result.moves = sanMoves;
+        result.reason = '';
+        return result;
+      }
+    }
+    result.moves = coordinateMoves;
+    result.reason = 'Complete server move history is unavailable; only verified coordinate moves are shown.';
+    return result;
+  }
+  function pgnResult(state) {
+    if (!state || state.phase !== 'over') return '*';
+    if (state.winner === 0) return '1-0';
+    if (state.winner === 1) return '0-1';
+    return '1/2-1/2';
+  }
+  function pgnTag(value) {
+    return String(value == null || value === '' ? '?' : value).replace(/[\r\n\t]+/g, ' ').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }
+  function exportPgn(state, players) {
+    var history = movesFromPositionHistory(state);
+    if (!history.complete) throw new Error(history.reason || 'Complete server move history is unavailable.');
+    players = players || {};
+    var result = pgnResult(state), tags = [
+      ['Event', 'Ludo Chess'], ['Site', 'Online room'], ['Date', '????.??.??'], ['Round', '?'],
+      ['White', players.red || 'Red'], ['Black', players.blue || 'Blue'], ['Result', result]
+    ];
+    var tokens = [];
+    history.moves.forEach(function (move) {
+      if (move.color === 0) tokens.push(String(move.number) + '. ' + move.san);
+      else if (tokens.length && tokens[tokens.length - 1].indexOf(String(move.number) + '.') === 0) tokens[tokens.length - 1] += ' ' + move.san;
+      else tokens.push(String(move.number) + '... ' + move.san);
+    });
+    tokens.push(result);
+    var lines = [], line = '';
+    tokens.forEach(function (token) {
+      if (line && line.length + token.length + 1 > 80) { lines.push(line); line = token; }
+      else line += (line ? ' ' : '') + token;
+    });
+    if (line) lines.push(line);
+    return tags.map(function (tag) { return '[' + tag[0] + ' "' + pgnTag(tag[1]) + '"]'; }).join('\n') + '\n\n' + lines.join('\n') + '\n';
+  }
   function pieceName(piece) {
     return ({ p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' })[String(piece || '').toLowerCase()] || 'empty';
   }
@@ -228,6 +392,9 @@
     repetitions: repetitions,
     insufficientMaterial: insufficientMaterial,
     coord: coord,
+    sanForMove: sanForMove,
+    movesFromPositionHistory: movesFromPositionHistory,
+    exportPgn: exportPgn,
     pieceName: pieceName,
     colorOf: colorOf
   };
