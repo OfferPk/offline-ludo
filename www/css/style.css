@@ -1349,23 +1349,40 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 
 .home-actions { --card-h: 108px; --card-gap: 10px; }
 .mode-card { min-height: var(--card-h); }
-.howto-card { grid-column: 1 / -1; box-sizing: border-box; width: 100%; height: calc(var(--card-h) * 2 + var(--card-gap)); min-height: calc(var(--card-h) * 2 + var(--card-gap)); max-height: calc(var(--card-h) * 2 + var(--card-gap)); display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 16px; overflow: hidden; color: var(--ink); background: linear-gradient(145deg, rgba(80,255,230,.08), rgba(20,24,32,.2)); border: 1.5px solid #7ef9ff; box-shadow: 0 0 6px #39fff2, 0 0 16px rgba(0,255,220,.55), inset 0 0 10px rgba(80,255,240,.18); }
-.howto-open { appearance: none; width: 100%; min-height: 44px; margin: 0; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(126,249,255,.55); color: #e9fbff; background: rgba(8,18,24,.45); font: inherit; font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-.howto-open:focus-visible { outline: 3px solid #9ad9ff; outline-offset: 2px; }
-.howto-panel { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+/* v1.6.5 · How to play: a compact full-width row that closes the mode section (after the
+   2x2 mode cards + 2x2 quick modes), styled like the other home CTAs. Collapsed it is one
+   56px row; opening it unfolds the Rule | Kaise table inside the same card (scrolls if long). */
+.home-actions > .mode-grid { grid-column: 1 / -1; }
+.howto-card { --howto: 72,224,214; grid-column: 1 / -1; box-sizing: border-box; width: 100%; display: flex; flex-direction: column; border-radius: 16px; overflow: hidden; color: var(--ink); border: 1px solid rgba(var(--howto),.34); background: linear-gradient(120deg, rgba(var(--howto),.12), rgba(87,138,191,.08) 55%, rgba(255,255,255,.03)); box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 8px 22px rgba(0,0,0,.14), 0 0 14px rgba(var(--howto),.10); backdrop-filter: blur(12px); transition: border-color .14s ease, box-shadow .14s ease; }
+.howto-card:hover, .howto-card.is-open { border-color: rgba(var(--howto),.62); box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 10px 24px rgba(0,0,0,.17), 0 0 18px rgba(var(--howto),.16); }
+.howto-open { appearance: none; width: 100%; min-height: 56px; margin: 0; padding: 9px 13px; display: flex; align-items: center; gap: 11px; border: 0; border-radius: 15px; color: var(--ink); background: transparent; font: inherit; text-align: start; cursor: pointer; }
+.howto-open:active { transform: scale(.99); }
+.howto-open:focus-visible { outline: 3px solid #9ad9ff; outline-offset: -3px; }
+.howto-open-mark { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border-radius: 11px; color: #8ff2ea; border: 1px solid rgba(255,255,255,.11); background: linear-gradient(145deg, rgba(var(--howto),.26), rgba(84,140,255,.14)); box-shadow: inset 0 1px 0 rgba(255,255,255,.12); }
+.howto-open-mark svg { width: 22px; height: 22px; display: block; }
+.howto-open-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+.howto-open-copy b { font-size: 14px; font-weight: 800; letter-spacing: -.01em; }
+.howto-open-copy small { color: var(--muted); font-size: 10.5px; line-height: 1.3; }
+.howto-open-chevron { flex: none; font-size: 25px; line-height: 1; color: #8ff2ea; transition: transform .18s ease; }
+.howto-open[aria-expanded="true"] .howto-open-chevron { transform: rotate(90deg); }
+html[dir="rtl"] .howto-open-chevron { transform: scaleX(-1); }
+html[dir="rtl"] .howto-open[aria-expanded="true"] .howto-open-chevron { transform: rotate(90deg); }
+.howto-panel { display: flex; flex-direction: column; margin: 0 12px 12px; padding-top: 8px; border-top: 1px solid rgba(var(--howto),.22); }
 .howto-panel.hidden { display: none; }
-.howto-panel-title { margin: 0; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
-.howto-scroll { min-height: 0; flex: 1; overflow: auto; }
-.howto-table { width: 100%; border-collapse: collapse; font-size: 11px; line-height: 1.25; }
-.howto-table th { text-align: left; position: sticky; top: 0; background: #141820; color: #9ad9ff; }
-.howto-table th, .howto-table td { padding: 3px 4px; vertical-align: top; border-bottom: 1px solid rgba(255,255,255,.08); }
+.howto-panel-title { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.howto-scroll { max-height: min(46vh, 300px); overflow: auto; overscroll-behavior: contain; border-radius: 8px; }
+.howto-table { width: 100%; border-collapse: collapse; font-size: 11.5px; line-height: 1.3; }
+.howto-table th { text-align: left; position: sticky; top: 0; background: #141c22; color: #9ad9ff; font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; }
+.howto-table th, .howto-table td { padding: 5px 6px; vertical-align: top; border-bottom: 1px solid rgba(255,255,255,.08); }
+.howto-table tbody tr:last-child td { border-bottom: 0; }
 .howto-table td:first-child, .howto-table th:first-child { width: 34%; font-weight: 700; }
 body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-index: 40; left: 12px; bottom: 16px; }
 @media (max-height: 720px) {
   #home .home-actions { --card-h: 96px; --card-gap: 8px; }
+  #home .howto-open { min-height: 49px; padding-top: 7px; padding-bottom: 7px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .howto-card { box-shadow: 0 0 0 1.5px #7ef9ff; }
+  .howto-card, .howto-open-chevron { transition: none; }
 }
 
 /* settings polish */
@@ -1542,13 +1559,18 @@ body.light #home .home-chess-launch-arrow { color: #b3372a; }
 body.light #home .home-chess-launch:focus-visible { outline-color: #1d5f96; }
 
 /* How to play */
-body.light .howto-card { background: linear-gradient(145deg, rgba(255,255,255,.92), rgba(20,168,162,.09)); border-color: #149c98; box-shadow: 0 0 0 3px rgba(20,156,152,.12), 0 1px 2px rgba(30,30,40,.08), 0 8px 22px rgba(10,110,110,.14); }
-body.light .howto-open { color: #0a4f54; border-color: rgba(10,110,114,.46); background: linear-gradient(180deg, rgba(20,168,162,.16), rgba(20,168,162,.07)); box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 1px 2px rgba(10,80,84,.12); }
+body.light .howto-card { border-color: rgba(10,110,114,.34); background: linear-gradient(120deg, rgba(255,255,255,.93), rgba(20,168,162,.10) 55%, rgba(87,138,191,.08)); box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(30,30,40,.08), 0 6px 18px rgba(10,110,110,.11); backdrop-filter: none; }
+body.light .howto-card:hover, body.light .howto-card.is-open { border-color: rgba(10,110,114,.56); box-shadow: inset 0 1px 0 #fff, 0 2px 4px rgba(30,30,40,.09), 0 8px 22px rgba(10,110,110,.15); }
+body.light .howto-open { color: #0a4f54; background: transparent; box-shadow: none; }
+body.light .howto-open-copy small { color: var(--muted); font-weight: 600; }
+body.light .howto-open-mark { color: #0b6265; border-color: rgba(11,98,101,.24); background: linear-gradient(145deg, rgba(20,168,162,.24), rgba(84,140,255,.12)); box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 2px 6px rgba(11,98,101,.14); }
+body.light .howto-open-mark svg * { stroke-width: 1.9; }
+body.light .howto-open-chevron { color: #0b6265; }
+body.light .howto-panel { border-top-color: rgba(10,110,114,.2); }
 body.light .howto-panel-title { color: var(--ink); }
 body.light .howto-table th { background: #dcf1ef; color: #0a4f54; }
 body.light .howto-table th, body.light .howto-table td { border-bottom-color: rgba(28,32,44,.12); }
 body.light .howto-table td { color: var(--ink); }
-@media (prefers-reduced-motion: reduce) { body.light .howto-card { box-shadow: 0 0 0 1.5px #149c98; } }
 
 /* buttons: quick modes, Skins/Rules/Settings, panel actions */
 body.light .btn:not(.primary):not(.rewarded-btn) { background: rgba(255,255,255,.74); border-color: var(--lt-edge); box-shadow: 0 1px 2px rgba(30,30,40,.07); }

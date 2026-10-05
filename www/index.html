@@ -8,8 +8,8 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.6.4">
-  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.6.4">
+  <link rel="stylesheet" href="css/style.css?v=1.6.5">
+  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.6.5">
 </head>
 <body>
   <div id="app">
@@ -43,9 +43,18 @@
             <span class="mode-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="8.5" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 19c.3-3.2 2-4.8 5-4.8s4.7 1.6 5 4.8M14.2 15.2c3.7-.8 5.8.6 6.3 3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
             <span class="mode-card-copy"><span class="mode-card-title" id="mode-pass-title">Pass &amp; Play</span><span class="mode-card-subtitle" id="mode-pass-subtitle">2–4 players on one phone</span></span>
           </button>
-
+          <div class="mode-grid">
+            <button id="btn-quick" class="btn plate"><span><em class="new-badge">NEW</em>Quick Ludo</span><small>2 tokens · fast games</small></button>
+            <button id="btn-team" class="btn plate"><span>Team Ludo</span><small>2v2 · partners opposite</small></button>
+            <button id="btn-arrow" class="btn plate"><span>Arrow Ludo</span><small>Jump +4 · 1 token out</small></button>
+            <button id="btn-friendly" class="btn plate"><span>Friendly</span><small>No captures · race home</small></button>
+          </div>
           <section id="howto-card" class="howto-card" aria-labelledby="howto-title">
-            <button id="btn-howto-home" class="howto-open" type="button" aria-expanded="false" aria-controls="howto-panel">How to play</button>
+            <button id="btn-howto-home" class="howto-open" type="button" aria-expanded="false" aria-controls="howto-panel">
+              <span class="howto-open-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 5.5c2.6-1 5.3-1 8 .6v13.4c-2.7-1.6-5.4-1.6-8-.6V5.5ZM20 5.5c-2.6-1-5.3-1-8 .6v13.4c2.7-1.6 5.4-1.6 8-.6V5.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6.6 9.2c1.2-.3 2.4-.2 3.4.3M6.6 12.2c1.2-.3 2.4-.2 3.4.3M14 9.5c1-.5 2.2-.6 3.4-.3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+              <span class="howto-open-copy"><b>How to play</b><small>Rule · Kaise — every mode in one table</small></span>
+              <span class="howto-open-chevron" aria-hidden="true">›</span>
+            </button>
             <div id="howto-panel" class="howto-panel hidden">
             <h2 id="howto-title" class="howto-panel-title">How to play</h2>
             <div class="howto-scroll">
@@ -68,12 +77,6 @@
             </div>
             </div>
           </section>
-          <div class="mode-grid">
-            <button id="btn-quick" class="btn plate"><span><em class="new-badge">NEW</em>Quick Ludo</span><small>2 tokens · fast games</small></button>
-            <button id="btn-team" class="btn plate"><span>Team Ludo</span><small>2v2 · partners opposite</small></button>
-            <button id="btn-arrow" class="btn plate"><span>Arrow Ludo</span><small>Jump +4 · 1 token out</small></button>
-            <button id="btn-friendly" class="btn plate"><span>Friendly</span><small>No captures · race home</small></button>
-          </div>
         </div>
         <div class="home-row">
           <button id="btn-skins" class="btn plate">Skins</button>
@@ -581,7 +584,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.6.4 · © OfferPk</p>
+        <p class="ver">Crossfour v1.6.5 · © OfferPk</p>
       </div>
     </div>
 
@@ -589,24 +592,24 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
-  <script src="js/ads-config.js?v=1.6.4"></script>
-  <script src="js/adgate.js?v=1.6.4"></script>
-  <script src="js/ads.js?v=1.6.4"></script>
-  <script src="js/logic.js?v=1.6.4"></script>
-  <script src="js/sound.js?v=1.6.4"></script>
-  <script src="js/themes.js?v=1.6.4"></script>
-  <script src="js/skin-shop.js?v=1.6.4"></script>
-  <script src="js/art.js?v=1.6.4"></script>
-  <script src="js/save-store.js?v=1.6.4"></script>
-  <script src="js/dice-gesture.js?v=1.6.4"></script>
-  <script src="js/path-animation.js?v=1.6.4"></script>
-  <script src="js/celebration.js?v=1.6.4"></script>
-  <script src="js/game.js?v=1.6.4"></script>
-  <script src="js/community-fixtures.js?v=1.6.4"></script>
-  <script src="js/community.js?v=1.6.4"></script>
-  <script src="js/supabase-config.js?v=1.6.4"></script>
-  <script src="js/chess.js?v=1.6.4"></script>
-  <script src="js/online.js?v=1.6.4"></script>
-  <script src="js/ludo-chess-discovery.js?v=1.6.4"></script>
+  <script src="js/ads-config.js?v=1.6.5"></script>
+  <script src="js/adgate.js?v=1.6.5"></script>
+  <script src="js/ads.js?v=1.6.5"></script>
+  <script src="js/logic.js?v=1.6.5"></script>
+  <script src="js/sound.js?v=1.6.5"></script>
+  <script src="js/themes.js?v=1.6.5"></script>
+  <script src="js/skin-shop.js?v=1.6.5"></script>
+  <script src="js/art.js?v=1.6.5"></script>
+  <script src="js/save-store.js?v=1.6.5"></script>
+  <script src="js/dice-gesture.js?v=1.6.5"></script>
+  <script src="js/path-animation.js?v=1.6.5"></script>
+  <script src="js/celebration.js?v=1.6.5"></script>
+  <script src="js/game.js?v=1.6.5"></script>
+  <script src="js/community-fixtures.js?v=1.6.5"></script>
+  <script src="js/community.js?v=1.6.5"></script>
+  <script src="js/supabase-config.js?v=1.6.5"></script>
+  <script src="js/chess.js?v=1.6.5"></script>
+  <script src="js/online.js?v=1.6.5"></script>
+  <script src="js/ludo-chess-discovery.js?v=1.6.5"></script>
 </body>
 </html>

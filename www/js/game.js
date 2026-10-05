@@ -2235,6 +2235,11 @@
     var panel = $('howto-panel'); if (!panel) return;
     var open = panel.classList.toggle('hidden') === false;
     this.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var card = $('howto-card'); if (card) card.classList.toggle('is-open', open);
+    if (open && card && card.scrollIntoView) {
+      var r = card.getBoundingClientRect();
+      if (r.bottom > window.innerHeight) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
   });
   each($('rules-tabs').children, function (b) { b.addEventListener('click', function () { SFX.click(); openRules(b.dataset.tab); }); });
   $('btn-settings').addEventListener('click', function () { SFX.unlock(); SFX.click(); syncSettingsUI(); show('settings'); });
@@ -2298,17 +2303,7 @@
     if (document.visibilityState !== 'visible') { if (G) { cancelFlow(); stopTimer(); layoutPieces(true); persist(); } }
     else if (G && !$('game').classList.contains('hidden') && !paused && !isOpen('result')) { layoutPieces(true); render(); advance(); }
   });
-  function sizeHowtoCard() {
-    var card = $('howto-card'); if (!card) return;
-    var ids = ['btn-vs-ai', 'btn-lucky', 'btn-mystery', 'btn-pass'];
-    var rects = ids.map(function (id) { var el = $(id); return el ? el.getBoundingClientRect() : null; });
-    if (rects.some(function (r) { return !r || !r.width; })) return;
-    var height = Math.max(rects[2].bottom, rects[3].bottom) - Math.min(rects[0].top, rects[1].top);
-    card.style.height = height + 'px';
-    card.style.minHeight = height + 'px';
-    card.style.maxHeight = height + 'px';
-  }
-  window.addEventListener('resize', function () { layout(); sizeHowtoCard(); });
+  window.addEventListener('resize', function () { layout(); });
   if (window.ResizeObserver) new ResizeObserver(function () { layout(); }).observe($('stage'));
 
   // play time for the ad gate (only while a match is on screen and running)
@@ -2326,7 +2321,6 @@
   if (loadResult.status === 'recovered') toast('Recovered your last safe save. Some recent moves may be missing.', 5000);
   // consent + SDK init only: no interstitial is ever shown on launch; the banner sits on the menu / game screens
   if (Ads) Ads.init().then(function () { syncSettingsUI(); Ads.showBanner(); });
-  sizeHowtoCard();
 
 
   // ---------------- online Classic on the local board ----------------

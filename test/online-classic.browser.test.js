@@ -44,7 +44,8 @@ function startLocalServer() {
       return { width, height, cardW: howto.width, cardH: howto.height, glow, rows: document.querySelectorAll('#howto-card tbody tr').length, inside: button && button.parentElement === document.getElementById('howto-card'), closed: panel.classList.contains('hidden') };
     });
     assert.ok(Math.abs(size.cardW - size.width) < 2, 'howto card width ' + size.cardW + ' vs ' + size.width);
-    assert.ok(Math.abs(size.cardH - size.height) < 2, 'howto card height ' + size.cardH + ' vs ' + size.height);
+    // v1.6.5: collapsed How to play is a compact full-width row (no longer a two-card-tall box).
+    assert.ok(size.cardH >= 44 && size.cardH <= 64, 'howto card is a compact row: ' + size.cardH);
     assert.ok(/rgb\(/.test(size.glow) || size.glow !== 'none', 'howto card has a glow');
     assert.equal(size.inside, true, 'How to play button is inside the card');
     assert.equal(size.closed, true, 'Rule | Kaise stays closed until the inner button is tapped');
