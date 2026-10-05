@@ -39,3 +39,12 @@ These online account and match functions remain separate from offline play. Exis
 ## Verification boundary
 
 `npm test`, the mocked signed-in lobby/Chess browser flow, responsive home-card browser tests, and responsive setup-layout tests passed. The live SQL integration checks exercised authenticated Chess create/join/ready/start, alternating legal moves, action-ID idempotency, illegal-move rejection, castling, en passant, underpromotion, and a draw claim. Synthetic Auth rows, rooms, and matches used for those checks were created inside explicit database transactions and rolled back; no test user or match was retained. The browser integration uses a mocked Auth/Supabase client and sends no email. A separate live two-device synchronization session was not run. Do not treat local coins and cloud balances as interchangeable.
+
+## Guest Chess and human opponents
+
+**Play Chess as Guest** is a client-local game against the computer. It does not create a Supabase anonymous session, profile, wallet row, room, membership, match-history record, or currency award. The same legal-move engine is reused locally; online room/move RPCs are not called. Email/password sign-in remains available to existing users for online human rooms, while account creation is hidden only when Chess is the selected mode.
+
+This local guest game is not a seat in an authoritative online room. There is currently no server-owned bot seat or authorized seat-takeover RPC, so a human cannot join and replace the computer in a running guest match. Do not silently rewrite a live room to imitate takeover. Supporting **anonymous online Chess** would require a reviewed Auth anonymous-signup configuration plus server/RLS policies that grant a guest only their own room membership and legal turn actions without wallet/profile/currency privileges. Supporting **bot-to-human replacement** additionally requires a migration/RPC with a version-checked, transactional seat/state transition, membership checks, idempotency, reconnect and disconnect rules, and corresponding tests. Neither configuration nor migration is applied by this guest-play change.
+
+
+A read-only Auth-config check for the dedicated Online Ludo project reports `external_anonymous_users_enabled = false`, `disable_signup = false`, `external_email_enabled = true`, and `mailer_autoconfirm = true`. No Auth setting was changed for this feature.

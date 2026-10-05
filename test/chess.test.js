@@ -136,6 +136,13 @@ const autoDraw = move(seventyFive, 62, 45);
 ok(autoDraw.phase === 'over' && autoDraw.result === 'draw_seventy_five_moves', 'the 75-move rule ends the game automatically');
 ok(Chess.insufficientMaterial(pos({ 60: 'K', 4: 'k' }).board), 'king versus king is insufficient material');
 
+const openingReply = Chess.chooseComputerMove(Chess.initialState());
+ok(openingReply && Chess.legalMoves(Chess.initialState(), openingReply.from).some(candidate => candidate.to === openingReply.to && (candidate.promotion || null) === (openingReply.promotion || null)), 'the local computer chooses a legal opening move from the shared Chess rules');
+const hangingQueen = pos({ 0: 'r', 7: 'k', 56: 'Q', 63: 'K' }, 1);
+const tacticalReply = Chess.chooseComputerMove(hangingQueen);
+ok(tacticalReply && tacticalReply.from === 0 && tacticalReply.to === 56, 'the local computer takes a safely capturable queen');
+ok(Chess.chooseComputerMove(mate) === null, 'the local computer does not move after checkmate');
+
 let partial = move(move(Chess.initialState(), square('e2'), square('e4')), square('e7'), square('e5'));
 partial.position_history = partial.position_history.slice(1);
 const partialHistory = Chess.movesFromPositionHistory(partial);

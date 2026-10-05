@@ -3,9 +3,7 @@
 
   var home = document.getElementById('home');
   var homeActions = home && home.querySelector('.home-actions');
-  var onlineLaunch = document.getElementById('btn-online');
-  var onlineMode = document.getElementById('online-mode');
-  if (!home || !homeActions || !onlineLaunch || !onlineMode || document.getElementById('btn-online-chess')) return;
+  if (!home || !homeActions || document.getElementById('btn-guest-chess')) return;
 
   function node(tag, className, text) {
     var element = document.createElement(tag);
@@ -15,34 +13,31 @@
   }
 
   var card = document.createElement('button');
-  card.id = 'btn-online-chess';
+  card.id = 'btn-guest-chess';
   card.type = 'button';
-  card.className = 'home-chess-launch';
-  card.setAttribute('aria-labelledby', 'home-chess-launch-title');
-  card.setAttribute('aria-describedby', 'home-chess-launch-description');
-  card.setAttribute('data-home-entry', 'ludo-chess');
+  card.className = 'home-chess-launch home-chess-guest-launch';
+  card.setAttribute('aria-labelledby', 'home-guest-chess-title');
+  card.setAttribute('aria-describedby', 'home-guest-chess-description');
+  card.setAttribute('data-home-entry', 'guest-chess');
 
   var mark = node('span', 'home-chess-launch-mark');
   mark.setAttribute('aria-hidden', 'true');
-  mark.appendChild(node('span', '', '♞'));
+  mark.appendChild(node('span', '', '♟'));
 
   var copy = node('span', 'home-chess-launch-copy');
-  copy.appendChild(node('b', '', 'Ludo Chess'));
-  copy.lastChild.id = 'home-chess-launch-title';
-  copy.appendChild(node('small', '', 'Online Rooms · Standard chess · 2 players'));
-  copy.lastChild.id = 'home-chess-launch-description';
+  copy.appendChild(node('b', '', 'Play Chess as Guest'));
+  copy.lastChild.id = 'home-guest-chess-title';
+  copy.appendChild(node('small', '', 'No email · Computer opponent · No coins'));
+  copy.lastChild.id = 'home-guest-chess-description';
 
   var arrow = node('span', 'home-chess-launch-arrow', '›');
   arrow.setAttribute('aria-hidden', 'true');
   card.append(mark, copy, arrow);
-
   card.addEventListener('click', function () {
-    onlineMode.value = 'ludo_chess';
-    onlineMode.dispatchEvent(new Event('change', { bubbles: true }));
-    onlineLaunch.click();
+    if (window.GuestChess) window.GuestChess.start();
   });
 
-  // Keep every existing Ludo mode and its order intact while making the online
-  // Chess route a separate, first-screen action on phone-sized layouts.
+  // The guest-first action is one tap. The separate signed-in human-room route
+  // is offered on the guest screen so existing Ludo modes keep their first-screen layout.
   homeActions.parentNode.insertBefore(card, homeActions);
 })();

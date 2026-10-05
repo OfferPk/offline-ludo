@@ -191,3 +191,15 @@
   }
   .online-chess-square { min-height: 0; }
 }
+
+/* No-email guest Chess is the primary path; online human rooms remain separate. */
+#home .home-chess-guest-launch {
+  border-color: rgba(130, 201, 187, .48);
+  background: radial-gradient(70% 140% at 0% 0%, rgba(130,201,187,.18), transparent 72%),
+    linear-gradient(112deg, rgba(130,201,187,.13), rgba(77,130,255,.09) 62%, rgba(255,255,255,.035));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 8px 22px rgba(0,0,0,.15), 0 0 18px rgba(130,201,187,.09);
+}
+#home .home-chess-guest-launch .home-chess-launch-mark { color: #b8e7dc; }
+#home .home-chess-guest-launch .home-chess-launch-arrow { color: #9cddce; }
+#home .home-chess-guest-launch:hover { border-color: rgba(160,225,211,.72); }
+@media (prefers-reduced-motion: reduce) { #home .home-chess-guest-launch { transition: none; } }

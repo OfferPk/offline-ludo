@@ -141,6 +141,7 @@
   function openOnline() {
     home.classList.add('hidden');
     screen.classList.remove('hidden');
+    updateRoomModeOptions();
     $('online-back').focus({ preventScroll: true });
     if (!isConfigured()) {
       announce('Online setup is pending: this build has no configured Supabase project.', true);
@@ -163,9 +164,18 @@
     home.classList.remove('hidden');
     $('btn-online').focus({ preventScroll: true });
   }
+  function chessModeSelected() { return !!$('online-mode') && $('online-mode').value === 'ludo_chess'; }
+  function updateChessAuthControls() {
+    var chessMode = chessModeSelected();
+    $('online-signup').classList.toggle('hidden', chessMode);
+    $('online-email-signup-note').classList.toggle('hidden', chessMode);
+    $('online-guest-chess-option').classList.toggle('hidden', !chessMode);
+    $('online-auth-title').textContent = chessMode ? 'Online Chess' : 'Sign in with email';
+  }
   function renderAccount() {
     var signedIn = !!currentUser;
     var recovering = !!recoveryMode;
+    updateChessAuthControls();
     authPanel.classList.toggle('hidden', signedIn || recovering);
     recoveryPanel.classList.toggle('hidden', !recovering);
     accountPanel.classList.toggle('hidden', !signedIn || recovering);
@@ -176,7 +186,11 @@
     });
     $('online-recovery-submit').disabled = !client || !recovering;
     if (!isConfigured()) {
-      $('online-config-note').textContent = 'Waiting for the Online Ludo Supabase URL and publishable key. Offline play remains available.';
+      $('online-config-note').textContent = chessModeSelected()
+        ? 'Online rooms are not configured in this build. You can still play Chess locally as a guest against the computer.'
+        : 'Waiting for the Online Ludo Supabase URL and publishable key. Offline play remains available.';
+    } else if (chessModeSelected()) {
+      $('online-config-note').textContent = 'Play a local guest game against the computer, or sign in with an existing account for online human rooms.';
     } else if (!emailPasswordEnabled()) {
       $('online-config-note').textContent = 'Email/password sign-in is disabled for this project. Offline play remains available.';
     } else {
@@ -191,7 +205,8 @@
     if (!signedIn) {
       $('online-wallet-coins').textContent = '—';
       $('online-wallet-diamonds').textContent = '—';
-      if (client && emailPasswordEnabled()) announce('Sign in to create or join online rooms.');
+      if (chessModeSelected()) announce('Play Chess as a guest against the computer, or sign in for online human rooms.');
+      else if (client && emailPasswordEnabled()) announce('Sign in to create or join online rooms.');
       else if (client) announce('Online Ludo email/password authentication is not enabled.', true);
       return;
     }
@@ -1025,6 +1040,7 @@
   function updateRoomModeOptions() {
     var chessMode = $('online-mode').value === 'ludo_chess';
     var capacity = $('online-capacity');
+    updateChessAuthControls();
     if (chessMode) {
       if (capacity.value !== '2') capacityBeforeChess = capacity.value;
       capacity.value = '2';

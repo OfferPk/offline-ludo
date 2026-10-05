@@ -401,7 +401,7 @@ function startLocalServer() {
     assert.equal(await page.$eval('#online', el => el.classList.contains('hidden')), true, 'online screen stays hidden at startup');
     for (const [width, height] of [[320, 568], [320, 844], [360, 844], [390, 844]]) {
       await page.setViewport({ width, height, isMobile: true, hasTouch: true });
-      const entry = await page.$eval('#btn-online-chess', button => {
+      const entry = await page.$eval('#btn-guest-chess', button => {
         const rect = button.getBoundingClientRect();
         const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
         const title = document.getElementById(button.getAttribute('aria-labelledby'));
@@ -416,15 +416,18 @@ function startLocalServer() {
       });
       const label = width + '×' + height;
       assert.equal(entry.tag + ':' + entry.type, 'BUTTON:button', label + ': Chess entry uses a native button');
-      assert.equal(entry.title, 'Ludo Chess', label + ': first-screen card has a clear accessible Chess name');
-      assert.match(entry.description, /Online Rooms.*2 players/i, label + ': card describes the online two-player route');
+      assert.equal(entry.title, 'Play Chess as Guest', label + ': first-screen card offers the no-email Chess route');
+      assert.match(entry.description, /No email.*Computer opponent.*No coins/i, label + ': card describes the guest computer game');
       assert.equal(entry.visible, true, label + ': Chess entry is visible above the fold');
       assert.equal(entry.hitTarget, true, label + ': the center of the card is a working tap target');
       assert.ok(entry.height >= 44, label + ': home card meets the 44px mobile target height');
       assert.equal(entry.overflow, false, label + ': the home screen has no horizontal overflow');
     }
     await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
-    await page.click('#btn-online-chess');
+    await page.click('#btn-guest-chess');
+    await page.waitForSelector('#guest-chess-screen:not(.hidden)');
+    assert.deepEqual(sdkRequests, [], 'the home Chess action starts a guest game without loading Supabase');
+    await page.click('#guest-chess-online');
     await page.waitForSelector('#online:not(.hidden)');
     await page.waitForFunction(() => window.__mockBackend.clientCalls.length === 1);
     assert.equal(await page.$eval('#online-mode', el => el.value), 'ludo_chess', 'the Chess home entry opens the existing online lobby with Ludo Chess selected');
@@ -432,8 +435,11 @@ function startLocalServer() {
     assert.match(await page.$eval('#online-auth-panel', el => el.textContent), /sign in immediately; no confirmation link is required/i);
     assert.equal(await page.$eval('#online-email', el => el.value), '', 'email is not prefilled or hardcoded in the portal');
     assert.equal(await page.$eval('#online-signin', el => el.disabled), false, 'verified email/password auth enables sign-in');
+    assert.equal(await page.$eval('#online-signup', el => el.classList.contains('hidden')), true, 'Chess mode does not present account creation as a prerequisite');
+    assert.equal(await page.$eval('#online-guest-chess-option', el => el.classList.contains('hidden')), false, 'Chess mode offers its local guest computer game before authentication');
     assert.equal(await page.$eval('#online-signup', el => el.disabled), false, 'enabled project signup enables account creation');
     await page.select('#online-mode', 'classic');
+    assert.equal(await page.$eval('#online-signup', el => el.classList.contains('hidden')), false, 'email account creation remains available for other modes');
     const clientConfig = await page.evaluate(() => window.__mockBackend.clientCalls[0]);
     assert.equal(clientConfig.url, 'https://exggyvbsqhoasrqgzerf.supabase.co', 'client is constructed for the dedicated Online Ludo project');
     assert.equal(clientConfig.options.auth.flowType, 'pkce', 'browser auth uses PKCE');
@@ -1114,7 +1120,9 @@ function startLocalServer() {
     const discoveryPreviewDir = path.resolve(__dirname, '../../artifacts/ludo-chess-discovery-preview');
     fs.mkdirSync(discoveryPreviewDir, { recursive: true });
     await page.screenshot({ path: path.join(discoveryPreviewDir, 'mobile-home-ludo-chess.png') });
-    await page.click('#btn-online-chess');
+    await page.click('#btn-guest-chess');
+    await page.waitForSelector('#guest-chess-screen:not(.hidden)');
+    await page.click('#guest-chess-online');
     await page.waitForFunction(() => !document.querySelector('#online').classList.contains('hidden') && document.querySelector('#online-mode').value === 'ludo_chess');
     await page.evaluate(() => {
       const state = window.__mockBackend;

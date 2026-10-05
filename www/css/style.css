@@ -1300,3 +1300,56 @@ body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-
 #settings .row span { flex: 1; line-height: 1.3; }
 #settings .row small, #settings .row .note { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 500; }
 #settings .sect { margin: 14px 0 4px; padding-top: 4px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+
+/* Local guest Chess: visually related to the online board, but isolated from room state. */
+.guest-chess-screen {
+  position: fixed; inset: 0; z-index: 41; display: flex; flex-direction: column; overflow-y: auto;
+  overscroll-behavior: contain; padding: max(12px, var(--sat)) 20px calc(max(16px, var(--sab)) + var(--banner-h));
+  color: #eef1f5; background: radial-gradient(110% 70% at 50% -18%, rgba(42,86,102,.36), transparent 70%), linear-gradient(155deg, #121a21 0%, #101419 55%, #14191e 100%);
+  scrollbar-gutter: stable; -webkit-overflow-scrolling: touch;
+}
+.guest-chess-screen .online-chess-header { width: min(100%, 1260px); flex: none; align-self: center; margin-bottom: 12px; }
+.guest-chess-screen .online-chess-brand > span { color: #82c9bb; }
+.guest-chess-screen .online-chess-network { display: flex; align-items: center; gap: 8px; color: #98a4ae; font-size: 10px; }
+.guest-chess-screen .online-chess-stage { width: min(100%, 1260px); flex: 1 0 auto; align-self: center; margin: 0 auto; }
+.guest-chess-screen .online-chess-board-column { width: 100%; }
+.guest-chess-screen .online-chess-info { width: 100%; }
+.guest-chess-screen .online-chess-board { width: min(100%, 660px); }
+.guest-chess-screen .guest-chess-actions { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.guest-chess-screen .guest-chess-actions > .btn { min-width: 0; min-height: 44px; padding: 8px 10px; font-size: 11px; }
+.guest-chess-screen .guest-chess-actions > .btn:last-child { grid-column: 1 / -1; }
+.guest-chess-local-note { margin: 0; padding: 11px 12px; border: 1px solid rgba(130,201,187,.16); border-radius: 11px; color: #aeb9c1; background: rgba(255,255,255,.025); font-size: 10px; line-height: 1.5; }
+.guest-chess-screen .chess-history-empty { margin: 7px 2px 0; color: #89949e; font-size: 10px; }
+@media (max-width: 900px) {
+  .guest-chess-screen { padding-inline: 14px; }
+  .guest-chess-screen .online-chess-stage { grid-template-columns: minmax(0, 1fr); gap: 13px; }
+  .guest-chess-screen .online-chess-board-column, .guest-chess-screen .online-chess-info { width: min(100%, 620px); justify-self: center; }
+  .guest-chess-screen .online-chess-board-frame { width: 100%; }
+  .guest-chess-screen .online-chess-board { width: min(100%, calc(100vw - 28px), 560px); max-width: 560px; }
+}
+@media (max-width: 600px) {
+  .guest-chess-screen { align-items: stretch; width: 100%; max-width: 100vw; padding-block-start: max(8px, var(--sat)); padding-inline: max(8px, env(safe-area-inset-left, 0px)); }
+  .guest-chess-screen .online-chess-header { grid-template-columns: minmax(0, 1fr) auto; align-self: stretch; width: 100%; gap: 7px; padding-bottom: 8px; }
+  .guest-chess-screen .online-chess-network { display: none; }
+  .guest-chess-screen .online-chess-brand { min-width: 0; }
+  .guest-chess-screen .online-chess-brand > span { width: 36px; height: 36px; }
+  .guest-chess-screen .online-chess-header-actions .btn { min-height: 44px; padding-inline: 12px; }
+  .guest-chess-screen .online-chess-stage { width: min(100%, 520px); }
+  .guest-chess-screen .online-chess-board-column, .guest-chess-screen .online-chess-info { width: 100%; max-width: 520px; }
+  .guest-chess-screen .online-chess-board-frame { padding: 3px; border-radius: 13px; }
+  .guest-chess-screen .online-chess-board { width: min(100%, calc(100vw - 22px)); max-width: 520px; }
+  .guest-chess-screen .chess-player { gap: 5px; padding: 8px 9px; border-radius: 11px; }
+  .guest-chess-screen .chess-player-main { grid-template-columns: 30px minmax(0,1fr) auto; gap: 8px; }
+  .guest-chess-screen .chess-player-mark { width: 29px; height: 29px; border-radius: 9px; }
+  .guest-chess-screen .chess-player-copy b { font-size: 12px; }
+  .guest-chess-screen .chess-player-copy small { font-size: 9px; }
+  .guest-chess-screen .online-chess-info { gap: 8px; }
+}
+@media (max-width: 370px) {
+  .guest-chess-screen { padding-inline: max(6px, env(safe-area-inset-left, 0px)); }
+  .guest-chess-screen .online-chess-board { width: min(100%, calc(100vw - 16px)); }
+  .guest-chess-screen .online-chess-header { gap: 4px; }
+  .guest-chess-screen .online-chess-brand { gap: 7px; }
+  .guest-chess-screen .online-chess-brand h2 { font-size: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .guest-chess-screen .chess-player { transition: none; } }

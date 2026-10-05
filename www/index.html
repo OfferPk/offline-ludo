@@ -212,7 +212,8 @@
         <section id="online-auth-panel" class="online-card" aria-labelledby="online-auth-title">
           <span class="online-eyebrow">OPTIONAL ACCOUNT</span><h2 id="online-auth-title">Sign in with email</h2>
           <p id="online-config-note">Use an email address and password for online rooms.</p>
-          <p class="online-mode-note">New email/password accounts sign in immediately; no confirmation link is required. Gmail SMTP remains configured for password resets, but reset-email delivery has not yet been tested.</p>
+          <p id="online-email-signup-note" class="online-mode-note">New email/password accounts sign in immediately; no confirmation link is required. Gmail SMTP remains configured for password resets, but reset-email delivery has not yet been tested.</p>
+          <div id="online-guest-chess-option" class="online-guest-chess-option hidden"><button id="online-guest-chess" class="btn primary" type="button">Play Chess as Guest vs Computer</button><p>Local game on this device; no email, account, online room, or cloud currency.</p></div>
           <form id="online-auth-form" class="online-auth-form">
             <label for="online-email">Email address<input id="online-email" type="email" autocomplete="email" maxlength="254" required></label>
             <label for="online-password">Password<input id="online-password" type="password" autocomplete="current-password" required></label>
@@ -300,6 +301,28 @@
           <div id="online-chess-header-actions" class="online-chess-header-actions"><button id="online-chess-back" class="btn plate" type="button">Room details</button></div>
         </header>
       </section>
+    </section>
+
+    <section id="guest-chess-screen" class="screen guest-chess-screen hidden" aria-label="Guest Chess versus computer" aria-hidden="true">
+      <header class="online-chess-header guest-chess-header">
+        <div class="online-chess-brand"><span aria-hidden="true">♞</span><div><h2 id="guest-chess-title" tabindex="-1">Guest Chess</h2><small>Local game · you vs computer</small></div></div>
+        <div class="online-chess-network"><span class="online-live-dot" aria-hidden="true"></span><small>Not connected to an online room</small></div>
+        <div class="online-chess-header-actions"><button id="guest-chess-home" class="btn plate" type="button">Home</button></div>
+      </header>
+      <main class="online-chess-stage guest-chess-stage">
+        <div class="online-chess-board-column">
+          <article id="guest-chess-blue" class="chess-player blue" aria-label="Blue computer player"><div class="chess-player-main"><span class="chess-player-mark" aria-hidden="true">C</span><span class="chess-player-copy"><b>Computer</b><small>Blue pieces · opponent</small></span><span class="chess-clock">Computer</span></div></article>
+          <div class="online-chess-board-frame"><p id="guest-chess-board-instructions" class="online-chess-sr-only">Use arrow keys to move between squares. Press Enter or Space to select a red piece or a highlighted destination.</p><div id="guest-chess-board" class="online-chess-board" role="grid" aria-label="Guest Chess board, Red side at bottom" aria-describedby="guest-chess-board-instructions" aria-rowcount="8" aria-colcount="8"></div></div>
+          <article id="guest-chess-red" class="chess-player red" aria-label="Red player"><div class="chess-player-main"><span class="chess-player-mark" aria-hidden="true">Y</span><span class="chess-player-copy"><b>You · Guest</b><small>Red pieces · you move first</small></span><span class="chess-clock">Your turn</span></div></article>
+          <div id="guest-chess-promotion" class="online-chess-promotion hidden" role="group" aria-label="Choose a promotion piece"><span>Promote pawn to</span><button type="button" data-guest-promotion="q" aria-label="Queen">♛ Queen</button><button type="button" data-guest-promotion="r" aria-label="Rook">♜ Rook</button><button type="button" data-guest-promotion="b" aria-label="Bishop">♝ Bishop</button><button type="button" data-guest-promotion="n" aria-label="Knight">♞ Knight</button></div>
+        </div>
+        <aside class="online-chess-info" aria-label="Guest game information and controls">
+          <section class="chess-live-status"><span class="chess-info-label">GUEST GAME</span><p id="guest-chess-status" class="online-room-state" role="status" aria-live="polite" aria-atomic="true">Your move · Red</p></section>
+          <section class="chess-move-section" aria-labelledby="guest-chess-move-heading"><div class="chess-info-heading"><div><h3 id="guest-chess-move-heading">Move history</h3><small>Standard algebraic notation</small></div></div><ol id="guest-chess-history" class="online-chess-move-list" aria-label="Guest game move history"></ol><p id="guest-chess-history-empty" class="chess-history-empty">No moves yet. Red makes the first move.</p></section>
+          <div class="online-chess-actions guest-chess-actions"><button id="guest-chess-claim-draw" class="btn plate hidden" type="button">Claim draw</button><button id="guest-chess-new" class="btn primary" type="button">New game</button><button id="guest-chess-online" class="btn plate" type="button">Find a human online</button></div>
+          <p id="guest-chess-local-note" class="guest-chess-local-note">This guest game runs only in this browser and is not saved; leaving or reloading ends it. It does not use online rooms, accounts, coins, or cloud wallets. Online Chess is a separate signed-in room; it cannot replace the computer in this game.</p>
+        </aside>
+      </main>
     </section>
 
     <!-- SETUP -->
@@ -604,5 +627,6 @@
   <script src="js/chess.js?v=1.5.7"></script>
   <script src="js/online.js?v=1.5.7"></script>
   <script src="js/ludo-chess-discovery.js?v=1.5.7"></script>
+  <script src="js/guest-chess.js?v=1.5.7"></script>
 </body>
 </html>
