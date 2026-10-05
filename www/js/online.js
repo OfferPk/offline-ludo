@@ -542,6 +542,21 @@
     }
     renderChessBoard(state, currentRoom, isMyTurn);
   }
+  var chessCelebrated = '';
+  /** v1.6.3: the Gulaab Camel trots to the winning chess player's card (decisive results only). */
+  function celebrateChessWin(state, room) {
+    if (!window.CamelCelebration || state.phase !== 'over' || (state.winner !== 0 && state.winner !== 1)) return;
+    var key = (room && room.id) + '|' + state.winner + '|' + (state.fullmove || 0) + '|' + (state.result || '');
+    if (chessCelebrated === key) return;
+    chessCelebrated = key;
+    setTimeout(function () {
+      var card = $(state.winner === 0 ? 'online-chess-red' : 'online-chess-blue');
+      if (!card) return;
+      try {
+        window.CamelCelebration.play({ target: card, anchor: card.querySelector('.chess-player-mark') || card, color: state.winner === 0 ? '#e5484d' : '#3b82f6', seat: 'chess-' + state.winner });
+      } catch (error) { /* cosmetic only */ }
+    }, 60);
+  }
   function renderChessBoard(state, room, isMyTurn) {
     var chess = window.LudoChess;
     if (!chess || !state || typeof state.board !== 'string' || state.board.length !== 64) return;
@@ -567,6 +582,7 @@
     $('online-chess-result').textContent = state.phase === 'over'
       ? chessResultLabel(state, room) + '. Match saved to online history.'
       : 'Standard chess rules · Red pieces move first · Select a piece, then a highlighted square.';
+    celebrateChessWin(state, room);
     $('online-chess-claim-draw').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || pendingMatchAction || !chess.canClaimDraw(state));
     $('online-chess-resign').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || !!pendingMatchAction);
     $('online-chess-promotion').classList.toggle('hidden', !pendingChessPromotion || !!pendingMatchAction);

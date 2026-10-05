@@ -12,12 +12,14 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 
 console.log('yard-pads.test.js');
 
-assert.equal(pkg.version, '1.6.2');
-assert.match(gradle, /versionCode 19/);
-assert.match(gradle, /versionName "1\.6\.2"/);
-assert.match(html, /Crossfour v1\.6\.2/);
-assert.match(html, /\?v=1\.6\.2/);
-console.log('  ok - version 1.6.2 / versionCode 19');
+// Version moves forward with each release (v1.6.3 = versionCode 20); yard pads must remain.
+const [maj, min, pat] = pkg.version.split('.').map(Number);
+assert.ok(maj > 1 || (maj === 1 && (min > 6 || (min === 6 && pat >= 2))), 'version >= 1.6.2');
+const code = Number((gradle.match(/versionCode (\d+)/) || [])[1]);
+assert.ok(code >= 19, 'versionCode >= 19');
+assert.match(gradle, new RegExp('versionName "' + pkg.version.replace(/\./g, '\\.') + '"'));
+assert.match(html, new RegExp('Crossfour v' + pkg.version.replace(/\./g, '\\.')));
+console.log('  ok - version ' + pkg.version + ' / versionCode ' + code + ' (>= 1.6.2 / 19)');
 
 assert.match(game, /Yard pads: inset wells/);
 assert.match(game, /numeral plate/);
