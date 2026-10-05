@@ -615,20 +615,26 @@
       for (var i = 0; i < G.st.pieces[s].length; i++) {
         var el = document.createElement('button'); el.type = 'button'; el.className = 'pc';
         el.innerHTML = '<svg class="gem-token" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-          '<defs><linearGradient id="gem-body-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--pcl)" stop-opacity=".92"/><stop offset=".48" stop-color="var(--pcd)" stop-opacity=".94"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity=".98"/></linearGradient>' +
-          '<radialGradient id="gem-core-' + s + '-' + i + '" cx="50%" cy="46%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".2" stop-color="var(--pccore)" stop-opacity=".98"/><stop offset=".58" stop-color="var(--pccore)" stop-opacity=".78"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient></defs>' +
-          '<ellipse class="gem-ground" cx="12" cy="20" rx="10" ry="3.1"/>' +
-          '<path class="gem-pad" d="M5.2 17.1 18.8 17.1 17.2 22.5 6.8 22.5Z"/>' +
-          '<ellipse class="gem-shadow" cx="12" cy="21.1" rx="7.8" ry="1.5"/>' +
+          '<defs><linearGradient id="gem-body-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--pcl)" stop-opacity=".96"/><stop offset=".42" stop-color="var(--pcd)" stop-opacity=".94"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity=".99"/></linearGradient>' +
+          '<linearGradient id="gem-sheen-' + s + '-' + i + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".38" stop-color="#fff" stop-opacity=".12"/><stop offset=".72" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></linearGradient>' +
+          '<linearGradient id="gem-metal-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".45" stop-color="var(--pcl)" stop-opacity=".35"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity=".55"/></linearGradient>' +
+          '<radialGradient id="gem-core-' + s + '-' + i + '" cx="50%" cy="42%" r="62%"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".18" stop-color="var(--pccore)" stop-opacity=".98"/><stop offset=".55" stop-color="var(--pccore)" stop-opacity=".72"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient></defs>' +
+          '<ellipse class="gem-ground" cx="12" cy="20.4" rx="10.6" ry="3.35"/>' +
+          '<path class="gem-pad" d="M5.1 17.05 18.9 17.05 17.25 22.65 6.75 22.65Z"/>' +
+          '<ellipse class="gem-shadow" cx="12" cy="21.25" rx="8.2" ry="1.7"/>' +
           '<path class="gem-body" style="fill:url(#gem-body-' + s + '-' + i + ')" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
+          '<path class="gem-rim-outer" d="M12 1.2 19.05 5.05 16.9 12.55 12 18.55 7.1 12.55 4.95 5.05Z"/>' +
           '<path class="gem-rim" d="M12 1.55 18.7 5.2 16.65 12.35 12 17.95 7.35 12.35 5.3 5.2Z"/>' +
           '<path class="gem-facet gem-facet-light" d="M12 1.1 12 13.6 7 12.6 4.8 5Z"/>' +
           '<path class="gem-facet gem-facet-dark" d="M12 1.1 19.2 5 17 12.6 12 13.6Z"/>' +
           '<path class="gem-facet gem-facet-side" d="M7 12.6 12 13.6 9.5 16.3Z"/>' +
           '<path class="gem-facet gem-facet-base" d="M7 12.6 12 13.6 17 12.6 12 18.7Z"/>' +
-          '<ellipse class="gem-core" style="fill:url(#gem-core-' + s + '-' + i + ')" cx="12" cy="9.2" rx="3.1" ry="4.1"/>' +
-          '<ellipse class="gem-glint-soft" cx="9.2" cy="6.4" rx="3.4" ry="2.1"/>' +
-          '<path class="gem-glint" d="M6.1 5.2 10.4 2.8 8.2 6.8 6.8 7.5Z"/>' +
+          '<path class="gem-sheen" style="fill:url(#gem-sheen-' + s + '-' + i + ')" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
+          '<path class="gem-bevel" style="stroke:url(#gem-metal-' + s + '-' + i + ')" d="M12 1.7 18.4 5.25 16.5 12.2 12 17.5 7.5 12.2 5.6 5.25Z"/>' +
+          '<ellipse class="gem-core" style="fill:url(#gem-core-' + s + '-' + i + ')" cx="12" cy="9.0" rx="3.25" ry="4.25"/>' +
+          '<ellipse class="gem-glint-soft" cx="9.0" cy="6.1" rx="3.7" ry="2.35"/>' +
+          '<path class="gem-glint" d="M5.85 5.05 10.55 2.55 8.35 6.9 6.55 7.55Z"/>' +
+          '<path class="gem-spec" d="M7.2 3.9 11.1 2.15 10.55 3.55 8.05 5.05Z"/>' +
           '<circle class="gem-shield" cx="12" cy="10.2" r="9.3"/>' +
           '<path class="gem-shield-glint" d="M6.1 8.2c1.2-3.4 4-5.1 7.3-5.3"/>' +
           '<path class="gem-frost-wash" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
@@ -650,7 +656,7 @@
   function center(rc) { var r = L.rot(rc, VIEW()); return { x: (r[1] + 0.5) * CELL, y: (r[0] + 0.5) * CELL }; }
   function place(el, x, y, sc) { el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) scale(' + (sc || 1) + ')'; }
   function placeToken(s, i, p, sc) { var el = pieceEls[s][i]; if (!el) return; var c = center(L.cellOf(s, p, i)); place(el, c.x, c.y, sc || 1); piecePos[s + '-' + i] = c; }
-  var CLUSTER = { 2: [[-0.3, 0.02], [0.3, -0.02]], 3: [[-0.3, -0.24], [0.3, -0.24], [0, 0.3]], 4: [[-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3]] };
+  var CLUSTER = { 2: [[-0.36, 0.05], [0.36, -0.05]], 3: [[-0.36, -0.3], [0.36, -0.3], [0, 0.36]], 4: [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]] };
   function layoutPieces(instant) {
     if (!G) return;
     var st = G.st, groups = {};
@@ -668,12 +674,21 @@
         var s = si[0], i = si[1], id = s + '-' + i, el = pieceEls[s][i];
         if (!el || moving[id]) return;
         var p = st.pieces[s][i], c = center(L.cellOf(s, p, i)), sc = p === L.HOME ? 1.08 : 1;
-        if (n > 1) { var off = CLUSTER[Math.min(n, 4)][Math.min(idx, 3)]; c.x += off[0] * CELL; c.y += off[1] * CELL; }
-        if (p === L.HOME) { c.x += (idx - (n - 1) / 2) * CELL * 0.028; c.y += (idx - (n - 1) / 2) * CELL * 0.028; }
         var selected = G.sel != null && !!(G.st.moves || []).some(function (m) { return m.seat === s && m.piece === i && m.v === G.sel; });
         var canMove = !!(G.st.moves || []).some(function (m) { return m.seat === s && m.piece === i; });
-        if (selected) { c.y -= CELL * 0.16; sc *= 1.08; }
-        else if (canMove && st.phase === 'move' && st.turn === s) { c.y -= CELL * 0.06; sc *= 1.03; }
+        if (n > 1) {
+          var off = CLUSTER[Math.min(n, 4)][Math.min(idx, 3)];
+          c.x += off[0] * CELL; c.y += off[1] * CELL;
+          /* front-most in a stack sits slightly above and higher z so clusters read clearly */
+          c.y -= idx * CELL * 0.018;
+          sc *= 1 - idx * 0.012;
+          el.style.zIndex = String((selected ? 12 : canMove ? 8 : 3) + idx);
+        } else {
+          el.style.zIndex = '';
+        }
+        if (p === L.HOME) { c.x += (idx - (n - 1) / 2) * CELL * 0.032; c.y += (idx - (n - 1) / 2) * CELL * 0.032; }
+        if (selected) { c.y -= CELL * 0.22; sc *= 1.12; }
+        else if (canMove && st.phase === 'move' && st.turn === s) { c.y -= CELL * 0.09; sc *= 1.05; }
         if (instant) { el.style.transition = 'none'; place(el, c.x, c.y, sc); void el.offsetWidth; el.style.transition = ''; }
         else place(el, c.x, c.y, sc);
         el.classList.toggle('done', p === L.HOME);
@@ -709,10 +724,12 @@
     var col = seatColor(lm.seat), n = lm.cells.length;
     lm.cells.forEach(function (rc, i) {
       var c = center(rc), e = document.createElement('i');
+      var t = (i + 1) / Math.max(1, n);
       e.className = 'trail';
-      e.style.background = 'radial-gradient(circle at 35% 30%, ' + rgba(col, 0.7) + ' 0%, ' + rgba(col, 0.28) + ' 70%, ' + rgba(col, 0.08) + ' 100%)';
-      e.style.animationDelay = (i * 0.05) + 's';
-      e.style.transform = 'translate(' + c.x.toFixed(1) + 'px,' + c.y.toFixed(1) + 'px) scale(' + (0.88 + 0.12 * ((i + 1) / Math.max(1, n))).toFixed(3) + ')';
+      e.style.background = 'radial-gradient(circle at 32% 28%, ' + rgba(col, 0.88) + ' 0%, ' + rgba(col, 0.42) + ' 55%, ' + rgba(col, 0.1) + ' 100%)';
+      e.style.boxShadow = 'inset 0 0 0 1.6px rgba(255,255,255,' + (0.35 + 0.25 * t).toFixed(2) + '), 0 0 12px ' + rgba(col, 0.35 + 0.2 * t) + ', 0 2px 4px rgba(0,0,0,.28)';
+      e.style.animationDelay = (i * 0.045) + 's';
+      e.style.transform = 'translate(' + c.x.toFixed(1) + 'px,' + c.y.toFixed(1) + 'px) scale(' + (0.82 + 0.22 * t).toFixed(3) + ')';
       box.appendChild(e);
     });
   }
