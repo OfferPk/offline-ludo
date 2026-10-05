@@ -1,3 +1,10 @@
+## v1.5.0 update — board and match polish
+
+- **Upload:** `offline-ludo-v1.5.0.aab` (version 1.5.0, **versionCode 7**), wahi upload key.
+- Board: richer wood/felt, sharper lanes, clearer safe stars, arrow glyphs on 4/17/30/43, readable stacks, stronger selected-token ring.
+- Match: turn banner pulse, capture/home celebration, reconnect countdown bar, turn-timer bar, win ranking animation, sound pack refresh.
+- How to play button still inside the neon home card. No gameplay rule rewrite. Real AdMob IDs stay for a later patch (v1.5.1+).
+
 # Launch checklist: Crossfour on Google Play (new personal account)
 
 ## v1.4.0 update — Roman Urdu khulasa (naya kya hai)
@@ -11,7 +18,7 @@
 - **Undo:** Settings mein Undo. Default on. Off karo to undo bilkul band, ad undo bhi nahi.
 - **How to play:** home par Rule | Kaise table, top 4 mode cards jitna size, neon border.
 - **Ads wahi:** interstitial sirf match ke baad, 5 matches AUR 3 minute, cap, pehle session / launch / exit / back par kabhi nahi. Rewarded sirf tap. Google TEST ad IDs. targetSdk 36. Coins/diamonds cosmetic. Koi wager, cash-out, billing nahi. 13+.
-- **Upload:** `offline-ludo-v1.4.0.aab` (version 1.4.0, **versionCode 5**), wahi upload key. **Asli AdMob IDs wala agla version v1.4.1 / versionCode 6 hoga.**
+- **Upload:** `offline-ludo-v1.4.0.aab` (version 1.4.0, **versionCode 5**), wahi upload key. **Asli AdMob IDs wala agla version ab v1.5.1+ hoga.**
 - **Online server:** migration repo mein hai. Is machine par database password / service role nahi, is liye live Supabase par migration apply nahi hui. Client canvas, timer, rule lock aur tests local chalaye gaye.
 
 ## v1.3.0 update — Roman Urdu khulasa (naya kya hai)
@@ -22,7 +29,7 @@
 - **Friendly:** capture band. Sirf race. App phir bhi **13+** hai.
 - **Polish:** chuni hui goti highlight, pichhli chaal ke khane roshan, jeet ki screen par moves aur waqt. Haptics dice aur capture par, Settings se band (default on). Do muft board: Midnight (dark) aur Classic Wood. Coins sirf cosmetic. Koi purchase / bet / entry fee nahi.
 - **Ads wahi:** interstitial sirf match ke baad, 5 matches AUR 3 minute ke baad, cap, pehle session / launch / exit / back par kabhi nahi. Rewarded sirf tap par. Google TEST ad IDs. targetSdk 36. Poora offline.
-- **Upload:** `offline-ludo-v1.3.0.aab` (version 1.3.0, **versionCode 4**), wahi upload key (SHA-256 `F1:C8:15:EA…`). **Asli AdMob IDs wala agla version v1.4.1 / versionCode 6 hoga** (pehle v1.2.1 / code 4 likha tha).
+- **Upload:** `offline-ludo-v1.3.0.aab` (version 1.3.0, **versionCode 4**), wahi upload key (SHA-256 `F1:C8:15:EA…`). **Asli AdMob IDs wala agla version ab v1.5.1+ hoga.**
 
 ## v1.2.0 update — Roman Urdu khulasa (naya kya hai)
 
