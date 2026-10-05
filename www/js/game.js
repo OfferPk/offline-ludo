@@ -1801,7 +1801,7 @@
 
   // ---------------- match lifecycle ----------------
   function startMatch(seats, mode, offerTutorial) {
-    cancelFlow();
+    cancelFlow(); stopCelebration();
     tutorial.active = offerTutorial === true && mode === 'classic' && !tutorialSeen();
     tutorial.intro = tutorial.active; tutorial.firstMove = false;
     var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
@@ -1863,6 +1863,19 @@
       layer.appendChild(piece);
     }
   }
+  /** v1.6.3 Gulaab Camel: an original cartoon camel trots to the winner's seat and showers rose petals (cosmetic only). */
+  function celebrateWin(seat) {
+    var C = window.CamelCelebration;
+    if (!C || !G || seat == null || !G.st.seats[seat]) return;
+    var pod = podEl(seat);
+    if (!pod) return;
+    try {
+      C.play({ target: pod, anchor: pod.querySelector('.avatar') || pod, color: seatColor(seat), seat: seat, reduced: prefersReducedMotion() });
+    } catch (error) {
+      if (window.console && console.warn) console.warn('Win celebration skipped.', error);
+    }
+  }
+  function stopCelebration() { if (window.CamelCelebration) window.CamelCelebration.stop(); }
   function showResult() {
     var st = G.st, hs = humans(st), single = hs.length === 1, winner = st.ranking[0];
     var entering = !isOpen('result');
@@ -1882,11 +1895,12 @@
     $('btn-r-double').classList.toggle('hidden', !G.coins || G.doubled);
     if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
     render(); setCoins(); setLevel(); show('result');
-    if (entering) spotlightWinner(winner);
+    if (entering) { spotlightWinner(winner); celebrateWin(winner); }
   }
   /** The ONLY place an interstitial may appear: leaving the result screen after a finished match. */
   function leaveResult(dest) {
     if (!G || G.st.phase !== 'over') return;
+    stopCelebration();
     hide('result');
     var seats = G.seats, mode = G.mode;
     G = null; save.game = null; persist();
@@ -1906,7 +1920,7 @@
   // ---------------- screens ----------------
   function screen(id) { ['home', 'setup', 'game'].forEach(function (k) { $(k).classList.toggle('hidden', k !== id); }); }
   function showHome() {
-    cancelFlow(); stopTimer(); paused = false;
+    cancelFlow(); stopTimer(); paused = false; stopCelebration();
     ['result', 'menu', 'chat'].forEach(hide);
     $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
     screen('home'); updateHome(); setCoins(); setLevel();
@@ -2311,6 +2325,7 @@
   var parkedLocal = null;
   var onlineClock = null;
   var onlineExpireKey = '';
+  var onlineCelebrated = '';
   function onlineNames(names, seat) { return names && names[seat] ? names[seat] : NAMES[seat]; }
   function serverToLocal(state, mySeat, names) {
     var players = (state.players || []).map(function (n) { return Number(n); });
@@ -2396,6 +2411,11 @@
     G = { st: st, seats: st.seats, mode: 'classic', view: mySeat, online: true, undoLeft: 0, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: true, started: Date.now() };
     screen('game'); paused = false;
     buildPods(); buildTiles(); buildPieces(); layout(); render(); highlight(); paintOnlineChrome();
+    if (st.phase === 'over' && st.ranking.length) {
+      // Online win: same Gulaab Camel celebration, once per finished match.
+      var celebrateKey = st.players.join(',') + '|' + st.ranking.join(',') + '|' + (st.turnCount || 0);
+      if (onlineCelebrated !== celebrateKey) { onlineCelebrated = celebrateKey; celebrateWin(st.ranking[0]); }
+    }
     stopOnlineClock();
     onlineClock = setInterval(paintOnlineChrome, 250);
   }
@@ -2406,6 +2426,7 @@
   }
   function clearOnline() {
     stopOnlineClock();
+    if (G && G.online) stopCelebration();
     onlineHooks = null;
     onlineExpireKey = '';
     if ($('online-turn-timer')) $('online-turn-timer').classList.add('hidden');
@@ -2441,6 +2462,8 @@
     layout: layout,
     presentOnline: presentOnline,
     clearOnline: clearOnline,
-    showOnlineBoard: showOnlineBoard
+    showOnlineBoard: showOnlineBoard,
+    celebrateWin: celebrateWin,
+    get celebration() { return window.CamelCelebration ? window.CamelCelebration.state : 'idle'; }
   };
 })();

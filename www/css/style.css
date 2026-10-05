@@ -1439,3 +1439,64 @@ body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-
   .turn-banner.turn-swap, .pod.turn-arrive, .ring-shock, .ring-whoosh, .ring-home, .ring-home-gold { animation: none !important; opacity: 0 !important; }
   .tool:active, .pdice:active, .chip-v:active { transform: none; }
 }
+
+/* ---------------- v1.6.3 · Gulaab Camel win celebration (original art) ---------------- */
+.camel-cel { position: fixed; inset: 0; z-index: 75; pointer-events: none; overflow: hidden; contain: layout paint; }
+.camel-cel * { pointer-events: none; }
+.camel-cel.leaving .cc-walker { opacity: 0; transition: opacity .55s ease .1s; }
+.camel-cel.leaving .cc-garland, .camel-cel.leaving .cc-bouquet { opacity: 0; transition: opacity .9s ease .35s; }
+.cc-walker { position: absolute; left: 0; top: 0; will-change: transform; transform: translate3d(var(--x0), var(--y), 0); animation: cc-walk var(--walk, 2000ms) cubic-bezier(.33,.08,.36,1) forwards; }
+@keyframes cc-walk { from { transform: translate3d(var(--x0), var(--y), 0); } to { transform: translate3d(var(--x1), var(--y), 0); } }
+.cc-flip { width: 100%; height: 100%; }
+.cc-flip.face-left { transform: scaleX(-1); }
+.cc-camel-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.cc-camel-svg .cc-leg { transform-box: fill-box; transform-origin: 50% 0; animation: cc-leg .42s ease-in-out infinite alternate; }
+.cc-camel-svg .cc-leg-b { animation-delay: -.42s; }
+.cc-camel-svg .cc-bob { animation: cc-bob .21s ease-in-out infinite alternate; }
+.cc-camel-svg .cc-head { transform-box: fill-box; transform-origin: 10% 90%; animation: cc-nod .42s ease-in-out infinite alternate; }
+.cc-camel-svg .cc-wave { transform-box: fill-box; transform-origin: 0% 100%; animation: cc-wave .5s ease-in-out infinite alternate; }
+.cc-camel-svg .cc-shadow { transform-box: fill-box; transform-origin: 50% 50%; animation: cc-shadow .21s ease-in-out infinite alternate; }
+@keyframes cc-leg { from { transform: rotate(-17deg); } to { transform: rotate(17deg); } }
+@keyframes cc-bob { from { transform: translateY(0); } to { transform: translateY(-2.4px); } }
+@keyframes cc-nod { from { transform: rotate(-3deg); } to { transform: rotate(4deg); } }
+@keyframes cc-wave { from { transform: rotate(-10deg); } to { transform: rotate(16deg); } }
+@keyframes cc-shadow { from { transform: scaleX(1); } to { transform: scaleX(.94); } }
+.camel-cel.arrived .cc-leg, .camel-cel.arrived .cc-bob, .camel-cel.arrived .cc-shadow { animation: none; }
+.camel-cel.arrived .cc-head { animation: cc-bow 1.1s ease-in-out 2; }
+@keyframes cc-bow { 0%, 100% { transform: rotate(0); } 45% { transform: rotate(16deg); } 60% { transform: rotate(14deg); } }
+.cc-garland { position: absolute; width: 0; height: 0; }
+.cc-halo { position: absolute; left: calc(var(--cc-ring) * -1 - 6px); top: calc(var(--cc-ring) * -1 - 6px); width: calc(var(--cc-ring) * 2 + 12px); height: calc(var(--cc-ring) * 2 + 12px); border-radius: 50%; border: 2px solid color-mix(in srgb, var(--cc-color) 70%, #fff); box-shadow: 0 0 18px 2px color-mix(in srgb, var(--cc-color) 55%, transparent), inset 0 0 14px color-mix(in srgb, #ff8fab 45%, transparent); opacity: 0; transform: scale(.6); }
+.cc-garland-rose { position: absolute; left: 0; top: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px; opacity: 0; transform: translate3d(var(--gx), var(--gy), 0) scale(.2); }
+.cc-garland-rose .cc-rose { width: 100%; height: 100%; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,.45)); }
+.camel-cel.arrived .cc-halo { animation: cc-halo .5s cubic-bezier(.2,.9,.3,1.3) forwards; }
+.camel-cel.arrived .cc-garland-rose { animation: cc-garland .42s cubic-bezier(.2,.9,.3,1.4) var(--gd) forwards; }
+@keyframes cc-halo { to { opacity: 1; transform: scale(1); } }
+@keyframes cc-garland { to { opacity: 1; transform: translate3d(var(--gx), var(--gy), 0) scale(1); } }
+.cc-bouquet { position: absolute; width: 54px; height: 30px; margin-left: -27px; opacity: 0; transform: translateY(8px) scale(.5); }
+.cc-bouquet .cc-rose { position: absolute; width: 26px; height: 26px; top: 2px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.4)); }
+.cc-bouquet .b1 { left: 0; transform: rotate(-18deg); } .cc-bouquet .b2 { left: 14px; top: -4px; } .cc-bouquet .b3 { left: 28px; transform: rotate(18deg); }
+.camel-cel.arrived .cc-bouquet { animation: cc-bouquet .5s cubic-bezier(.2,.9,.3,1.4) .25s forwards; }
+@keyframes cc-bouquet { to { opacity: 1; transform: translateY(0) scale(1); } }
+.cc-petals { position: absolute; inset: 0; }
+.cc-petal { position: absolute; width: 10px; height: 13px; margin-left: -5px; border-radius: 70% 10% 70% 10%; background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--pc) 55%, #fff) 0, var(--pc) 55%, color-mix(in srgb, var(--pc) 70%, #3b0716) 100%); opacity: 0; will-change: transform, opacity; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.cc-petal.wide { width: 13px; height: 11px; border-radius: 60% 60% 50% 50% / 70% 70% 30% 30%; }
+.cc-petal.small { width: 7px; height: 9px; }
+.camel-cel.showering .cc-petal { animation: cc-petal var(--pdur, 2000ms) cubic-bezier(.35,.1,.6,1) var(--pd, 0ms) forwards; }
+@keyframes cc-petal {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) rotate(0); }
+  10% { opacity: 1; }
+  50% { transform: translate3d(var(--sway), calc(var(--fall) * .5), 0) rotate(calc(var(--rot) * .5)); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate3d(calc(var(--sway) * -.5), var(--fall), 0) rotate(var(--rot)); }
+}
+/* Reduced motion: no walking, no falling — a short static rose garland + bouquet. */
+.camel-cel.reduced .cc-halo, .camel-cel.reduced .cc-garland-rose, .camel-cel.reduced .cc-bouquet { animation: none !important; opacity: 1; }
+.camel-cel.reduced .cc-halo { transform: none; }
+.camel-cel.reduced .cc-garland-rose { transform: translate3d(var(--gx), var(--gy), 0); }
+.camel-cel.reduced .cc-bouquet { transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  .camel-cel .cc-walker, .camel-cel .cc-petals { display: none !important; }
+  .camel-cel .cc-halo, .camel-cel .cc-garland-rose, .camel-cel .cc-bouquet { animation: none !important; opacity: 1; }
+  .camel-cel .cc-garland-rose { transform: translate3d(var(--gx), var(--gy), 0); }
+  .camel-cel .cc-halo, .camel-cel .cc-bouquet { transform: none; }
+}
