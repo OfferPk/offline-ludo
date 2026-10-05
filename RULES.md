@@ -53,8 +53,11 @@ off in Settings. Undo is only offered for human rolls.
 
 ## Tokens
 
-Each of a seat's four tokens is numbered **1–4** on the token body so you can tell them apart. Tokens also
-carry a soft firefly-style (jugnu) glow that slowly pulses — cosmetic only.
+Tokens are circular **3D layered hero pieces** (original Crossfour art): metallic outer rim, crystal/glass
+body, bevel and reflection, soft contact shadow, and an embossed raised number **1–4**. Seat materials:
+Coral = ruby + rose-gold rim, Jade = emerald + silver/green rim, Saffron = gold crystal + golden rim,
+Cobalt = sapphire + silver/blue rim. A soft firefly-style (jugnu) glow pulses tastefully — cosmetic only.
+(Token evolution levels Lv1–Lv5 ship in a later release.)
 
 ## Decision countdown (offline)
 
