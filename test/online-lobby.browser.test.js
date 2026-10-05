@@ -399,13 +399,41 @@ function startLocalServer() {
     await page.waitForSelector('#home:not(.hidden)');
     assert.deepEqual(sdkRequests, [], 'offline-first startup does not download the Supabase SDK');
     assert.equal(await page.$eval('#online', el => el.classList.contains('hidden')), true, 'online screen stays hidden at startup');
-    await page.click('#btn-online');
+    for (const [width, height] of [[320, 568], [320, 844], [360, 844], [390, 844]]) {
+      await page.setViewport({ width, height, isMobile: true, hasTouch: true });
+      const entry = await page.$eval('#btn-online-chess', button => {
+        const rect = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        const title = document.getElementById(button.getAttribute('aria-labelledby'));
+        const description = document.getElementById(button.getAttribute('aria-describedby'));
+        return {
+          tag: button.tagName, type: button.type, title: title && title.textContent.trim(),
+          description: description && description.textContent.trim(),
+          visible: getComputedStyle(button).display !== 'none' && getComputedStyle(button).visibility === 'visible' && rect.width > 0 && rect.height > 0 && rect.top >= 0 && rect.bottom <= innerHeight,
+          hitTarget: hit === button || button.contains(hit), width: rect.width, height: rect.height,
+          overflow: document.documentElement.scrollWidth > innerWidth
+        };
+      });
+      const label = width + '×' + height;
+      assert.equal(entry.tag + ':' + entry.type, 'BUTTON:button', label + ': Chess entry uses a native button');
+      assert.equal(entry.title, 'Ludo Chess', label + ': first-screen card has a clear accessible Chess name');
+      assert.match(entry.description, /Online Rooms.*2 players/i, label + ': card describes the online two-player route');
+      assert.equal(entry.visible, true, label + ': Chess entry is visible above the fold');
+      assert.equal(entry.hitTarget, true, label + ': the center of the card is a working tap target');
+      assert.ok(entry.height >= 44, label + ': home card meets the 44px mobile target height');
+      assert.equal(entry.overflow, false, label + ': the home screen has no horizontal overflow');
+    }
+    await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    await page.click('#btn-online-chess');
     await page.waitForSelector('#online:not(.hidden)');
     await page.waitForFunction(() => window.__mockBackend.clientCalls.length === 1);
+    assert.equal(await page.$eval('#online-mode', el => el.value), 'ludo_chess', 'the Chess home entry opens the existing online lobby with Ludo Chess selected');
+    assert.equal(await page.$eval('#online-capacity', el => el.value + ':' + el.disabled), '2:true', 'the Chess entry preserves the online mode two-seat requirement');
     assert.match(await page.$eval('#online-auth-panel', el => el.textContent), /sign in immediately; no confirmation link is required/i);
     assert.equal(await page.$eval('#online-email', el => el.value), '', 'email is not prefilled or hardcoded in the portal');
     assert.equal(await page.$eval('#online-signin', el => el.disabled), false, 'verified email/password auth enables sign-in');
     assert.equal(await page.$eval('#online-signup', el => el.disabled), false, 'enabled project signup enables account creation');
+    await page.select('#online-mode', 'classic');
     const clientConfig = await page.evaluate(() => window.__mockBackend.clientCalls[0]);
     assert.equal(clientConfig.url, 'https://exggyvbsqhoasrqgzerf.supabase.co', 'client is constructed for the dedicated Online Ludo project');
     assert.equal(clientConfig.options.auth.flowType, 'pkce', 'browser auth uses PKCE');
@@ -1079,6 +1107,63 @@ function startLocalServer() {
     await page.click('#btn-vs-ai');
     await page.waitForSelector('#setup:not(.hidden)');
     assert.equal(await page.$eval('#btn-online', el => !!el), true, 'offline game setup remains reachable after online sign-out');
+    await page.click('#btn-setup-back');
+    await page.waitForSelector('#home:not(.hidden)');
+    await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    const discoveryPreviewDir = path.resolve(__dirname, '../../artifacts/ludo-chess-discovery-preview');
+    fs.mkdirSync(discoveryPreviewDir, { recursive: true });
+    await page.screenshot({ path: path.join(discoveryPreviewDir, 'mobile-home-ludo-chess.png') });
+    await page.click('#btn-online-chess');
+    await page.waitForFunction(() => !document.querySelector('#online').classList.contains('hidden') && document.querySelector('#online-mode').value === 'ludo_chess');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.tables.rooms = state.tables.rooms.filter(row => row.id !== 'chess-room');
+      state.tables.room_members = state.tables.room_members.filter(row => row.room_id !== 'chess-room');
+      state.tables.room_invites = state.tables.room_invites.filter(row => row.room_id !== 'chess-room');
+      state.tables.ludo_chess_matches = state.tables.ludo_chess_matches.filter(row => row.room_id !== 'chess-room');
+    });
+    await page.click('#online-create-room');
+    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats' && document.querySelector('#online-room-status').textContent.includes('Waiting'));
+    await page.click('#online-ready');
+    await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
+    await page.click('#online-start-room');
+    await page.waitForFunction(() => !document.querySelector('#online-chess-screen').classList.contains('hidden') && document.querySelectorAll('#online-chess-board [data-square]').length === 64);
+    for (const [width, height, squareIndex] of [[320, 568, 52], [320, 844, 53], [360, 844, 54], [390, 844, 55]]) {
+      await page.setViewport({ width, height, isMobile: true, hasTouch: true });
+      await page.evaluate(compactHeight => {
+        const screen = document.querySelector('#online-chess-screen');
+        screen.scrollTop = 0;
+        if (compactHeight < 700) document.querySelector('#online-chess-board').scrollIntoView({ block: 'center' });
+      }, height);
+      const geometry = await page.evaluate(index => {
+        const screen = document.querySelector('#online-chess-screen');
+        const header = document.querySelector('.online-chess-header');
+        const board = document.querySelector('#online-chess-board');
+        const frame = board.closest('.online-chess-board-frame');
+        const square = board.querySelector('[data-square="' + index + '"]');
+        const b = board.getBoundingClientRect(), f = frame.getBoundingClientRect(), s = square.getBoundingClientRect(), h = header.getBoundingClientRect();
+        const hit = document.elementFromPoint(s.left + s.width / 2, s.top + s.height / 2);
+        return {
+          viewport: innerWidth, documentWidth: document.documentElement.scrollWidth,
+          screenWidth: screen.getBoundingClientRect().width, board: { left: b.left, right: b.right, top: b.top, bottom: b.bottom, width: b.width, height: b.height },
+          frameCenter: f.left + f.width / 2, square: { width: s.width, height: s.height },
+          rows: [...board.children].map(row => row.children.length), headerBottom: h.bottom,
+          hitSquare: !!hit && hit.closest('[data-square]') === square,
+          visible: !board.closest('#online-chess-screen').classList.contains('hidden') && b.width > 0 && b.top >= h.bottom && b.bottom <= innerHeight
+        };
+      }, squareIndex);
+      assert.equal(geometry.documentWidth <= width, true, width + 'px: Chess play screen has no horizontal overflow');
+      assert.ok(geometry.board.left >= 0 && geometry.board.right <= width, width + 'px: centered board fits inside the phone viewport');
+      assert.ok(Math.abs(geometry.board.width - geometry.board.height) <= 1, width + 'px: chess surface remains square');
+      assert.ok(Math.abs((geometry.board.left + geometry.board.width / 2) - geometry.frameCenter) <= 2, width + 'px: 8×8 board is centered in its frame');
+      assert.deepEqual(geometry.rows, Array(8).fill(8), width + 'px: rendered play surface has exactly 8 rows × 8 columns');
+      assert.ok(geometry.square.width >= 24 && geometry.square.height >= 24, width + 'px: each square retains a practical touch target');
+      assert.equal(geometry.hitSquare, true, width + 'px: a touch at the square center resolves to the intended board cell');
+      assert.equal(geometry.visible, true, width + 'px: board is visible below the flowing header without overlay');
+      await page.touchscreen.tap(geometry.board.left + geometry.board.width * ((squareIndex % 8) + .5) / 8, geometry.board.top + geometry.board.height * (Math.floor(squareIndex / 8) + .5) / 8);
+      await page.waitForFunction(index => document.querySelector('#online-chess-board [data-square="' + index + '"]').getAttribute('aria-selected') === 'true', {}, squareIndex);
+    }
+    await page.screenshot({ path: path.join(discoveryPreviewDir, 'mobile-ludo-chess.png') });
     assert.deepEqual(errors, [], 'page has no uncaught JavaScript errors');
     console.log('Online Ludo deterministic browser test passed (mocked Auth, Classic/Chess refresh recovery and rejoin, active-room discovery, stale snapshots, auth changes, clean leave, mobile preview, and offline fallback).');
   } finally {
