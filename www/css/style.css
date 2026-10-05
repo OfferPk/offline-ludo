@@ -1175,7 +1175,11 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .home-actions { --card-h: 108px; --card-gap: 10px; }
 .mode-card { min-height: var(--card-h); }
 .howto-card { grid-column: 1 / -1; box-sizing: border-box; width: 100%; height: calc(var(--card-h) * 2 + var(--card-gap)); min-height: calc(var(--card-h) * 2 + var(--card-gap)); max-height: calc(var(--card-h) * 2 + var(--card-gap)); display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 16px; overflow: hidden; color: var(--ink); background: linear-gradient(145deg, rgba(80,255,230,.08), rgba(20,24,32,.2)); border: 1.5px solid #7ef9ff; box-shadow: 0 0 6px #39fff2, 0 0 16px rgba(0,255,220,.55), inset 0 0 10px rgba(80,255,240,.18); }
-.howto-card h2 { margin: 0; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+.howto-open { appearance: none; width: 100%; min-height: 44px; margin: 0; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(126,249,255,.55); color: #e9fbff; background: rgba(8,18,24,.45); font: inherit; font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.howto-open:focus-visible { outline: 3px solid #9ad9ff; outline-offset: 2px; }
+.howto-panel { min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.howto-panel.hidden { display: none; }
+.howto-panel-title { margin: 0; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
 .howto-scroll { min-height: 0; flex: 1; overflow: auto; }
 .howto-table { width: 100%; border-collapse: collapse; font-size: 11px; line-height: 1.25; }
 .howto-table th { text-align: left; position: sticky; top: 0; background: #141820; color: #9ad9ff; }

@@ -39,12 +39,19 @@ function startLocalServer() {
       const width = cards[1].right - cards[0].left;
       const height = cards[3].bottom - cards[0].top;
       const glow = getComputedStyle(document.getElementById('howto-card')).boxShadow;
-      return { width, height, cardW: howto.width, cardH: howto.height, glow, rows: document.querySelectorAll('#howto-card tbody tr').length };
+      const button = document.getElementById('btn-howto-home');
+      const panel = document.getElementById('howto-panel');
+      return { width, height, cardW: howto.width, cardH: howto.height, glow, rows: document.querySelectorAll('#howto-card tbody tr').length, inside: button && button.parentElement === document.getElementById('howto-card'), closed: panel.classList.contains('hidden') };
     });
     assert.ok(Math.abs(size.cardW - size.width) < 2, 'howto card width ' + size.cardW + ' vs ' + size.width);
     assert.ok(Math.abs(size.cardH - size.height) < 2, 'howto card height ' + size.cardH + ' vs ' + size.height);
     assert.ok(/rgb\(/.test(size.glow) || size.glow !== 'none', 'howto card has a glow');
+    assert.equal(size.inside, true, 'How to play button is inside the card');
+    assert.equal(size.closed, true, 'Rule | Kaise stays closed until the inner button is tapped');
     assert.equal(size.rows, 9, 'Rule / Kaise rows');
+    await page.click('#btn-howto-home');
+    const opened = await page.evaluate(() => !document.getElementById('howto-panel').classList.contains('hidden') && document.getElementById('btn-howto-home').getAttribute('aria-expanded') === 'true');
+    assert.equal(opened, true, 'the inner button opens Rule | Kaise');
     await page.evaluate(() => {
       const L = window.__cf.logic;
       const deadline = Date.now() + 45000;

@@ -1575,6 +1575,12 @@
   $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); show('stats'); });
   $('btn-skins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   $('btn-rules').addEventListener('click', function () { SFX.unlock(); SFX.click(); openRules('basics'); });
+  if ($('btn-howto-home')) $('btn-howto-home').addEventListener('click', function () {
+    SFX.click();
+    var panel = $('howto-panel'); if (!panel) return;
+    var open = panel.classList.toggle('hidden') === false;
+    this.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
   each($('rules-tabs').children, function (b) { b.addEventListener('click', function () { SFX.click(); openRules(b.dataset.tab); }); });
   $('btn-settings').addEventListener('click', function () { SFX.unlock(); SFX.click(); syncSettingsUI(); show('settings'); });
   $('btn-game-settings').addEventListener('click', function () { SFX.click(); syncSettingsUI(); show('settings'); });
