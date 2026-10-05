@@ -51,10 +51,25 @@ again (earlier chips of the same turn are kept). Each match gives **3 free undos
 undo is available only if **you** tap it and choose to watch an optional rewarded ad. Undo can be turned
 off in Settings. Undo is only offered for human rolls.
 
+## Tokens
+
+Each of a seat's four tokens is numbered **1–4** on the token body so you can tell them apart. Tokens also
+carry a soft firefly-style (jugnu) glow that slowly pulses — cosmetic only.
+
+## Decision countdown (offline)
+
+Offline vs AI and Pass & Play human seats get a **4-second** move countdown (4…3…2…1). If you do not
+act, Crossfour auto-plays the best move: prefer a capture with either stacked die, else open from the
+yard with a 6 when possible, else the hard AI heuristic. Online Classic keeps its own 45 s server clock.
+
+When you have stacked rolls (e.g. 6 and 4) and tap a token that can use more than one of them, a
+premium die-number picker appears on that token so you can choose which number to apply. Only legal
+options for that token are shown.
+
 ## Turn timer (optional)
 
 Off by default. When on, a human player has 20 seconds per decision (a ring drains round their avatar);
-when it runs out, a sensible move is played for them.
+when it runs out, a sensible move is played for them. The 4-second offline countdown above still applies.
 
 ## Online Classic
 

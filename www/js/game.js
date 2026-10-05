@@ -14,7 +14,7 @@
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
   var ACCENT = { graphite: ['#f4b740', '#1c1504'], linen: ['#2b3140', '#ffffff'], walnut: ['#e0a232', '#231605'], aurora: ['#27e0b3', '#03261d'], midnight: ['#6aa8ff', '#071018'], timber: ['#c47a32', '#2a1808'] };
   var CORE_LIGHTS = ['#ffd0c1', '#a0ffd2', '#ffe7a3', '#a9ddff'];
-  var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, FREE_UNDOS = 3;
+  var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, MOVE_DECIDE_MS = 4000, FREE_UNDOS = 3;
   var PHRASES = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!'];
 
   // ---------------- save ----------------
@@ -642,40 +642,46 @@
       var col = seatColor(s);
       for (var i = 0; i < G.st.pieces[s].length; i++) {
         var el = document.createElement('button'); el.type = 'button'; el.className = 'pc';
-        el.innerHTML = '<svg class="gem-token" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
-          '<defs><linearGradient id="gem-body-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--pcl)" stop-opacity=".96"/><stop offset=".42" stop-color="var(--pcd)" stop-opacity=".94"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity=".99"/></linearGradient>' +
-          '<linearGradient id="gem-sheen-' + s + '-' + i + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".38" stop-color="#fff" stop-opacity=".12"/><stop offset=".72" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".18"/></linearGradient>' +
-          '<linearGradient id="gem-metal-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".45" stop-color="var(--pcl)" stop-opacity=".35"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity=".55"/></linearGradient>' +
-          '<radialGradient id="gem-core-' + s + '-' + i + '" cx="50%" cy="42%" r="62%"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".18" stop-color="var(--pccore)" stop-opacity=".98"/><stop offset=".55" stop-color="var(--pccore)" stop-opacity=".72"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient></defs>' +
+        var tokNum = i + 1;
+        el.innerHTML = '<i class="jugnu" aria-hidden="true"></i><svg class="gem-token" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+          '<defs><linearGradient id="gem-body-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--pcl)" stop-opacity=".98"/><stop offset=".38" stop-color="var(--pcd)" stop-opacity=".95"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity="1"/></linearGradient>' +
+          '<linearGradient id="gem-sheen-' + s + '-' + i + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".68"/><stop offset=".32" stop-color="#fff" stop-opacity=".22"/><stop offset=".62" stop-color="#fff" stop-opacity=".04"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></linearGradient>' +
+          '<linearGradient id="gem-metal-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".4" stop-color="var(--pcl)" stop-opacity=".42"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity=".62"/></linearGradient>' +
+          '<linearGradient id="gem-rim-lit-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".55" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="var(--pcl)" stop-opacity=".15"/></linearGradient>' +
+          '<radialGradient id="gem-core-' + s + '-' + i + '" cx="48%" cy="38%" r="64%"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".16" stop-color="var(--pccore)" stop-opacity="1"/><stop offset=".52" stop-color="var(--pccore)" stop-opacity=".78"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient>' +
+          '<radialGradient id="gem-jugnu-' + s + '-' + i + '" cx="50%" cy="42%" r="55%"><stop offset="0" stop-color="#fff" stop-opacity=".95"/><stop offset=".35" stop-color="var(--pccore)" stop-opacity=".7"/><stop offset="1" stop-color="var(--pc)" stop-opacity="0"/></radialGradient></defs>' +
+          '<ellipse class="gem-jugnu-glow" style="fill:url(#gem-jugnu-' + s + '-' + i + ')" cx="12" cy="11" rx="11.2" ry="11.8"/>' +
           '<ellipse class="gem-ground" cx="12" cy="20.4" rx="10.6" ry="3.35"/>' +
           '<path class="gem-pad" d="M5.1 17.05 18.9 17.05 17.25 22.65 6.75 22.65Z"/>' +
           '<ellipse class="gem-shadow" cx="12" cy="21.25" rx="8.2" ry="1.7"/>' +
           '<path class="gem-body" style="fill:url(#gem-body-' + s + '-' + i + ')" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
           '<path class="gem-rim-outer" d="M12 1.2 19.05 5.05 16.9 12.55 12 18.55 7.1 12.55 4.95 5.05Z"/>' +
-          '<path class="gem-rim" d="M12 1.55 18.7 5.2 16.65 12.35 12 17.95 7.35 12.35 5.3 5.2Z"/>' +
+          '<path class="gem-rim" style="stroke:url(#gem-rim-lit-' + s + '-' + i + ')" d="M12 1.55 18.7 5.2 16.65 12.35 12 17.95 7.35 12.35 5.3 5.2Z"/>' +
           '<path class="gem-facet gem-facet-light" d="M12 1.1 12 13.6 7 12.6 4.8 5Z"/>' +
           '<path class="gem-facet gem-facet-dark" d="M12 1.1 19.2 5 17 12.6 12 13.6Z"/>' +
           '<path class="gem-facet gem-facet-side" d="M7 12.6 12 13.6 9.5 16.3Z"/>' +
           '<path class="gem-facet gem-facet-base" d="M7 12.6 12 13.6 17 12.6 12 18.7Z"/>' +
           '<path class="gem-sheen" style="fill:url(#gem-sheen-' + s + '-' + i + ')" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
           '<path class="gem-bevel" style="stroke:url(#gem-metal-' + s + '-' + i + ')" d="M12 1.7 18.4 5.25 16.5 12.2 12 17.5 7.5 12.2 5.6 5.25Z"/>' +
-          '<ellipse class="gem-core" style="fill:url(#gem-core-' + s + '-' + i + ')" cx="12" cy="9.0" rx="3.25" ry="4.25"/>' +
-          '<ellipse class="gem-glint-soft" cx="9.0" cy="6.1" rx="3.7" ry="2.35"/>' +
-          '<path class="gem-glint" d="M5.85 5.05 10.55 2.55 8.35 6.9 6.55 7.55Z"/>' +
-          '<path class="gem-spec" d="M7.2 3.9 11.1 2.15 10.55 3.55 8.05 5.05Z"/>' +
+          '<ellipse class="gem-core" style="fill:url(#gem-core-' + s + '-' + i + ')" cx="12" cy="8.85" rx="3.35" ry="4.35"/>' +
+          '<ellipse class="gem-glint-soft" cx="8.85" cy="5.9" rx="3.9" ry="2.45"/>' +
+          '<path class="gem-glint" d="M5.75 4.95 10.65 2.4 8.4 6.85 6.45 7.5Z"/>' +
+          '<path class="gem-spec" d="M7.05 3.75 11.2 1.95 10.6 3.4 7.95 4.95Z"/>' +
+          '<circle class="gem-num-disc" cx="12" cy="11.15" r="4.15"/>' +
+          '<text class="gem-num" x="12" y="13.05" text-anchor="middle">' + tokNum + '</text>' +
           '<circle class="gem-shield" cx="12" cy="10.2" r="9.3"/>' +
           '<path class="gem-shield-glint" d="M6.1 8.2c1.2-3.4 4-5.1 7.3-5.3"/>' +
           '<path class="gem-frost-wash" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
           '<path class="gem-frost-crack" d="m14.4 4.6-2 3.2 1.5 1.6-2.2 2.3 1.2 2.6-2.1 2.1"/>' +
           '</svg><i class="crown">' + ART.icon('crown', 16) + '</i>';
         el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45)); el.style.setProperty('--pccore', CORE_LIGHTS[s]);
-        el.dataset.seat = s; el.dataset.piece = i;
+        el.style.setProperty('--jugnu-delay', ((s * 0.37 + i * 0.55) % 2.8).toFixed(2) + 's');
+        el.dataset.seat = s; el.dataset.piece = i; el.dataset.num = String(tokNum);
+        el.setAttribute('aria-label', NAMES[s] + ' token ' + tokNum);
         el.addEventListener('click', function (e) {
           if (e.detail !== 0 || !G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn)) return;
           var seat = +this.dataset.seat, piece = +this.dataset.piece;
-          var pool = G.sel != null && chipMoves(G.sel).length ? chipMoves(G.sel) : G.st.moves;
-          var m = pool.filter(function (x) { return x.seat === seat && x.piece === piece; })[0];
-          if (m) { SFX.unlock(); doMove(m.piece, m.v, true); }
+          if (handleTokenTap(seat, piece, true)) return;
         });
         box.appendChild(el); pieceEls[s].push(el);
       }
@@ -732,6 +738,7 @@
     });
     layoutTiles();
     layoutTrail();
+    if (diePick) placeDiePick(diePick.seat, diePick.piece);
   }
   function layout() {
     var stage = $('stage'); if (!stage || $('game').classList.contains('hidden')) return;
@@ -765,8 +772,11 @@
   // ---------------- flow control ----------------
   var runToken = 0, timers = [], busy = false, paused = false, keyboardRoll = false;
   var autoRollTk = null, autoRollKey = null, autoRollDeadline = 0, autoRollRemaining = null;
+  var moveDecideTk = null, moveDecideTick = null, moveDecideLeft = 0, moveDecideKey = null;
+  var diePick = null; // { seat, piece, values: number[] } when a multi-die token picker is open
+  var lastTurnFx = -1;
   function later(fn, ms) { var tk = runToken; var id = setTimeout(function () { var k = timers.indexOf(id); if (k >= 0) timers.splice(k, 1); if (tk === runToken) fn(); }, ms); timers.push(id); return id; }
-  function cancelFlow() { stopAutoRollTimer(false); runToken++; timers.forEach(function (id) { clearTimeout(id); clearInterval(id); }); timers = []; Object.keys(activeMotions).forEach(function (id) { var motion = activeMotions[id]; if (motion && motion.cancel) motion.cancel(); }); activeMotions = {}; moving = {}; busy = false; keyboardRoll = false; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
+  function cancelFlow() { stopAutoRollTimer(false); stopMoveDecide(false); hideDiePick(); lastTurnFx = -1; runToken++; timers.forEach(function (id) { clearTimeout(id); clearInterval(id); }); timers = []; Object.keys(activeMotions).forEach(function (id) { var motion = activeMotions[id]; if (motion && motion.cancel) motion.cancel(); }); activeMotions = {}; moving = {}; busy = false; keyboardRoll = false; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
   function gameVisible() { return !$('game').classList.contains('hidden') && document.visibilityState === 'visible'; }
   function humans(st) { return st.players.filter(function (s) { return st.seats[s].type === 'human'; }); }
   function hasAI(st) { return st.players.some(function (s) { return st.seats[s].type === 'ai'; }); }
@@ -936,6 +946,7 @@
       banner.classList.toggle('is-live', !over);
       banner.classList.toggle('is-mine', !over && isHuman(s));
     }
+    if (!over && !busy) turnChangeFx(s);
     if (over) lbl.innerHTML = 'Match over';
     else {
       var faceV = Math.min(6, Math.max(1, +(st.faces && st.faces[s]) || 1));
@@ -973,13 +984,126 @@
     else if (G.st.phase === 'move') target = document.querySelector('#pieces .pc.can');
     if (target && !target.disabled) target.focus();
   }
+  // ---------------- token die picker (multi stacked rolls) ----------------
+  function tokenDieMoves(seat, piece) {
+    var seen = {}, out = [];
+    (G.st.moves || []).forEach(function (m) {
+      if (m.seat !== seat || m.piece !== piece || seen[m.v]) return;
+      seen[m.v] = 1; out.push(m);
+    });
+    out.sort(function (a, b) { return b.v - a.v; });
+    return out;
+  }
+  function hideDiePick() {
+    diePick = null;
+    var el = $('token-die-pick');
+    if (el) { el.classList.add('hidden'); el.innerHTML = ''; el.removeAttribute('data-seat'); el.removeAttribute('data-piece'); }
+    each(document.querySelectorAll('.pc.picking'), function (e) { e.classList.remove('picking'); });
+  }
+  function placeDiePick(seat, piece) {
+    var el = $('token-die-pick'), pos = piecePos[seat + '-' + piece];
+    if (!el || !pos) return;
+    el.style.transform = 'translate(' + pos.x.toFixed(1) + 'px,' + (pos.y - CELL * 0.72).toFixed(1) + 'px)';
+  }
+  function showDiePick(seat, piece, moves) {
+    var el = $('token-die-pick'); if (!el) return;
+    hideDiePick();
+    diePick = { seat: seat, piece: piece, values: moves.map(function (m) { return m.v; }) };
+    var html = '<div class="token-die-card" role="group" aria-label="Choose die number for this token">';
+    moves.forEach(function (m) {
+      html += '<button type="button" class="token-die-v" data-v="' + m.v + '" aria-label="Move with ' + m.v + '">' + m.v + '</button>';
+    });
+    html += '<button type="button" class="token-die-x" aria-label="Cancel">×</button></div>';
+    el.innerHTML = html;
+    el.dataset.seat = seat; el.dataset.piece = piece;
+    el.classList.remove('hidden');
+    placeDiePick(seat, piece);
+    var tok = pieceEls[seat] && pieceEls[seat][piece]; if (tok) tok.classList.add('picking');
+    $('hint').textContent = 'Pick ' + moves.map(function (m) { return m.v; }).join(' or ') + ' for this token';
+  }
+  function handleTokenTap(seat, piece, keyboard) {
+    if (!G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn) || G.online) return false;
+    var opts = tokenDieMoves(seat, piece);
+    if (!opts.length) return false;
+    // Multi-die for this token: open the premium picker (overrides chip selection).
+    if (opts.length > 1) {
+      SFX.click();
+      if (diePick && diePick.seat === seat && diePick.piece === piece) { hideDiePick(); return true; }
+      showDiePick(seat, piece, opts);
+      return true;
+    }
+    // Single legal value: spend the selected chip if it matches, otherwise that only value.
+    if (G.sel != null && chipMoves(G.sel).some(function (m) { return m.seat === seat && m.piece === piece; })) {
+      hideDiePick(); SFX.unlock(); doMove(piece, G.sel, !!keyboard); return true;
+    }
+    hideDiePick(); SFX.unlock(); doMove(opts[0].piece, opts[0].v, !!keyboard); return true;
+  }
+
+  // ---------------- 4s move decision countdown ----------------
+  function setMoveCountdownVisual(n) {
+    var el = $('move-countdown'); if (!el) return;
+    if (n == null || n <= 0) { el.classList.add('hidden'); el.textContent = ''; return; }
+    el.textContent = String(n);
+    el.classList.remove('hidden');
+    el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+  }
+  function stopMoveDecide(keepVisual) {
+    if (moveDecideTk) {
+      clearTimeout(moveDecideTk);
+      var k = timers.indexOf(moveDecideTk); if (k >= 0) timers.splice(k, 1);
+      moveDecideTk = null;
+    }
+    if (moveDecideTick) {
+      clearInterval(moveDecideTick);
+      var k2 = timers.indexOf(moveDecideTick); if (k2 >= 0) timers.splice(k2, 1);
+      moveDecideTick = null;
+    }
+    moveDecideLeft = 0; moveDecideKey = null;
+    if (!keepVisual) setMoveCountdownVisual(null);
+  }
+  function autoPlayBestMove() {
+    if (!G || busy || paused || G.online || G.st.phase !== 'move' || !isHuman(G.st.turn)) return;
+    hideDiePick();
+    var c = L.bestAutoMove(G.st, 'hard');
+    if (!c) return;
+    toast('Auto-play · ' + c.v, 900);
+    doMove(c.piece, c.v);
+  }
+  function startMoveDecide() {
+    var st = G && G.st;
+    stopMoveDecide(false);
+    if (!st || G.online || st.phase !== 'move' || !isHuman(st.turn) || busy || paused || tutorial.intro || !gameVisible() || isOpen('confirm')) return;
+    var key = st.turn + ':' + st.rolls + ':' + st.turnCount + ':' + (st.queue || []).join(',');
+    moveDecideKey = key;
+    moveDecideLeft = 4;
+    setMoveCountdownVisual(4);
+    var tk = runToken;
+    moveDecideTick = setInterval(function () {
+      if (tk !== runToken || !G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn) || moveDecideKey !== key) { stopMoveDecide(false); return; }
+      moveDecideLeft -= 1;
+      if (moveDecideLeft >= 1) setMoveCountdownVisual(moveDecideLeft);
+      else setMoveCountdownVisual(null);
+    }, 1000);
+    timers.push(moveDecideTick);
+    moveDecideTk = later(function () {
+      moveDecideTk = null;
+      if (moveDecideTick) { clearInterval(moveDecideTick); var k = timers.indexOf(moveDecideTick); if (k >= 0) timers.splice(k, 1); moveDecideTick = null; }
+      setMoveCountdownVisual(null);
+      if (!G || busy || paused || !gameVisible() || isOpen('confirm') || G.st.phase !== 'move' || !isHuman(G.st.turn) || moveDecideKey !== key) return;
+      moveDecideKey = null;
+      autoPlayBestMove();
+    }, MOVE_DECIDE_MS);
+  }
+
   function offerMoves() {
     var st = G.st; if (st.phase !== 'move' || !isHuman(st.turn)) return;
+    hideDiePick();
     render(); highlight();
     if (keyboardRoll) { var target = document.querySelector('#pieces .pc.can'); if (target) target.focus(); keyboardRoll = false; }
     var distinct = L.distinctMoves(st.moves);
     if (save.settings.auto && distinct.length === 1 && !undoActive()) { var m = distinct[0]; later(function () { doMove(m.piece, m.v); }, save.settings.fast ? 220 : 420); return; }
-    startTimer();
+    startTimer(); // optional 20s setting (legacy); 4s decide always runs below for offline humans
+    startMoveDecide();
   }
 
   // ---------------- turn timer (optional) ----------------
@@ -1107,7 +1231,9 @@
       }
       if (die) { die.classList.remove('rolling'); die.classList.add('show-flat'); }
       setDiceFace(s, v, true);
-      SFX.land(v === 6); haptic('light'); cb();
+      SFX.land(v === 6); haptic(v === 6 ? 'medium' : 'light');
+      if (v === 6) sixFlourish(s);
+      cb();
     }, dur);
   }
 
@@ -1189,20 +1315,98 @@
     });
   }
 
-  // ---------------- effects ----------------
+  // ---------------- effects (WebView-safe: transform/opacity; respects reduced motion) ----------------
+  function fxOk() { return !prefersReducedMotion(); }
   function fxEl(cls, x, y) { var e = document.createElement('i'); e.className = cls; e.style.left = x + 'px'; e.style.top = y + 'px'; $('fx').appendChild(e); return e; }
   function burst(x, y, col, n) {
+    if (!fxOk()) return;
+    n = Math.min(n || 12, 22);
     for (var k = 0; k < n; k++) {
-      var e = fxEl('burst', x, y), a = k / n * Math.PI * 2 + Math.random() * 0.4, d = CELL * (1 + Math.random() * 1.2);
+      var e = fxEl('burst', x, y), a = k / n * Math.PI * 2 + Math.random() * 0.35, d = CELL * (0.9 + Math.random() * 1.35);
       e.style.background = col; e.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px'); e.style.setProperty('--dy', (Math.sin(a) * d).toFixed(1) + 'px');
-      setTimeout(function (el) { el.remove(); }.bind(null, e), 700);
+      if (k % 3 === 0) e.classList.add('burst-star');
+      setTimeout(function (el) { el.remove(); }.bind(null, e), 780);
     }
   }
-  function ring(x, y, col) { var e = fxEl('ring', x, y); e.style.setProperty('--rc', col); setTimeout(function () { e.remove(); }, 600); }
-  function floatAt(x, y, txt) { var e = document.createElement('div'); e.className = 'float'; e.style.left = x + 'px'; e.style.top = y + 'px'; e.textContent = txt; $('fx').appendChild(e); setTimeout(function () { e.remove(); }, 1000); }
-  function bolt(x, y) { var e = fxEl('bolt', x, y); e.innerHTML = ART.icon('zap', 40); setTimeout(function () { e.remove(); }, 700); }
-  function iconPop(x, y, id, cls) { var e = fxEl('iconpop ' + (cls || ''), x, y); e.innerHTML = ART.icon(id, 30); setTimeout(function () { e.remove(); }, 900); }
-  function shake() { var w = $('board-wrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); }
+  function ring(x, y, col, cls) {
+    if (!fxOk()) return;
+    var e = fxEl('ring' + (cls ? ' ' + cls : ''), x, y); e.style.setProperty('--rc', col);
+    setTimeout(function () { e.remove(); }, 700);
+  }
+  function floatAt(x, y, txt, cls) {
+    var e = document.createElement('div'); e.className = 'float' + (cls ? ' ' + cls : '');
+    e.style.left = x + 'px'; e.style.top = y + 'px'; e.textContent = txt; $('fx').appendChild(e);
+    setTimeout(function () { e.remove(); }, cls && cls.indexOf('big') >= 0 ? 1400 : 1100);
+  }
+  function bolt(x, y) { if (!fxOk()) return; var e = fxEl('bolt', x, y); e.innerHTML = ART.icon('zap', 40); setTimeout(function () { e.remove(); }, 700); }
+  function iconPop(x, y, id, cls) { if (!fxOk()) return; var e = fxEl('iconpop ' + (cls || ''), x, y); e.innerHTML = ART.icon(id, 30); setTimeout(function () { e.remove(); }, 900); }
+  function shake() { if (!fxOk()) return; var w = $('board-wrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); }
+  /** Soft kill/capture burst — more particles + shockwave, still transform-only. */
+  function killBurst(x, y, attackerCol, victimCol) {
+    if (!fxOk()) return;
+    burst(x, y, victimCol || attackerCol, 18);
+    burst(x, y, attackerCol, 10);
+    ring(x, y, attackerCol, 'ring-shock');
+    var flash = fxEl('kill-flash', x, y); flash.style.setProperty('--rc', attackerCol);
+    setTimeout(function () { flash.remove(); }, 480);
+  }
+  /** Six-roll flourish on the active die pod. */
+  function sixFlourish(seat) {
+    if (!fxOk()) return;
+    var die = diceBtn(seat), pod = podEl(seat);
+    if (die) { die.classList.remove('six-pop'); void die.offsetWidth; die.classList.add('six-pop'); later(function () { if (die) die.classList.remove('six-pop'); }, 900); }
+    if (pod) {
+      var r = pod.getBoundingClientRect(), br = $('board-wrap').getBoundingClientRect();
+      var x = r.left + r.width / 2 - br.left, y = r.top + r.height / 2 - br.top;
+      burst(x, y, seatColor(seat), 12);
+      floatAt(x, y - 18, '6!', 'float-six');
+    }
+  }
+  /** Safe-square landing pulse under the token. */
+  function safePulse(x, y, col) {
+    if (!fxOk()) return;
+    var e = fxEl('safe-pulse', x, y); e.style.setProperty('--rc', col || '#fff');
+    setTimeout(function () { e.remove(); }, 700);
+  }
+  /** Arrow jump whoosh along the jump path. */
+  function arrowWhoosh(seat, piece, path) {
+    if (!fxOk() || !path || path.length < 2) return;
+    var from = center(L.cellOf(seat, path[path.length - 1 - (L.ARROW_JUMP || 4)], piece));
+    var to = center(L.cellOf(seat, path[path.length - 1], piece));
+    var e = fxEl('arrow-whoosh', from.x, from.y);
+    e.style.setProperty('--rc', seatColor(seat));
+    e.style.setProperty('--wx', (to.x - from.x).toFixed(1) + 'px');
+    e.style.setProperty('--wy', (to.y - from.y).toFixed(1) + 'px');
+    setTimeout(function () { e.remove(); }, 520);
+    ring(to.x, to.y, seatColor(seat), 'ring-whoosh');
+  }
+  /** Token reaches home — mini celebration. */
+  function homeCelebrate(seat, at) {
+    if (!fxOk()) return;
+    var col = seatColor(seat), x = at ? at.x : 7.5 * CELL, y = at ? at.y : 7.5 * CELL;
+    burst(x, y, col, 20);
+    burst(x, y, '#ffd24a', 8);
+    ring(x, y, col, 'ring-home');
+    ring(x, y, '#ffd24a', 'ring-home-gold');
+    floatAt(x, y - CELL * 0.7, 'Home!', 'float-home');
+    var tok = null; // sparkles only
+    for (var k = 0; k < 6; k++) {
+      var sp = fxEl('home-spark', x, y);
+      sp.style.setProperty('--dx', ((k % 2 ? 1 : -1) * (12 + k * 7)) + 'px');
+      sp.style.setProperty('--dy', (-18 - k * 10) + 'px');
+      sp.style.background = k % 2 ? col : '#ffe08a';
+      setTimeout(function (el) { el.remove(); }.bind(null, sp), 900);
+    }
+  }
+  /** Smooth turn-change flash on the turn banner / active pod. */
+  function turnChangeFx(seat) {
+    if (!fxOk() || seat == null || seat === lastTurnFx) return;
+    lastTurnFx = seat;
+    var banner = $('turn-banner');
+    if (banner) { banner.classList.remove('turn-swap'); void banner.offsetWidth; banner.classList.add('turn-swap'); later(function () { if (banner) banner.classList.remove('turn-swap'); }, 650); }
+    var pod = podEl(seat);
+    if (pod) { pod.classList.remove('turn-arrive'); void pod.offsetWidth; pod.classList.add('turn-arrive'); later(function () { if (pod) pod.classList.remove('turn-arrive'); }, 700); }
+  }
 
   function animatePath(s, i, from, path, cb) {
     var id = s + '-' + i, el = pieceEls[s][i];
@@ -1252,8 +1456,9 @@
     setTimeout(function () { el.style.transition = ''; }, 600);
   }
   function captureFx(s, caps, at) {
-    caps.forEach(function (cp) { burst(at.x, at.y, seatColor(cp.seat), 14); sendToBase(cp.seat, cp.piece); });
-    ring(at.x, at.y, seatColor(s)); floatAt(at.x, at.y - CELL * 0.6, 'Captured!'); shake();
+    caps.forEach(function (cp) { killBurst(at.x, at.y, seatColor(s), seatColor(cp.seat)); sendToBase(cp.seat, cp.piece); });
+    floatAt(at.x, at.y - CELL * 0.6, caps.length > 1 ? 'Captures!' : 'Captured!', 'float-kill');
+    shake();
     SFX.capture(); haptic('heavy');
   }
 
@@ -1268,7 +1473,7 @@
     }
     var st = G.st, s = st.turn, human = isHuman(s);
     if (!st.moves.some(function (m) { return m.piece === piece && (v == null || m.v === v); })) return;
-    busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); stopAutoRollTimer(false); hide('chat');
+    busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); stopAutoRollTimer(false); stopMoveDecide(false); hideDiePick(); hide('chat');
     var res = L.move(st, piece, v, forcedEvents.length ? forcedEvents.shift() : undefined);
     if (human) { save.stats.captures += res.captures.length; if (res.finish) save.stats.home++; if (res.event) save.stats.events++; }
     G.sel = null;
@@ -1276,13 +1481,21 @@
     render(); persist();
     animatePath(s, piece, res.from, res.path, function () {
       var c = piecePos[s + '-' + piece] || { x: 0, y: 0 }, pause = 260;
+      if (res.arrowJump) { arrowWhoosh(s, piece, res.path); pause = Math.max(pause, 420); }
+      if (!res.finish && !res.captures.length && L.onTrack(res.to) && st.rules.safeSquares && L.isSafeAbs(L.absOf(s, res.to))) {
+        safePulse(c.x, c.y, seatColor(s));
+      }
       if (res.captures.length) {
         pause = 820; captureFx(s, res.captures, c);
-        floatAt(c.x, c.y - CELL * 0.75, res.captures.length > 1 ? 'Captures!' : 'Capture!');
         if (res.captures.some(function (cp) { return isHuman(cp.seat); }) && !human) setTimeout(function () { SFX.captured(); }, 250);
         aiReact('capture', s, res.captures);
       }
-      if (res.finish) { pause = Math.max(pause, 720); ring(7.5 * CELL, 7.5 * CELL, seatColor(s)); burst(7.5 * CELL, 7.5 * CELL, seatColor(s), 18); floatAt(7.5 * CELL, 6.8 * CELL, res.finishedPlayer ? NAMES[s] + ' finished!' : 'Home!'); SFX.home(); haptic('success'); if (!human) aiReact('home', s); }
+      if (res.finish) {
+        pause = Math.max(pause, 900);
+        homeCelebrate(s, { x: 7.5 * CELL, y: 7.5 * CELL });
+        if (res.finishedPlayer) floatAt(7.5 * CELL, 6.2 * CELL, NAMES[s] + ' finished!', 'float-home big');
+        SFX.home(); haptic('success'); if (!human) aiReact('home', s);
+      }
       if (res.stride) floatAt(c.x, c.y + CELL * 0.7, 'King +1');
       if (res.kingCaptured) { pause = Math.max(pause, 900); toast(nameOf(s) + ' toppled a King! +2 Lucky Charge', 1600); later(function () { SFX.mega(); }, 300); }
       if (res.crowned) { pause = Math.max(pause, 900); later(function () { crownFx(res.crowned); }, res.captures.length ? 420 : 0); }
@@ -1910,10 +2123,21 @@
   // tap near a movable token (tokens are small on phones, so pick the nearest highlighted one)
   $('board-wrap').addEventListener('pointerdown', function (e) {
     if (!G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn)) return;
+    if (e.target && e.target.closest && e.target.closest('#token-die-pick')) return; // die picker handles its own clicks
     var r = $('board-wrap').getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, best = null, bd = Infinity;
-    var pool = G.sel != null && chipMoves(G.sel).length ? chipMoves(G.sel) : G.st.moves;
+    var pool = G.st.moves || [];
     pool.forEach(function (m) { var p = piecePos[m.seat + '-' + m.piece]; if (!p) return; var d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = m; } });
-    if (best && bd < CELL * 1.6) { SFX.unlock(); doMove(best.piece, best.v); }
+    if (best && bd < CELL * 1.6) handleTokenTap(best.seat, best.piece, false);
+  });
+  // token die picker buttons
+  $('board-wrap').addEventListener('click', function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest('#token-die-pick .token-die-v, #token-die-pick .token-die-x') : null;
+    if (!btn || !diePick || !G || busy || paused || G.st.phase !== 'move') return;
+    e.preventDefault(); e.stopPropagation();
+    if (btn.classList.contains('token-die-x')) { SFX.click(); hideDiePick(); return; }
+    var v = +btn.dataset.v, seat = diePick.seat, piece = diePick.piece;
+    if (!tokenDieMoves(seat, piece).some(function (m) { return m.v === v; })) { hideDiePick(); return; }
+    SFX.unlock(); hideDiePick(); doMove(piece, v, true);
   });
   $('btn-undo').addEventListener('click', undoRoll);
   $('btn-chat').addEventListener('click', function () { SFX.click(); if (isOpen('chat')) hide('chat'); else show('chat'); });
@@ -2146,9 +2370,13 @@
     get game() { return G; }, get save() { return save; }, get loadStatus() { return loadResult.status; }, logic: L, gate: gate,
     native: native, haptic: haptic,
     persist: persist, isValidGame: validGame, isValidSave: validSave, get lastSaveError() { return lastSaveError; },
-    get busy() { return busy; }, get paused() { return paused; }, get idle() { return !busy && timers.length === 0 && !isOpen('wheel') && !isOpen('choice'); },
+    get busy() { return busy; }, get paused() { return paused; }, get idle() { return !busy && timers.length === 0 && !isOpen('wheel') && !isOpen('choice') && !diePick && (!($('move-countdown')) || $('move-countdown').classList.contains('hidden')); },
     get undoActive() { return undoActive(); },
     force: function (vals) { forced = vals.slice(); },
+    bestAutoMove: function () { return G && G.st ? L.bestAutoMove(G.st, 'hard') : null; },
+    get diePick() { return diePick; },
+    get moveDecideLeft() { return moveDecideLeft; },
+
     forceEvent: function (evs) { forcedEvents = [].concat(evs); },
     forceMega: function (evs) { forcedMega = [].concat(evs); },
     mega: function (ev) { doMega(ev); },
