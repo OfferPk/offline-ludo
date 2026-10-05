@@ -346,8 +346,9 @@ body.light .seg { background: rgba(0,0,0,.06); }
 
 .pc .gem-body { stroke: rgba(255,255,255,.78); stroke-width: .55; }
 .pc .gem-sheen { opacity: .78; pointer-events: none; mix-blend-mode: soft-light; }
-.pc .gem-core { opacity: .88; filter: drop-shadow(0 0 3.5px var(--pccore)) drop-shadow(0 0 6px rgba(255,255,255,.32)); animation: gem-core-breathe 2.8s ease-in-out infinite; animation-delay: var(--jugnu-delay, 0s); }
-.pc.is-turn .gem-core { animation-duration: 2.1s; }
+.pc .gem-core { opacity: .88; filter: drop-shadow(0 0 3.5px var(--pccore)) drop-shadow(0 0 6px rgba(255,255,255,.32)); animation: none; animation-delay: var(--jugnu-delay, 0s); }
+.pc.can .gem-core { animation: gem-core-breathe 2.8s ease-in-out infinite; }
+.pc.can.is-turn .gem-core { animation-duration: 2.1s; }
 @keyframes gem-core-breathe { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
 .pc .gem-glint { fill: #fff; opacity: .95; filter: drop-shadow(0 0 1.8px rgba(255,255,255,.9)); }
 .pc .gem-glint-soft { fill: #fff; opacity: .5; }
@@ -1760,3 +1761,189 @@ body.light .online-chess-screen .btn:not(.primary):not(.rewarded-btn) { backgrou
 body.light .online-chess-screen .online-room-connection { color: #9ad9ff !important; background: rgba(105,205,255,.07); }
 body.light .online-chess-screen .online-room-connection[data-state="reconnecting"] { color: #ffd37a !important; background: rgba(244,183,64,.08); }
 body.light .online-chess-screen .online-room-connection[data-state="ended"] { color: #b8e7ce !important; background: rgba(115,224,176,.08); }
+
+/* ---- Token 2.0: circular layered crystal, free wardrobe, and short feedback ---- */
+.pc .gem-token, .token-preview .gem-token { overflow: visible; filter: drop-shadow(0 2px 1.8px rgba(0,0,0,.4)) drop-shadow(0 0 1.4px rgba(255,255,255,.24)); }
+.pc .gem-ground, .token-preview .gem-ground { fill: var(--pc); opacity: .36; filter: blur(1.35px); }
+.pc .gem-pad, .token-preview .gem-pad { fill: var(--token-rim-dark); fill-opacity: .38; stroke: var(--token-rim); stroke-opacity: .78; stroke-width: .62; }
+.pc .gem-shadow, .token-preview .gem-shadow { fill: rgba(0,0,0,.56); opacity: .96; filter: blur(.8px); }
+.pc .gem-body, .token-preview .gem-body { stroke: var(--token-rim-light); stroke-opacity: .92; stroke-width: .52; stroke-linejoin: round; }
+.pc .gem-rim-outer, .token-preview .gem-rim-outer { stroke: var(--token-rim-dark); stroke-width: .62; stroke-opacity: .98; }
+.pc .gem-rim-inner, .token-preview .gem-rim-inner { fill: none; stroke: rgba(255,255,255,.64); stroke-width: .36; }
+.pc .gem-rim, .token-preview .gem-rim { fill: none; stroke: var(--token-rim-light); stroke-width: .37; opacity: .84; }
+.pc .gem-bevel, .token-preview .gem-bevel { fill: none; stroke: rgba(255,255,255,.52); stroke-width: .32; opacity: .88; }
+.pc .gem-facet-light, .token-preview .gem-facet-light { fill: var(--pcl); fill-opacity: .45; }
+.pc .gem-facet-dark, .token-preview .gem-facet-dark { fill: var(--pcdd); fill-opacity: .32; }
+.pc .gem-facet-base, .token-preview .gem-facet-base { fill: var(--pcdd); fill-opacity: .42; }
+.pc .gem-core, .token-preview .gem-core { opacity: .72; filter: drop-shadow(0 0 1.8px var(--pccore)); }
+.pc .gem-glint, .token-preview .gem-glint { fill: #fff; opacity: .92; filter: drop-shadow(0 0 1.2px #fff); }
+.pc .gem-glint-soft, .token-preview .gem-glint-soft { fill: #fff; opacity: .32; }
+.pc .gem-spec, .token-preview .gem-spec { fill: #fff; opacity: .82; }
+.pc .gem-sheen, .token-preview .gem-sheen { opacity: .52; }
+.pc .gem-num-rim, .token-preview .gem-num-rim { fill: rgba(5,9,17,.38); stroke: var(--token-rim-light); stroke-opacity: .72; stroke-width: .43; }
+.pc .gem-num-disc, .token-preview .gem-num-disc { fill: rgba(7, 12, 20, .82); stroke: rgba(255,255,255,.94); stroke-width: .52; }
+.pc .gem-num, .token-preview .gem-num { fill: #fff; font-family: Inter, system-ui, "Segoe UI", sans-serif; font-size: 7.45px; font-weight: 900; letter-spacing: -.055em; dominant-baseline: alphabetic; paint-order: stroke fill; stroke: rgba(5,8,14,.96); stroke-width: .68px; stroke-linejoin: round; }
+.pc .gem-num.number-roman, .token-preview .gem-num.number-roman { font-family: Georgia, serif; font-size: 5.55px; letter-spacing: -.07em; }
+.pc .gem-num.number-digital, .token-preview .gem-num.number-digital { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 5.25px; letter-spacing: -.09em; fill: #c9ffff; filter: drop-shadow(0 0 1px #5eeaff); }
+.pc .gem-num.number-ancient, .token-preview .gem-num.number-ancient { font-family: Georgia, serif; font-size: 6.2px; fill: #fff0c2; }
+.pc .gem-num.number-carved, .token-preview .gem-num.number-carved { fill: var(--token-rim-light); stroke: rgba(31,21,15,.95); stroke-width: .9px; paint-order: stroke fill; }
+.pc .gem-seat-bezel, .token-preview .gem-seat-bezel { fill: rgba(8,13,21,.88); stroke: var(--token-rim-light); stroke-width: .34; }
+.pc .gem-seat-mark, .token-preview .gem-seat-mark { fill: #fff5d7; stroke: rgba(4,8,14,.96); stroke-width: .48; stroke-linecap: round; stroke-linejoin: round; paint-order: stroke fill; }
+.pc .gem-set-mark, .token-preview .gem-set-mark { opacity: .9; pointer-events: none; }
+.pc .gem-set-mark path, .token-preview .gem-set-mark path { fill: rgba(255,245,205,.72); stroke: rgba(255,255,255,.9); stroke-width: .42; stroke-linecap: round; stroke-linejoin: round; paint-order: stroke fill; }
+.pc.token-set-inferno .gem-set-mark path, .token-preview.token-set-inferno .gem-set-mark path { fill: #ffd086; stroke: #fff1c5; }
+.pc.token-set-frost .gem-set-mark path, .token-preview.token-set-frost .gem-set-mark path { fill: #c8f4ff; stroke: #effdff; }
+.pc.token-set-galaxy .gem-set-mark path, .token-preview.token-set-galaxy .gem-set-mark path { fill: #e2c9ff; stroke: #fff2c8; }
+.pc.token-set-royal .gem-set-mark path, .token-preview.token-set-royal .gem-set-mark path { fill: #ffe09a; stroke: #fff8df; }
+
+/* The player color drives the metal rim and body variables, regardless of skin. */
+.pc[data-material="ruby"], .token-preview[data-material="ruby"] { --token-accent: #e26870; }
+.pc[data-material="gold"], .token-preview[data-material="gold"] { --token-accent: #e7bb51; }
+.pc[data-material="emerald"], .token-preview[data-material="emerald"] { --token-accent: #46c58a; }
+.pc[data-material="sapphire"], .token-preview[data-material="sapphire"] { --token-accent: #5c9cf0; }
+.pc.token-skin-royal .gem-rim-inner, .token-preview.token-skin-royal .gem-rim-inner { stroke: #ffdf8b; stroke-width: .42; }
+.pc.token-skin-dragon .gem-rim-inner, .token-preview.token-skin-dragon .gem-rim-inner { stroke: #ffb27b; stroke-dasharray: 1.2 .65; }
+.pc.token-skin-cyber .gem-rim-inner, .token-preview.token-skin-cyber .gem-rim-inner { stroke: #9dfaff; stroke-width: .48; }
+.pc.token-skin-galaxy .gem-rim-inner, .token-preview.token-skin-galaxy .gem-rim-inner { stroke: #d7b5ff; stroke-dasharray: .6 .55; }
+.pc.token-skin-fire .gem-rim-inner, .token-preview.token-skin-fire .gem-rim-inner { stroke: #ffb04b; }
+.pc.token-skin-ice .gem-rim-inner, .token-preview.token-skin-ice .gem-rim-inner { stroke: #ccf8ff; }
+.pc.token-skin-shadow .gem-body, .token-preview.token-skin-shadow .gem-body { stroke: var(--token-rim); }
+.pc.token-skin-shadow .gem-facet-light, .token-preview.token-skin-shadow .gem-facet-light { fill: #554973; fill-opacity: .58; }
+.pc.token-skin-shadow .gem-facet-dark, .token-preview.token-skin-shadow .gem-facet-dark { fill: #11121f; fill-opacity: .72; }
+.pc.token-skin-shadow .gem-core, .token-preview.token-skin-shadow .gem-core { fill: #a995ff; opacity: .52; }
+.pc.token-skin-diamond .gem-rim, .token-preview.token-skin-diamond .gem-rim { stroke: #fff; stroke-width: .58; }
+.pc.token-skin-diamond .gem-glint, .token-preview.token-skin-diamond .gem-glint { opacity: 1; }
+.pc.token-skin-legendary .gem-token, .token-preview.token-skin-legendary .gem-token { filter: drop-shadow(0 0 2.4px var(--token-rim)) drop-shadow(0 2px 1.8px rgba(0,0,0,.38)); }
+.pc.token-skin-legendary .gem-rim-inner, .token-preview.token-skin-legendary .gem-rim-inner { stroke: #fff0a4; stroke-width: .52; }
+
+.pc.token-level-2 .gem-rim-inner, .token-preview.token-level-2 .gem-rim-inner { stroke-width: .48; }
+.pc.token-level-3 .gem-rim-inner, .token-preview.token-level-3 .gem-rim-inner { stroke-width: .58; filter: drop-shadow(0 0 1px var(--token-accent)); }
+.pc.token-level-4 .gem-rim-inner, .token-preview.token-level-4 .gem-rim-inner { stroke-width: .7; filter: drop-shadow(0 0 1.35px var(--token-accent)); }
+.pc.token-level-5 .gem-rim-inner, .token-preview.token-level-5 .gem-rim-inner { stroke-width: .82; filter: drop-shadow(0 0 1.8px var(--token-accent)); }
+.pc.token-level-5 .gem-seat-bezel, .token-preview.token-level-5 .gem-seat-bezel { stroke-width: .55; }
+.pc.token-level-5 .gem-set-mark, .token-preview.token-level-5 .gem-set-mark { opacity: 1; }
+
+/* Preview tokens reuse the exact board artwork but never inherit the board hitbox. */
+.token-preview { display: inline-block; position: relative; flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; background: transparent; box-shadow: none; }
+.token-preview .gem-token { display: block; position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.token-preview .gem-pad { opacity: .55; }
+.token-preview .gem-ground { opacity: .28; }
+.token-preview .gem-num { font-size: 6.1px; }
+
+/* Skin/set selection, free evolution track, and completeness previews. */
+#skins .panel.wide { width: min(900px, calc(100vw - 32px)); max-height: min(92vh, 960px); }
+#skins .panel > .note { line-height: 1.4; }
+.token-wardrobe { display: grid; gap: 14px; }
+.token-hero { display: grid; grid-template-columns: 1fr; gap: 12px; min-width: 0; padding: 14px; border-radius: 16px; border: 1px solid rgba(175,214,245,.18); background: radial-gradient(circle at 12% 0%, rgba(102,197,255,.16), transparent 48%), linear-gradient(135deg, rgba(119,101,194,.12), rgba(28,39,56,.6)); }
+.token-hero-showcase { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); align-items: center; gap: 5px; padding: 10px 8px; border-radius: 13px; background: rgba(2,8,15,.42); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+.token-hero-piece { min-width: 0; display: grid; justify-items: center; gap: 3px; }
+.token-hero-piece .token-preview { width: clamp(34px, 10vw, 48px); height: clamp(34px, 10vw, 48px); }
+.token-hero-piece small, .token-color-item small { color: var(--muted); font-size: 9px; line-height: 1.15; text-align: center; }
+.token-hero-info { min-width: 0; }
+.token-kicker { color: #91dafa; font-size: 10px; font-weight: 800; letter-spacing: .15em; }
+.token-hero-info h4, .token-evolution h4, .token-catalog h4 { margin: 5px 0 6px; color: var(--ink); font-size: 17px; }
+.token-hero-info p, .token-section-note { margin: 4px 0 8px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.token-identity-line { color: var(--ink) !important; font-weight: 700; }
+.token-color-key { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; margin-top: 9px; }
+.token-color-item { min-width: 0; display: grid; justify-items: center; gap: 1px; }
+.token-color-item .token-preview { width: 28px; height: 28px; }
+.token-evolution, .token-catalog { min-width: 0; padding: 13px; border-radius: 15px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.075); }
+.token-level-track { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 5px; }
+.token-level-step { appearance: none; border: 0; width: 100%; font: inherit; cursor: pointer; min-width: 0; display: grid; justify-items: center; gap: 3px; padding: 7px 2px; border-radius: 10px; background: rgba(4,9,16,.35); color: var(--muted); opacity: .68; }
+.token-level-step b { display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid currentColor; border-radius: 50%; font-size: 12px; }
+.token-level-step small { font-size: 9px; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+.token-level-step.is-earned { color: #8ee7c3; opacity: 1; }
+.token-level-step.is-current { background: rgba(75,195,153,.13); box-shadow: inset 0 0 0 1px rgba(142,231,195,.28); }
+.token-level-step.is-current b { color: #09241e; background: #8ee7c3; border-color: #8ee7c3; }
+.token-progress-copy { margin: 8px 0 5px; color: var(--ink); font-size: 12px; font-weight: 650; }
+.token-progressbar { height: 7px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.1); }
+.token-progressbar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#5acba4,#98e8c7); transition: width .24s ease-out; }
+.token-free-note { display: block; margin-top: 8px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.token-catalog h4 { margin-top: 1px; }
+.token-section-note { margin-bottom: 9px; }
+.token-skin-grid, .token-set-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.token-choice-card { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 9px 7px; border-radius: 13px; background: rgba(5,11,18,.33); border: 1px solid rgba(255,255,255,.08); text-align: center; }
+.token-choice-card.is-selected { border-color: rgba(113,220,185,.78); box-shadow: inset 0 0 0 1px rgba(113,220,185,.2),0 5px 16px rgba(23,132,103,.1); }
+.token-choice-card.is-locked { border-style: dashed; }
+.token-choice-preview { display: grid; place-items: center; min-height: 47px; }
+.token-choice-preview .token-preview { width: 45px; height: 45px; }
+.token-choice-title { color: var(--ink); font-size: 12px; line-height: 1.2; }
+.token-choice-material, .token-choice-unlock, .token-choice-description { min-height: 23px; color: var(--muted); font-size: 9.5px; line-height: 1.3; overflow-wrap: anywhere; }
+.token-choice-unlock { color: #96dcbd; font-weight: 700; }
+.token-choice-card.is-locked .token-choice-unlock { color: #d6bb7d; }
+.token-choice-card .btn { width: 100%; min-height: 35px; padding: 6px 4px; font-size: 11px; line-height: 1.2; }
+.token-set-card { align-items: stretch; }
+.token-set-preview { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); justify-items: center; align-items: start; gap: 2px; width: 100%; padding: 4px 0; }
+.token-set-piece { min-width: 0; display: grid; justify-items: center; gap: 0; }
+.token-set-piece .token-preview { width: clamp(26px,7vw,34px); height: clamp(26px,7vw,34px); }
+.token-set-piece small { color: var(--muted); font-size: 8px; line-height: 1.1; text-align: center; overflow-wrap: anywhere; }
+.token-set-card .token-choice-description { min-height: 25px; }
+.token-choice-card button:focus-visible, #skin-tabs button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.token-choice-card button:disabled { cursor: default; opacity: .82; }
+
+/* A brief, non-interactive identity intro accompanies match setup. */
+.token-intro { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 10px; pointer-events: none; }
+.token-intro-card { width: min(92%, 430px); padding: 12px; border: 1px solid rgba(205,231,255,.26); border-radius: 17px; background: rgba(9,15,24,.92); box-shadow: 0 15px 38px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.1); backdrop-filter: blur(12px); animation: token-intro-in .62s cubic-bezier(.16,.82,.28,1) both; }
+@keyframes token-intro-in { 0% { opacity: 0; transform: translateY(10px) scale(.96); } 22% { opacity: 1; } 72% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: .92; transform: translateY(-2px) scale(.99); } }
+.token-intro-copy { display: grid; justify-items: center; gap: 3px; margin-bottom: 8px; text-align: center; }
+.token-intro-kicker { color: #99dff7; font-size: 8px; font-weight: 800; letter-spacing: .16em; }
+.token-intro-copy b { color: #f2f6ff; font-size: 14px; line-height: 1.2; }
+.token-intro-copy small { color: #a7b6c8; font-size: 9px; line-height: 1.3; }
+.token-intro-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 4px; }
+.token-intro-player { min-width: 0; display: grid; justify-items: center; align-content: start; gap: 3px; padding: 5px 2px; border-radius: 10px; background: rgba(255,255,255,.045); animation: token-intro-player .38s cubic-bezier(.16,.8,.3,1) var(--intro-delay,0ms) both; }
+@keyframes token-intro-player { from { opacity: 0; transform: translateY(8px) scale(.88); } to { opacity: 1; transform: none; } }
+.token-intro-player .token-preview { width: clamp(30px,9vw,42px); height: clamp(30px,9vw,42px); }
+.token-intro-player b { max-width: 100%; overflow: hidden; color: #f0f4fa; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.token-intro-player small { color: #b1c1d1; font-size: 8px; text-align: center; }
+
+/* Cosmetic trail and capture layers are independent of input/turn scheduling. */
+.token-trail-dot { position: absolute; width: calc(var(--cell) * .16); height: calc(var(--cell) * .16); min-width: 2px; min-height: 2px; margin: calc(var(--cell) * -.08) 0 0 calc(var(--cell) * -.08); z-index: 5; border-radius: 50%; background: var(--trail-color,#fff); box-shadow: 0 0 5px 1px var(--trail-color,#fff); pointer-events: none; animation: token-trail-drift .34s ease-out both; }
+@keyframes token-trail-drift { from { opacity: .96; transform: translate(0,0) scale(1); } to { opacity: 0; transform: translate(var(--dx),var(--dy)) scale(.3); } }
+.token-capture-impact, .token-capture-wave { position: absolute; left: 0; top: 0; width: calc(var(--cell) * 1.1); height: calc(var(--cell) * 1.1); margin: calc(var(--cell) * -.55) 0 0 calc(var(--cell) * -.55); border-radius: 50%; pointer-events: none; z-index: 9; }
+.token-capture-impact { background: radial-gradient(circle,rgba(255,255,255,.92) 0%,color-mix(in srgb,var(--capture-a,#fff) 52%,transparent) 17%,transparent 72%); animation: token-impact-flash .23s ease-out both; }
+.token-capture-wave { width: calc(var(--cell) * .48); height: calc(var(--cell) * .48); margin: calc(var(--cell) * -.24) 0 0 calc(var(--cell) * -.24); border: 2px solid color-mix(in srgb,var(--capture-a,#fff) 68%,var(--capture-b,#fff)); box-shadow: 0 0 0 1px rgba(255,255,255,.5),0 0 12px color-mix(in srgb,var(--capture-a,#fff) 50%,transparent); animation: token-capture-shockwave .64s cubic-bezier(.12,.7,.25,1) both; }
+@keyframes token-impact-flash { 0% { opacity: 0; transform: scale(.15); } 22% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: scale(.72); } }
+@keyframes token-capture-shockwave { 0% { opacity: .95; transform: scale(.28); } 56% { opacity: .62; } 100% { opacity: 0; transform: scale(4.6); } }
+.pc.capture-victim { z-index: 8 !important; animation: token-capture-disappear .21s ease-in both; pointer-events: none; }
+@keyframes token-capture-disappear { 0% { filter: brightness(1.45); } 32% { filter: brightness(1.8); } 100% { filter: brightness(.72) saturate(.55); } }
+.pc.capture-settle { z-index: 10 !important; animation: token-capture-settle .42s cubic-bezier(.18,.76,.24,1) both; }
+@keyframes token-capture-settle { 0% { filter: brightness(1.55); } 36% { filter: brightness(1.34) drop-shadow(0 0 4px var(--pc)); } 100% { filter: none; } }
+.float-kill { animation-duration: .68s; }
+
+@media (min-width: 700px) {
+  #skins .panel.wide { width: min(920px, calc(100vw - 48px)); padding: 22px; }
+  .token-hero { grid-template-columns: minmax(0,1.1fr) minmax(0,1fr); align-items: center; }
+  .token-skin-grid { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .token-set-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 380px) {
+  .token-hero { padding: 10px; }
+  .token-level-step { padding: 6px 1px; }
+  .token-level-step small { font-size: 8px; }
+  .token-choice-card { padding-inline: 5px; }
+  .token-choice-card .btn { font-size: 10px; }
+  .token-intro-card { width: 96%; padding: 9px; }
+  .token-intro-player .token-preview { width: 28px; height: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .token-intro-card, .token-intro-player, .token-progressbar i, .pc.token-level-5 .gem-rim-inner, .token-preview.token-level-5 .gem-rim-inner { animation: none !important; transition: none !important; }
+  .token-trail-dot, .token-capture-impact, .token-capture-wave { display: none !important; animation: none !important; }
+  .pc.capture-victim, .pc.capture-settle { animation: none !important; }
+}
+
+
+/* Token identity is cosmetic profile data, clearly separate from balances. */
+.online-profile-token-identity { margin: 9px 0 6px; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.online-token-identity { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; line-height: 1.25; overflow-wrap: anywhere; }
+.token-choice-card .btn { min-height: 44px; }
+
+/* Standalone wardrobe tokens are not shielded/frozen board pieces; hide these SVG state overlays explicitly. */
+.token-preview .gem-shield { fill: #c9f2ff; fill-opacity: .16; stroke: #c9f2ff; stroke-opacity: .8; stroke-width: .7; opacity: 0; }
+.token-preview .gem-shield-glint { fill: none; stroke: rgba(255,255,255,.84); stroke-width: .75; stroke-linecap: round; opacity: 0; }
+.token-preview .gem-frost-wash, .token-preview .gem-frost-crack { opacity: 0; pointer-events: none; }
+.token-preview .gem-frost-wash { fill: #d9f2ff; fill-opacity: .26; }
+.token-preview .gem-frost-crack { fill: none; stroke: #f4fbff; stroke-width: .65; stroke-linecap: round; stroke-linejoin: round; }
+
+.token-level-step:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+body.light .token-hero, body.light .token-evolution, body.light .token-catalog { background-color: rgba(255,255,255,.72); border-color: rgba(28,32,44,.14); }
+body.light .token-intro-card { background: rgba(9,15,24,.94); }

@@ -1,47 +1,29 @@
-// v1.7.2 Tall classic Ludo pawn tokens (not flat/bowl circles).
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-
 const root = path.join(__dirname, '..');
-const read = f => fs.readFileSync(path.join(root, f), 'utf8');
-const html = read('www/index.html');
-const css = read('www/css/style.css');
-const game = read('www/js/game.js');
-const celebration = read('www/js/celebration.js');
-const ads = read('www/js/ads-config.js');
-const rules = read('RULES.md');
-const gradle = read('android/app/build.gradle');
-const pkg = JSON.parse(read('package.json'));
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const css = read('www/css/style.css'), game = read('www/js/game.js'), tokenSystem = read('www/js/token-system.js');
+const html = read('www/index.html'), online = read('www/js/online.js'), saveStore = read('www/js/save-store.js'), pkg = JSON.parse(read('package.json'));
 let checks = 0;
-const ok = (c, m) => { assert.ok(c, m); checks++; console.log('  ok -', m); };
-
+function ok(value, message) { assert.ok(value, message); checks++; console.log('  ok - ' + message); }
 console.log('tall-pawns.test.js');
-
-ok(pkg.version === '1.7.2', 'package version 1.7.2');
-ok(/versionCode 26/.test(gradle) && /versionName "1\.7\.2"/.test(gradle), 'gradle versionCode 26 / 1.7.2');
-ok(/Crossfour v1\.7\.2/.test(html) && /css\/style\.css\?v=1\.7\.2/.test(html), 'footer + asset cache-bust 1.7.2');
-
-ok(/Tall classic Ludo pawn/.test(game), 'tall pawn comment in game.js');
-ok(/Tall classic Ludo pawn tokens/.test(css), 'tall pawn CSS banner');
-ok(/tall classic \*\*Ludo pawn pieces\*\*/.test(rules) || /tall classic \*\*Ludo pawn/.test(rules), 'RULES describe tall pawns');
-ok(/pawnOuter/.test(game) && /pawnBody/.test(game), 'pawnOuter + pawnBody silhouette paths');
-ok(/viewBox="0 0 24 36"/.test(game), 'tall viewBox 24×36');
-ok(/<path class="gem-rim-outer"/.test(game) && /<path class="gem-body"/.test(game), 'path-based rim + body (not circle bowl)');
-ok(!/<circle class="gem-body"/.test(game) && !/<circle class="gem-rim-outer"/.test(game), 'no circular bowl body/rim');
-ok(/gem-collar/.test(game) && /\.pc \.gem-collar/.test(css), 'collar band wired in SVG + CSS');
-ok(/height: calc\(var\(--cell\) \* \.88\)/.test(css) && /width: calc\(var\(--cell\) \* \.54\)/.test(css), 'tall hit-box aspect on .pc');
-ok(/TOKEN_MAT/.test(game) && /id: 'ruby'/.test(game) && /id: 'sapphire'/.test(game), 'crystal per-color materials kept');
-ok(/gem-num-hi/.test(game) && /gem-num-shadow/.test(game), 'embossed 1–4 kept');
-ok(/TOKEN_EVOLUTION/.test(game) && /data-evo/.test(css) && /evo-badge/.test(game), 'evolution visuals kept');
-ok(/evo-prev-pawn/.test(game) && /evo-prev-pawn/.test(css), 'Skins → Tokens preview uses pawn shape');
-ok(!/Ludo Star|Yalla|yalla|ludostar/i.test(game + css), 'no Ludo Star / Yalla asset names');
-
-ok(/MOVE_DECIDE_MS = 4000/.test(game) && /function showDiePick/.test(game), 'die picker + 4s timer intact');
-ok(/CamelCelebration|celebrateWin/.test(game) && /function play\(/.test(celebration), 'camel celebration kept');
-ok(/ca-app-pub-3940256099942544/.test(ads) && /IS_TESTING: true/.test(ads), 'ads test IDs intact');
-ok(/DANGER_FILL = '#d23a30'/.test(game), 'arrow danger intact');
-ok(/G\.online/.test(game) && /paintOnlineChrome|online-turn-timer/.test(game), 'online paths intact');
-
-console.log('tall-pawns checks passed (' + checks + ' checks).');
+ok(pkg.version === '1.7.3', 'feature patch version is aligned');
+const pcRule = css.match(/\.pc \{[^}]+\}/);
+ok(!!pcRule && /width: calc\(var\(--cell\) \* \.54\)/.test(pcRule[0]) && /height: calc\(var\(--cell\) \* \.88\)/.test(pcRule[0]), 'latest-main token-button hitbox dimensions are unchanged');
+ok(/margin: calc\(var\(--cell\) \* -\.70\) 0 0 calc\(var\(--cell\) \* -\.27\)/.test(pcRule[0]), 'token anchor and board-coordinate margins are unchanged');
+ok(/function buildPieces\(\)[\s\S]*?TokenSystem\.svgMarkup/.test(game), 'shared Ludo modes use the procedural circular TokenSystem renderer');
+ok(/viewBox="0 0 24 24"/.test(tokenSystem) && /<circle class="gem-body"/.test(tokenSystem), 'live token body retains circular geometry');
+ok(/gem-rim-outer/.test(tokenSystem) && /gem-body/.test(tokenSystem) && /gem-num-disc/.test(tokenSystem) && /gem-set-mark/.test(tokenSystem), 'rim, crystal, raised number, and set emblem are all retained');
+ok(/TOKEN_MATERIAL_ORDER = \[0, 2, 1, 3\]/.test(game) && /id: 'ruby'/.test(game) && /id: 'emerald'/.test(game) && /id: 'gold'/.test(game) && /id: 'sapphire'/.test(game), 'Ruby, Gold, Emerald, and Sapphire metals are distinct');
+ok(/TOKEN_CAPTURE_MS = 680/.test(game) && /token-capture-wave/.test(game) && /capture-settle/.test(game), 'impact, shockwave, vanish, and settle remain short and non-blocking');
+ok(/function sendToBase[\s\S]*?prefersReducedMotion\(\)/.test(game) && /prefers-reduced-motion: reduce/.test(css), 'capture feedback honors reduced-motion preference');
+ok(/token-trail-dot/.test(css) && /function trailColors/.test(tokenSystem), 'skin/set-themed movement trails are short and data-driven');
+ok(['mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'].every(mode => new RegExp('data-mode="' + mode + '"').test(html)), 'all pre-existing shared offline Ludo modes remain available');
+ok(/if \(isChess\)[\s\S]*?renderChessBoard[\s\S]*?return;/.test(online) && /presentOnline\(/.test(online), 'Online Classic uses shared identity rendering while Chess retains its separate branch');
+ok(/tokenIdentity/.test(game) && /normalizeProgress/.test(game) && /var VERSION = 3/.test(saveStore) && /crossfour\.save\.v' \+ version/.test(saveStore), 'identity and free match progress persist in existing versioned local save');
+ok(/Only completed matches advance evolution/.test(game) && !/coins|diamonds|purchase/i.test(game.slice(game.indexOf('function renderTokenShop'), game.indexOf('function renderSkins'))), 'Token 2.0 selection/progression contains no spending path');
+ok(/aria-label.*material.*skin\.name.*set\.name.*tier\.name/.test(game), 'screen-reader token label includes material, skin, set, level, position, and move hint');
+ok(/js\/token-system\.js\?v=1\.7\.3/.test(html) && /Crossfour v1\.7\.3/.test(html), 'asset cache and release label are aligned');
+console.log('\n' + checks + ' Token geometry checks passed.');

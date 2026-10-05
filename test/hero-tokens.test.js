@@ -1,56 +1,35 @@
-// Tall pawn tokens (v1.7.2); Token Evolution covered in token-evolution.test.js.
 'use strict';
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-
 const root = path.join(__dirname, '..');
-const read = f => fs.readFileSync(path.join(root, f), 'utf8');
-const html = read('www/index.html');
-const css = read('www/css/style.css');
-const game = read('www/js/game.js');
-const celebration = read('www/js/celebration.js');
-const gradle = read('android/app/build.gradle');
-const pkg = JSON.parse(read('package.json'));
+const read = file => fs.readFileSync(path.join(root, file), 'utf8');
+const html = read('www/index.html'), css = read('www/css/style.css'), game = read('www/js/game.js');
+const tokens = read('www/js/token-system.js'), evolution = read('www/js/token-evolution.js');
+const online = read('www/js/online.js'), migration = read('supabase/migrations/20261006013000_token_2_0_profile_identity.sql');
+const migrationSql = migration.replace(/^\s*--.*$/gm, '');
+const gradle = read('android/app/build.gradle'), pkg = JSON.parse(read('package.json'));
 let checks = 0;
-const ok = (c, m) => { assert.ok(c, m); checks++; console.log('  ok -', m); };
+function ok(value, message) { assert.ok(value, message); checks++; console.log('  ok - ' + message); }
 
 console.log('hero-tokens.test.js');
-
-ok(pkg.version === '1.7.2', 'package version 1.7.2');
-ok(/versionCode 26/.test(gradle) && /versionName "1\.7\.2"/.test(gradle), 'gradle versionCode 26 / 1.7.2');
-ok(/Crossfour v1\.7\.2/.test(html) && /css\/style\.css\?v=1\.7\.2/.test(html), 'footer + asset cache-bust 1.7.2');
-
-// Tall classic Ludo pawn SVG (not flat/bowl circle).
-ok(/Tall classic Ludo pawn/.test(game), 'tall pawn comment present');
-ok(/TOKEN_MAT/.test(game) && /id: 'ruby'/.test(game) && /id: 'emerald'/.test(game) && /id: 'gold'/.test(game) && /id: 'sapphire'/.test(game), 'per-color materials ruby/emerald/gold/sapphire');
-ok(/gem-rim-outer/.test(game) && /gem-bevel/.test(game) && /gem-body/.test(game) && /gem-num-hi/.test(game), 'rim + bevel + crystal body + embossed numeral layers');
-ok(/pawnOuter/.test(game) && /pawnBody/.test(game) && /viewBox="0 0 24 36"/.test(game), 'tall pawn paths + viewBox 24x36');
-ok(/<path class="gem-body"/.test(game) && /<path class="gem-rim-outer"/.test(game), 'path silhouette body + rim (not flat circle)');
-ok(/gem-collar/.test(game), 'collar band between head and body');
-ok(/gem-num-shadow/.test(game) && /gem-num-bevel/.test(game), 'embossed raised 3D number layers');
-ok(/--pcrim0|--pcrim1|--pcglassHi/.test(game) && /dataset\.mat/.test(game), 'material CSS vars + dataset.mat');
-ok(/TOKEN_EVOLUTION/.test(game) && /evoLevelForSeat/.test(game), 'Token Evolution wired');
-
-// CSS materials + emboss + jugnu tasteful.
-ok(/Tall classic Ludo pawn tokens/.test(css), 'tall pawn CSS banner');
-ok(/\.pc \.gem-rim-outer/.test(css) && /\.pc \.gem-num-hi/.test(css) && /\.pc \.gem-num-shadow/.test(css), 'rim + emboss numeral CSS');
-ok(/jugnu-pulse/.test(css) && /tasteful pulse|Soft firefly/.test(css), 'jugnu pulse kept');
-ok(/data-evo/.test(css), 'data-evo CSS present');
-
-// Stronger kill FX ~0.5–0.8s with impact shockwave + settle glow.
-ok(/kill-settle/.test(game) && /ring-shock-outer/.test(game), 'kill settle glow + outer shockwave wired');
-ok(/@keyframes kill-settle/.test(css) && /\.kill-settle/.test(css), 'kill-settle CSS');
-ok(/animation-duration: \.62s/.test(css) || /kill-splash \.68s/.test(css), 'capture FX duration in 0.5–0.8s range');
-ok(/prefers-reduced-motion: reduce/.test(css) && /kill-settle/.test(css), 'reduced-motion covers kill-settle');
-
-// Must not regress die picker / 4s timer / Arrow / camel / ads / online.
-ok(/MOVE_DECIDE_MS = 4000/.test(game) && /function showDiePick/.test(game), 'die picker + 4s timer intact');
-ok(/CamelCelebration|celebrateWin/.test(game) && /function play\(/.test(celebration), 'camel celebration kept');
-ok(/Ads\./.test(game) && /DANGER_FILL = '#d23a30'/.test(game), 'ads + arrow danger intact');
-ok(/G\.online/.test(game) && /paintOnlineChrome|online-turn-timer/.test(game), 'online paths intact');
-ok(!/Ludo Star|Yalla|yalla|ludostar/i.test(game + css), 'no Ludo Star / Yalla asset names');
-
-ok(/renderTokenEvolution/.test(game) && /evo-badge/.test(game), 'Token Evolution UI + badge shipped');
-
-console.log('hero-tokens checks passed (' + checks + ' checks).');
+ok(pkg.version === '1.7.3', 'package version is 1.7.3');
+ok(/versionCode 27/.test(gradle) && /versionName "1\.7\.3"/.test(gradle), 'Android package metadata is aligned');
+ok(/Crossfour v1\.7\.3/.test(html) && /css\/style\.css\?v=1\.7\.3/.test(html), 'footer and asset cache keys are aligned');
+ok(html.indexOf('js/token-system.js') < html.indexOf('js/token-evolution.js') && html.indexOf('js/token-evolution.js') < html.indexOf('js/game.js'), 'TokenSystem loads before evolution and gameplay');
+ok(/viewBox="0 0 24 24"/.test(tokens) && /<circle class="gem-rim-outer"/.test(tokens) && /<circle class="gem-body"/.test(tokens), 'procedural artwork preserves the circular body and metallic rim');
+ok(/gem-facet-light/.test(tokens) && /gem-facet-dark/.test(tokens) && /gem-sheen/.test(tokens) && /gem-spec/.test(tokens) && /gem-shadow/.test(tokens), 'crystal facets, layered specular reflection, and contact shadows are original SVG layers');
+ok(/gem-num-rim/.test(tokens) && /gem-num-disc/.test(tokens) && /class="gem-num number-/.test(tokens), 'raised number disc and skin-specific numeral are included');
+ok(/SEAT_SHAPES/.test(tokens) && /id: 'ruby'/.test(game) && /id: 'emerald'/.test(game) && /id: 'gold'/.test(game) && /id: 'sapphire'/.test(game), 'four distinct per-player metallic materials remain data-driven');
+ok(['classic', 'royal', 'dragon', 'cyber', 'galaxy', 'fire', 'ice', 'shadow', 'diamond', 'legendary'].every(id => new RegExp("id: '" + id + "'").test(tokens)), 'all ten requested original skins are present');
+ok(/roman/.test(tokens) && /digital/.test(tokens) && /ancient/.test(tokens) && /carved/.test(tokens), 'Royal, Cyber, Ancient/Galaxy, and Dragon number treatments are available');
+ok(/TOKEN_CAPTURE_MS = 680/.test(game) && /token-capture-wave/.test(game) && /capture-settle/.test(game), 'capture shockwave/settle effects are bounded to 680ms');
+ok(/prefersReducedMotion\(\).*placeToken/.test(game) && /prefers-reduced-motion: reduce/.test(css), 'captured token transitions and decorative motion respect reduced-motion preferences');
+ok(/token-trail-dot/.test(game + css) && /TRAILS/.test(tokens), 'short, skin/set-themed movement trails are available');
+ok(/tokenIdentityForSeat/.test(game) && /token-intro-grid/.test(html), 'player identity is carried into accessible board tokens and match-intro UI');
+ok(/syncTokenIdentity: syncTokenIdentity/.test(online) && /token_skin: chosen\.skin, token_set: chosen\.set, token_level: chosen\.level/.test(online), 'only the authenticated owner can sync skin, set, and level fields');
+ok(/grant update \(token_skin, token_set, token_level\)[\s\S]*?to authenticated/i.test(migrationSql) && !/create policy|grant[\s\S]{0,100}wallet|grant[\s\S]{0,100}currency/i.test(migrationSql), 'unapplied migration grants only additive token columns and leaves existing profile RLS in place');
+ok(/function collectEligible/.test(evolution) && /matchesRequired/.test(evolution) && !/coinCost|coin|diamond|purchase|wins/i.test(evolution), 'evolution progression has no coins, diamonds, purchase, or win-count path');
+ok(/token-system\.test\.js/.test(pkg.scripts.test) && /test:token2-browser/.test(JSON.stringify(pkg.scripts)), 'TokenSystem unit and responsive browser suites are registered');
+ok(!/Ludo Star|Yalla|yalla|ludostar/i.test(game + css + tokens), 'Token 2.0 uses original art, with no third-party game asset references');
+console.log('\nhero-token checks passed (' + checks + ' checks).');

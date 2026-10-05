@@ -69,6 +69,29 @@
     var message = error && typeof error.message === 'string' ? error.message : '';
     return message || 'The request could not be completed. Please try again.';
   }
+  function missingTokenIdentityColumns(error) {
+    var message = errorText(error);
+    return /token_(?:skin|set|level)/i.test(message) && /column|schema cache|does not exist|not found/i.test(message);
+  }
+  function readProfile(userId) {
+    return client.from('profiles').select('handle,display_name,token_skin,token_set,token_level').eq('id', userId).maybeSingle().then(function (result) {
+      if (!result.error || !missingTokenIdentityColumns(result.error)) return result;
+      return client.from('profiles').select('handle,display_name').eq('id', userId).maybeSingle();
+    });
+  }
+  function readRoomProfiles(ids) {
+    return client.from('profiles').select('id,display_name,handle,token_skin,token_set,token_level').in('id', ids).then(function (result) {
+      if (!result.error || !missingTokenIdentityColumns(result.error)) return result;
+      return client.from('profiles').select('id,display_name,handle').in('id', ids);
+    });
+  }
+  function profileTokenIdentity(profile) {
+    return window.TokenSystem.normalizeProfileIdentity(profile || {});
+  }
+  function tokenIdentityLabel(identity) {
+    var chosen = profileTokenIdentity(identity), level = window.TokenSystem.LEVELS[chosen.level - 1];
+    return window.TokenSystem.skin(chosen.skin).name + ' ' + window.TokenSystem.set(chosen.set).name + ' Set · ' + level.name;
+  }
   function rpcObject(data) {
     return Array.isArray(data) ? (data[0] || {}) : (data || {});
   }
@@ -138,6 +161,19 @@
       return rpcObject(result.data);
     });
   }
+  function syncTokenIdentity(identity) {
+    if (!client || !currentUser) return Promise.resolve({ ok: false, reason: 'signed-out' });
+    var userId = currentUser.id, chosen = profileTokenIdentity(identity);
+    var payload = { token_skin: chosen.skin, token_set: chosen.set, token_level: chosen.level };
+    return client.from('profiles').update(payload).eq('id', userId).select('id').maybeSingle().then(function (result) {
+      if (result.error) throw result.error;
+      if (!currentUser || currentUser.id !== userId) return { ok: false, reason: 'session-changed' };
+      if (!result.data) throw new Error('The signed-in profile is not available for token identity updates.');
+      var line = $('online-profile-token-identity');
+      if (line) line.textContent = 'Token identity · ' + tokenIdentityLabel(chosen);
+      return { ok: true, identity: chosen };
+    });
+  }
   function openOnline() {
     home.classList.add('hidden');
     screen.classList.remove('hidden');
@@ -191,6 +227,7 @@
     if (!signedIn) {
       $('online-wallet-coins').textContent = '—';
       $('online-wallet-diamonds').textContent = '—';
+      if ($('online-profile-token-identity')) $('online-profile-token-identity').textContent = 'Token identity · Classic Inferno Set · Basic';
       if (client && emailPasswordEnabled()) announce('Sign in to create or join online rooms.');
       else if (client) announce('Online Ludo email/password authentication is not enabled.', true);
       return;
@@ -276,7 +313,7 @@
     if (!client || !currentUser) return Promise.resolve();
     var requestedUserId = currentUser.id;
     return Promise.all([
-      client.from('profiles').select('handle,display_name').eq('id', currentUser.id).maybeSingle(),
+      readProfile(currentUser.id),
       client.from('wallets').select('coins,diamonds').eq('user_id', currentUser.id).maybeSingle()
     ]).then(function (results) {
       if (results[0].error) throw results[0].error;
@@ -287,8 +324,10 @@
       if (profile) {
         $('online-profile-name').value = profile.display_name || '';
         $('online-profile-handle').textContent = '@' + (profile.handle || 'player');
+        $('online-profile-token-identity').textContent = 'Token identity · ' + tokenIdentityLabel(profile);
       } else {
         $('online-profile-handle').textContent = 'Profile is being created…';
+        $('online-profile-token-identity').textContent = 'Token identity · Classic Inferno Set · Basic';
       }
       $('online-wallet-coins').textContent = wallet ? Number(wallet.coins).toLocaleString() : '0';
       $('online-wallet-diamonds').textContent = wallet ? Number(wallet.diamonds).toLocaleString() : '0';
@@ -346,6 +385,11 @@
       var playerState = document.createElement('small');
       playerState.textContent = 'Seat ' + (member.seat + 1) + ' · ' + (member.ready ? 'Ready' : 'Not ready') + (member.role === 'host' ? ' · Host' : '');
       item.append(playerName, playerState);
+      if (room.mode === 'classic') {
+        var tokenState = document.createElement('small'); tokenState.className = 'online-token-identity';
+        tokenState.textContent = 'Tokens · ' + tokenIdentityLabel(member.tokenIdentity);
+        item.appendChild(tokenState);
+      }
       $('online-room-roster').appendChild(item);
     });
     $('online-chess-resume').classList.toggle('hidden', !(room.mode === 'ludo_chess' && room.matchState && room.matchState.state && chessPlayViewDismissed));
@@ -719,11 +763,17 @@
       var localView = { mode: 'classic', players: state.players, pieces: state.pieces, rules: state.rules, turn: Number(state.turn), phase: 'move', queue: queue, ranking: state.ranking || [], effects: [], capd: state.capd || [false, false, false, false], lk: null };
       window.LudoLogic.queueMoves(localView);
     }
-    var names = {};
-    (room.roster || []).forEach(function (member) { names[Number(member.seat)] = member.displayName || member.handle || ('Seat ' + (Number(member.seat) + 1)); });
+    var names = {}, tokenIdentities = {};
+    (room.roster || []).forEach(function (member) {
+      var seat = Number(member.seat);
+      names[seat] = member.displayName || member.handle || ('Seat ' + (seat + 1));
+      tokenIdentities[seat] = member.tokenIdentity || { skin: 'classic', set: 'inferno', level: 1 };
+    });
     if (window.__cf && window.__cf.presentOnline) {
       window.__cf.presentOnline({
         state: state,
+        roomId: currentRoomId,
+        tokenIdentities: tokenIdentities,
         mySeat: myMember ? Number(myMember.seat) : Number(state.turn),
         names: names,
         deadline: Number(state.turn_deadline) || 0,
@@ -820,7 +870,7 @@
         throw notMember;
       }
       var ids = roster.map(function (member) { return member.user_id; });
-      return client.from('profiles').select('id,display_name,handle').in('id', ids).then(function (profileResult) {
+      return readRoomProfiles(ids).then(function (profileResult) {
         if (profileResult.error) throw profileResult.error;
         if (requestSequence !== roomRefreshSequence || currentRoomId !== requestedRoomId || !currentUser || currentUser.id !== userId) return null;
         var profiles = {};
@@ -836,7 +886,7 @@
           matchState: serverMatchState,
           roster: roster.map(function (member) {
             var profile = profiles[member.user_id] || {};
-            return Object.assign({}, member, { displayName: profile.display_name, handle: profile.handle });
+            return Object.assign({}, member, { displayName: profile.display_name, handle: profile.handle, tokenIdentity: profileTokenIdentity(profile) });
           })
         });
         var mine = roster.filter(function (member) { return member.user_id === userId; })[0];
@@ -1329,6 +1379,7 @@
   window.__crossfourOnline = {
     isConfigured: isConfigured,
     open: openOnline,
-    close: closeOnline
+    close: closeOnline,
+    syncTokenIdentity: syncTokenIdentity
   };
 })();

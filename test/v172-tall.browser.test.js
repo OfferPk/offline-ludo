@@ -1,4 +1,4 @@
-// v1.7.2 Tall pawn tokens — board/material/evolution screenshots + DOM checks.
+// v1.7.2 token hitbox contract — Token 2.0 circular board/evolution screenshots + DOM checks.
 // Usage: CHROME=/usr/bin/google-chrome SHOT_DIR=/workspace/offline-ludo-shots npm run test:tall
 'use strict';
 const fs = require('node:fs');
@@ -61,13 +61,12 @@ const LEVEL_NAMES = ['basic', 'polished', 'elite', 'mythic', 'legendary'];
     await page.reload({ waitUntil: 'networkidle0' });
     await page.waitForSelector('#home:not(.hidden)');
 
-    // Unlock all levels via coins path for preview shots
+    // Seed a completed-match-only local fixture for level preview shots.
     await page.evaluate(() => {
       const s = window.__cf.save;
-      s.coins = 10000;
-      s.stats.won = 100;
       s.tokenEvoUnlocked = 1;
       s.tokenEvo = 1;
+      s.tokenProgress = { completed: 20, roomCompletions: [] };
       window.TokenEvolution.collectEligible(s);
       window.__cf.persist();
     });
@@ -76,8 +75,9 @@ const LEVEL_NAMES = ['basic', 'polished', 'elite', 'mythic', 'legendary'];
     await page.waitForSelector('#skins:not(.hidden)');
     await page.click('#skin-tabs [data-tab="tokens"]');
     await sleep(200);
-    const evoCards = await page.$$eval('#skin-grid .evo-card', els => els.length);
-    ok(evoCards === 5, '5 evolution cards in Skins → Tokens');
+    const evoCards = await page.$$eval('#token-wardrobe .token-level-step', els => els.length);
+    ok(evoCards === 5, '5 accessible evolution levels in the unified Token 2.0 wardrobe');
+    ok(await page.$$eval('#token-wardrobe .token-level-step', els => els.length === 5 && els.every(el => !el.disabled)), 'all five screenshot levels are unlocked by the free completion fixture');
     await shot('skins-tokens');
 
     await page.click('#skins .close');
@@ -139,18 +139,20 @@ const LEVEL_NAMES = ['basic', 'polished', 'elite', 'mythic', 'legendary'];
         const svg = document.querySelector('.pc[data-seat="0"] .gem-token');
         const body = svg && svg.querySelector('.gem-body');
         const rim = svg && svg.querySelector('.gem-rim-outer');
-        const collar = svg && svg.querySelector('.gem-collar');
         return {
           vb: svg ? svg.getAttribute('viewBox') : null,
           bodyTag: body ? body.tagName.toLowerCase() : null,
           rimTag: rim ? rim.tagName.toLowerCase() : null,
-          hasCollar: !!collar,
-          hasPathD: !!(body && body.getAttribute('d'))
+          hasPathD: !!(body && body.getAttribute('d')),
+          hasFacets: !!(svg && svg.querySelector('.gem-facet')),
+          hasSeatMark: !!(svg && svg.querySelector('.gem-seat-mark')),
+          hasSetMark: !!(svg && svg.querySelector('.gem-set-mark')),
+          hasEmbossedNumber: !!(svg && svg.querySelector('.gem-num-rim') && svg.querySelector('.gem-num-disc') && svg.querySelector('.gem-num'))
         };
       });
-      ok(shape.vb === '0 0 24 36', 'viewBox tall 24x36 at Lv' + lv);
-      ok(shape.bodyTag === 'path' && shape.rimTag === 'path' && shape.hasPathD, 'path silhouette (not circle) at Lv' + lv);
-      ok(shape.hasCollar, 'collar present at Lv' + lv);
+      ok(shape.vb === '0 0 24 24', 'viewBox preserves circular 24x24 token geometry at Lv' + lv);
+      ok(shape.bodyTag === 'circle' && shape.rimTag === 'circle' && !shape.hasPathD, 'layered circular crystal and metallic rim at Lv' + lv);
+      ok(shape.hasFacets && shape.hasSeatMark && shape.hasSetMark && shape.hasEmbossedNumber, 'crystal facets, seat/set emblem, and raised number at Lv' + lv);
       ok(probe.aiEvo.every(e => e === '1'), 'AI tokens stay Basic at Lv' + lv);
       if (lv >= 4) ok(probe.badge, 'badge present at Lv' + lv);
       else ok(!probe.badge, 'no badge below Mythic at Lv' + lv);

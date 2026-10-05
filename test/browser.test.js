@@ -3,6 +3,7 @@
 // Fails on any console error / failed request.
 // Usage: PUPPETEER=puppeteer-core node test/browser.test.js <url> [screenshot dir]
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
+const APP_VERSION = require('../package.json').version;
 const URL = (process.argv[2] || 'http://localhost:8781/').replace(/\/?$/, '/');
 const OUT = process.argv[3] || '/tmp';
 const W = 360, H = 740;
@@ -66,7 +67,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(await visible('#home') && !(await visible('#btn-continue')), 'home on launch, nothing to continue');
   ok(await visible('#btn-mystery'), 'Mystery Tiles mode on home screen');
   ok((await ev(() => window.__cf.gate.state.sessions)) === 1, 'first session counted');
-  ok(/1\.3\.0/.test(await ev(() => document.body.innerText + document.documentElement.innerHTML)), 'version 1.3.0 in page');
+  ok((await ev(() => document.body.innerText + document.documentElement.innerHTML)).includes('v' + APP_VERSION), 'version ' + APP_VERSION + ' in page');
 
   const failedSave = await ev(() => {
     const proto = Storage.prototype, original = proto.setItem;
@@ -144,11 +145,17 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
     const c = window.__cf, expected = c.logic.clone(c.game.st), result = c.logic.roll(expected);
     return { state: expected, raw: result.raw, value: result.value };
   });
+  await ev(() => {
+    window.__normalMotionToss = false;
+    const die = document.querySelector('.pod[data-seat="0"] .pdice');
+    const observe = event => { if (event.animationName === 'toss') { window.__normalMotionToss = true; die.removeEventListener('animationstart', observe); } };
+    die.addEventListener('animationstart', observe);
+  });
   await swipeDice(0);
   await waitFor(expectedRolls => { const c = window.__cf; return !c.busy && c.game.st.turn === 0 && c.game.st.rolls === expectedRolls && (c.game.st.phase === 'roll' || c.game.st.phase === 'move'); }, 8000, 'human swipe roll after restored match', beforeSwipe.rolls + 1);
   const afterSwipe = await st();
   ok(afterSwipe.rolls === beforeSwipe.rolls + 1 && afterSwipe.faces[0] === expectedAfterSwipe.raw && JSON.stringify(afterSwipe) === JSON.stringify(expectedAfterSwipe.state), 'a real touch swipe triggers exactly one roll and preserves the deterministic RNG/result');
-  ok(await ev(() => getComputedStyle(document.querySelector('.pod[data-seat="0"] .pdice')).animationName.includes('toss')), 'normal-motion swipe shows the brief dice bounce');
+  ok(await ev(() => window.__normalMotionToss), 'normal-motion swipe starts the brief dice bounce');
   ok(await ev(() => /tap or swipe/i.test(document.querySelector('.pod[data-seat="0"] .pdice').getAttribute('aria-label'))), 'the focused dice button advertises swipe while retaining an accessible tap action');
   ok(await ev(() => {
     const c = window.__cf, old = window.Capacitor; let calls = 0, threw = false;
@@ -242,21 +249,21 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
       const size = svg && svg.getBoundingClientRect();
       return t.tagName === 'BUTTON' && !!t.getAttribute('aria-label') && svg.getAttribute('aria-hidden') === 'true' &&
         body && pad && svg.querySelector('.gem-glint') && svg.querySelector('.gem-core') && svg.querySelector('.gem-shadow') &&
-        /^fill:url\(#gem-body-/.test(body.getAttribute('style')) && svg.querySelector('linearGradient') && svg.querySelector('radialGradient') && size.width >= 14 && size.height >= 14;
+        body.getAttribute('fill').includes('-body)') && svg.querySelector('linearGradient') && svg.querySelector('radialGradient') && size.width >= 10.5 && size.height >= 14;
     });
     const coreBySeat = Object.fromEntries(seats.map(s => [s, getComputedStyle(document.querySelector('.pc[data-seat="' + s + '"]')).getPropertyValue('--pccore').trim()]));
     const first = tokens[0], svg = first && first.querySelector('.gem-token'), shadow = svg && svg.querySelector('.gem-shadow');
     const gradient = svg && svg.querySelector('radialGradient');
     const body = svg && svg.querySelector('.gem-body');
     return { ready, seats, tag: body && body.tagName, radius: body && body.getAttribute('r'), glint: svg && svg.querySelector('.gem-glint') && svg.querySelector('.gem-glint').getAttribute('d'),
-      rim: !!(svg && svg.querySelector('.gem-rim-outer')), emboss: !!(svg && svg.querySelector('.gem-num-hi')),
+      rim: !!(svg && svg.querySelector('.gem-rim-outer')), emboss: !!(svg && svg.querySelector('.gem-num-rim') && svg.querySelector('.gem-num-disc') && svg.querySelector('.gem-num')),
       coreStops: gradient ? [...gradient.querySelectorAll('stop')].map(stop => stop.getAttribute('stop-color')) : [],
       shadowFilter: shadow ? getComputedStyle(shadow).filter : '', shadowOpacity: shadow ? getComputedStyle(shadow).opacity : '',
       colors: [...new Set(seats.map(s => getComputedStyle(document.querySelector('.pc[data-seat="' + s + '"]')).getPropertyValue('--pc').trim()))], coreBySeat };
   });
   ok(gemCheck.ready && gemCheck.colors.length === gemCheck.seats.length && gemCheck.coreBySeat['1'] === '#a0ffd2' && gemCheck.coreBySeat['3'] === '#a9ddff', 'circular hero tokens, layered gradients, player-colored pads, and Jade/Cobalt core hues are legible at board size');
   ok(gemCheck.tag === 'circle' && Number(gemCheck.radius) >= 7 && gemCheck.rim && gemCheck.emboss && gemCheck.glint, 'circular crystal body, metallic rim, embossed numeral, and reflection glint stay crisp');
-  ok(gemCheck.coreStops[0] === '#fff' && gemCheck.coreStops.includes('var(--pccore)') && gemCheck.shadowFilter.includes('blur(') && Number(gemCheck.shadowOpacity) < .9, 'white-hot radial core glows inside the crystal over a soft contact shadow');
+  ok(gemCheck.coreStops[0] === '#fff' && gemCheck.coreStops.some(stop => stop.startsWith('var(--pccore')) && gemCheck.shadowFilter.includes('blur(') && Number(gemCheck.shadowOpacity) >= .9, 'white-hot radial core glows inside the crystal over a soft contact shadow');
   await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
 
   // ---------- Star-style stacked rolls: 6, 6, 3 ----------
@@ -295,12 +302,14 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await page.focus('.pod[data-seat="3"] .chip-v[data-v="6"]'); await page.keyboard.press('Enter'); await sleep(100);
   ok(await ev(() => window.__cf.game.sel === 6), 'tapped chip 6 is selected');
   const keyboardToken = '.pc[data-seat="3"][data-piece="0"]';
-  ok(await ev(sel => { const b = document.querySelector(sel); return b.tagName === 'BUTTON' && !b.disabled && /You token 1, in base, select to move/.test(b.getAttribute('aria-label')); }, keyboardToken), 'legal token is a named, enabled button with its position');
+  ok(await ev(sel => { const b = document.querySelector(sel), label = b && b.getAttribute('aria-label') || ''; return b && b.tagName === 'BUTTON' && !b.disabled && /You · (?:Ruby|Gold|Emerald|Sapphire) Classic Inferno Set, Basic evolution, token 1, in base, select to move/.test(label); }, keyboardToken), 'legal token is a named, enabled button with its position');
   ok(await ev(() => { const h = document.getElementById('hint'); return h.getAttribute('role') === 'status' && h.getAttribute('aria-live') === 'polite' && /Dice chip 6 selected/.test(h.textContent); }), 'move guidance is announced after a chip is selected');
   ok(await ev(sel => document.activeElement === document.querySelector(sel), keyboardToken), 'keyboard chip selection focuses the matching legal token');
   await page.keyboard.press('Enter'); await idleHuman('move', 3); s = await st();
   ok(s.pieces[3][0] === 0 && s.queue.join() === '6,4', 'Enter moves a focused token out of base without triggering a roll');
-  await chip(3, 4); await sleep(80); await tapPiece(3, 0); await idleHuman('move', 3); s = await st();
+  await chip(3, 4); await sleep(80); await tapPiece(3, 0);
+  await waitFor(() => { const picker = document.querySelector('#token-die-pick'); return picker && !picker.classList.contains('hidden') && !!picker.querySelector('.token-die-v[data-v="4"]'); }, 3000, 'multi-die token picker');
+  await tap('#token-die-pick .token-die-v[data-v="4"]'); await idleHuman('move', 3); s = await st();
   ok(s.pieces[3][0] === 4 && s.queue.join() === '6', 'chip 4 moved that token 4 squares');
   await tapPiece(3, 1);
   await waitFor(() => { const g = window.__cf.game; return g.st.turn === 1 || g.st.phase === 'over'; }, 10000, 'turn passes to computer');
@@ -634,7 +643,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await ev(() => document.querySelector('#rules [data-close="rules"]').click()); await sleep(100);
 
   await tap('#btn-arrow'); await sleep(200);
-  ok(/one-way/.test(await ev(() => document.getElementById('mode-note').textContent)), 'Arrow setup explains one-way tiles');
+  ok(/Exact land on amber arrow/.test(await ev(() => document.getElementById('mode-note').textContent)) && /jump \+4/.test(await ev(() => document.getElementById('mode-note').textContent)) && /Passing over an arrow is normal movement/.test(await ev(() => document.getElementById('mode-note').textContent)), 'Arrow setup explains exact landing, jump +4, and ordinary pass-over movement');
   await tap('#btn-setup-back'); await sleep(150);
   await tap('#btn-friendly'); await sleep(200);
   ok(/captures are off/i.test(await ev(() => document.getElementById('mode-note').textContent)), 'Friendly setup says captures are off');

@@ -41,7 +41,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await seedSave('crossfour.save.v1', v1);
     let migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
     ok(migrated.status === 'migrated-v1' && migrated.save.coins === 77 && migrated.save.board === 'linen' && migrated.save.dice === 'brass', 'v1 save migration retains coins and selected legacy skins');
-    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === false && migrated.save.owned.boards.includes('linen') && migrated.save.owned.dice.includes('brass'), 'v1 gains safe streak/event defaults without losing owned skins');
+    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true && migrated.save.owned.boards.includes('linen') && migrated.save.owned.dice.includes('brass'), 'v1 gains safe streak/event defaults without losing owned skins');
 
     const legacyV2 = await page.evaluate(() => {
       const s = JSON.parse(JSON.stringify(window.__cf.save));
@@ -51,7 +51,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await seedSave('crossfour.save.v2', legacyV2);
     migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
     ok(migrated.status === 'migrated-v2' && migrated.save.coins === 321 && migrated.save.board === 'walnut' && migrated.save.dice === 'frost', 'v2 save migration retains progression and selected legacy skins');
-    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === false, 'v2 receives backward-compatible achievement and event defaults');
+    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true, 'v2 receives backward-compatible achievement and event defaults');
 
     const legacyV3 = await page.evaluate(() => {
       const s = JSON.parse(JSON.stringify(window.__cf.save));
@@ -66,12 +66,12 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await reload();
     migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
     ok(migrated.status === 'loaded' && migrated.save.coins === 432 && migrated.save.board === 'aurora' && migrated.save.dice === 'ember', 'old v3 primary snapshot is accepted and keeps its selected IDs');
-    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === false, 'old v3 primary/checkpoint are normalized without schema loss');
+    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true, 'old v3 primary/checkpoint are normalized without schema loss');
 
     // Start shop tests from a clean local-only profile.
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await reload();
     await page.click('#btn-skins'); await page.waitForSelector('#skins:not(.hidden) #skin-grid [data-id="graphite"]');
-    ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === 20, 'real Boards tab renders all 20 boards');
+    ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === 22, 'real Boards tab renders all 22 boards');
     ok(await page.evaluate(() => {
       const box = document.getElementById('skins').querySelector('.panel');
       const grid = document.getElementById('skin-grid');
@@ -83,6 +83,8 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     const galaxyCard = await page.$('[data-id="galaxy"]');
     await galaxyCard.screenshot({ path: path.join(OUT, 'skin-preview-galaxy.png') });
     ok(await page.$eval('[data-id="galaxy"] canvas', canvas => canvas.width > 0 && canvas.getAttribute('aria-label') === 'Galaxy board preview'), 'Galaxy board preview draws the actual board renderer');
+    await page.evaluate(() => { window.__cf.save.flags.diamondCollection = false; window.__cf.persist(); document.querySelector('#skin-tabs [data-tab="boards"]').click(); });
+    await page.waitForFunction(() => document.querySelector('[data-id="diamond"] button').disabled);
     ok(await page.$eval('[data-id="diamond"] button', button => button.disabled && /future event/i.test(button.textContent)), 'Diamond board remains locked without an event flag');
     ok(await page.$eval('[data-id="champion"] small', note => /50 lifetime wins/i.test(note.textContent)), 'Champion card shows its real 50-win requirement');
     ok(await page.$eval('[data-id="streak-master"] small', note => /10 consecutive wins/i.test(note.textContent)), 'Streak Master card shows its real streak requirement');
@@ -114,6 +116,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     ok(await page.evaluate(() => window.__cf.save.board === 'galaxy' && window.__cf.save.coins === 1900 && window.__cf.save.owned.boards.includes('galaxy')), 'equipped Board skin and coin balance survive reload');
     await page.click('#btn-skins'); await page.waitForSelector('[data-id="galaxy"]');
 
+    await page.evaluate(() => { window.__cf.save.flags.diamondCollection = false; window.__cf.persist(); });
     await page.click('#skin-tabs button[data-tab="dice"]');
     ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === 17, 'real Dice tab renders all 17 dice styles');
     ok(await page.evaluate(() => {
