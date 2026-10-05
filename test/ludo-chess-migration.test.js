@@ -46,4 +46,31 @@ ok(/alter publication supabase_realtime add table public\.ludo_chess_matches/i.t
 ok(/table: 'ludo_chess_matches'/i.test(online) && /ludo_chess_move/i.test(online), 'the signed-in client subscribes to and acts on the Chess match table');
 ok(/value="ludo_chess"/i.test(html) && /online-chess-board/i.test(html), 'online lobby offers Chess and has a dedicated playable board');
 ok(!/ludo_chess|LudoChess/.test(read('www/js/logic.js') + read('www/js/save-store.js')), 'Classic Ludo engine and local save format are not changed by Chess');
+const drawOfferMigration = migrations.find(file => /_online_chess_draw_offers\.sql$/.test(file));
+ok(drawOfferMigration, 'a forward-only mutual Chess draw-offer migration exists');
+const drawSql = read('supabase/migrations/' + drawOfferMigration);
+const offerStart = drawSql.indexOf('create or replace function public.offer_ludo_chess_draw(');
+const offerEnd = drawSql.indexOf('$$;', offerStart);
+const offerBody = drawSql.slice(offerStart, offerEnd);
+const respondStart = drawSql.indexOf('create or replace function public.respond_ludo_chess_draw(');
+const respondEnd = drawSql.indexOf('$$;', respondStart);
+const respondBody = drawSql.slice(respondStart, respondEnd);
+ok(/add column if not exists draw_offer jsonb/i.test(drawSql) && /position_version/i.test(drawSql) && /position_key/i.test(drawSql), 'pending offers are stored on the authoritative match row and bound to its position/version');
+ok(/create trigger ludo_chess_matches_clear_draw_offer[\s\S]*?before update of state on public\.ludo_chess_matches/i.test(drawSql) && /new\.state->>'phase' = 'over'[\s\S]*?new\.draw_offer := null/i.test(drawSql) && /private\.ludo_chess_position_key\(new\.state\)[\s\S]*?is distinct from private\.ludo_chess_position_key\(old\.state\)/i.test(drawSql), 'a committed move or terminal game state clears the pending offer atomically');
+ok(/new\.status = 'cancelled'[\s\S]*?update public\.ludo_chess_matches[\s\S]*?draw_offer = null/i.test(drawSql), 'room cancellation clears any pending offer');
+for (const fn of ['offer_ludo_chess_draw', 'respond_ludo_chess_draw']) {
+  ok(new RegExp('create or replace function public\\.' + fn + '\\(', 'i').test(drawSql), fn + ' is a dedicated server RPC');
+  ok(new RegExp('grant execute on function public\\.' + fn + '\\(', 'i').test(drawSql), fn + ' is granted only through the authenticated role');
+}
+ok(/room_members as rm[\s\S]*?rm\.user_id = v_user[\s\S]*?You are not a member of this room/i.test(offerBody) && /v_status <> 'active'[\s\S]*?v_state->>'phase' <> 'active'/i.test(offerBody), 'only authenticated members of an active Chess match may offer');
+ok(offerBody.indexOf('select a.* into v_existing') < offerBody.indexOf('if p_expected_version <> v_version') && /v_existing\.actor_id <> v_user or v_existing\.request <> v_request/i.test(offerBody), 'offer retries are actor/payload-bound and exact duplicates return before stale-version checks');
+ok(/if p_expected_version <> v_version then[\s\S]*?raise exception 'Match state is stale/i.test(offerBody) && /position_version/.test(offerBody), 'offer creation rejects stale versions and captures the observed position version');
+ok(/Only the player who offered the draw can withdraw it/i.test(respondBody) && /Only the other player can respond to this draw offer/i.test(respondBody), 'only the offerer may withdraw, and only the opponent may accept or decline');
+ok(respondBody.indexOf('select a.* into v_existing') < respondBody.indexOf('if p_expected_version <> v_version') && /v_existing\.actor_id <> v_user or v_existing\.request <> v_request/i.test(respondBody), 'responses are idempotent and bound to actor, version, and decision');
+ok(/p_response = 'accept'[\s\S]*?\{phase\}[\s\S]*?"over"[\s\S]*?\{result\}[\s\S]*?draw_agreement[\s\S]*?\{winner\}[\s\S]*?null/i.test(respondBody), 'accepting records an agreed draw in the authoritative game state');
+ok(/update public\.ludo_chess_matches[\s\S]*?update public\.rooms[\s\S]*?status = 'completed'[\s\S]*?update public\.match_history[\s\S]*?winner_id = null[\s\S]*?jsonb_build_object\('version', v_new_version, 'state', v_state\)/i.test(respondBody), 'acceptance commits match state and draw history together with no winner');
+ok(/p_response = 'accept' then[\s\S]*?end if;[\s\S]*?update public\.ludo_chess_matches[\s\S]*?state = v_state, draw_offer = null/i.test(respondBody) && /Only the player who offered the draw can withdraw it/i.test(respondBody), 'declining or withdrawing clears the offer while leaving the active game state unchanged');
+ok(!/currency_ledger|wallets|post_currency_transaction/i.test(drawSql), 'draw offers do not alter currency or wallet behavior');
+ok(/if p_expected_version <> v_version then[\s\S]*?raise exception 'Match state is stale/i.test(respondBody), 'stale draw responses are rejected before offer-side effects');
+ok(/update public\.match_history[\s\S]*?where room_id = p_room_id and status = 'active'/i.test(respondBody), 'draw acceptance updates the production active-history row');
 console.log('\nLudo Chess database and integration static tests passed (' + checks + ' checks).');
