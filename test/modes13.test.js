@@ -18,9 +18,26 @@ t('Quick Ludo: 2 tokens, same track, 6 to leave, exact home', () => {
   assert.strictEqual(L.legalMoves(st, 3, 2).length, 0, 'exact roll still required');
 });
 
+t('Arrow: each player starts with one token already on the start square', () => {
+  const four = L.newGame([H, A(), A(), A()], {}, 4, 'arrow');
+  assert.strictEqual(four.nPieces, 4);
+  four.players.forEach(s => {
+    assert.strictEqual(four.pieces[s][0], 0, 'token 0 starts on the start square');
+    assert.ok(four.pieces[s].slice(1).every(p => p === -1), 'other tokens stay in base');
+  });
+  const withOne = L.legalMoves(four, 0, 1).find(m => m.piece === 0);
+  assert.ok(withOne && withOne.from === 0 && withOne.to === 1, 'any roll 1-5 moves the starter token without a 6');
+  assert.deepStrictEqual(L.legalMoves(four, 0, 1).find(m => m.from === -1), undefined, 'tokens still in base need a 6');
+  const classic = L.newGame([H, A(), null, null], {}, 4, 'classic');
+  assert.ok(classic.pieces[0].every(p => p === -1), 'classic still starts every token in base');
+  const quick = L.newGame([H, A(), null, null], {}, 4, 'quick');
+  assert.ok(quick.pieces[0].every(p => p === -1), 'quick still starts every token in base');
+});
+
 t('Arrow: landing or passing both ride one extra clockwise square', () => {
   const st = L.newGame([H, A(), null, null], {}, 4, 'arrow');
   assert.ok(st.rules.arrows);
+  assert.strictEqual(st.pieces[0][0], 0);
   assert.deepStrictEqual(L.legalMoves(st, 0, 1).find(m => m.from === -1), undefined);
   assert.deepStrictEqual(L.ARROW_SQUARES, [4, 17, 30, 43]);
   st.pieces[0][0] = 3;

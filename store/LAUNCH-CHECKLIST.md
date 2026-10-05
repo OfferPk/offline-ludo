@@ -1,3 +1,9 @@
+## v1.5.1 update — Arrow start + polish
+
+- **Upload:** `offline-ludo-v1.5.1.aab` (version 1.5.1, **versionCode 8**), wahi upload key.
+- Arrow mode: har player ki 1 goti pehle se start square par; us goti ke liye 6 ka wait nahi. Baqi modes pehle jaisi.
+- Dice / token / board lighting polish. Gameplay rules (Mystery, Lucky, online) same.
+
 ## v1.5.0 update — board and match polish
 
 - **Upload:** `offline-ludo-v1.5.0.aab` (version 1.5.0, **versionCode 7**), wahi upload key.

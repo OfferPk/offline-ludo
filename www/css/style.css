@@ -157,9 +157,9 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .chip-v.dbl { background: linear-gradient(135deg, #2a86e0, #18b3b8); color: #fff; box-shadow: none; }
 .pdice { width: 44px; height: 44px; perspective: 300px; flex: none; position: relative; border-radius: 11px; touch-action: none; }
 .pdice:disabled { cursor: default; }
-.pdice .cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform .92s cubic-bezier(.16,.72,.2,1); }
-.pdice .face { position: absolute; inset: 0; border-radius: 11px; background: linear-gradient(160deg, #fff 0%, var(--d-face) 46%, var(--d-edge) 100%); box-shadow: inset 0 2px 0 rgba(255,255,255,.9), inset 0 -7px 8px rgba(40,32,20,.16); border: 1px solid rgba(255,255,255,.7); display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 6px; backface-visibility: hidden; }
-.pdice .face i { width: 8px; height: 8px; border-radius: 50%; background: radial-gradient(circle at 32% 30%, #6b7382, var(--d-pip) 58%, #0c0e12); box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 1px 1px rgba(0,0,0,.4); place-self: center; }
+.pdice .cube { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform .88s cubic-bezier(.14,.7,.18,1); filter: drop-shadow(0 4px 3px rgba(0,0,0,.28)); }
+.pdice .face { position: absolute; inset: 0; border-radius: 11px; background: linear-gradient(155deg, #ffffff 0%, var(--d-face) 42%, var(--d-edge) 100%); box-shadow: inset 0 2px 0 rgba(255,255,255,.95), inset 0 -8px 10px rgba(40,32,20,.18), 0 2px 4px rgba(0,0,0,.12); border: 1px solid rgba(255,255,255,.78); display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 6px; backface-visibility: hidden; }
+.pdice .face i { width: 8.5px; height: 8.5px; border-radius: 50%; background: radial-gradient(circle at 30% 28%, #8a93a3, var(--d-pip) 52%, #07090c); box-shadow: inset 0 1px 0 rgba(255,255,255,.4), inset 0 -1px 1px rgba(0,0,0,.35), 0 1px 1.5px rgba(0,0,0,.45); place-self: center; }
 .pdice .f1 { transform: translateZ(22px); } .pdice .f6 { transform: rotateY(180deg) translateZ(22px); }
 .pdice .f2 { transform: rotateY(90deg) translateZ(22px); } .pdice .f5 { transform: rotateY(-90deg) translateZ(22px); }
 .pdice .f3 { transform: rotateX(90deg) translateZ(22px); } .pdice .f4 { transform: rotateX(-90deg) translateZ(22px); }
@@ -206,7 +206,7 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .online-grace-meter { display: block; height: 3px; border-radius: 999px; overflow: hidden; background: rgba(255,210,122,.18); }
 .online-grace-meter > i { display: block; height: 100%; width: 100%; background: #ffd27a; border-radius: inherit; }
 #board-wrap { position: relative; width: var(--bs); height: var(--bs); flex: none; }
-#board { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 16px; box-shadow: 0 22px 48px -14px rgba(0,0,0,.55), 0 8px 18px -10px rgba(0,0,0,.35); }
+#board { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 16px; box-shadow: 0 24px 52px -12px rgba(0,0,0,.58), 0 10px 20px -10px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.08); }
 #board-wrap.shake { animation: shake .32s; }
 @keyframes shake { 20% { transform: translateX(-4px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
 #tiles, #pieces, #fx { position: absolute; inset: 0; pointer-events: none; }
@@ -221,11 +221,11 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc::after { content: ""; position: absolute; left: 2%; bottom: -8%; width: 96%; height: 24%; border: 1px solid var(--pc); border-radius: 50%; opacity: 0; transform: scale(.68); pointer-events: none; }
 .pc.land::after { animation: gem-ripple .4s ease-out both; }
 @keyframes gem-ripple { from { opacity: .62; transform: scale(.68); box-shadow: 0 0 4px var(--pc); } to { opacity: 0; transform: scale(1.3); box-shadow: 0 0 9px var(--pc); } }
-.pc .gem-token { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; filter: drop-shadow(0 3px 1.5px rgba(0,0,0,.42)); }
+.pc .gem-token { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; filter: drop-shadow(0 3.5px 2px rgba(0,0,0,.48)); }
 .pc .gem-ground { fill: var(--pc); opacity: .22; filter: blur(1.2px); }
 .pc .gem-pad { fill: var(--pc); fill-opacity: .16; stroke: var(--pc); stroke-opacity: .6; stroke-width: .7; stroke-linejoin: bevel; }
 .pc .gem-shadow { fill: rgba(0,0,0,.38); opacity: .9; filter: blur(.6px); }
-.pc .gem-body { fill: var(--pcd); fill-opacity: 1; stroke: rgba(255,255,255,.96); stroke-opacity: .9; stroke-width: 1.05; stroke-linejoin: round; }
+.pc .gem-body { fill: var(--pcd); fill-opacity: 1; stroke: rgba(255,255,255,.98); stroke-opacity: .95; stroke-width: 1.15; stroke-linejoin: round; }
 .pc .gem-facet-light { fill: var(--pcl); fill-opacity: .88; }
 .pc .gem-facet-dark { fill: var(--pcdd); fill-opacity: .8; }
 .pc .gem-facet-side { fill: var(--pcd); fill-opacity: .72; }
@@ -233,7 +233,7 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .pc .gem-core { fill: var(--pccore); opacity: .86; filter: drop-shadow(0 0 3px var(--pccore)) drop-shadow(0 0 5px rgba(255,255,255,.28)); }
 .pc.is-turn .gem-core { animation: gem-core-breathe 1.7s ease-in-out infinite; }
 @keyframes gem-core-breathe { 0%, 100% { opacity: .62; } 50% { opacity: 1; } }
-.pc .gem-glint { fill: #fff; opacity: .95; }
+.pc .gem-glint { fill: #fff; opacity: .98; filter: drop-shadow(0 0 1px rgba(255,255,255,.6)); }
 .pc .gem-shield { fill: #c9f2ff; fill-opacity: .16; stroke: #c9f2ff; stroke-opacity: .8; stroke-width: .7; opacity: 0; transition: opacity .16s; }
 .pc .gem-shield-glint { fill: none; stroke: rgba(255,255,255,.84); stroke-width: .75; stroke-linecap: round; opacity: 0; }
 .pc.is-shielded .gem-shield, .pc.is-shielded .gem-shield-glint { opacity: 1; }

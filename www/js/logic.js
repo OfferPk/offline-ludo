@@ -121,13 +121,19 @@
     if (md === 'arrow') rr.arrows = true;
     if (md === 'friendly') rr.noCapture = true;
     var blank = function () { var a = []; for (var k = 0; k < np; k++) a.push(-1); return a; };
+    // Arrow mode: each player begins with token 0 already on their start square (no 6 needed to get moving).
+    var startPieces = function () {
+      var a = blank();
+      if (md === 'arrow') a[0] = 0;
+      return a;
+    };
     var st = {
       v: 2,
       mode: md,
       nPieces: np,
       seats: seats.map(function (x) { return x ? { type: x.type === 'ai' ? 'ai' : 'human', level: LEVELS.indexOf(x.level) >= 0 ? x.level : 'medium' } : null; }),
       players: players,
-      pieces: seats.map(function (x) { return x ? blank() : null; }),
+      pieces: seats.map(function (x) { return x ? startPieces() : null; }),
       rules: rr,
       moveCount: 0,
       turn: players[0],

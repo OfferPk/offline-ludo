@@ -366,7 +366,7 @@
         star(ctx, cx, cy, c * 0.3, c * 0.13);
         if (rules && rules.safeSquares) {
           var sg = ctx.createRadialGradient(cx - c * 0.06, cy - c * 0.08, c * 0.02, cx, cy, c * 0.3);
-          sg.addColorStop(0, mix(b.muted, 'w', 0.55)); sg.addColorStop(1, rgba(b.muted.length === 7 ? b.muted : '#888888', 0.95));
+          sg.addColorStop(0, mix(b.muted, 'w', 0.7)); sg.addColorStop(1, rgba(b.muted.length === 7 ? b.muted : '#888888', 0.98));
           ctx.fillStyle = sg; ctx.fill();
           ctx.lineWidth = Math.max(1, c * 0.04); ctx.strokeStyle = alpha(mix(b.muted, 'w', 0.4), 0.7); ctx.stroke();
         } else {
@@ -1371,7 +1371,7 @@
     var entering = !isOpen('result');
     var teamWin = st.mode === 'team', tName = function (seat) { return L.teamOf(seat) ? 'Jade & Cobalt' : 'Coral & Saffron'; };
     $('r-title').textContent = teamWin ? (tName(winner) + ' win') : single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
-    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'ARROW LUDO · ', friendly: 'FRIENDLY · ' };
+    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: each player starts with 1 token already on their start square (no 6 needed for that token). Amber one-way tiles on board number 4: land on or pass and ride one extra square clockwise.', friendly: 'FRIENDLY · ' };
     $('r-kicker').textContent = (MODE_KICK[st.mode] || '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
     var sec = Math.round((G.elapsed || 0) / 1000), mm = Math.floor(sec / 60), ss = sec % 60;
     $('r-meta').textContent = (G.moves || 0) + ' moves · ' + mm + ':' + (ss < 10 ? '0' : '') + ss;

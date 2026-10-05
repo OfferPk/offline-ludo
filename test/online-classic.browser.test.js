@@ -48,7 +48,7 @@ function startLocalServer() {
     assert.ok(/rgb\(/.test(size.glow) || size.glow !== 'none', 'howto card has a glow');
     assert.equal(size.inside, true, 'How to play button is inside the card');
     assert.equal(size.closed, true, 'Rule | Kaise stays closed until the inner button is tapped');
-    assert.equal(size.rows, 9, 'Rule / Kaise rows');
+    assert.equal(size.rows, 10, 'Rule / Kaise rows');
     await page.click('#btn-howto-home');
     const opened = await page.evaluate(() => !document.getElementById('howto-panel').classList.contains('hidden') && document.getElementById('btn-howto-home').getAttribute('aria-expanded') === 'true');
     assert.equal(opened, true, 'the inner button opens Rule | Kaise');

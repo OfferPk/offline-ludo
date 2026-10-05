@@ -221,7 +221,7 @@ pass & play. In 300 simulated 1 v 1 games the average was about 86 rolls (a 4-to
 capture your partner, and a partner's block does not stop you. Pass & play, or you with a computer partner against
 two computers, or four computers. An opponent who finishes their own tokens first does not win the match.
 
-**Arrow Ludo.** Amber one-way arrows on board number 4 of each side (absolute squares 4, 17, 30 and 43), always pointing
+**Arrow Ludo.** Each player starts with **one token already on their start square**, so they can move on any roll without waiting for a 6 for that starter token (other tokens still need a 6 to leave base). Amber one-way arrows on board number 4 of each side (absolute squares 4, 17, 30 and 43), always pointing
 clockwise, which is the only direction tokens move. Stepping onto an arrow, whether the die **lands** there or
 **passes through**, carries the token one extra square clockwise. You cannot choose to stop on an arrow. If that
 extra square is blocked, or the ride would overshoot home, the token stays on the arrow. The home column has no
