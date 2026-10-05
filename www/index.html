@@ -8,8 +8,8 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.6.0">
-  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.6.0">
+  <link rel="stylesheet" href="css/style.css?v=1.6.1">
+  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.6.1">
 </head>
 <body>
   <div id="app">
@@ -352,6 +352,8 @@
           <div id="trail"></div>
           <div id="tiles"></div>
           <div id="pieces"></div>
+          <div id="token-die-pick" class="token-die-pick hidden" aria-live="polite"></div>
+          <div id="move-countdown" class="move-countdown hidden" aria-live="polite" aria-atomic="true"></div>
           <div id="fx"></div>
           <div id="wheel" class="wheel hidden" aria-live="polite">
             <div class="wheel-card">
@@ -500,7 +502,8 @@
             <li>Chips that can't be used (for example a 5 when every token is in base) are dropped.</li>
             <li><b>Classic style</b>: you move each roll before rolling again; a 6 still gives another roll after moving.</li>
             <li><b>Undo dice roll</b>: for about 2 seconds after your roll you can undo it and roll again. 3 free undos per match; after that, an optional ad gives one more. You can switch undo off in Settings.</li>
-            <li><b>Turn timer</b> (optional, off by default): if time runs out the game rolls or moves for you.</li>
+            <li><b>4-second decision</b>: offline human turns count 4…3…2…1; if you do not move, Crossfour auto-plays the best move (kill → open with 6 → AI). Optional 20 s turn timer still available in Settings.</li>
+            <li><b>Stacked dice picker</b>: when you have more than one usable roll (e.g. 6 and 4), tap a token to choose which number to apply.</li>
           </ul>
         </div>
         <div class="rules-page hidden" data-page="mystery">
@@ -578,7 +581,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.6.0 · © OfferPk</p>
+        <p class="ver">Crossfour v1.6.1 · © OfferPk</p>
       </div>
     </div>
 
@@ -586,23 +589,23 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
-  <script src="js/ads-config.js?v=1.6.0"></script>
-  <script src="js/adgate.js?v=1.6.0"></script>
-  <script src="js/ads.js?v=1.6.0"></script>
-  <script src="js/logic.js?v=1.6.0"></script>
-  <script src="js/sound.js?v=1.6.0"></script>
-  <script src="js/themes.js?v=1.6.0"></script>
-  <script src="js/skin-shop.js?v=1.6.0"></script>
-  <script src="js/art.js?v=1.6.0"></script>
-  <script src="js/save-store.js?v=1.6.0"></script>
-  <script src="js/dice-gesture.js?v=1.6.0"></script>
-  <script src="js/path-animation.js?v=1.6.0"></script>
-  <script src="js/game.js?v=1.6.0"></script>
-  <script src="js/community-fixtures.js?v=1.6.0"></script>
-  <script src="js/community.js?v=1.6.0"></script>
-  <script src="js/supabase-config.js?v=1.6.0"></script>
-  <script src="js/chess.js?v=1.6.0"></script>
-  <script src="js/online.js?v=1.6.0"></script>
-  <script src="js/ludo-chess-discovery.js?v=1.6.0"></script>
+  <script src="js/ads-config.js?v=1.6.1"></script>
+  <script src="js/adgate.js?v=1.6.1"></script>
+  <script src="js/ads.js?v=1.6.1"></script>
+  <script src="js/logic.js?v=1.6.1"></script>
+  <script src="js/sound.js?v=1.6.1"></script>
+  <script src="js/themes.js?v=1.6.1"></script>
+  <script src="js/skin-shop.js?v=1.6.1"></script>
+  <script src="js/art.js?v=1.6.1"></script>
+  <script src="js/save-store.js?v=1.6.1"></script>
+  <script src="js/dice-gesture.js?v=1.6.1"></script>
+  <script src="js/path-animation.js?v=1.6.1"></script>
+  <script src="js/game.js?v=1.6.1"></script>
+  <script src="js/community-fixtures.js?v=1.6.1"></script>
+  <script src="js/community.js?v=1.6.1"></script>
+  <script src="js/supabase-config.js?v=1.6.1"></script>
+  <script src="js/chess.js?v=1.6.1"></script>
+  <script src="js/online.js?v=1.6.1"></script>
+  <script src="js/ludo-chess-discovery.js?v=1.6.1"></script>
 </body>
 </html>

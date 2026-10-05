@@ -1058,9 +1058,9 @@
     return sc;
   }
   function scoreMove(st, m, level) { return level === 'hard' ? evalHard(st, m) : evalMedium(st, m); }
-  /** Pick a move { piece, v } for the current AI player. */
-  function chooseMove(st, level, rnd) {
-    var moves = st.moves;
+  /** Pick a move { piece, v } for the current AI player. Optional `pool` limits the candidate moves. */
+  function chooseMove(st, level, rnd, pool) {
+    var moves = pool || st.moves;
     if (!moves.length) return null;
     var r = rnd || function () { return rngNext(st); };
     if (moves.length === 1) return { piece: moves[0].piece, v: moves[0].v };
@@ -1073,6 +1073,20 @@
     var best = null, bs = -Infinity;
     moves.forEach(function (m) { var v = scoreMove(st, m, level) + r() * (level === 'hard' ? 0.01 : 6); if (v > bs) { bs = v; best = m; } });
     return { piece: best.piece, v: best.v };
+  }
+  /**
+   * Offline human decision timeout — prefer kill (any die), else open from yard with a 6,
+   * else the hard AI heuristic. Used by the 4-second move countdown auto-play.
+   */
+  function bestAutoMove(st, level, rnd) {
+    var moves = st.moves;
+    if (!moves || !moves.length) return null;
+    var lv = level || 'hard';
+    var kills = moves.filter(function (m) { return m.captures && m.captures.length; });
+    if (kills.length) return chooseMove(st, lv, rnd, kills);
+    var leaves = moves.filter(function (m) { return m.leave && m.v === 6; });
+    if (leaves.length) return chooseMove(st, lv, rnd, leaves);
+    return chooseMove(st, lv, rnd);
   }
   /** Pick-a-number event: which value (1..6) should the AI take? */
   function chooseDieValue(st, seat, level) {
@@ -1134,7 +1148,7 @@
     normRules: normRules, newGame: newGame, nPieces: nPieces, teamOf: teamOf, partnerOf: partnerOf, arrowsOn: arrowsOn, legalMoves: legalMoves, queueMoves: queueMoves, moveFor: moveFor, pathOf: pathOf, roll: roll, move: move, mustChoose: mustChoose,
     nextTurn: nextTurn, activeLeft: activeLeft, progressOf: progressOf, canEnter: canEnter, isShielded: isShielded, isFrozen: isFrozen, opponentBlockAt: opponentBlockAt,
     tileAt: tileAt, applyEvent: applyEvent, eventValid: eventValid, eventTarget: eventTarget,
-    threatsTo: threatsTo, evalHard: evalHard, chooseMove: chooseMove, chooseDieValue: chooseDieValue, distinctMoves: distinctMoves,
+    threatsTo: threatsTo, evalHard: evalHard, chooseMove: chooseMove, bestAutoMove: bestAutoMove, chooseDieValue: chooseDieValue, distinctMoves: distinctMoves,
     coinsFor: coinsFor, xpFor: xpFor, levelFromXp: levelFromXp, simulate: simulate, clone: clone, aiStep: aiStep, continueTurn: continueTurn,
     // Lucky Chaos Ludo
     LUCKY_BOOST: LUCKY_BOOST, LUCKY_CHAOS: LUCKY_CHAOS, DANGER_TILES: DANGER_TILES, LWHEELS: LWHEELS, POWERS: POWERS, MAX_CHARGE: MAX_CHARGE, MAX_POWERS: MAX_POWERS,
