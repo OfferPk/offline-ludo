@@ -6,11 +6,15 @@
   var $ = function (id) { return document.getElementById(id); };
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
   var native = !!(Ads && Ads.isNative());
-  var SAVE_KEY = 'crossfour.save.v2', OLD_KEY = 'crossfour.save.v1';
+  var SAVE_KEY = 'crossfour.save.v3', CHECKPOINT_KEY = 'crossfour.save.checkpoint.v3';
+  var V2_KEY = 'crossfour.save.v2', OLD_KEY = 'crossfour.save.v1';
+  var TUTORIAL_KEY = 'crossfour.tutorial.v1';
+  var tutorial = { active: false, intro: false, firstMove: false };
   var NAMES = SK.SEAT_NAMES;
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
   var ACCENT = { graphite: ['#f4b740', '#1c1504'], linen: ['#2b3140', '#ffffff'], walnut: ['#e0a232', '#231605'], aurora: ['#27e0b3', '#03261d'] };
-  var UNDO_MS = 2200, TIMER_MS = 20000, FREE_UNDOS = 3;
+  var CORE_LIGHTS = ['#ffd0c1', '#a0ffd2', '#ffe7a3', '#a9ddff'];
+  var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, FREE_UNDOS = 3;
   var PHRASES = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!'];
 
   // ---------------- save ----------------
@@ -24,43 +28,175 @@
         pass: [null, { type: 'human' }, null, { type: 'human' }],
         mode: { ai: 'classic', pass: 'classic' }
       },
-      stats: { played: 0, won: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], quick: [0, 0], team: [0, 0], arrow: [0, 0], friendly: [0, 0], duel: [0, 0], four: [0, 0] },
-      game: null, ad: {}
+      stats: { played: 0, won: 0, streak: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], quick: [0, 0], team: [0, 0], arrow: [0, 0], friendly: [0, 0], duel: [0, 0], four: [0, 0] },
+      flags: { diamondCollection: true }, game: null, ad: {}
+
     };
   }
-  function load() {
-    var d = defaults(), s = null, old = null;
-    try { s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { s = null; }
-    if (!s) { try { old = JSON.parse(localStorage.getItem(OLD_KEY) || 'null'); } catch (e) { old = null; } }
-    if (!s && old && typeof old === 'object') {
-      // v1.0 save: keep coins, skins, settings, stats and ad pacing; the old match format is not resumable
-      s = { coins: old.coins, owned: old.owned, board: old.board, dice: old.dice, settings: old.settings, stats: old.stats, ad: old.ad };
-      if (old.setup && old.setup.rules) s.rules = { safeSquares: old.setup.rules.safeSquares !== false, bonusOnCapture: old.setup.rules.extraOnCapture !== false };
+  function isRecord(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
+  function isInt(x, min, max) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x && x >= min && x <= max; }
+  function isCount(x) { return isInt(x, 0, 9007199254740991); }
+  function validSeatList(a) {
+    return Array.isArray(a) && a.length === 4 && a.every(function (x) {
+      return x === null || (isRecord(x) && (x.type === 'human' || (x.type === 'ai' && ['easy', 'medium', 'hard'].indexOf(x.level) >= 0)));
+    });
+  }
+  function sameSeats(a, b) {
+    return a.every(function (x, i) { return x === null ? b[i] === null : !!b[i] && x.type === b[i].type && (x.type !== 'ai' || x.level === b[i].level); });
+  }
+  function validGame(g) {
+    if (!isRecord(g) || !isRecord(g.st)) return false;
+    var st = g.st, modes = ['classic', 'mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'], np = st.nPieces === 2 ? 2 : 4;
+    if (st.v !== 2 || modes.indexOf(st.mode) < 0 || g.mode !== st.mode || !validSeatList(st.seats) || !validSeatList(g.seats) || !sameSeats(g.seats, st.seats)) return false;
+    if (!Array.isArray(st.players) || st.players.length < 2 || st.players.length > 4 || !Array.isArray(st.pieces) || st.pieces.length !== 4 ||
+        !Array.isArray(st.stats) || st.stats.length !== 4 || !Array.isArray(st.ranking) || !Array.isArray(st.queue) || !Array.isArray(st.moves) ||
+        !Array.isArray(st.faces) || st.faces.length !== 4 || !Array.isArray(st.capd) || st.capd.length !== 4 || !Array.isArray(st.boost) || st.boost.length !== 4 ||
+        !Array.isArray(st.effects) || !Array.isArray(st.tiles) || !isRecord(st.rules) || !isInt(st.turn, 0, 3) || !isInt(st.rng, 0, 4294967295) ||
+        !isCount(st.rolls) || !isCount(st.turnCount) || !isInt(st.sixes, 0, 3) || !isCount(st.bonus) || typeof st.rollAgain !== 'boolean' ||
+        ['roll', 'move', 'over', 'choose'].indexOf(st.phase) < 0 || !st.seats[st.turn]) return false;
+    if (st.players.length !== st.seats.filter(Boolean).length || !st.players.every(function (s, i) { return isInt(s, 0, 3) && !!st.seats[s] && st.players.indexOf(s) === i; }) || st.players.indexOf(st.turn) < 0) return false;
+    if (!st.ranking.every(function (s, i) { return isInt(s, 0, 3) && st.players.indexOf(s) >= 0 && st.ranking.indexOf(s) === i; })) return false;
+    if (!st.queue.every(function (v) { return isInt(v, 1, 6); }) || !st.faces.every(function (v) { return isInt(v, 1, 6); }) ||
+        !st.capd.every(function (v) { return typeof v === 'boolean'; }) || !st.boost.every(function (v) { return v === null || v === 'double' || v === 'choose'; })) return false;
+    if (!st.pieces.every(function (pieces, s) {
+      if (!st.seats[s]) return pieces === null && st.stats[s] === null;
+      return Array.isArray(pieces) && pieces.length === np && pieces.every(function (p) { return isInt(p, -1, L.HOME); }) &&
+        isRecord(st.stats[s]) && ['captures', 'captured', 'sixes', 'home', 'rolls', 'events'].every(function (k) { return isCount(st.stats[s][k]); });
+    })) return false;
+    var ruleKeys = Object.keys(L.normRules({}));
+    if (!ruleKeys.every(function (k) { return k === 'rollStyle' ? (st.rules[k] === 'star' || st.rules[k] === 'classic') : typeof st.rules[k] === 'boolean'; })) return false;
+    if (!st.effects.every(function (e) { return isRecord(e) && ['shield', 'freeze'].indexOf(e.type) >= 0 && isInt(e.seat, 0, 3) && isInt(e.piece, 0, 3) && isCount(e.at); })) return false;
+    if (!st.tiles.every(function (t) { return isRecord(t) && isInt(t.abs, 0, 51) && ['boost', 'chaos', 'danger'].indexOf(t.kind) >= 0 && isCount(t.until); })) return false;
+    if (st.phase === 'choose' && (!isRecord(st.pending) || ['revenge', 'swap', 'wild'].indexOf(st.pending.type) < 0 || !isInt(st.pending.seat, 0, 3) || !Array.isArray(st.pending.options))) return false;
+    if (st.phase !== 'choose' && st.pending != null) return false;
+    if (st.mode === 'lucky') {
+      var lk = st.lk;
+      if (!isRecord(lk) || !Array.isArray(lk.charge) || lk.charge.length !== 4 || !lk.charge.every(function (x) { return isInt(x, 0, 5); }) ||
+          !Array.isArray(lk.streak) || lk.streak.length !== 4 || !lk.streak.every(function (x) { return isInt(x, 0, 3); }) ||
+          !Array.isArray(lk.revenge) || lk.revenge.length !== 4 || !lk.revenge.every(function (x) { return typeof x === 'boolean'; }) ||
+          !Array.isArray(lk.powers) || lk.powers.length !== 4 || !lk.powers.every(function (x) { return Array.isArray(x) && x.length <= 2 && x.every(function (id) { return ['dbl', 'six', 'escape'].indexOf(id) >= 0; }); }) ||
+          !Array.isArray(lk.kills) || lk.kills.length !== 4 || !lk.kills.every(function (x) { return Array.isArray(x) && x.length === 4 && x.every(function (n) { return isInt(n, 0, 1); }); }) ||
+          !Array.isArray(lk.kings) || !lk.kings.every(function (k) { return isRecord(k) && isInt(k.seat, 0, 3) && isInt(k.piece, 0, 3) && isInt(k.left, 1, 3) && isCount(k.at); }) ||
+          !(lk.used === null || ['dbl', 'six', 'escape'].indexOf(lk.used) >= 0) || typeof lk.forceSix !== 'boolean' || typeof lk.tg !== 'boolean') return false;
+    } else if (st.lk !== null) return false;
+    if (!isInt(g.view, 0, 3) || !isInt(g.undoLeft, 0, 3) || !isCount(g.coins) || !isCount(g.xp) ||
+        typeof g.doubled !== 'boolean' || typeof g.counted !== 'boolean' || !isCount(g.started)) return false;
+    return true;
+  }
+  function normalizeSeat(x) {
+    if (!isRecord(x)) return null;
+    if (x.type === 'human') return { type: 'human' };
+    if (x.type === 'ai') return { type: 'ai', level: ['easy', 'medium', 'hard'].indexOf(x.level) >= 0 ? x.level : 'medium' };
+    return null;
+  }
+  function normalizeSeats(a, fallback) {
+    if (!Array.isArray(a) || a.length !== 4) return fallback.map(function (x) { return x ? normalizeSeat(x) : null; });
+    return a.map(function (x) { return x === null ? null : normalizeSeat(x); });
+  }
+  function safeCounter(x, fallback) { return isCount(x) ? x : fallback; }
+  function normalizeSave(raw) {
+    if (!isRecord(raw)) return null;
+    var d = defaults(), s = d;
+    s.coins = safeCounter(raw.coins, d.coins); s.xp = safeCounter(raw.xp, d.xp);
+    if (isRecord(raw.owned)) {
+      ['boards', 'dice'].forEach(function (kind) { s.owned[kind] = window.SkinShop.normalizeOwned(raw.owned[kind], d.owned[kind]); });
     }
-    if (!s || typeof s !== 'object') return d;
-    Object.keys(d).forEach(function (k) { if (s[k] === undefined || (s[k] === null && k !== 'game')) s[k] = d[k]; });
-    ['settings', 'stats'].forEach(function (k) { if (typeof s[k] !== 'object') s[k] = d[k]; Object.keys(d[k]).forEach(function (j) { if (s[k][j] === undefined) s[k][j] = d[k][j]; }); });
-    s.rules = L.normRules(s.rules);
-    if (!s.setup || !Array.isArray(s.setup.ai) || !Array.isArray(s.setup.pass)) s.setup = d.setup;
-    if (!s.setup.mode) s.setup.mode = d.setup.mode;
-    if (!s.owned || !Array.isArray(s.owned.boards) || !Array.isArray(s.owned.dice)) s.owned = d.owned;
-    ['midnight', 'timber'].forEach(function (id) { if (s.owned.boards.indexOf(id) < 0) s.owned.boards.push(id); });
-    ['coins', 'xp'].forEach(function (k) { if (typeof s[k] !== 'number' || !isFinite(s[k]) || s[k] < 0) s[k] = 0; });
+    s.board = SK.BOARDS.some(function (x) { return x.id === raw.board; }) ? raw.board : d.board;
+    s.dice = SK.DICE.some(function (x) { return x.id === raw.dice; }) ? raw.dice : d.dice;
+    if (isRecord(raw.settings)) Object.keys(d.settings).forEach(function (k) { s.settings[k] = typeof raw.settings[k] === 'boolean' ? raw.settings[k] : d.settings[k]; });
+    if (isRecord(raw.rules)) Object.keys(d.rules).forEach(function (k) {
+      s.rules[k] = k === 'rollStyle' ? (raw.rules[k] === 'classic' || raw.rules[k] === 'star' ? raw.rules[k] : d.rules[k]) :
+        (typeof raw.rules[k] === 'boolean' ? raw.rules[k] : d.rules[k]);
+    });
+    if (isRecord(raw.setup)) {
+      s.setup.ai = normalizeSeats(raw.setup.ai, d.setup.ai); s.setup.pass = normalizeSeats(raw.setup.pass, d.setup.pass);
+      if (isRecord(raw.setup.mode)) ['ai', 'pass'].forEach(function (k) { s.setup.mode[k] = ['classic', 'mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'].indexOf(raw.setup.mode[k]) >= 0 ? raw.setup.mode[k] : d.setup.mode[k]; });
+    }
+    if (isRecord(raw.stats)) {
+      Object.keys(d.stats).forEach(function (k) {
+        if (k === 'vs') {
+          if (isRecord(raw.stats.vs)) Object.keys(d.stats.vs).forEach(function (level) {
+            var pair = raw.stats.vs[level]; if (Array.isArray(pair) && pair.length === 2) s.stats.vs[level] = [safeCounter(pair[0], 0), safeCounter(pair[1], 0)];
+          });
+        } else if (['mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly', 'duel', 'four'].indexOf(k) >= 0) {
+          var p = raw.stats[k]; if (Array.isArray(p) && p.length === 2) s.stats[k] = [safeCounter(p[0], 0), safeCounter(p[1], 0)];
+        } else s.stats[k] = safeCounter(raw.stats[k], d.stats[k]);
+      });
+    }
+    if (isRecord(raw.flags)) Object.keys(d.flags).forEach(function (k) { s.flags[k] = raw.flags[k] === true; });
+    s.flags.diamondCollection = true;
+    if (isRecord(raw.ad)) ['sessions', 'matchesSince', 'lastTs', 'playMs', 'matchesCompleted'].forEach(function (k) {
+      if (Object.prototype.hasOwnProperty.call(raw.ad, k)) s.ad[k] = safeCounter(raw.ad[k], 0);
+    });
+    if (validGame(raw.game)) {
+      s.game = JSON.parse(JSON.stringify(raw.game));
+      delete s.game.timerTk; delete s.game.actor; s.game.undo = null; s.game.sel = null;
+      s.game.st.moves = s.game.st.phase === 'move' ? L.queueMoves(s.game.st) : [];
+    } else s.game = null;
     return s;
   }
-  var save = load();
-  function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) {} }
+  function validSave(s) {
+    if (!isRecord(s) || !Object.prototype.hasOwnProperty.call(s, 'game') || !isCount(s.coins) || !isCount(s.xp) || !isRecord(s.owned) || !Array.isArray(s.owned.boards) || !Array.isArray(s.owned.dice) ||
+        !s.owned.boards.every(function (id) { return typeof id === 'string' && id.length <= 32; }) || !s.owned.dice.every(function (id) { return typeof id === 'string' && id.length <= 32; }) ||
+        !SK.BOARDS.some(function (x) { return x.id === s.board; }) || !SK.DICE.some(function (x) { return x.id === s.dice; }) || !isRecord(s.settings) ||
+        !isRecord(s.rules) || !isRecord(s.setup) || !isRecord(s.stats) || !isRecord(s.ad) || !(s.game === null || validGame(s.game))) return false;
+    if (!Object.keys(defaults().settings).every(function (k) { return typeof s.settings[k] === 'boolean'; })) return false;
+    if (s.flags !== undefined && (!isRecord(s.flags) || !Object.keys(s.flags).every(function (k) { return typeof s.flags[k] === 'boolean'; }))) return false;
+    if (!Object.keys(defaults().rules).every(function (k) { return k === 'rollStyle' ? ['star', 'classic'].indexOf(s.rules[k]) >= 0 : typeof s.rules[k] === 'boolean'; })) return false;
+    if (!validSeatList(s.setup.ai) || !validSeatList(s.setup.pass) || !isRecord(s.setup.mode) || !['ai', 'pass'].every(function (k) { return ['classic', 'mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'].indexOf(s.setup.mode[k]) >= 0; })) return false;
+    var ds = defaults().stats;
+    if (!Object.keys(ds).every(function (k) {
+      if (k === 'streak') return s.stats.streak === undefined || isCount(s.stats.streak);
+      if (k === 'vs') return isRecord(s.stats.vs) && Object.keys(ds.vs).every(function (level) { return Array.isArray(s.stats.vs[level]) && s.stats.vs[level].length === 2 && s.stats.vs[level].every(isCount); });
+      if (['mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly', 'duel', 'four'].indexOf(k) >= 0) return Array.isArray(s.stats[k]) && s.stats[k].length === 2 && s.stats[k].every(isCount);
+      return isCount(s.stats[k]);
+    })) return false;
+    return ['sessions', 'matchesSince', 'lastTs', 'playMs', 'matchesCompleted'].every(function (k) { return s.ad[k] === undefined || isCount(s.ad[k]); });
+  }
+  var saveStore = window.SaveStore.create(function () { return window.localStorage; }, {
+    key: SAVE_KEY, checkpointKey: CHECKPOINT_KEY, legacyV2Key: V2_KEY, legacyV1Key: OLD_KEY,
+    defaults: defaults, normalize: normalizeSave, validate: validSave
+  });
+  var loadResult = saveStore.load();
+  var save = normalizeSave(loadResult.data) || defaults();
+  loadResult.data = save;
+  var saveWriteFailed = false;
+  var lastSaveError = null;
+  function persist() {
+    var result;
+    try {
+      var snapshotData = JSON.parse(JSON.stringify(save));
+      if (snapshotData.game) { delete snapshotData.game.timerTk; delete snapshotData.game.actor; snapshotData.game.undo = null; snapshotData.game.sel = null; }
+      result = saveStore.save(snapshotData);
+    } catch (e) { result = { ok: false, reason: 'invalid-snapshot' }; }
+    if (!result.ok) {
+      lastSaveError = { reason: result.reason, stage: result.stage };
+      if (!saveWriteFailed) {
+        var warning = $('save-warning');
+        warning.textContent = 'Save failed. Your latest progress may not be saved on this device. Keep the app open and check device storage.';
+        warning.classList.remove('hidden');
+      }
+      saveWriteFailed = true;
+      return false;
+    }
+    lastSaveError = null;
+    if (saveWriteFailed) {
+      saveWriteFailed = false;
+      $('save-warning').classList.add('hidden');
+      if (typeof toast === 'function') toast('Saving has resumed', 1800);
+    }
+    return true;
+  }
   var gate = window.AdGate.create(CFG, save.ad); save.ad = gate.state;
   gate.sessionStarted();
   persist();
 
-  function validGame(g) {
-    return g && g.st && g.st.v === 2 && Array.isArray(g.st.pieces) && g.st.pieces.length === 4 && Array.isArray(g.st.players) && g.st.players.length >= 2 &&
-      ['roll', 'move', 'over', 'choose'].indexOf(g.st.phase) >= 0 && (g.st.phase !== 'choose' || !!g.st.pending) && (g.st.mode !== 'lucky' || !!g.st.lk) && g.st.seats && g.st.seats[g.st.turn];
-  }
   var G = validGame(save.game) ? save.game : null;
   if (!G) save.game = null;
-  if (G) G.undo = null;
+  if (G) {
+    G.undo = null; G.sel = null; delete G.timerTk; delete G.actor;
+    G.st.moves = G.st.phase === 'move' ? L.queueMoves(G.st) : [];
+  }
 
   // ---------------- helpers ----------------
   function hex2rgb(h) { h = h.replace('#', ''); return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)]; }
@@ -75,9 +211,11 @@
     var Hp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
     if (!Hp) return;
     try {
-      if (kind === 'success') Hp.notification({ type: 'SUCCESS' });
-      else if (kind === 'warn') Hp.notification({ type: 'WARNING' });
-      else Hp.impact({ style: kind === 'heavy' ? 'HEAVY' : kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
+      var task;
+      if (kind === 'success') task = Hp.notification({ type: 'SUCCESS' });
+      else if (kind === 'warn') task = Hp.notification({ type: 'WARNING' });
+      else task = Hp.impact({ style: kind === 'heavy' ? 'HEAVY' : kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
+      if (task && typeof task.catch === 'function') task.catch(function () {});
     } catch (e) {}
   }
   var toastTimer = null;
@@ -187,6 +325,7 @@
   var pieceEls = [[], [], [], []];
   var piecePos = {};
   var moving = {};
+  var activeMotions = {};
   function cubeHTML() { var h = '<div class="cube">'; for (var f = 1; f <= 6; f++) { h += '<div class="face f' + f + '">'; for (var k = 0; k < f; k++) h += '<i></i>'; h += '</div>'; } return h + '</div>'; }
   function podEl(seat) { return document.querySelector('.pod[data-slot="' + slotOf(seat) + '"]'); }
   function buildPods() {
@@ -200,9 +339,16 @@
       el.innerHTML = '<div class="avatar"><svg class="tring" viewBox="0 0 44 44"><circle cx="22" cy="22" r="20"/></svg><span class="av">' + ART.avatar(pl.type) + '</span>' +
         (pl.type === 'ai' ? '<span class="lvtag">' + LEVEL_NAMES[pl.level].charAt(0) + '</span>' : '') + '<span class="lkb"></span></div>' +
         '<div class="pmeta"><b class="pname"></b><small class="plvl"></small><div class="chips"></div></div>' +
-        '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + '">' + cubeHTML() + '<em class="boost-tag hidden"></em></button>' +
+        '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + ' (tap or swipe)">' + cubeHTML() + '<i class="roll-countdown" aria-hidden="true"></i><em class="boost-tag hidden"></em></button>' +
         '<div class="bubble hidden"></div>';
-      el.querySelector('.pdice').addEventListener('click', function () { SFX.unlock(); if (G && G.st.turn === s && isHuman(s)) doRoll(); });
+      var die = el.querySelector('.pdice');
+      window.DiceGesture.bind(die, function (e) {
+        SFX.unlock();
+        if (G && G.st.turn === s && isHuman(s)) { keyboardRoll = e.detail === 0; doRoll(); }
+      }, function () {
+        SFX.unlock(); keyboardRoll = false;
+        if (G && G.st.turn === s && isHuman(s)) doRoll();
+      });
       setDiceFace(s, G.st.faces ? G.st.faces[s] : 1, true);
     });
   }
@@ -235,9 +381,34 @@
       if (!G.st.pieces[s]) continue;
       var col = seatColor(s);
       for (var i = 0; i < G.st.pieces[s].length; i++) {
-        var el = document.createElement('div'); el.className = 'pc'; el.innerHTML = '<i class="crown">' + ART.icon('crown', 16) + '</i>';
-        el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45));
+        var el = document.createElement('button'); el.type = 'button'; el.className = 'pc';
+        el.innerHTML = '<svg class="gem-token" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+          '<defs><linearGradient id="gem-body-' + s + '-' + i + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--pcl)" stop-opacity=".92"/><stop offset=".48" stop-color="var(--pcd)" stop-opacity=".94"/><stop offset="1" stop-color="var(--pcdd)" stop-opacity=".98"/></linearGradient>' +
+          '<radialGradient id="gem-core-' + s + '-' + i + '" cx="50%" cy="46%" r="60%"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".2" stop-color="var(--pccore)" stop-opacity=".98"/><stop offset=".58" stop-color="var(--pccore)" stop-opacity=".78"/><stop offset="1" stop-color="var(--pccore)" stop-opacity="0"/></radialGradient></defs>' +
+          '<ellipse class="gem-ground" cx="12" cy="20" rx="10" ry="3.1"/>' +
+          '<path class="gem-pad" d="M5.2 17.1 18.8 17.1 17.2 22.5 6.8 22.5Z"/>' +
+          '<ellipse class="gem-shadow" cx="12" cy="21.1" rx="7.8" ry="1.5"/>' +
+          '<path class="gem-body" style="fill:url(#gem-body-' + s + '-' + i + ')" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
+          '<path class="gem-facet gem-facet-light" d="M12 1.1 12 13.6 7 12.6 4.8 5Z"/>' +
+          '<path class="gem-facet gem-facet-dark" d="M12 1.1 19.2 5 17 12.6 12 13.6Z"/>' +
+          '<path class="gem-facet gem-facet-side" d="M7 12.6 12 13.6 9.5 16.3Z"/>' +
+          '<path class="gem-facet gem-facet-base" d="M7 12.6 12 13.6 17 12.6 12 18.7Z"/>' +
+          '<ellipse class="gem-core" style="fill:url(#gem-core-' + s + '-' + i + ')" cx="12" cy="9.2" rx="3.1" ry="4.1"/>' +
+          '<path class="gem-glint" d="M6.1 5.2 10.4 2.8 8.2 6.8 6.8 7.5Z"/>' +
+          '<circle class="gem-shield" cx="12" cy="10.2" r="9.3"/>' +
+          '<path class="gem-shield-glint" d="M6.1 8.2c1.2-3.4 4-5.1 7.3-5.3"/>' +
+          '<path class="gem-frost-wash" d="M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z"/>' +
+          '<path class="gem-frost-crack" d="m14.4 4.6-2 3.2 1.5 1.6-2.2 2.3 1.2 2.6-2.1 2.1"/>' +
+          '</svg><i class="crown">' + ART.icon('crown', 16) + '</i>';
+        el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45)); el.style.setProperty('--pccore', CORE_LIGHTS[s]);
         el.dataset.seat = s; el.dataset.piece = i;
+        el.addEventListener('click', function (e) {
+          if (e.detail !== 0 || !G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn)) return;
+          var seat = +this.dataset.seat, piece = +this.dataset.piece;
+          var pool = G.sel != null && chipMoves(G.sel).length ? chipMoves(G.sel) : G.st.moves;
+          var m = pool.filter(function (x) { return x.seat === seat && x.piece === piece; })[0];
+          if (m) { SFX.unlock(); doMove(m.piece, m.v, true); }
+        });
         box.appendChild(el); pieceEls[s].push(el);
       }
     }
@@ -267,10 +438,13 @@
         if (instant) { el.style.transition = 'none'; place(el, c.x, c.y, sc); void el.offsetWidth; el.style.transition = ''; }
         else place(el, c.x, c.y, sc);
         el.classList.toggle('done', p === L.HOME);
-        el.classList.toggle('shield', L.isShielded(st, s, i));
-        el.classList.toggle('frozen', L.isFrozen(st, s, i));
-        el.classList.toggle('king', !!(st.lk && L.isKing(st, s, i)));
+        var shielded = L.isShielded(st, s, i), frozen = L.isFrozen(st, s, i), king = !!(st.lk && L.isKing(st, s, i));
+        el.classList.toggle('shield', shielded); el.classList.toggle('is-shielded', shielded);
+        el.classList.toggle('frozen', frozen); el.classList.toggle('is-frozen', frozen);
+        el.classList.toggle('king', king); el.classList.toggle('is-king', king);
+        el.classList.toggle('sel', G.sel != null && !!(G.st.moves||[]).some(function (m) { return m.seat === s && m.piece === i && m.v === G.sel; }));
         el.classList.toggle('last', !!(G.lastMove && G.lastMove.seat === s && G.lastMove.piece === i));
+
         piecePos[id] = c;
       });
     });
@@ -302,9 +476,10 @@
   }
 
   // ---------------- flow control ----------------
-  var runToken = 0, timers = [], busy = false, paused = false;
+  var runToken = 0, timers = [], busy = false, paused = false, keyboardRoll = false;
+  var autoRollTk = null, autoRollKey = null, autoRollDeadline = 0, autoRollRemaining = null;
   function later(fn, ms) { var tk = runToken; var id = setTimeout(function () { var k = timers.indexOf(id); if (k >= 0) timers.splice(k, 1); if (tk === runToken) fn(); }, ms); timers.push(id); return id; }
-  function cancelFlow() { runToken++; timers.forEach(clearTimeout); timers = []; busy = false; moving = {}; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
+  function cancelFlow() { stopAutoRollTimer(false); runToken++; timers.forEach(clearTimeout); timers = []; Object.keys(activeMotions).forEach(function (id) { var motion = activeMotions[id]; if (motion && motion.cancel) motion.cancel(); }); activeMotions = {}; moving = {}; busy = false; keyboardRoll = false; if (G) { G.undo = null; G.actor = null; } hide('wheel'); hide('picker'); hide('choice'); }
   function gameVisible() { return !$('game').classList.contains('hidden') && document.visibilityState === 'visible'; }
   function humans(st) { return st.players.filter(function (s) { return st.seats[s].type === 'human'; }); }
   function hasAI(st) { return st.players.some(function (s) { return st.seats[s].type === 'ai'; }); }
@@ -321,6 +496,81 @@
     if (G.sel != null && chipMoves(G.sel).length) return;
     G.sel = null;
     for (var i = 0; i < st.queue.length; i++) if (chipMoves(st.queue[i]).length) { G.sel = st.queue[i]; break; }
+  }
+  function tutorialSeen() {
+    try { return window.localStorage.getItem(TUTORIAL_KEY) === '1'; }
+    catch (e) { return false; }
+  }
+  function markTutorialSeen() {
+    try { window.localStorage.setItem(TUTORIAL_KEY, '1'); }
+    catch (e) { /* The tutorial still works if device storage is unavailable. */ }
+  }
+  function updateTutorial() {
+    var intro = $('tutorial-intro'), coach = $('tutorial-coach');
+    if (!tutorial.active || !G || G.mode !== 'classic' || $('game').classList.contains('hidden')) {
+      intro.classList.add('hidden'); coach.classList.add('hidden');
+      each(document.querySelectorAll('.tutorial-target'), function (el) { el.classList.remove('tutorial-target'); });
+      return;
+    }
+    if (tutorial.intro) { intro.classList.remove('hidden'); coach.classList.add('hidden'); return; }
+    intro.classList.add('hidden');
+    var st = G.st;
+    var stage = tutorial.firstMove || st.phase === 'over' ? 'finish' : !isHuman(st.turn) ? 'wait' : st.phase === 'move' ? 'move' : 'roll';
+    var title, copy, kicker, progress;
+    if (stage === 'wait') {
+      kicker = 'FIRST MATCH · GET READY'; title = 'Your turn is coming up';
+      copy = 'Watch the board. When it’s your turn, tap or swipe the highlighted die. You need a 6 to bring a token out of base.';
+      progress = 1;
+    } else if (stage === 'roll') {
+      kicker = 'FIRST MATCH · STEP 1 OF 2'; title = 'Roll your die';
+      if (st.queue.length || st.sixes || st.bonus) copy = save.rules.rollStyle === 'star' ? 'A 6 earns another roll. Your dice stay as chips in your corner until it’s time to move.' : 'Roll again when you’re ready. A 6 gives you another roll after you move it.';
+      else copy = 'Tap or swipe the die in your corner. You need a 6 to bring a token out of base.';
+      progress = 1;
+    } else if (stage === 'move') {
+      kicker = 'FIRST MATCH · STEP 2 OF 2'; title = 'Choose a move';
+      copy = save.settings.auto ? 'Tap a dice chip, then a glowing token. If only one move is possible, Auto-move may play it for you.' : 'Tap a dice chip, then tap one of your glowing tokens to move it.';
+      progress = 2;
+    } else {
+      kicker = 'FIRST MATCH · ALL SET'; title = 'Nice first move!';
+      var bonusCopy = save.rules.bonusOnCapture && save.rules.bonusOnHome ? ' Captures and reaching home each earn a bonus roll.' :
+        save.rules.bonusOnCapture ? ' Captures earn a bonus roll.' : save.rules.bonusOnHome ? ' Reaching home earns a bonus roll.' : '';
+      copy = 'Roll a 6 to launch tokens and move clockwise.' + bonusCopy + ' You need an exact roll to reach home; first to bring all 4 tokens home wins.';
+      progress = 3;
+    }
+    $('tutorial-kicker').textContent = kicker;
+    $('tutorial-title').textContent = title;
+    $('tutorial-copy').textContent = copy;
+    $('tutorial-done').classList.toggle('hidden', stage !== 'finish');
+    each(document.querySelectorAll('.tutorial-progress i'), function (el, i) { el.classList.toggle('on', i < progress); });
+    coach.classList.remove('hidden');
+    each(document.querySelectorAll('.tutorial-target'), function (el) { el.classList.remove('tutorial-target'); });
+    var target = null, anchorTarget = null, pod = podEl(st.turn);
+    if (stage === 'roll' && pod) target = pod.querySelector('.pdice');
+    else if (stage === 'move' && pod) {
+      target = pod.querySelector('.chip-v:not(.dim)') || document.querySelector('#pieces .pc.can');
+      anchorTarget = document.querySelector('#pieces .pc.can') || target;
+    } else target = $('turn-label');
+    if (!anchorTarget) anchorTarget = target;
+    if (target) target.classList.add('tutorial-target');
+    var card = coach.querySelector('.tutorial-card'), anchor = anchorTarget && anchorTarget.getBoundingClientRect();
+    if (!anchor || !anchor.width) anchor = $('turn-label').getBoundingClientRect();
+    var cardRect = card.getBoundingClientRect(), pad = 12, minTop = Math.max(58, (window.visualViewport ? window.visualViewport.offsetTop : 0) + 8);
+    var left = Math.max(pad, Math.min(window.innerWidth - cardRect.width - pad, anchor.left + anchor.width / 2 - cardRect.width / 2));
+    var top = anchor.top < window.innerHeight / 2 ? anchor.bottom + 12 : anchor.top - cardRect.height - 12;
+    top = Math.max(minTop, Math.min(window.innerHeight - cardRect.height - pad, top));
+    card.style.left = left + 'px'; card.style.top = top + 'px';
+  }
+  function closeTutorial() {
+    markTutorialSeen(); tutorial.active = false; tutorial.intro = false; tutorial.firstMove = false;
+    $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
+    each(document.querySelectorAll('.tutorial-target'), function (el) { el.classList.remove('tutorial-target'); });
+    if (G && !$('game').classList.contains('hidden') && !paused) { render(); advance(); }
+  }
+  function beginTutorial() {
+    if (!tutorial.active || !tutorial.intro) return;
+    markTutorialSeen(); tutorial.intro = false;
+    $('tutorial-intro').classList.add('hidden'); updateTutorial();
+    advance(); focusTurnControl();
   }
   // ---- Lucky Chaos pod widgets: charge meter, streak, revenge, stored powers, Mega button ----
   var POWER_NAMES = { dbl: 'Double Roll', six: 'Lucky 6', escape: 'Safe Escape' };
@@ -376,6 +626,14 @@
       var dz = el.querySelector('.pdice'); dz.disabled = !humanRoll; dz.classList.toggle('ready', humanRoll);
       var bt = el.querySelector('.boost-tag'), b = st.boost[s];
       bt.classList.toggle('hidden', !b); bt.innerHTML = b === 'double' ? '×2' : b === 'choose' ? '1-6' : '';
+      var pieceMoves = !over && active && isHuman(s) && st.phase === 'move' && !busy ? (G.sel != null && chipMoves(G.sel).length ? chipMoves(G.sel) : st.moves) : [];
+      each(pieceEls[s], function (pc, i) {
+        var pos = st.pieces[s][i], place = pos < 0 ? 'in base' : pos === L.HOME ? 'home' : pos >= 52 ? 'in home lane' : 'on the track';
+        var canMove = pieceMoves.some(function (m) { return m.seat === s && m.piece === i; });
+        pc.disabled = !canMove;
+        pc.classList.toggle('is-turn', canMove);
+        pc.setAttribute('aria-label', nameOf(s) + ' token ' + (i + 1) + ', ' + place + (canMove ? ', select to move' : ''));
+      });
     });
     var s = cur, lbl = $('turn-label');
     if (over) lbl.innerHTML = 'Match over';
@@ -384,7 +642,7 @@
     var hint = '';
     if (!over && st.phase === 'choose') hint = isHuman(st.turn) ? 'Make your choice' : NAMES[st.turn] + ' is choosing…';
     else if (!over && isHuman(s) && !busy) {
-      if (st.phase === 'roll') hint = L.mustChoose(st) ? 'Tap your die and pick a number' : st.queue.length ? 'Six! Roll again' : (st.bonus || st.sixes) ? 'Roll again' : 'Tap your die to roll';
+      if (st.phase === 'roll') hint = L.mustChoose(st) ? 'Tap your die and pick a number' : st.queue.length ? 'Six! Roll again' : (st.bonus || st.sixes) ? 'Roll again' : 'Tap your die to roll or swipe it';
       else if (st.phase === 'move') hint = st.queue.length > 1 ? 'Pick a chip, then a token' : 'Pick a token';
     } else if (!over && !isHuman(s)) hint = NAMES[s] + ' is thinking…';
     $('hint').textContent = hint;
@@ -394,6 +652,7 @@
     u.disabled = !act; u.classList.toggle('live', act);
     $('undo-label').textContent = G.undoLeft > 0 ? 'Undo (' + G.undoLeft + ')' : 'Undo';
     $('undo-ad').classList.toggle('hidden', G.undoLeft > 0);
+    updateTutorial();
   }
   function clearHighlights() { each(document.querySelectorAll('.pc.can, .pc.sel'), function (e) { e.classList.remove('can'); e.classList.remove('sel'); }); }
   function highlight() {
@@ -402,9 +661,17 @@
     var ms = G.sel != null ? chipMoves(G.sel) : st.moves;
     ms.forEach(function (m) { var el = pieceEls[m.seat][m.piece]; if (!el) return; el.classList.add('can'); if (G.sel != null && m.v === G.sel) el.classList.add('sel'); });
   }
+  function focusTurnControl() {
+    if (!G || busy || paused || !isHuman(G.st.turn)) return;
+    var target = null;
+    if (G.st.phase === 'roll') { var pod = podEl(G.st.turn); target = pod && pod.querySelector('.pdice'); }
+    else if (G.st.phase === 'move') target = document.querySelector('#pieces .pc.can');
+    if (target && !target.disabled) target.focus();
+  }
   function offerMoves() {
     var st = G.st; if (st.phase !== 'move' || !isHuman(st.turn)) return;
     render(); highlight();
+    if (keyboardRoll) { var target = document.querySelector('#pieces .pc.can'); if (target) target.focus(); keyboardRoll = false; }
     var distinct = L.distinctMoves(st.moves);
     if (save.settings.auto && distinct.length === 1 && !undoActive()) { var m = distinct[0]; later(function () { doMove(m.piece, m.v); }, save.settings.fast ? 220 : 420); return; }
     startTimer();
@@ -414,14 +681,13 @@
   function startTimer() {
     var st = G.st, s = st.turn, el = podEl(s);
     stopTimer();
-    if (!save.settings.timer || !isHuman(s) || st.phase === 'over' || !el) return;
+    if (!save.settings.timer || !isHuman(s) || st.phase !== 'move' || !el) return;
     el.style.setProperty('--tdur', TIMER_MS + 'ms'); void el.offsetWidth; el.classList.add('timing');
     G.timerTk = later(function () {
       G.timerTk = null;
-      if (!G || busy || G.st.turn !== s || !isHuman(s)) return;
+      if (!G || busy || G.st.turn !== s || G.st.phase !== 'move' || !isHuman(s)) return;
       toast('Time is up: playing for you', 1200);
-      if (G.st.phase === 'roll') doRoll(L.mustChoose(G.st) ? L.chooseDieValue(G.st, s, 'medium') : undefined);
-      else if (G.st.phase === 'move') { var c = L.chooseMove(G.st, 'medium'); if (c) doMove(c.piece, c.v); }
+      var c = L.chooseMove(G.st, 'medium'); if (c) doMove(c.piece, c.v);
     }, TIMER_MS);
   }
   function stopTimer() {
@@ -429,12 +695,45 @@
     if (G && G.timerTk) { clearTimeout(G.timerTk); var k = timers.indexOf(G.timerTk); if (k >= 0) timers.splice(k, 1); G.timerTk = null; }
   }
 
+  function clearAutoRollVisual() {
+    each(document.querySelectorAll('.pdice.counting'), function (die) { die.classList.remove('counting'); });
+  }
+  function stopAutoRollTimer(preserveRemaining) {
+    if (autoRollTk) {
+      if (preserveRemaining) autoRollRemaining = Math.max(0, autoRollDeadline - Date.now());
+      clearTimeout(autoRollTk);
+      var k = timers.indexOf(autoRollTk); if (k >= 0) timers.splice(k, 1);
+      autoRollTk = null;
+    }
+    clearAutoRollVisual();
+    if (!preserveRemaining) { autoRollKey = null; autoRollDeadline = 0; autoRollRemaining = null; }
+  }
+  function startAutoRollTimer() {
+    var st = G && G.st;
+    if (!st || st.phase !== 'roll' || !isHuman(st.turn) || busy || paused || tutorial.intro || !gameVisible() || isOpen('confirm')) {
+      if (autoRollTk) stopAutoRollTimer(true);
+      return;
+    }
+    var s = st.turn, key = s + ':' + st.rolls + ':' + st.turnCount;
+    if (autoRollKey !== key) { stopAutoRollTimer(false); autoRollKey = key; autoRollRemaining = AUTO_ROLL_MS; }
+    if (autoRollTk) return;
+    if (autoRollRemaining == null) autoRollRemaining = AUTO_ROLL_MS;
+    var duration = Math.max(0, autoRollRemaining), diePod = podEl(s), die = diePod && diePod.querySelector('.pdice');
+    autoRollDeadline = Date.now() + duration;
+    if (die) { die.style.setProperty('--roll-countdown-ms', duration + 'ms'); die.classList.remove('counting'); void die.offsetWidth; die.classList.add('counting'); }
+    autoRollTk = later(function () {
+      autoRollTk = null; autoRollKey = null; autoRollDeadline = 0; autoRollRemaining = null; clearAutoRollVisual();
+      if (!G || busy || paused || !gameVisible() || isOpen('confirm') || G.st.turn !== s || G.st.phase !== 'roll' || !isHuman(s)) return;
+      doRoll(L.mustChoose(G.st) ? L.chooseDieValue(G.st, s, G.st.seats[s].level) : undefined);
+    }, duration);
+  }
+
   function advance() {
     if (!G) return;
     var st = G.st;
     render(); persist();
     if (st.phase === 'over') { later(finishMatch, 800); return; }
-    if (paused || !gameVisible() || busy) return;
+    if (paused || tutorial.intro || !gameVisible() || busy) return;
     if (undoActive() && !isHuman(st.turn)) return; // waiting for the undo window after a human roll that passed the turn
     var s = st.turn, pl = st.seats[s];
     highlight();
@@ -446,7 +745,7 @@
       }, aiDelay());
       else later(aiMove, aiDelay() * 0.6);
     } else if (st.phase === 'move') offerMoves();
-    else startTimer();
+    else startAutoRollTimer();
   }
   function aiMove() { if (!G || busy || G.st.phase !== 'move') return; var c = L.chooseMove(G.st, G.st.seats[G.st.turn].level); if (c) doMove(c.piece, c.v); }
 
@@ -459,10 +758,11 @@
     if (instant) cube.style.transitionDuration = '0ms';
     cube.style.transform = 'rotateX(' + (f[0] + 720 * spins[s]) + 'deg) rotateY(' + (f[1] + 360 * spins[s]) + 'deg)';
   }
+  function prefersReducedMotion() { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
   function animateDice(s, v, cb) {
-    var cube = cubeOf(s), dur = save.settings.fast ? 420 : 700;
+    var cube = cubeOf(s), reduced = prefersReducedMotion(), dur = reduced ? 0 : save.settings.fast ? 420 : 700;
     spins[s]++;
-    if (cube) { cube.style.transitionDuration = dur + 'ms'; setDiceFace(s, v); var pd = cube.parentNode; pd.classList.remove('rolling'); void pd.offsetWidth; pd.classList.add('rolling'); }
+    if (cube) { cube.style.transitionDuration = dur + 'ms'; setDiceFace(s, v); var pd = cube.parentNode; pd.classList.remove('rolling'); if (!reduced) { void pd.offsetWidth; pd.classList.add('rolling'); } }
     SFX.roll();
     later(function () { SFX.land(v === 6); haptic('light'); cb(); }, dur);
   }
@@ -480,6 +780,7 @@
   function doRoll(chosen) {
     if (!G || busy || G.st.phase !== 'roll' || paused) return;
     var st = G.st, s = st.turn, human = isHuman(s);
+    stopAutoRollTimer(false);
     if (L.mustChoose(st) && chosen == null) {
       if (human) { stopTimer(); openPicker(); return; }
       chosen = L.chooseDieValue(st, s, st.seats[s].level);
@@ -557,16 +858,44 @@
   function animatePath(s, i, from, path, cb) {
     var id = s + '-' + i, el = pieceEls[s][i];
     if (!el || !path || !path.length) { cb(); return; }
+    var run = runToken, origin = piecePos[id] || center(L.cellOf(s, from, i));
+    var points = path.map(function (p) { return center(L.cellOf(s, p, i)); });
+    var entry = {}, settled = false;
     moving[id] = true;
-    var k = 0, ms = stepMs();
-    el.classList.add('hop');
-    (function step() {
-      if (k >= path.length) { delete moving[id]; el.classList.remove('hop'); cb(); return; }
-      var c = center(L.cellOf(s, path[k], i));
-      place(el, c.x, c.y, 1.12); piecePos[id] = c;
-      if (from < 0 && k === 0) SFX.leave(); else SFX.step(k);
-      k++; later(step, ms);
-    })();
+    activeMotions[id] = entry;
+    function release(clearEffects) {
+      if (settled) return;
+      settled = true;
+      delete moving[id];
+      if (activeMotions[id] === entry) delete activeMotions[id];
+      if (el) { el.classList.remove('hop'); if (clearEffects) el.classList.remove('land'); }
+    }
+    function complete() {
+      if (settled) return;
+      release();
+      if (run === runToken) cb();
+    }
+    function interrupted() { release(true); }
+    try {
+      entry.cancel = PathAnimation.animate({
+        el: el, start: origin, points: points, duration: stepMs(), arcHeight: CELL * 0.27,
+        reducedMotion: prefersReducedMotion(),
+        onStep: function (k) {
+          piecePos[id] = points[k];
+          if (!prefersReducedMotion()) { el.classList.remove('land'); void el.offsetWidth; el.classList.add('land'); }
+          if (from < 0 && k === 0) SFX.leave(); else SFX.step(k);
+          if (SFX.crystal) SFX.crystal(k);
+        },
+        onComplete: complete,
+        onCancel: interrupted,
+        onError: function (error) { piecePos[id] = points[points.length - 1]; if (window.console && console.warn) console.warn('Token movement animation failed; completing at its legal destination.', error); }
+      });
+    } catch (error) {
+      if (window.console && console.warn) console.warn('Token movement animation failed; completing at its legal destination.', error);
+      piecePos[id] = points[points.length - 1];
+      place(el, piecePos[id].x, piecePos[id].y, 1);
+      complete();
+    }
   }
   function sendToBase(seat, piece) {
     var el = pieceEls[seat][piece]; if (!el) return;
@@ -579,11 +908,11 @@
     SFX.capture(); haptic('heavy');
   }
 
-  function doMove(piece, v) {
+  function doMove(piece, v, keyboard) {
     if (!G || busy || G.st.phase !== 'move' || paused) return;
     var st = G.st, s = st.turn, human = isHuman(s);
     if (!st.moves.some(function (m) { return m.piece === piece && (v == null || m.v === v); })) return;
-    busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); hide('chat');
+    busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); stopAutoRollTimer(false); hide('chat');
     var res = L.move(st, piece, v, forcedEvents.length ? forcedEvents.shift() : undefined);
     if (human) { save.stats.captures += res.captures.length; if (res.finish) save.stats.home++; if (res.event) save.stats.events++; }
     G.sel = null;
@@ -601,9 +930,12 @@
       if (res.kingCaptured) { pause = Math.max(pause, 900); toast(nameOf(s) + ' toppled a King! Mega Wheel charged (5/5)', 1600); later(function () { SFX.mega(); }, 300); }
       if (res.crowned) { pause = Math.max(pause, 900); later(function () { crownFx(res.crowned); }, res.captures.length ? 420 : 0); }
       var done = function () {
+        if (human && tutorial.active && !tutorial.intro) tutorial.firstMove = true;
         layoutPieces(); busy = false; G.actor = null;
         if (human && !res.over && st.turn === s && st.phase === 'roll') toast(st.boost[s] === 'choose' ? 'Pick a number for your next roll' : 'Bonus roll!', 1000);
-        render(); later(advance, pause);
+        render();
+        if (keyboard) { highlight(); focusTurnControl(); }
+        later(advance, pause);
       };
       if (res.event && res.event.lucky) later(function () { showWheel(res.event, function () { resolveFlow(res.event, done); }); }, res.captures.length || res.crowned ? 700 : 150);
       else if (res.event) later(function () { showWheel(res.event, function () { animateEvent(res.event, done); }); }, res.captures.length ? 500 : 150);
@@ -844,13 +1176,16 @@
   }
 
   // ---------------- match lifecycle ----------------
-  function startMatch(seats, mode) {
+  function startMatch(seats, mode, offerTutorial) {
     cancelFlow();
+    tutorial.active = offerTutorial === true && mode === 'classic' && !tutorialSeen();
+    tutorial.intro = tutorial.active; tutorial.firstMove = false;
     var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
     G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now() };
     save.game = G; persist();
     spins = [0, 0, 0, 0];
     showGame();
+    if (tutorial.intro) $('tutorial-start').focus(); else focusTurnControl();
   }
   function finishMatch() {
     if (!G || G.st.phase !== 'over') return;
@@ -866,21 +1201,47 @@
       var ai = st.players.filter(function (s) { return st.seats[s].type === 'ai'; }).map(function (s) { return st.seats[s].level; });
       G.place = best; G.coins = L.coinsFor(best, st.players.length, ai, st.mode); G.xp = L.xpFor(best, st.players.length);
       save.coins += G.coins; save.xp += G.xp;
-      var S = save.stats; S.played++; if (best === 1) S.won++;
+      var S = save.stats; S.played++;
+      if (best === 1) { S.won++; S.streak = safeCounter(S.streak, 0) + 1; } else S.streak = 0;
       if (ai.length) { var top = ai.indexOf('hard') >= 0 ? 'hard' : ai.indexOf('medium') >= 0 ? 'medium' : 'easy'; S.vs[top][0]++; if (best === 1) S.vs[top][1]++; } else S.pass++;
       if (st.mode === 'mystery') { S.mystery[0]++; if (best === 1) S.mystery[1]++; }
       if (st.mode === 'lucky') { S.lucky[0]++; if (best === 1) S.lucky[1]++; }
       ['quick', 'team', 'arrow', 'friendly'].forEach(function (m) { if (st.mode === m) { S[m][0]++; if (best === 1) S[m][1]++; } });
       if (st.players.length === 2) { S.duel[0]++; if (best === 1) S.duel[1]++; } else if (st.players.length === 4) { S.four[0]++; if (best === 1) S.four[1]++; }
+      var previousBoards = save.owned.boards.slice(), previousDice = save.owned.dice.slice();
+      var newlyUnlocked = window.SkinShop.collectEligible(save, SK);
       gate.matchCompleted();
-      persist();
+      if (!persist()) {
+        save.owned.boards = previousBoards; save.owned.dice = previousDice;
+      } else if (newlyUnlocked.length) {
+        toast('Achievement unlocked: ' + newlyUnlocked.map(function (x) { return x.name; }).join(', '), 3000);
+      }
       if (!isHuman(st.ranking[0])) aiReact('win', st.ranking[0]);
       if (gate.canShow(Date.now())) Ads.prepareInterstitial();
     }
     showResult();
   }
+  function spotlightWinner(seat) {
+    var layer = $('winner-confetti');
+    if (!layer) return;
+    layer.textContent = '';
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var colors = [seatColor(seat), seatColor(seat), '#f4b740', '#ffffff'];
+    for (var i = 0; i < 28; i++) {
+      var piece = document.createElement('i');
+      var spread = 44 + (i * 37 % 150);
+      piece.className = 'confetti-piece';
+      piece.style.setProperty('--confetti-color', colors[i % colors.length]);
+      piece.style.setProperty('--confetti-x', (i % 2 ? spread : -spread) + 'px');
+      piece.style.setProperty('--confetti-y', (62 + i * 29 % 152) + 'px');
+      piece.style.setProperty('--confetti-spin', ((i * 71 % 720) - 360) + 'deg');
+      piece.style.setProperty('--confetti-delay', (i % 4 * 24) + 'ms');
+      layer.appendChild(piece);
+    }
+  }
   function showResult() {
     var st = G.st, hs = humans(st), single = hs.length === 1, winner = st.ranking[0];
+    var entering = !isOpen('result');
     var teamWin = st.mode === 'team', tName = function (seat) { return L.teamOf(seat) ? 'Jade & Cobalt' : 'Coral & Saffron'; };
     $('r-title').textContent = teamWin ? (tName(winner) + ' win') : single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
     var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'ARROW LUDO · ', friendly: 'FRIENDLY · ' };
@@ -888,15 +1249,17 @@
     var sec = Math.round((G.elapsed || 0) / 1000), mm = Math.floor(sec / 60), ss = sec % 60;
     $('r-meta').textContent = (G.moves || 0) + ' moves · ' + mm + ':' + (ss < 10 ? '0' : '') + ss;
     $('r-rank').innerHTML = st.ranking.map(function (s, k) {
-      return '<li class="' + (isHuman(s) ? 'me' : '') + '"><span class="medal m' + (k + 1) + '">' + (k + 1) + '</span><span class="pdot" style="background:' + seatColor(s) + '"></span>' + nameOf(s) +
+      return '<li class="' + (isHuman(s) ? 'me ' : '') + (k === 0 ? 'winner' : '') + '" style="--winner-color:' + seatColor(s) + '"><span class="medal m' + (k + 1) + '">' + (k + 1) + '</span><span class="pdot" style="background:' + seatColor(s) + '"></span>' + nameOf(s) +
         '<small>' + levelOf(s) + (st.seats[s].type === 'ai' ? ' AI' : '') + ' · ' + st.pieces[s].filter(function (p) { return p === L.HOME; }).length + '/' + (st.nPieces || 4) + ' home</small></li>';
+
     }).join('');
     $('r-coins').textContent = '+' + (G.coins * (G.doubled ? 2 : 1));
     $('r-xp').textContent = '+' + G.xp;
     var lv = L.levelFromXp(save.xp); $('r-lvl').textContent = 'Level ' + lv.level; $('r-lvl-fill').style.width = Math.round(lv.into / lv.need * 100) + '%';
     $('btn-r-double').classList.toggle('hidden', !G.coins || G.doubled);
-    if (!isOpen('result')) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
+    if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
     render(); setCoins(); setLevel(); show('result');
+    if (entering) spotlightWinner(winner);
   }
   /** The ONLY place an interstitial may appear: leaving the result screen after a finished match. */
   function leaveResult(dest) {
@@ -922,6 +1285,7 @@
   function showHome() {
     cancelFlow(); stopTimer(); paused = false;
     ['result', 'menu', 'chat'].forEach(hide);
+    $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
     screen('home'); updateHome(); setCoins(); setLevel();
   }
   function updateHome() {
@@ -945,11 +1309,11 @@
     if (!r.bonusOnHome) out.push('no home bonus');
     if (r.arrows) out.push('arrow tiles');
     if (r.noCapture) out.push('no captures');
-    return out.join(' · ');
+    return out;
   }
   function renderSetup() {
     var seats = save.setup[setupKind], list = $('seat-list'); list.innerHTML = '';
-    each($('mode-seg').children, function (b) { b.classList.toggle('on', b.dataset.mode === setupMode); });
+    each($('mode-seg').children, function (b) { var selected = b.dataset.mode === setupMode; b.classList.toggle('on', selected); b.setAttribute('aria-pressed', selected ? 'true' : 'false'); });
     var NOTES = {
       mystery: 'Mystery Tiles: ? and ! tiles on the track spin a wheel of events (shield, jump, swap, zap, freeze…). No stakes: every match is free.',
       lucky: 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.',
@@ -964,24 +1328,37 @@
     var order = [0, 1, 3, 2], pos = ['top left', 'top right', 'bottom right', 'bottom left'];
     order.forEach(function (s) {
       var x = seats[s], cur = !x ? 'off' : x.type === 'human' ? 'human' : x.level;
-      var row = document.createElement('div'); row.className = 'seat';
-      row.innerHTML = '<span class="sw-dot" style="background:' + seatColor(s) + '"></span><span class="sname">' + NAMES[s] + '<br><small>' + pos[s] + '</small></span><div class="seg"></div>';
-      var seg = row.querySelector('.seg');
+      var row = document.createElement('div'); row.className = 'seat'; row.dataset.seat = s;
+      row.setAttribute('role', 'group'); row.setAttribute('aria-label', NAMES[s] + ' seat, ' + pos[s]);
+      var head = document.createElement('div'); head.className = 'seat-head';
+      var dot = document.createElement('span'); dot.className = 'sw-dot'; dot.style.background = seatColor(s); dot.setAttribute('aria-hidden', 'true');
+      var name = document.createElement('span'); name.className = 'sname'; name.textContent = NAMES[s];
+      var position = document.createElement('small'); position.textContent = pos[s]; name.appendChild(position); head.appendChild(dot); head.appendChild(name); row.appendChild(head);
+      var seg = document.createElement('div'); seg.className = 'seg seat-options'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', NAMES[s] + ' player type');
       [['off', 'Off'], ['human', 'Human'], ['easy', 'Easy'], ['medium', 'Normal'], ['hard', 'Hard']].forEach(function (o) {
-        var b = document.createElement('button'); b.textContent = o[1]; b.dataset.v = o[0]; b.dataset.seat = s; if (o[0] === cur) b.className = 'on';
-        b.addEventListener('click', function () {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = o[1]; b.dataset.v = o[0]; b.dataset.seat = s;
+        var selected = o[0] === cur; b.setAttribute('aria-pressed', selected ? 'true' : 'false'); if (selected) b.className = 'on';
+        b.addEventListener('click', function (e) {
+          var keyboard = e.detail === 0;
           SFX.click();
           seats[s] = o[0] === 'off' ? null : o[0] === 'human' ? { type: 'human' } : { type: 'ai', level: o[0] };
           persist(); renderSetup();
+          if (keyboard) {
+            var next = list.querySelector('.seat-options button[data-seat="' + s + '"][data-v="' + o[0] + '"]');
+            if (next) next.focus({ preventScroll: true });
+          }
         });
         seg.appendChild(b);
       });
+      row.appendChild(seg);
       list.appendChild(row);
     });
     var n = seats.filter(Boolean).length, h = seats.filter(function (x) { return x && x.type === 'human'; }).length;
     var msg = setupMode === 'team' && n !== 4 ? 'Team Ludo needs all 4 corners. Partners sit opposite.' : n < 2 ? 'Choose at least 2 players.' : h < 1 ? 'At least one player must be human.' : setupMode === 'quick' && n > 4 ? '' : '';
     $('setup-msg').textContent = msg; $('btn-start').disabled = !!msg;
-    $('rules-sum').textContent = rulesSummary();
+    each($('presets').children, function (b) { var selected = (b.dataset.p === '1v1' && n === 2) || (b.dataset.p === '3' && n === 3) || (b.dataset.p === '4' && n === 4); b.setAttribute('aria-pressed', selected ? 'true' : 'false'); });
+    var summary = $('rules-sum'); summary.innerHTML = '';
+    rulesSummary().forEach(function (text) { var chip = document.createElement('span'); chip.className = 'rule-chip'; chip.textContent = text; summary.appendChild(chip); });
   }
   function applyPreset(p) {
     var seats = save.setup[setupKind], lvl = 'medium';
@@ -1000,10 +1377,27 @@
   }
   function openMenu() { if (!G) return; cancelFlow(); stopTimer(); paused = true; layoutPieces(true); render(); persist(); show('menu'); }
   function resumeFromMenu() { hide('menu'); paused = false; layoutPieces(true); advance(); }
-  function askConfirm(title, text, yes, onYes) {
+  function askConfirm(title, text, yes, onYes, onNo) {
     $('confirm-title').textContent = title; $('confirm-text').textContent = text; $('confirm-yes').textContent = yes;
+    $('confirm').classList.toggle('exit-confirm', title === 'Exit match?');
     $('confirm-yes').onclick = function () { hide('confirm'); onYes(); };
+    $('confirm-no').onclick = function () {
+      SFX.click(); hide('confirm');
+      if (onNo) { onNo(); return; }
+      if (G && !$('game').classList.contains('hidden') && paused) show('menu');
+    };
     show('confirm');
+  }
+  function openExitConfirmation() {
+    if (!G || G.st.phase === 'over') return;
+    cancelFlow(); stopTimer(); paused = true; hide('chat');
+    layoutPieces(true); render(); persist();
+    askConfirm('Exit match?', 'Are you sure you want to exit the match? Progress will be lost.', 'Exit', function () {
+      cancelFlow(); stopTimer(); G = null; save.game = null; persist(); showHome();
+    }, function () {
+      hide('menu'); paused = false;
+      if (G) { buildPods(); buildTiles(); buildPieces(); layout(); render(); advance(); }
+    });
   }
 
   // ---------------- stats / skins / settings / rules ----------------
@@ -1015,24 +1409,59 @@
     $('stats-body').innerHTML = cells.map(function (c) { return '<div><b>' + c[1] + '</b><span>' + c[0] + '</span></div>'; }).join('');
   }
   var skinTab = 'boards';
+  function skinRequirement(it) {
+    if (it.unlock === 'wins') return 'Unlock at ' + it.threshold + ' lifetime wins';
+    if (it.unlock === 'streak') return 'Unlock with ' + it.threshold + ' consecutive wins';
+    if (it.unlock === 'event') return 'Future event reward · not available yet';
+    if (!it.price) return it.id === 'classic-white' ? 'Free option · Ivory remains unchanged' : 'Included';
+    return 'Earn ' + it.price.toLocaleString('en-US') + ' coins in matches';
+  }
+  function skinLockedLabel(it) {
+    if (it.unlock === 'event') return 'Locked · future event';
+    if (it.unlock === 'streak') return 'Locked · ' + it.threshold + '-win streak';
+    if (it.unlock === 'wins') return 'Locked · ' + it.threshold + ' wins';
+    return 'Locked';
+  }
   function renderSkins() {
     setCoins();
     each($('skin-tabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === skinTab); });
     var grid = $('skin-grid'); grid.innerHTML = '';
-    var list = skinTab === 'boards' ? SK.BOARDS : SK.DICE, owned = save.owned[skinTab], cur = skinTab === 'boards' ? save.board : save.dice;
+    var list = skinTab === 'boards' ? SK.BOARDS : SK.DICE;
     list.forEach(function (it) {
-      var el = document.createElement('div'); el.className = 'skin' + (it.id === cur ? ' on' : ''); el.dataset.id = it.id;
-      if (skinTab === 'boards') { var cv = document.createElement('canvas'); el.appendChild(cv); drawBoard(cv, 150, it, L.DEFAULT_RULES); }
-      else { var dp = document.createElement('div'); dp.className = 'dprev'; dp.style.background = it.face; dp.style.boxShadow = 'inset 0 -4px 0 ' + it.edge; dp.innerHTML = '<i></i><i></i><i></i>'; each(dp.children, function (i) { i.style.background = it.pip; }); el.appendChild(dp); }
+      var state = window.SkinShop.state(it, save, skinTab);
+      var el = document.createElement('div');
+      el.className = 'skin' + (state.selected ? ' on' : '') + (!state.owned && !state.meetsCondition ? ' is-locked' : '');
+      el.dataset.id = it.id; el.dataset.skinPreview = it.id;
+      if (skinTab === 'boards') {
+        var cv = document.createElement('canvas'); cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', it.name + ' board preview');
+        el.appendChild(cv); drawBoard(cv, 150, it, L.DEFAULT_RULES);
+      } else {
+        var dp = document.createElement('div'); dp.className = 'dprev'; dp.setAttribute('role', 'img'); dp.setAttribute('aria-label', it.name + ' dice preview');
+        dp.style.background = it.face; dp.style.boxShadow = 'inset 0 -4px 0 ' + it.edge;
+        dp.innerHTML = '<i></i><i></i><i></i>'; each(dp.children, function (pip) { pip.style.background = it.pip; }); el.appendChild(dp);
+      }
       var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = it.name + (it.dark === false ? ' (light)' : ''); el.appendChild(nm);
-      var b = document.createElement('button'); b.className = 'btn ' + (it.id === cur ? 'plate' : owned.indexOf(it.id) >= 0 ? 'primary' : 'plate');
-      if (it.id === cur) { b.textContent = 'In use'; b.disabled = true; }
-      else if (owned.indexOf(it.id) >= 0) b.textContent = 'Use';
-      else { b.innerHTML = '<span class="coin-ico"></span>' + it.price; if (save.coins < it.price) b.disabled = true; }
+      var note = document.createElement('small'); note.className = 'skin-note'; note.textContent = skinRequirement(it); el.appendChild(note);
+      var b = document.createElement('button');
+      b.className = 'btn ' + (state.selected ? 'plate' : state.owned || state.canUnlock ? 'primary' : 'plate');
+      if (state.selected) { b.textContent = 'In use'; b.disabled = true; }
+      else if (state.owned) b.textContent = 'Use';
+      else if (!state.meetsCondition) { b.textContent = skinLockedLabel(it); b.disabled = true; }
+      else if (!state.affordable) { b.textContent = 'Need ' + state.price.toLocaleString('en-US') + ' coins'; b.disabled = true; }
+      else if (it.unlock) b.textContent = 'Unlock reward';
+      else if (!state.price) b.textContent = 'Get free';
+      else b.textContent = 'Unlock · ' + state.price.toLocaleString('en-US') + ' coins';
+      b.setAttribute('aria-label', it.name + ': ' + b.textContent);
       b.addEventListener('click', function () {
-        if (owned.indexOf(it.id) < 0) { if (save.coins < it.price) return; save.coins -= it.price; owned.push(it.id); SFX.coin(); } else SFX.click();
-        if (skinTab === 'boards') save.board = it.id; else save.dice = it.id;
-        persist(); applySkin(); renderSkins(); setCoins();
+        var result = window.SkinShop.act(save, skinTab, it, persist);
+        if (!result.ok) {
+          if (result.reason === 'save-failed') toast('Skin not unlocked. Check device storage and try again.', 2600);
+          else if (result.reason === 'insufficient-coins') toast('Not enough coins for ' + it.name + '.', 2000);
+          else if (result.reason === 'event-locked') toast('Diamond skins are reserved for a future event.', 2400);
+          return;
+        }
+        if (result.newlyOwned && result.price > 0) SFX.coin(); else SFX.click();
+        applySkin(); renderSkins(); setCoins();
         if (!$('game').classList.contains('hidden')) { buildPods(); buildTiles(); buildPieces(); layout(); render(); }
       });
       el.appendChild(b); grid.appendChild(el);
@@ -1091,16 +1520,23 @@
   $('btn-start').addEventListener('click', function () {
     SFX.unlock(); SFX.click();
     var seats = save.setup[setupKind].map(function (x) { return x ? { type: x.type, level: x.level } : null; }), mode = setupMode;
+    var offerTutorial = mode === 'classic' && !tutorialSeen();
     save.setup.mode[setupKind] = mode;
-    if (G && G.st.phase !== 'over') askConfirm('Start a new match?', 'Your saved match will be replaced.', 'Start', function () { startMatch(seats, mode); });
-    else startMatch(seats, mode);
+    if (G && G.st.phase !== 'over') askConfirm('Start a new match?', 'Your saved match will be replaced.', 'Start', function () { startMatch(seats, mode, offerTutorial); });
+    else startMatch(seats, mode, offerTutorial);
   });
+  $('tutorial-start').addEventListener('click', function () { SFX.click(); beginTutorial(); });
+  $('tutorial-intro-skip').addEventListener('click', function () { SFX.click(); closeTutorial(); });
+  $('tutorial-skip').addEventListener('click', function () { SFX.click(); closeTutorial(); });
+  $('tutorial-done').addEventListener('click', function () { SFX.click(); closeTutorial(); });
   // chips: pick which value to move next
   $('stage').addEventListener('click', function (e) {
     var c = e.target.closest ? e.target.closest('.chip-v') : null;
     if (!c || !G || busy || G.st.phase !== 'move' || !isHuman(G.st.turn)) return;
     var v = +c.dataset.v; if (!chipMoves(v).length) return;
-    SFX.click(); G.sel = v; render(); highlight();
+    var keyboard = e.detail === 0;
+    SFX.click(); G.sel = v; render(); highlight(); $('hint').textContent = 'Dice chip ' + v + ' selected. Choose a highlighted token.';
+    if (keyboard) { var target = document.querySelector('#pieces .pc.can'); if (target) target.focus(); }
   });
   // tap near a movable token (tokens are small on phones, so pick the nearest highlighted one)
   $('board-wrap').addEventListener('pointerdown', function (e) {
@@ -1120,7 +1556,7 @@
   $('btn-r-again').addEventListener('click', function () { leaveResult('again'); });
   $('btn-r-home').addEventListener('click', function () { leaveResult('home'); });
   $('btn-r-double').addEventListener('click', doubleCoins);
-  $('confirm-no').addEventListener('click', function () { SFX.click(); hide('confirm'); if (G && !$('game').classList.contains('hidden') && paused) show('menu'); });
+  $('btn-exit-match').addEventListener('click', function () { SFX.click(); openExitConfirmation(); });
   $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); show('stats'); });
   $('btn-skins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   $('btn-rules').addEventListener('click', function () { SFX.unlock(); SFX.click(); openRules('basics'); });
@@ -1145,15 +1581,40 @@
   $('btn-reset').addEventListener('click', function () {
     hide('settings');
     askConfirm('Reset progress?', 'Coins, XP, skins, statistics and the saved match will be deleted.', 'Reset', function () {
-      var ad = save.ad; save = defaults(); save.ad = ad; persist(); location.reload();
+      var resetData = defaults(); resetData.ad = save.ad;
+      var resetResult = saveStore.reset(resetData);
+      if (!resetResult.ok) {
+        lastSaveError = { reason: resetResult.reason, stage: resetResult.stage };
+        saveWriteFailed = true;
+        var warning = $('save-warning');
+        warning.textContent = 'Reset failed. Your existing progress was not cleared. Check device storage and try again.';
+        warning.classList.remove('hidden');
+        toast('Progress was not reset', 2400);
+        return;
+      }
+      save = resetData;
+      try { window.localStorage.removeItem(TUTORIAL_KEY); } catch (e) { /* The main progress reset succeeded. */ }
+      location.reload();
     });
   });
   document.addEventListener('keydown', function (e) {
+    if (tutorial.intro && e.key === 'Escape') { e.preventDefault(); closeTutorial(); return; }
+    if (tutorial.intro && e.key === 'Tab') {
+      var dialogButtons = document.querySelectorAll('#tutorial-intro button:not([disabled])');
+      if (!dialogButtons.length) return;
+      var firstDialogButton = dialogButtons[0], lastDialogButton = dialogButtons[dialogButtons.length - 1];
+      if (e.shiftKey && document.activeElement === firstDialogButton) { e.preventDefault(); lastDialogButton.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastDialogButton) { e.preventDefault(); firstDialogButton.focus(); }
+      return;
+    }
     if (!G || $('game').classList.contains('hidden') || paused) return;
-    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); if (isHuman(G.st.turn)) doRoll(); }
+    if (e.key === ' ' || e.key === 'Enter') {
+      if (e.target && e.target.closest && e.target.closest('button, a, input, select, textarea')) return;
+      e.preventDefault(); if (isHuman(G.st.turn)) doRoll();
+    }
     else if (/^[1-4]$/.test(e.key) && G.st.phase === 'move' && isHuman(G.st.turn)) {
       var p = +e.key - 1, ms = G.st.moves.filter(function (x) { return x.piece === p; }), m = ms.filter(function (x) { return x.v === G.sel; })[0] || ms[0];
-      if (m) doMove(m.piece, m.v);
+      if (m) doMove(m.piece, m.v, true);
     } else if (e.key === 'u' || e.key === 'U') undoRoll();
   });
   document.addEventListener('visibilitychange', function () {
@@ -1175,11 +1636,14 @@
   // ---------------- boot ----------------
   SFX.setEnabled(save.settings.sound);
   applySkin(); setCoins(); setLevel(); updateHome(); buildChat(); buildRulesEvents();
+  if (loadResult.status === 'recovered') toast('Recovered your last safe save. Some recent moves may be missing.', 5000);
   // consent + SDK init only: no interstitial is ever shown on launch; the banner sits on the menu / game screens
   if (Ads) Ads.init().then(function () { syncSettingsUI(); Ads.showBanner(); });
 
   window.__cf = {
-    get game() { return G; }, get save() { return save; }, logic: L, gate: gate,
+    get game() { return G; }, get save() { return save; }, get loadStatus() { return loadResult.status; }, logic: L, gate: gate,
+    native: native, haptic: haptic,
+    persist: persist, isValidGame: validGame, isValidSave: validSave, get lastSaveError() { return lastSaveError; },
     get busy() { return busy; }, get paused() { return paused; }, get idle() { return !busy && timers.length === 0 && !isOpen('wheel') && !isOpen('choice'); },
     get undoActive() { return undoActive(); },
     force: function (vals) { forced = vals.slice(); },

@@ -1,0 +1,273 @@
+// Browser coverage for the presentation-only Crystal League screen.
+// Usage: node test/community.test.js [url]
+const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
+const URL = (process.argv[2] || 'http://localhost:8781/').replace(/\/?$/, '/');
+const URLCtor = require('node:url').URL;
+const CHROME = process.env.CHROME || '/usr/bin/chromium';
+let checks = 0;
+function ok(condition, message) {
+  if (!condition) throw new Error('FAILED: ' + message);
+  checks++;
+  console.log('  ok -', message);
+}
+
+(async () => {
+  const browser = await puppeteer.launch({ executablePath: CHROME, headless: 'new', args: ['--no-sandbox'] });
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    const posts = [];
+    const externalRequests = [];
+    page.on('request', request => {
+      if (request.method() !== 'GET' && request.method() !== 'HEAD') posts.push(request.method() + ' ' + request.url());
+      if (new URLCtor(request.url()).origin !== new URLCtor(URL).origin) externalRequests.push(request.url());
+    });
+    page.on('pageerror', error => { throw error; });
+    await page.goto(URL, { waitUntil: 'networkidle0' });
+    await page.waitForSelector('#home:not(.hidden)');
+    ok(await page.$eval('#btn-community', el => el.getAttribute('aria-label') === 'Open leaderboard and referrals'), 'home has an accessible community navigation control');
+    ok(await page.$eval('meta[name="viewport"]', el => !/user-scalable=no|maximum-scale=1/.test(el.content)), 'the page allows browser zoom for larger text and touch accessibility');
+    const getPersistentState = () => page.evaluate(async () => JSON.stringify({
+      localStorage: Object.keys(localStorage).sort().map(key => [key, localStorage.getItem(key)]),
+      sessionStorage: Object.keys(sessionStorage).sort().map(key => [key, sessionStorage.getItem(key)]),
+      indexedDB: indexedDB.databases ? (await indexedDB.databases()).map(database => database.name).sort() : null
+    }));
+    const initialStorage = await getPersistentState();
+    await page.click('#btn-community');
+    await page.waitForSelector('#community:not(.hidden)');
+    ok(await page.$eval('#community-tab-leaderboard', el => el.getAttribute('aria-selected') === 'true'), 'community navigation opens on the selected leaderboard tab');
+    const fixtureTables = await page.evaluate(() => window.__communityPreview.getFixtures());
+    ok(fixtureTables.leaderboardRows.length === 10 && fixtureTables.currentUserRow.isCurrentUser && fixtureTables.currentUserRow.rank > 10 && fixtureTables.leaderboardRows.every(row => row.id.startsWith('demo-') && row.avatarId && row.skinId && Number.isFinite(row.score) && Number.isInteger(row.rank) && row.isCurrentUser === false), 'leaderboard fixture table has ten stable demo players with IDs, avatar/skin, score, rank and current-user metadata');
+    ok(new Set(fixtureTables.leaderboardRows.map(row => row.id)).size === 10 && fixtureTables.leaderboardRows.filter(row => row.rank === 3 && row.score === fixtureTables.leaderboardRows.find(other => other.rank === 3).score && row.tieGroup === 'rank-3').length === 2 && fixtureTables.leaderboardRows.filter(row => row.rank === 10 && row.tieGroup === 'rank-10').length === 2, 'rank-three and rank-ten ties use matching scores and explicit tie-group metadata');
+    ok(JSON.stringify(fixtureTables) === JSON.stringify(await page.evaluate(() => window.__communityPreview.getFixtures())), 'all three local fixture tables return byte-stable deterministic snapshots');
+    const referralFixtureCounts = await page.evaluate(() => {
+      const data = window.__communityPreview.getFixtures();
+      const counted = id => data.referralRows.filter(row => row.scenario === id && row.state === 'first_match_completed' && row.counted).length;
+      const statuses = new Set(data.referralRows.map(row => row.state));
+      return { states: ['shared', 'joined', 'first_match_completed', 'simulated_review'].every(state => statuses.has(state)), zero: counted('not-started'), nine: counted('almost'), active: counted('review-active'), ended: counted('review-ended'), duplicate: data.referralRows.filter(row => row.scenario === 'duplicate'), self: data.referralRows.filter(row => row.scenario === 'self-referral'), dated: data.referralRows.every(row => row.id.startsWith('demo-') && /^2026-\d\d-\d\d$/.test(row.date)) };
+    });
+    ok(referralFixtureCounts.states && referralFixtureCounts.zero === 0 && referralFixtureCounts.nine === 9 && referralFixtureCounts.active === 10 && referralFixtureCounts.ended === 10 && referralFixtureCounts.dated, 'referral fixture table has dated fake records for shared/joined/completed/review states and exact 0/9/10 counts');
+    ok(referralFixtureCounts.duplicate.length === 1 && referralFixtureCounts.duplicate[0].state === 'duplicate' && referralFixtureCounts.self.length === 1 && referralFixtureCounts.self[0].state === 'self_referral' && !referralFixtureCounts.duplicate[0].counted && !referralFixtureCounts.self[0].counted, 'duplicate and self-referral fixtures are separate and never increase demo progress');
+    ok(fixtureTables.uiScenarios.week.active.eventId && fixtureTables.uiScenarios.week.active.eventStartsAt && fixtureTables.uiScenarios.week.active.eventEndsAt && fixtureTables.uiScenarios.week.active.timeZone === 'UTC' && fixtureTables.uiScenarios.week.active.resetAt === fixtureTables.uiScenarios.week.active.endsAt && fixtureTables.uiScenarios.week.ended.ended && Date.parse(fixtureTables.uiScenarios.week.ended.resetAt) < Date.parse(fixtureTables.uiScenarios.week.ended.demoNow) && fixtureTables.uiScenarios.week.active.reward.previewOnly, 'week fixture table defines event/week end and reset metadata in UTC, an ended week, and preview-only rewards');
+    ok(await page.$$eval('#community-leaderboard-list > li', rows => rows.length === 11 && rows.filter(row => row.dataset.currentUser === 'false').length === 10), 'leaderboard shows ten stable sample players plus a separate current-user row');
+    ok(await page.$$eval('#community-leaderboard-list > li', rows => rows.slice(0, 4).every(row => row.querySelector('.crystal-crown'))), 'the top three places use crystal crowns, including the tied 3rd-place pair');
+    ok(await page.$$eval('.crystal-crown', crowns => crowns.length === 4 && crowns.every(crown => { const id = crown.querySelector('linearGradient')?.id; return !!id && crown.querySelector('.crown-base').getAttribute('style').includes('url(#' + id + ')') && crown.querySelectorAll('linearGradient stop').length === 3; })), 'podium crowns use unique three-stop dimensional crystal gradients');
+    ok(await page.$$eval('.leader-rank-podium b', ranks => ranks.map(el => el.textContent).join(',') === '1st,2nd,3rd,3rd'), 'podium ranks are explicitly labeled 1st, 2nd, and 3rd for tied players');
+    ok(await page.$$eval('#community-leaderboard-list [data-rank="10"]', rows => rows.length === 2 && rows.every(row => row.querySelector('.leader-rank-number').textContent === '10th')), 'equal 10th-place scores consistently share the same displayed rank');
+    ok(await page.$eval('#community-panel-leaderboard', panel => /share a place/.test(panel.textContent) && /10th/.test(panel.textContent)), 'the weekly scoring and tie rule is legible in text');
+    ok(await page.$eval('#community-leaderboard-list [data-current-user="true"]', row => row.dataset.rank === '14' && row.classList.contains('leader-you') && row.getAttribute('aria-label').includes('outside Top 10') && row.getAttribute('aria-label').includes('You')), 'the current user is a separate, accessible demo row outside the Top 10');
+    ok(await page.$eval('#community-leaderboard-list [data-rank="8"]', row => row.title.includes('Alexandria of the Opal Garden') && row.getAttribute('aria-label').includes('Alexandria of the Opal Garden')), 'long sample names remain available through title and assistive text');
+    ok(await page.$eval('.community-section-head p', el => /demo preview/i.test(el.textContent) && /not synced/i.test(el.textContent)), 'leaderboard prominently identifies offline, unsynced demo data');
+
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    ok(await page.$eval('#community-claim-open', el => document.activeElement === el && el.matches(':focus-visible') && getComputedStyle(el).boxShadow.includes('rgba')), 'Preview reward has a visible keyboard-focus glow');
+    await page.evaluate(() => document.activeElement.blur());
+    const claimBaseShadow = await page.$eval('#community-claim-open', el => getComputedStyle(el).boxShadow);
+    await page.hover('#community-claim-open');
+    await new Promise(resolve => setTimeout(resolve, 200));
+    ok(await page.$eval('#community-claim-open', (el, base) => el.matches(':hover') && getComputedStyle(el).boxShadow !== base, claimBaseShadow), 'Preview reward gains a subtle hover glow');
+    const claimBox = await page.$eval('#community-claim-open', el => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await page.mouse.move(claimBox.x, claimBox.y);
+    await page.mouse.down();
+    ok(await page.$eval('#community-claim-open', el => el.matches(':active') && getComputedStyle(el).transform !== 'none'), 'Preview reward gives a restrained pressed/tap response');
+    await page.mouse.move(0, 0);
+    await page.mouse.up();
+
+    const scrollState = await page.$eval('#community-panel-leaderboard', panel => {
+      const hasOverflow = panel.scrollHeight > panel.clientHeight;
+      panel.scrollTop = panel.scrollHeight;
+      return { hasOverflow };
+    });
+    await page.waitForFunction(() => document.querySelector('#community-panel-leaderboard').scrollTop > 0, { timeout: 2000 });
+    scrollState.top = await page.$eval('#community-panel-leaderboard', panel => panel.scrollTop);
+    ok(scrollState.hasOverflow && scrollState.top > 0, 'leaderboard panel scrolls independently through its ranked rows');
+    const footerState = await page.evaluate(() => {
+      const screen = document.getElementById('community').getBoundingClientRect();
+      const footer = document.getElementById('community-sticky-footer').getBoundingClientRect();
+      return { visible: footer.top < innerHeight && footer.bottom <= innerHeight + 1, pinned: Math.abs(footer.bottom - screen.bottom) < 2, rank: document.getElementById('community-current-rank').textContent, you: document.querySelector('.community-footer-rank').textContent.includes('You'), progress: document.getElementById('community-current-progress').textContent };
+    });
+    ok(footerState.visible && footerState.pinned && footerState.rank === '#14' && footerState.you && /420 sample crystals/.test(footerState.progress) && /outside Top 10/.test(footerState.progress), 'sticky footer shows the separate rank-14 demo user and outside-Top-10 sample score');
+    ok(await page.$eval('#community-sticky-footer', el => /blur\(/.test(getComputedStyle(el).backdropFilter) && getComputedStyle(el).boxShadow.split(',').length >= 3 && parseFloat(getComputedStyle(el).borderTopWidth) >= 1), 'sticky-rank footer has a distinct frosted separation rule and soft layered shadow');
+
+    const timer = await page.$eval('#community-countdown', el => ({ text: el.textContent, live: el.getAttribute('aria-live'), date: el.dateTime, label: el.getAttribute('aria-label') }));
+    ok(/\d+d \d{2}h \d{2}m \d{2}s/.test(timer.text) && timer.live === 'off', 'deterministic UTC demo countdown is visible without announcing each second');
+    ok(Number.isFinite(Date.parse(timer.date)) && /not synced/i.test(timer.label) && await page.$eval('#community-reset-at', el => el.textContent.startsWith('Ends ') && !!el.title), 'weekly end time is shown with timezone context and an explicit unsynced label');
+    await page.waitForFunction(previous => document.getElementById('community-countdown').textContent !== previous, { timeout: 3000 }, timer.text);
+    ok(await page.$eval('#community-countdown', el => el.textContent !== ''), 'the client-only countdown updates while the page is open');
+    await page.select('#community-week-scenario', 'ended');
+    ok(await page.evaluate(() => window.__communityPreview.getState().week === 'ended') && await page.$eval('#community-countdown', el => /^0d 00h 00m 00s$/.test(el.textContent) && /ended demo week/i.test(el.getAttribute('aria-label'))) && await page.$eval('#community-reset-at', el => el.textContent.startsWith('Ended ') && /UTC/.test(el.textContent) && /not synced/.test(el.title)) && await page.$eval('#community-week-chip', el => /WEEK 39.*ENDED DEMO/.test(el.textContent)), 'ended-week scenario reaches zero with deterministic UTC reset metadata and an explicit ended label');
+    await page.select('#community-week-scenario', 'active');
+    ok(await page.evaluate(() => window.__communityPreview.getState().week === 'active') && await page.$eval('#community-countdown', el => !/^0d 00h 00m 00s$/.test(el.textContent)) && await page.$eval('#community-week-status', el => /offline and not synced/i.test(el.textContent)), 'switching back replays only the active local week fixture and countdown');
+
+    await page.evaluate(() => window.__communityPreview.setCountdownFixture(3600));
+    ok(await page.$eval('#community-countdown', el => /01h 00m 00s/.test(el.textContent) && !el.classList.contains('is-under-hour')), 'the deterministic one-hour boundary does not pulse');
+    await page.evaluate(() => window.__communityPreview.setCountdownFixture(3599));
+    ok(await page.$eval('#community-countdown', el => el.classList.contains('is-under-hour') && getComputedStyle(el).animationName === 'community-countdown-pulse' && getComputedStyle(el).animationDuration === '2.8s' && el.getAttribute('aria-live') === 'off'), 'only the under-hour fixture gets a soft, non-live countdown pulse');
+    await page.evaluate(() => window.__communityPreview.setCountdownFixture(0));
+    ok(await page.$eval('#community-countdown', el => !el.classList.contains('is-under-hour') && el.getAttribute('aria-live') === 'off'), 'an expired countdown is not pulsed or announced as a ticking live region');
+    await page.evaluate(() => window.__communityPreview.setCountdownFixture(null));
+
+    await page.$eval('#community-panel-leaderboard', panel => { panel.scrollTop = 0; });
+    await page.waitForFunction(() => document.querySelector('#community-panel-leaderboard').scrollTop === 0, { timeout: 2000 });
+    ok(await page.$eval('#community-claim-open', el => el.textContent.trim() === 'Preview reward'), 'top-10 action is clearly a reward preview, not a claim');
+    await page.click('#community-claim-open');
+    await page.waitForSelector('#community-claim-modal:not(.hidden)');
+    await page.waitForFunction(() => document.getElementById('community-claim-modal').classList.contains('is-open'));
+    await new Promise(resolve => setTimeout(resolve, 300));
+    ok(await page.$eval('#community-claim-modal [role="dialog"]', el => el.getAttribute('aria-modal') === 'true' && el.getAttribute('aria-labelledby') === 'community-claim-title' && document.getElementById('community-claim-title').textContent === 'Reward preview'), 'reward preview opens an accessible, clearly titled modal');
+    ok(await page.$eval('#community-claim-modal', el => getComputedStyle(el).opacity === '1' && /blur\(/.test(getComputedStyle(el).backdropFilter) && /0\.24s/.test(getComputedStyle(el).transitionDuration) && getComputedStyle(el.querySelector('.community-dialog')).opacity === '1'), 'reward modal fades and scales into a frosted-glass open state');
+    ok(await page.$eval('#community-claim-note', el => /Claim unavailable in demo/.test(el.textContent) && /non-submitting/.test(el.textContent)), 'modal states that claiming is unavailable and the phone field does not submit');
+    ok(await page.$eval('#community-phone', el => el.type === 'tel' && el === document.activeElement && el.autocomplete === 'off'), 'phone-number demo input is labeled, focused and not autofilled');
+    await page.type('#community-phone', '+1 555 010 1234');
+    await page.click('#community-claim-preview');
+    ok(await page.$eval('#community-claim-status', el => !el.classList.contains('hidden') && /no phone number was checked, sent, or saved/.test(el.textContent) && /unavailable in this demo/.test(el.textContent)), 'phone preview confirms no checking, sending, saving, approval or claim occurs');
+    ok(await page.$eval('#community-phone', el => el.value === ''), 'reward preview clears the phone field instead of retaining the value');
+    const afterClaimStorage = await getPersistentState();
+    ok(afterClaimStorage === initialStorage && posts.length === 0, 'reward preview makes no network submission and does not change local storage');
+    await page.click('#community-claim-cancel');
+    await page.waitForFunction(() => document.getElementById('community-claim-modal').classList.contains('is-closing'));
+    ok(await page.$eval('#community-claim-modal', el => !el.classList.contains('hidden') && el.getAttribute('aria-hidden') === 'true' && getComputedStyle(el).transitionDuration.includes('0.24s')), 'closing begins a fade-out immediately and removes the modal from interaction');
+    await page.waitForSelector('#community-claim-modal.hidden');
+    ok(await page.evaluate(() => document.activeElement.id === 'community-claim-open'), 'closing the reward dialog restores keyboard focus to its opener');
+
+    await page.click('#community-tab-referrals');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    ok(await page.$eval('#referral-preview-toggle', el => document.activeElement === el && el.matches(':focus-visible') && getComputedStyle(el).boxShadow.includes('rgba')), 'referral preview control has a visible keyboard-focus glow');
+    await page.evaluate(() => document.activeElement.blur());
+    const referralBaseShadow = await page.$eval('#referral-preview-toggle', el => getComputedStyle(el).boxShadow);
+    await page.hover('#referral-preview-toggle');
+    await new Promise(resolve => setTimeout(resolve, 200));
+    ok(await page.$eval('#referral-preview-toggle', (el, base) => el.matches(':hover') && getComputedStyle(el).boxShadow !== base, referralBaseShadow), 'referral preview control gains a subtle hover glow');
+    const referralBox = await page.$eval('#referral-preview-toggle', el => { const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+    await page.mouse.move(referralBox.x, referralBox.y);
+    await page.mouse.down();
+    ok(await page.$eval('#referral-preview-toggle', el => el.matches(':active') && getComputedStyle(el).transform !== 'none'), 'referral preview control responds gently to a tap/press');
+    await page.mouse.move(0, 0);
+    await page.mouse.up();
+    ok(await page.$eval('#referral-count', el => el.textContent === '4/10') && await page.$eval('#referral-progress-title', el => /Sample referrals counted/.test(el.textContent)), 'referral dashboard starts at the requested 4/10 sample-counted state');
+    ok(await page.$eval('#referral-progress', el => el.getAttribute('role') === 'progressbar' && el.getAttribute('aria-valuenow') === '4' && el.getAttribute('aria-valuemax') === '10' && /sample referrals/.test(el.getAttribute('aria-valuetext'))), '4/10 referral progress is conveyed accessibly as demo data');
+    ok(await page.$eval('#referral-progress-fill', el => el.style.width === '40%'), '4/10 crystal progress bar is filled to forty percent');
+    ok(await page.$$eval('.referral-crystal-slot', slots => slots.length === 10 && slots.slice(0, 4).every(slot => { const fill = slot.querySelector('.milestone-crystal-fill'); const id = slot.querySelector('linearGradient')?.id; return !!fill && fill.getAttribute('fill') === 'url(#' + id + ')' && parseFloat(getComputedStyle(fill).opacity) > 0; }) && slots.slice(4).every(slot => parseFloat(getComputedStyle(slot.querySelector('.milestone-crystal-fill')).opacity) === 0)), 'earned referral milestones show dimensional gradient crystals while remaining slots stay subdued');
+    ok(await page.$$eval('#referral-stage-list [data-referral-id]', rows => rows.length === 6 && rows.some(row => row.dataset.referralState === 'shared') && rows.some(row => row.dataset.referralState === 'joined') && rows.filter(row => row.dataset.referralState === 'first_match_completed').length === 4 && rows.every(row => row.textContent.includes('Fake ID:') && row.querySelector('time'))), 'dated fake referral rows show shared, joined and first-match-completed demo states');
+    ok(await page.$eval('#referral-review-card', el => el.classList.contains('hidden')), 'review card stays hidden before the 10/10 milestone');
+    await page.click('#referral-preview-toggle');
+    ok(await page.$eval('#referral-count', el => el.textContent === '10/10'), 'the one-click demo toggle reaches 10/10');
+    ok(await page.$eval('#referral-progress', el => el.getAttribute('aria-valuenow') === '10') && await page.$eval('#referral-progress-fill', el => el.style.width === '100%'), '10/10 state fills the progress bar and updates its accessible value');
+    ok(await page.$$eval('#referral-stage-list [data-referral-state="first_match_completed"]', rows => rows.length === 10) && await page.$eval('#referral-stage-list [data-referral-state="simulated_review"]', row => /simulated/i.test(row.textContent)), '10/10 preview displays ten sample completions and a separately labeled simulated review row');
+    ok(await page.$eval('#referral-review-card', el => !el.classList.contains('hidden') && el.textContent.includes('Pending 48h Manual Review') && /simulated/i.test(el.textContent)), '10/10 reveals the simulated Pending 48h Manual Review card');
+    ok(await page.$eval('#referral-review-copy', el => /does not imply approval or payout/.test(el.textContent)), 'the 48-hour review expiry does not imply approval or payout');
+    await page.click('#referral-review-toggle');
+    ok(await page.$eval('#referral-review-toggle', el => el.getAttribute('aria-expanded') === 'false') && await page.$eval('#referral-review-details', el => el.classList.contains('hidden')), 'review card can be collapsed with an accurate expanded state');
+    await page.click('#referral-review-toggle');
+    ok(await page.$eval('#referral-review-toggle', el => el.getAttribute('aria-expanded') === 'true') && await page.$eval('#referral-review-details', el => !el.classList.contains('hidden')), 'review card can be expanded again');
+    await page.click('#referral-preview-toggle');
+    ok(await page.$eval('#referral-count', el => el.textContent === '4/10') && await page.$eval('#referral-review-card', el => el.classList.contains('hidden')), 'returning to 4/10 hides the completion-only review card');
+
+    await page.$eval('.referral-more-states', el => { el.open = true; });
+    await page.select('#referral-demo-state', 'not-started');
+    ok(await page.$eval('#referral-count', el => el.textContent === '0/10') && await page.$eval('#referral-progress', el => el.getAttribute('aria-valuenow') === '0'), 'selectable 0/10 fixture shows no counted sample referrals');
+    ok(await page.$$eval('#referral-stage-list [data-referral-state]', rows => rows.length === 2 && rows.some(row => row.dataset.referralState === 'shared') && rows.some(row => row.dataset.referralState === 'joined')), '0/10 can still show shared/joined fake records without counting them as completed');
+    await page.select('#referral-demo-state', 'almost');
+    ok(await page.$eval('#referral-count', el => el.textContent === '9/10') && await page.$eval('#referral-progress-fill', el => el.style.width === '90%'), 'selectable 9/10 fixture previews the final referral slot');
+    ok(await page.$$eval('#referral-stage-list [data-referral-state="first_match_completed"]', rows => rows.length === 9), '9/10 scenario renders exactly nine sample completion rows');
+    await page.select('#referral-demo-state', 'duplicate');
+    ok(await page.$eval('#referral-count', el => el.textContent === '0/10') && await page.$$eval('#referral-stage-list [data-referral-state]', rows => rows.length === 1 && rows[0].dataset.referralState === 'duplicate' && /excluded from demo count/i.test(rows[0].textContent)), 'duplicate example is its own visible demo scenario and does not count');
+    await page.select('#referral-demo-state', 'self-referral');
+    ok(await page.$eval('#referral-count', el => el.textContent === '0/10') && await page.$$eval('#referral-stage-list [data-referral-state]', rows => rows.length === 1 && rows[0].dataset.referralState === 'self_referral' && /excluded from demo count/i.test(rows[0].textContent)), 'self-referral example is separate from duplicate and does not count');
+    await page.select('#referral-demo-state', 'review-ended');
+    ok(await page.$eval('#referral-review-title', el => /outcome unknown/.test(el.textContent)) && await page.$eval('#referral-review-copy', el => /no approval or payout is implied/i.test(el.textContent)) && await page.$$eval('#referral-stage-list [data-referral-state="first_match_completed"]', rows => rows.length === 10), 'ended-review fixture leaves ten demo completions and its result unknown without approval or payout');
+    await page.select('#referral-demo-state', 'pending-overdue');
+    ok(await page.$eval('#referral-review-title', el => /Pending >48h/.test(el.textContent)) && await page.$eval('#referral-review-copy', el => /remains pending/.test(el.textContent) && /never implies approval or payout/.test(el.textContent)), 'pending-beyond-48h fixture remains pending without automatic approval');
+    await page.select('#referral-demo-state', 'empty');
+    ok(await page.$eval('#referral-state-message', el => !el.classList.contains('hidden') && /empty state/i.test(el.textContent)) && await page.$eval('#referral-stage-fixtures', el => el.classList.contains('hidden')), 'empty fixture honestly shows no entries');
+    await page.select('#referral-demo-state', 'loading');
+    ok(await page.$eval('#referral-state-message', el => /simulated on this device; no request is made/i.test(el.textContent)), 'loading fixture is explicitly simulated without a request');
+    await page.select('#referral-demo-state', 'error');
+    ok(await page.$eval('#referral-state-message', el => /fixture error \(simulated\)/i.test(el.textContent)) && await page.$eval('#referral-retry', el => !el.classList.contains('hidden') && /Retry local demo/.test(el.textContent)), 'error fixture exposes a retry that is explicitly local');
+    await page.click('#referral-retry');
+    ok(await page.$eval('#referral-count', el => el.textContent === '4/10') && await page.$eval('#referral-demo-state', el => el.value === 'in-progress'), 'Retry resets only the local demo to 4/10');
+    await page.select('#referral-demo-state', 'expired');
+    ok(await page.$eval('#referral-state-message', el => /expired \(simulated\)/.test(el.textContent)) && await page.$eval('#referral-retry', el => /Restart local demo/.test(el.textContent)), 'expired fixture is labeled simulated and offers only a local restart');
+    await page.click('#referral-retry');
+    ok(await page.$eval('#referral-count', el => el.textContent === '4/10') && posts.length === 0, 'local retry never contacts a server');
+    await page.evaluate(() => {
+      window.__communityPreview.setWeekScenario('ended');
+      window.__communityPreview.setReferralScenario('error');
+      window.__communityPreview.resetLocalFixtures();
+    });
+    ok(await page.evaluate(() => { const state = window.__communityPreview.getState(); return state.week === 'active' && state.referral === 'in-progress' && state.countdownFixtureSeconds === null; }) && await page.$eval('#referral-count', el => el.textContent === '4/10') && await page.$eval('#community-week-scenario', el => el.value === 'active') && await getPersistentState() === initialStorage && posts.length === 0 && externalRequests.length === 0, 'fixture replay restores active week and 4/10 sample state in memory only, with no network or storage writes');
+
+    await page.focus('#community-tab-referrals');
+    await page.keyboard.press('ArrowLeft');
+    ok(await page.evaluate(() => document.activeElement.id === 'community-tab-leaderboard' && document.activeElement.getAttribute('aria-selected') === 'true'), 'community tabs support left/right keyboard navigation');
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    const motion = await page.$eval('.leader-row', el => ({ matches: matchMedia('(prefers-reduced-motion: reduce)').matches, animation: getComputedStyle(el).animationName, transition: getComputedStyle(el).transitionDuration }));
+    ok(motion.matches && motion.animation === 'none' && motion.transition === '0s', 'reduced-motion preference disables leaderboard animation and transitions');
+    await page.evaluate(() => window.__communityPreview.setCountdownFixture(3599));
+    ok(await page.$eval('#community-countdown', el => el.classList.contains('is-under-hour') && getComputedStyle(el).animationName === 'none'), 'reduced motion preserves the under-hour state without animating it');
+    await page.evaluate(() => window.__communityPreview.setCountdownFixture(null));
+    await page.click('#community-claim-open');
+    await page.waitForSelector('#community-claim-modal:not(.hidden)');
+    await page.waitForFunction(() => document.getElementById('community-claim-modal').classList.contains('is-open'));
+    ok(await page.$eval('#community-claim-modal', el => matchMedia('(prefers-reduced-motion: reduce)').matches && getComputedStyle(el).transitionDuration === '0s' && getComputedStyle(el.querySelector('.community-dialog')).transitionDuration === '0s'), 'reduced motion removes reward-modal fade and scale transitions');
+    await page.click('#community-claim-cancel');
+    await page.waitForSelector('#community-claim-modal.hidden');
+    await page.setViewport({ width: 320, height: 740, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    const smallScreen = await page.evaluate(() => ({ documentWidth: document.documentElement.scrollWidth, viewport: innerWidth, panelWidth: document.getElementById('community-panel-leaderboard').scrollWidth, panelClient: document.getElementById('community-panel-leaderboard').clientWidth }));
+    ok(smallScreen.documentWidth <= smallScreen.viewport && smallScreen.panelWidth <= smallScreen.panelClient + 1, 'compact phone width avoids horizontal overflow');
+    await page.setViewport({ width: 360, height: 740, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.querySelector('.community-footer').getBoundingClientRect().width <= innerWidth), '360px phone layout keeps the leaderboard and frosted footer within the viewport');
+    const desktopContext = await browser.createBrowserContext();
+    const desktopPage = await desktopContext.newPage();
+    const desktopPosts = [];
+    desktopPage.on('request', request => { if (request.method() !== 'GET' && request.method() !== 'HEAD') desktopPosts.push(request.method() + ' ' + request.url()); });
+    await desktopPage.setViewport({ width: 1440, height: 960, deviceScaleFactor: 1, isMobile: false, hasTouch: false });
+    await desktopPage.goto(URL, { waitUntil: 'networkidle0' });
+    await desktopPage.click('#btn-community');
+    await desktopPage.waitForSelector('#community:not(.hidden)');
+    ok(await desktopPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.getElementById('community-panel-leaderboard').clientWidth <= 520 && document.getElementById('community-panel-leaderboard').scrollHeight > document.getElementById('community-panel-leaderboard').clientHeight) && desktopPosts.length === 0, 'desktop layout stays centered, width-bounded, independently scrollable and offline');
+    await desktopContext.close();
+    await page.evaluate(() => { document.documentElement.dir = 'rtl'; });
+    const rtl = await page.evaluate(() => ({ direction: getComputedStyle(document.getElementById('community')).direction, overflow: document.documentElement.scrollWidth <= innerWidth }));
+    ok(rtl.direction === 'rtl' && rtl.overflow, 'logical-direction styles preserve a usable RTL layout');
+    await page.evaluate(() => { document.documentElement.dir = 'ltr'; });
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+    await page.focus('#community-tab-referrals');
+    await page.keyboard.press('ArrowRight');
+    ok(await page.evaluate(() => document.activeElement.id === 'community-tab-themes' && document.activeElement.getAttribute('aria-selected') === 'true'), 'keyboard arrow navigation reaches and selects the Themes tab');
+    await page.click('#community-tab-themes');
+    ok(await page.$eval('#community-tab-themes', el => el.getAttribute('aria-selected') === 'true') && await page.$eval('#community-panel-themes', el => !el.classList.contains('hidden') && el.getAttribute('aria-hidden') === 'false'), 'Themes opens as an accessible third community tab and tab panel');
+    const themeCards = await page.$$eval('#theme-card-list [data-theme-card]', cards => cards.map(card => ({ id: card.dataset.themeCard, name: card.querySelector('h3').textContent, price: card.querySelector('.theme-price').textContent.trim() })));
+    ok(themeCards.length === 4 && themeCards.map(card => card.name).join('|') === 'Classic Obsidian|Neon Frost|Royal Gold|Deep Ocean' && themeCards.map(card => card.price).join('|') === 'Included|500 crystals|1,000 crystals|2,000 crystals', 'four distinct theme cards render with their titles and 500/1,000/2,000-crystal mock costs');
+    const initialThemes = await page.evaluate(() => ({ balance: document.getElementById('theme-demo-balance').textContent, states: Array.from(document.querySelectorAll('.theme-card-state'), el => el.textContent), neon: document.querySelector('[data-theme-id="neon-frost"]').textContent.trim(), royalDisabled: document.querySelector('[data-theme-id="royal-gold"]').disabled, deepDisabled: document.querySelector('[data-theme-id="deep-ocean"]').disabled }));
+    ok(initialThemes.balance === '750' && initialThemes.states[0] === 'Equipped' && initialThemes.neon === 'Unlock with Crystals' && initialThemes.royalDisabled === true && initialThemes.deepDisabled === true, '750 demo crystals equip Classic, allow Neon Frost, and leave Royal Gold and Deep Ocean locked at the outset');
+    ok(await page.$eval('#theme-preview-board', el => getComputedStyle(el).transitionDuration.includes('0.36s') && getComputedStyle(el.querySelector('.theme-track')).transitionDuration.includes('0.36s')), 'theme board frame and route accents transition smoothly when reduced motion is not requested');
+    const obsidianPalette = await page.$eval('#theme-preview-board', el => ['--theme-board-bg', '--theme-path', '--theme-frame'].map(name => getComputedStyle(el).getPropertyValue(name).trim()).join('|'));
+    await page.click('.theme-action-button[data-theme-id="neon-frost"]');
+    const unlockedNeon = await page.evaluate(() => ({ balance: document.getElementById('theme-demo-balance').textContent, state: document.querySelector('[data-theme-card="neon-frost"] .theme-card-state').textContent, action: document.querySelector('[data-theme-id="neon-frost"]').textContent.trim(), preview: document.getElementById('theme-preview-board').dataset.themePreview, title: document.getElementById('theme-preview-title').textContent, note: document.getElementById('theme-preview-note').textContent, palette: ['--theme-board-bg', '--theme-path', '--theme-frame'].map(name => getComputedStyle(document.getElementById('theme-preview-board')).getPropertyValue(name).trim()).join('|'), focusRestored: document.activeElement === document.querySelector('[data-theme-id="neon-frost"]') }));
+    ok(unlockedNeon.balance === '250' && unlockedNeon.state === 'Unlocked' && unlockedNeon.action === 'Equip theme' && unlockedNeon.preview === 'neon-frost' && /unlocked preview/i.test(unlockedNeon.note) && unlockedNeon.palette !== obsidianPalette && unlockedNeon.focusRestored, 'unlocking Neon Frost deducts only 500 demo crystals, updates the preview palette, and preserves keyboard focus');
+    await page.click('.theme-action-button[data-theme-id="neon-frost"]');
+    ok(await page.$eval('[data-theme-card="neon-frost"] .theme-action-button', el => el.textContent === 'Equipped' && el.getAttribute('aria-pressed') === 'true' && document.activeElement === el) && await page.$eval('.theme-preview-card', el => el.dataset.themeEquipped === 'neon-frost') && await page.$eval('#theme-preview-note', el => /Equipped demo theme/.test(el.textContent)), 'Equipping Neon Frost updates the equipped state, accessible pressed state, preview label, and focus');
+    await page.click('.theme-action-button[data-theme-id="classic-obsidian"]');
+    ok(await page.$eval('#theme-preview-board', el => el.dataset.themePreview === 'classic-obsidian') && await page.$eval('[data-theme-card="classic-obsidian"] .theme-card-state', el => el.textContent === 'Equipped') && await page.$eval('#theme-preview-board', (el, palette) => ['--theme-board-bg', '--theme-path', '--theme-frame'].map(name => getComputedStyle(el).getPropertyValue(name).trim()).join('|') === palette, obsidianPalette), 'switching back to Classic Obsidian restores its distinct board, path and frame palette');
+    await page.click('.theme-action-button[data-theme-id="neon-frost"]');
+    const lockedThemes = await page.evaluate(() => ({ balance: document.getElementById('theme-demo-balance').textContent, royalPrice: document.querySelector('[data-theme-card="royal-gold"] .theme-price').textContent.trim(), royalState: document.querySelector('[data-theme-card="royal-gold"] .theme-card-state').textContent, royalButtonText: document.querySelector('[data-theme-id="royal-gold"]').textContent.trim(), royalDisabled: document.querySelector('[data-theme-id="royal-gold"]').disabled, deepState: document.querySelector('[data-theme-card="deep-ocean"] .theme-card-state').textContent, deepDisabled: document.querySelector('[data-theme-id="deep-ocean"]').disabled }));
+    ok(lockedThemes.balance === '250' && lockedThemes.royalPrice === '1,000 crystals' && lockedThemes.royalState === 'Locked (Not enough crystals)' && lockedThemes.royalDisabled === true && lockedThemes.royalButtonText === 'Locked (Not enough crystals)' && lockedThemes.deepState === 'Locked (Not enough crystals)' && lockedThemes.deepDisabled === true, 'insufficient funds keep the 1,000- and 2,000-crystal themes locked without another deduction');
+    await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+    ok(await page.$eval('#theme-preview-board', el => matchMedia('(prefers-reduced-motion: reduce)').matches && getComputedStyle(el).transitionDuration === '0s' && getComputedStyle(el.querySelector('.theme-track')).transitionDuration === '0s' && getComputedStyle(el).animationName === 'none'), 'reduced motion removes theme-preview movement and transitions');
+    const themeStorage = await getPersistentState();
+    ok(themeStorage === initialStorage && posts.length === 0, 'theme browsing, mock unlocking and equipping make no network requests or localStorage changes');
+    await page.setViewport({ width: 320, height: 740, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.getElementById('community-panel-themes').scrollWidth <= document.getElementById('community-panel-themes').clientWidth + 1 && document.getElementById('theme-card-list').scrollWidth <= document.getElementById('theme-card-list').clientWidth + 1), 'theme previews and crystal actions fit without horizontal overflow on a 320px touch screen');
+    await page.setViewport({ width: 360, height: 740, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+    await page.click('#community-back');
+    ok(await page.evaluate(() => document.getElementById('community').classList.contains('hidden') && !document.getElementById('home').classList.contains('hidden') && document.activeElement.id === 'btn-community'), 'Back returns home and restores focus to the launcher');
+    const finalStorage = await getPersistentState();
+    ok(finalStorage === initialStorage && posts.length === 0 && externalRequests.length === 0, 'navigation and every referral/reward fixture stay offline, avoid external requests, and leave persistent storage unchanged');
+    console.log(`\n${checks} community UI checks passed`);
+  } finally {
+    await browser.close();
+  }
+})().catch(error => { console.error(error.stack || error); process.exit(1); });

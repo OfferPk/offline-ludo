@@ -14,6 +14,11 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   console.log('Testing', URL);
   const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage(); global.__page = page;
+  const rawTap = page.tap.bind(page);
+  page.tap = async (sel, opts) => {
+    if (typeof sel === 'string') await page.evaluate(q => { const e = document.querySelector(q); if (e) e.scrollIntoView({ block: 'center' }); }, sel);
+    return rawTap(sel, opts);
+  };
   await page.emulate({ viewport: { width: W, height: H, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36' });
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + e.message));
@@ -33,18 +38,167 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   const st = () => ev(() => { const g = window.__cf.game; return g ? JSON.parse(JSON.stringify(g.st)) : null; });
   async function tapPiece(seat, i) { const p = await ev((s, k) => window.__cf.piecePoint(s, k), seat, i); await page.touchscreen.tap(p.x, p.y); }
   async function tap(sel){ await page.evaluate(q=>{ const e=document.querySelector(q); if(!e) throw new Error('missing '+q); e.scrollIntoView({block:'center'}); }, sel); await page.tap(sel); }
+  async function dicePoint(seat) { return ev(s => { const r = document.querySelector('.pod[data-seat="' + s + '"] .pdice').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }, seat); }
+  async function swipeDice(seat) {
+    const p = await dicePoint(seat), cdp = await page.target().createCDPSession();
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y, id: 1, radiusX: 1, radiusY: 1, force: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: p.x + 34, y: p.y + 6, id: 1, radiusX: 1, radiusY: 1, force: 1 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.detach();
+  }
+  async function tapDice(seat) { const p = await dicePoint(seat); await page.touchscreen.tap(p.x, p.y); }
   const roll = seat => ev(s => document.querySelector('.pod[data-seat="' + s + '"] .pdice').click(), seat);
   const chip = (seat, v) => ev((s, x) => document.querySelector('.pod[data-seat="' + s + '"] .chip-v[data-v="' + x + '"]').click(), seat, v);
   const chips = seat => ev(s => [...document.querySelectorAll('.pod[data-seat="' + s + '"] .chip-v')].map(c => +c.dataset.v), seat);
   const waitUndoGone = async () => { await waitFor(() => !window.__cf.undoActive, 5000, 'undo window to close'); await sleep(80); };
   const edit = (code) => ev(c => { window.__cf.edit(new Function('st', c)); }, code);
+  async function keyboardMoveToHandoff(seat, nextSeat, label) {
+    await ev(v => window.__cf.force([v]), 1);
+    await page.focus('.pod[data-seat="' + seat + '"] .pdice'); await page.keyboard.press('Enter');
+    await idleHuman('move', seat);
+    ok(await ev(s => document.activeElement.matches('#pieces .pc.can[data-seat="' + s + '"]') && !document.activeElement.disabled, seat), label + ': keyboard roll focuses a legal token');
+    await page.keyboard.press('Enter');
+    await waitFor(s => { const c = window.__cf, d = document.querySelector('.pod[data-seat="' + s + '"] .pdice'); return c.game.st.turn === s && c.game.st.phase === 'roll' && !c.busy && d && !d.disabled && document.activeElement === d; }, 15000, label + ' focus handoff', nextSeat);
+  }
 
   await page.goto(URL, { waitUntil: 'networkidle0' });
-  await ev(() => localStorage.clear()); await page.reload({ waitUntil: 'networkidle0' }); await sleep(300);
+  await ev(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await page.reload({ waitUntil: 'networkidle0' }); await sleep(300);
   ok(await visible('#home') && !(await visible('#btn-continue')), 'home on launch, nothing to continue');
   ok(await visible('#btn-mystery'), 'Mystery Tiles mode on home screen');
   ok((await ev(() => window.__cf.gate.state.sessions)) === 1, 'first session counted');
   ok(/1\.3\.0/.test(await ev(() => document.body.innerText + document.documentElement.innerHTML)), 'version 1.3.0 in page');
+
+  const failedSave = await ev(() => {
+    const proto = Storage.prototype, original = proto.setItem;
+    proto.setItem = function (key, value) {
+      if (key === 'crossfour.save.v3') throw new DOMException('quota exceeded', 'QuotaExceededError');
+      return original.call(this, key, value);
+    };
+    window.__cf.persist();
+    const warned = !document.getElementById('save-warning').classList.contains('hidden');
+    proto.setItem = original; window.__cf.persist();
+    return { warned, cleared: document.getElementById('save-warning').classList.contains('hidden') };
+  });
+  ok(failedSave.warned && failedSave.cleared, 'failed local save shows a persistent warning that clears after storage recovers');
+
+  await ev(() => {
+    const primary = JSON.parse(localStorage.getItem('crossfour.save.v3'));
+    const checkpoint = JSON.parse(JSON.stringify(primary)); checkpoint.payload.coins = 41;
+    primary.payload.coins = -1;
+    localStorage.setItem('crossfour.save.checkpoint.v3', JSON.stringify(checkpoint));
+    localStorage.setItem('crossfour.save.v3', JSON.stringify(primary));
+  });
+  await page.reload({ waitUntil: 'networkidle0' }); await sleep(200);
+  ok(await ev(() => window.__cf.loadStatus === 'recovered' && window.__cf.save.coins === 41 && /last safe save/i.test(document.getElementById('toast').textContent)),
+    'checkpoint recovery resumes known-good progress and warns that recent moves may be missing');
+
+  await ev(() => {
+    localStorage.clear();
+    localStorage.setItem('crossfour.tutorial.v1', '1');
+    localStorage.setItem('crossfour.save.v1', JSON.stringify({ coins: 77, xp: 123, owned: { boards: ['linen'], dice: ['brass'] }, board: 'linen', dice: 'brass',
+      settings: { sound: false, fast: true }, stats: { played: 4, won: 2 }, ad: { matchesCompleted: 7 }, setup: { rules: { safeSquares: false, extraOnCapture: false } } }));
+  });
+  await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+  ok(await ev(() => {
+    const c = window.__cf;
+    return c.save.coins === 77 && c.save.xp === 123 && c.save.stats.played === 4 && c.save.settings.sound === false &&
+      c.save.rules.safeSquares === false && c.save.rules.bonusOnCapture === false && c.save.game === null && c.save.ad.matchesCompleted === 7;
+  }), 'v1 migration preserves profile, settings, stats, ad pacing and compatible house rules');
+  ok(!(await visible('#btn-continue')), 'incompatible legacy v1 match format is not resumed as if it were a current game');
+  await page.tap('#btn-settings'); await sleep(120); await page.tap('#btn-reset'); await sleep(120);
+  if (await visible('#confirm')) {
+    const resetNavigation = page.waitForNavigation({ waitUntil: 'networkidle0', timeout: 5000 }).catch(() => null);
+    await page.tap('#confirm-yes'); await resetNavigation;
+  }
+  await sleep(200);
+  ok(await ev(() => {
+    const c = window.__cf, checkpoint = JSON.parse(localStorage.getItem('crossfour.save.checkpoint.v3'));
+    return c.save.coins === 0 && c.save.xp === 0 && c.save.stats.played === 0 && c.save.ad.matchesCompleted === 7 && !localStorage.getItem('crossfour.tutorial.v1') &&
+      !localStorage.getItem('crossfour.save.v1') && !localStorage.getItem('crossfour.save.v2') && checkpoint.payload.coins === 0;
+  }), 'confirmed Reset progress clears stale snapshots/legacy keys while retaining ad pacing');
+  await ev(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+
+  const v2 = await ev(() => {
+    const c = window.__cf, seats = [{ type: 'human' }, { type: 'human' }, null, null];
+    const st = c.logic.newGame(seats, {}, 123456, 'mystery');
+    st.turn = 0; st.phase = 'roll'; st.queue = []; st.moves = []; st.pieces[0] = [0, -1, -1, -1]; st.pieces[1] = [4, -1, -1, -1]; st.rng = 991723;
+    const legacy = JSON.parse(JSON.stringify(c.save));
+    legacy.coins = 321; legacy.xp = 654; legacy.board = 'linen'; legacy.settings.fast = true; legacy.settings.auto = false;
+    legacy.stats.played = 9; legacy.stats.won = 4;
+    legacy.game = { st, seats, mode: st.mode, view: 3, undoLeft: 2, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now() };
+    ['crossfour.save.v3', 'crossfour.save.checkpoint.v3', 'crossfour.save.v1', 'crossfour.save.v2'].forEach(k => localStorage.removeItem(k));
+    localStorage.setItem('crossfour.save.v2', JSON.stringify(legacy));
+    return { rng: st.rng, turn: st.turn, pieces: st.pieces[0].slice(), mode: st.mode };
+  });
+  await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+  ok(await visible('#btn-continue'), 'migrated v2 match is offered from the home screen');
+  ok(await ev(() => {
+    const c = window.__cf, snap = JSON.parse(localStorage.getItem('crossfour.save.v3'));
+    return c.save.coins === 321 && c.save.xp === 654 && c.save.stats.played === 9 && c.save.settings.fast &&
+      c.save.game.st.rng === 991723 && c.save.game.st.pieces[0][0] === 0 && snap.schemaVersion === 3 && !!snap.savedAt;
+  }), 'v2 save migration preserves progression, settings and match state in a validated v3 snapshot');
+  await page.tap('#btn-continue'); await sleep(150);
+  ok(await visible('#game') && (await st()).rng === v2.rng && (await st()).mode === v2.mode, 'Continue restores the same on-device match after reload');
+  const beforeSwipe = await st();
+  const expectedAfterSwipe = await ev(() => {
+    const c = window.__cf, expected = c.logic.clone(c.game.st), result = c.logic.roll(expected);
+    return { state: expected, raw: result.raw, value: result.value };
+  });
+  await swipeDice(0);
+  await waitFor(expectedRolls => { const c = window.__cf; return !c.busy && c.game.st.turn === 0 && c.game.st.rolls === expectedRolls && (c.game.st.phase === 'roll' || c.game.st.phase === 'move'); }, 8000, 'human swipe roll after restored match', beforeSwipe.rolls + 1);
+  const afterSwipe = await st();
+  ok(afterSwipe.rolls === beforeSwipe.rolls + 1 && afterSwipe.faces[0] === expectedAfterSwipe.raw && JSON.stringify(afterSwipe) === JSON.stringify(expectedAfterSwipe.state), 'a real touch swipe triggers exactly one roll and preserves the deterministic RNG/result');
+  ok(await ev(() => getComputedStyle(document.querySelector('.pod[data-seat="0"] .pdice')).animationName.includes('toss')), 'normal-motion swipe shows the brief dice bounce');
+  ok(await ev(() => /tap or swipe/i.test(document.querySelector('.pod[data-seat="0"] .pdice').getAttribute('aria-label'))), 'the focused dice button advertises swipe while retaining an accessible tap action');
+  ok(await ev(() => {
+    const c = window.__cf, old = window.Capacitor; let calls = 0, threw = false;
+    window.Capacitor = { Plugins: { Haptics: { impact() { calls++; } } } };
+    try { c.save.settings.haptics = true; c.haptic('light'); } catch (e) { threw = true; }
+    window.Capacitor = old;
+    return !c.native && calls === 0 && !threw;
+  }), 'unsupported browser haptics safely no-op without calling an unavailable native plugin');
+
+  await ev(() => window.__cf.edit(st => { st.phase = 'roll'; st.queue = []; st.moves = []; st.sixes = 0; st.bonus = 0; st.rollAgain = false; }));
+  await idleHuman('roll', 0);
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'reduce' }]);
+  const beforeTap = await st();
+  const expectedAfterTap = await ev(() => {
+    const c = window.__cf, expected = c.logic.clone(c.game.st), result = c.logic.roll(expected);
+    return { state: expected, raw: result.raw };
+  });
+  await page.focus('.pod[data-seat="0"] .pdice'); await page.keyboard.press('Enter');
+  await waitFor(expectedRolls => { const c = window.__cf; return !c.busy && c.game.st.turn === 0 && c.game.st.rolls === expectedRolls && (c.game.st.phase === 'roll' || c.game.st.phase === 'move'); }, 8000, 'reduced-motion tap fallback roll', beforeTap.rolls + 1);
+  const afterTap = await st();
+  ok(afterTap.rolls === beforeTap.rolls + 1 && afterTap.faces[0] === expectedAfterTap.raw && JSON.stringify(afterTap) === JSON.stringify(expectedAfterTap.state), 'focused die activation still rolls exactly once with the same RNG results');
+  ok(await ev(() => matchMedia('(prefers-reduced-motion: reduce)').matches && getComputedStyle(document.querySelector('.pod[data-seat="0"] .pdice')).animationName === 'none' && getComputedStyle(document.querySelector('.pod[data-seat="0"] .cube')).transitionDuration === '0s'), 'reduced motion removes dice animation and rotation transition');
+  await idleHuman('move', 0);
+  ok(await ev(() => {
+    const tokens = [...document.querySelectorAll('#pieces .pc.is-turn')];
+    return matchMedia('(prefers-reduced-motion: reduce)').matches && tokens.length > 0 && tokens.every(t =>
+      getComputedStyle(t, '::before').animationName === 'none' && getComputedStyle(t.querySelector('.gem-core')).animationName === 'none');
+  }), 'reduced motion suppresses legal-token breathing as well as travel animation');
+  await ev(() => {
+    const animator = window.PathAnimation, animate = animator.animate;
+    const probe = window.__reducedPathProbe = { calls: 0, reduced: false, immediate: false, completes: 0 };
+    probe.restore = () => { animator.animate = animate; };
+    animator.animate = function (opts) {
+      probe.calls++; probe.reduced = opts.reducedMotion;
+      const done = opts.onComplete; let returned = false;
+      opts.onComplete = function () { probe.immediate = !returned; probe.completes++; if (done) done(); };
+      const cancel = animate(opts); returned = true; return cancel;
+    };
+  });
+  await page.focus('#pieces .pc.can'); await page.keyboard.press('Enter');
+  await waitFor(() => window.__reducedPathProbe.completes === 1 && !window.__cf.busy, 5000, 'reduced-motion token path completion');
+  const reducedPath = await ev(() => { const p = window.__reducedPathProbe; const out = { calls: p.calls, reduced: p.reduced, immediate: p.immediate, completes: p.completes, clean: !document.querySelector('.pc.hop'), noRipple: !document.querySelector('.pc.land') }; p.restore(); delete window.__reducedPathProbe; return out; });
+  ok(reducedPath.calls === 1 && reducedPath.reduced && reducedPath.immediate && reducedPath.completes === 1 && reducedPath.clean && reducedPath.noRipple, 'reduced-motion token movement is immediate with no hop styling or landing ripple');
+  await page.emulateMediaFeatures([{ name: 'prefers-reduced-motion', value: 'no-preference' }]);
+
+  await edit('st.phase="over"; st.ranking=st.players.slice(); st.queue=[]; st.moves=[]; st.pieces.forEach(function (p) { if (p) p.fill(57); });');
+  await waitFor(() => !document.getElementById('result').classList.contains('hidden'), 5000, 'migrated match result before fixture cleanup');
+  await page.tap('#btn-r-home'); await waitFor(() => { const h = document.getElementById('home'); return h && !h.classList.contains('hidden'); }, 5000, 'migrated match cleared through normal result flow');
+  await ev(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await page.reload({ waitUntil: 'networkidle0' }); await sleep(250);
+  ok(await visible('#home') && !(await visible('#btn-continue')) && (await ev(() => window.__cf.gate.state.sessions)) === 1, 'clean browser fixture restored after migration tests');
   await page.screenshot({ path: OUT + '/cf-home.png' });
 
   // ---------- rules & settings ----------
@@ -80,6 +234,27 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(geo.hd[0] >= geo.hp[0] && geo.hd[2] <= geo.hp[2] + 1 && geo.ad[0] >= geo.ap[0] && geo.ad[2] <= geo.ap[2] + 1, 'each player has their own die inside their pod');
   ok(geo.empty === 2, 'unused corners are empty in 1 v 1');
   ok(await ev(() => document.querySelectorAll('.pc').length === 8), '8 tokens on the board');
+  const gemCheck = await ev(() => {
+    const tokens = [...document.querySelectorAll('#pieces .pc')];
+    const seats = [...new Set(tokens.map(t => t.dataset.seat))];
+    const ready = tokens.every(t => {
+      const svg = t.querySelector('.gem-token'), body = svg && svg.querySelector('.gem-body'), pad = svg && svg.querySelector('.gem-pad');
+      const size = svg && svg.getBoundingClientRect();
+      return t.tagName === 'BUTTON' && !!t.getAttribute('aria-label') && svg.getAttribute('aria-hidden') === 'true' &&
+        body && pad && svg.querySelector('.gem-glint') && svg.querySelector('.gem-core') && svg.querySelector('.gem-shadow') &&
+        /^fill:url\(#gem-body-/.test(body.getAttribute('style')) && svg.querySelector('linearGradient') && svg.querySelector('radialGradient') && size.width >= 14 && size.height >= 14;
+    });
+    const coreBySeat = Object.fromEntries(seats.map(s => [s, getComputedStyle(document.querySelector('.pc[data-seat="' + s + '"]')).getPropertyValue('--pccore').trim()]));
+    const first = tokens[0], svg = first && first.querySelector('.gem-token'), shadow = svg && svg.querySelector('.gem-shadow');
+    const gradient = svg && svg.querySelector('radialGradient');
+    return { ready, seats, outline: svg && svg.querySelector('.gem-body').getAttribute('d'), glint: svg && svg.querySelector('.gem-glint').getAttribute('d'),
+      coreStops: gradient ? [...gradient.querySelectorAll('stop')].map(stop => stop.getAttribute('stop-color')) : [],
+      shadowFilter: shadow ? getComputedStyle(shadow).filter : '', shadowOpacity: shadow ? getComputedStyle(shadow).opacity : '',
+      colors: [...new Set(seats.map(s => getComputedStyle(document.querySelector('.pc[data-seat="' + s + '"]')).getPropertyValue('--pc').trim()))], coreBySeat };
+  });
+  ok(gemCheck.ready && gemCheck.colors.length === gemCheck.seats.length && gemCheck.coreBySeat['1'] === '#a0ffd2' && gemCheck.coreBySeat['3'] === '#a9ddff', 'faceted gems, layered gradients, player-colored pads, and Jade/Cobalt core hues are legible at board size');
+  ok(gemCheck.outline === 'M12 1.1 19.2 5 17 12.6 12 18.7 7 12.6 4.8 5Z' && gemCheck.glint === 'M6.1 5.2 10.4 2.8 8.2 6.8 6.8 7.5Z', 'tapered gemstone silhouette and sharp diagonal glint stay crisp');
+  ok(gemCheck.coreStops[0] === '#fff' && gemCheck.coreStops.includes('var(--pccore)') && gemCheck.shadowFilter.includes('blur(') && Number(gemCheck.shadowOpacity) < .9, 'white-hot radial core glows inside the gem over a soft diffused board shadow');
   await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
 
   // ---------- Star-style stacked rolls: 6, 6, 3 ----------
@@ -88,13 +263,22 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await idleHuman('roll', 3);
   ok(await ev(() => document.querySelector('.pod[data-seat="3"]').classList.contains('active')), 'active seat highlighted');
   await ev(() => window.__cf.force([6, 6, 3]));
-  await roll(3);
+  await page.focus('.pod[data-seat="3"] .pdice'); await page.keyboard.press('Enter');
   await idleHuman('roll', 3); s = await st();
   ok(s.queue.join() === '6' && s.phase === 'roll', 'rolled 6: another roll right away, 6 queued');
   ok(await ev(() => document.getElementById('btn-undo').classList.contains('live') && !document.getElementById('btn-undo').disabled), 'undo button live after a human roll');
-  await roll(3); await idleHuman('roll', 3);
-  await roll(3); await idleHuman('move', 3); s = await st();
+  await page.keyboard.press('Enter'); await idleHuman('roll', 3);
+  await page.keyboard.press('Enter'); await idleHuman('move', 3); s = await st();
   ok(s.queue.join() === '6,6,3' && (await chips(3)).join() === '6,6,3', 'queue 6,6,3 shown as dice chips on the human pod');
+  ok(await ev(() => document.activeElement && document.activeElement.matches('#pieces .pc.can')), 'keyboard die moves focus to a legal token after the roll');
+  ok(await ev(() => {
+    const st = window.__cf.game.st, tokens = [...document.querySelectorAll('#pieces .pc')];
+    const legal = new Set(st.moves.filter(m => m.seat === st.turn).map(m => m.seat + ':' + m.piece));
+    return st.phase === 'move' && legal.size > 0 && tokens.every(p => {
+      const isLegal = legal.has(p.dataset.seat + ':' + p.dataset.piece);
+      return p.classList.contains('is-turn') === isLegal && getComputedStyle(p.querySelector('.gem-core')).animationName === (isLegal ? 'gem-core-breathe' : 'none');
+    });
+  }), 'only currently legal tokens breathe during their owner’s move turn');
   // ---------- undo dice roll ----------
   ok(await ev(() => window.__cf.undoActive), 'undo window open after the roll');
   await tap('#btn-undo'); await sleep(200);
@@ -106,10 +290,14 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await waitUndoGone();
   ok(await waitFor(() => document.getElementById('btn-undo').disabled, 1500, 'undo button off'), 'undo window closes after about 2 s');
   // ---------- pick chip, then token ----------
-  await chip(3, 6); await sleep(100);
+  await page.focus('.pod[data-seat="3"] .chip-v[data-v="6"]'); await page.keyboard.press('Enter'); await sleep(100);
   ok(await ev(() => window.__cf.game.sel === 6), 'tapped chip 6 is selected');
-  await tapPiece(3, 0); await idleHuman('move', 3); s = await st();
-  ok(s.pieces[3][0] === 0 && s.queue.join() === '6,4', 'first 6 brings a token out, 6,4 left');
+  const keyboardToken = '.pc[data-seat="3"][data-piece="0"]';
+  ok(await ev(sel => { const b = document.querySelector(sel); return b.tagName === 'BUTTON' && !b.disabled && /You token 1, in base, select to move/.test(b.getAttribute('aria-label')); }, keyboardToken), 'legal token is a named, enabled button with its position');
+  ok(await ev(() => { const h = document.getElementById('hint'); return h.getAttribute('role') === 'status' && h.getAttribute('aria-live') === 'polite' && /Dice chip 6 selected/.test(h.textContent); }), 'move guidance is announced after a chip is selected');
+  ok(await ev(sel => document.activeElement === document.querySelector(sel), keyboardToken), 'keyboard chip selection focuses the matching legal token');
+  await page.keyboard.press('Enter'); await idleHuman('move', 3); s = await st();
+  ok(s.pieces[3][0] === 0 && s.queue.join() === '6,4', 'Enter moves a focused token out of base without triggering a roll');
   await chip(3, 4); await sleep(80); await tapPiece(3, 0); await idleHuman('move', 3); s = await st();
   ok(s.pieces[3][0] === 4 && s.queue.join() === '6', 'chip 4 moved that token 4 squares');
   await tapPiece(3, 1);
@@ -166,6 +354,12 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(s.mode === 'mystery' && s.players.length === 4 && s.tiles.length === 8, 'mystery match: 4 players, 8 mystery tiles');
   ok(await ev(() => document.querySelectorAll('#tiles .tile').length === 8 && document.querySelectorAll('.pod:not(.empty)').length === 4), '8 tiles drawn, 4 player pods with their own dice');
   ok(await ev(() => window.__cf.podOf(3) === 3), 'human still bottom-left in 4-player');
+  ok(await ev(() => {
+    const seats = [...new Set([...document.querySelectorAll('#pieces .pc')].map(t => t.dataset.seat))];
+    const colors = new Set(seats.map(s => getComputedStyle(document.querySelector('.pc[data-seat="' + s + '"]')).getPropertyValue('--pc').trim()));
+    const cores = new Set(seats.map(s => getComputedStyle(document.querySelector('.pc[data-seat="' + s + '"]')).getPropertyValue('--pccore').trim()));
+    return seats.length === 4 && colors.size === 4 && cores.size === 4 && [...document.querySelectorAll('#pieces .pc .gem-body')].length === 16;
+  }), 'all four Lucky-mode seats retain distinct gem and inner-core color mappings');
   await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
   await idleHuman('roll', 3);
   // a lively position for the store screenshot: per-player dice + queued chips
@@ -183,7 +377,32 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await idleHuman('roll', 3);
   await ev(() => { window.__cf.save.settings.fast = false; window.__cf.force([2]); window.__cf.forceEvent('jump3'); });
   await roll(3); await idleHuman('move', 3); await waitUndoGone();
-  await tapPiece(3, 0);
+  await ev(() => {
+    const probe = window.__pathProbe = { paths: [], steps: [], completes: 0, tileEvents: 0, gemDuringHop: false, landingRipple: false, crystalCalls: 0 };
+    const sfx = window.SFX, crystal = sfx.crystal;
+    sfx.crystal = function (i) { probe.crystalCalls++; return crystal.call(this, i); };
+    probe.restoreCrystal = () => { sfx.crystal = crystal; };
+    const animator = window.PathAnimation, animate = animator.animate;
+    probe.restoreAnimator = () => { animator.animate = animate; };
+    animator.animate = function (opts) {
+      probe.paths.push(opts.points.map(p => ({ x: p.x, y: p.y })));
+      const step = opts.onStep, complete = opts.onComplete;
+      opts.onStep = function (i) { probe.steps.push(i); if (step) step(i); if (opts.el.classList.contains('land') && getComputedStyle(opts.el, '::after').animationName === 'gem-ripple') probe.landingRipple = true; };
+      opts.onComplete = function () { probe.completes++; if (complete) complete(); };
+      return animate(opts);
+    };
+    const logic = window.__cf.logic, move = logic.move;
+    probe.restoreMove = () => { logic.move = move; };
+    logic.move = function () { const result = move.apply(this, arguments); if (result.event) probe.tileEvents++; return result; };
+    const token = document.querySelector('.pc[data-seat="3"][data-piece="0"]');
+    token.disabled = false;
+    token.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    probe.gemDuringHop = token.classList.contains('hop') && !!token.querySelector('.gem-token .gem-body');
+    token.disabled = false;
+    token.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+  });
+  await sleep(90); await page.screenshot({ path: OUT + '/cf-crystal-hop.png' });
+  ok(await ev(rel => window.__cf.busy && window.__cf.game.st.pieces[3][0] === rel + 3, tileRel), 'rapid second token activation is ignored while the first move owns the input lock');
   await waitFor(() => !document.getElementById('wheel').classList.contains('hidden'), 6000, 'wheel to appear');
   ok(await ev(() => document.getElementById('wheel').classList.contains('boost')), 'landing on "?" spins the Boost wheel');
   await waitFor(() => /\w/.test(document.getElementById('wheel-result').textContent), 6000, 'wheel result');
@@ -193,6 +412,17 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await ev(() => { window.__cf.save.settings.fast = true; });
   s = await st();
   ok(s.pieces[3][0] === tileRel + 3, 'Jump 3 event moved the token 3 more squares');
+  const movementProbe = await ev(rel => {
+    const p = window.__pathProbe;
+    const result = { pathLengths: p.paths.map(path => path.length), steps: p.steps.slice(), completes: p.completes, tileEvents: p.tileEvents, gemDuringHop: p.gemDuringHop, landingRipple: p.landingRipple, crystalCalls: p.crystalCalls,
+      tileCooling: window.__cf.game.st.tiles.find(t => t.abs === window.__cf.logic.absOf(3, rel)).until > window.__cf.game.st.turnCount };
+    p.restoreAnimator(); p.restoreMove(); p.restoreCrystal(); delete window.__pathProbe; return result;
+  }, tileRel);
+  ok(movementProbe.pathLengths.join() === '2,3' && movementProbe.steps.join() === '0,1,0,1,2' && movementProbe.completes === 2,
+    'the legal two-step arrival and three-step tile effect animate in sequence with exact endpoints');
+  ok(movementProbe.gemDuringHop, 'crystal token stays visible and elevated during the locked move');
+  ok(movementProbe.landingRipple && movementProbe.crystalCalls === 5, 'normal-motion steps add one quiet crystal-clink call and soft landing ripples');
+  ok(movementProbe.tileEvents === 1 && movementProbe.tileCooling, 'the tile arrival resolves exactly once and keeps its existing cooldown');
 
   // chaos tile "!" -> Freeze on yourself (frozen)
   await idleHuman('roll', 3);
@@ -207,6 +437,9 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await waitFor(() => document.getElementById('wheel').classList.contains('hidden') && !window.__cf.busy, 8000, 'chaos wheel to close');
   s = await st();
   ok(s.pieces[3][0] === chaosRel - 3, 'Back 3 event sent the token back 3 squares');
+  await edit('st.effects = st.effects.filter(function(e){ return !(e.type === "freeze" && e.seat === 3 && e.piece === 0); }); st.effects.push({type:"freeze",seat:3,piece:0,at:st.turnCount});');
+  ok(await ev(() => { const p = document.querySelector('.pc[data-seat="3"][data-piece="0"]'); return p.classList.contains('is-frozen') && getComputedStyle(p.querySelector('.gem-frost-wash')).opacity === '1' && getComputedStyle(p.querySelector('.gem-frost-crack')).opacity === '1' && getComputedStyle(p.querySelector('.gem-core')).animationName === 'none'; }), 'existing Freeze state extinguishes the core and shows frost-crack facets');
+  await edit('st.effects = st.effects.filter(function(e){ return !(e.type === "freeze" && e.seat === 3 && e.piece === 0); });');
   // let the computers play a little with events on
   await waitFor(() => { const g = window.__cf.game; return g.st.turn !== 3; }, 8000, 'computers take turns');
   await idleHuman('roll', 3);
@@ -270,6 +503,8 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await flowDone();
   s = await st();
   ok(s.effects.some(e => e.type === 'shield' && e.seat === 3 && e.piece === 0) && !s.lk.revenge[3], 'tapped Shield was applied, Revenge used');
+  await waitFor(() => { const p = document.querySelector('.pc[data-seat="3"][data-piece="0"]'); return p && p.classList.contains('is-shielded') && getComputedStyle(p.querySelector('.gem-shield')).opacity === '1' && getComputedStyle(p.querySelector('.gem-shield-glint')).opacity === '1'; }, 2000, 'Shield gem visual transition');
+  ok(true, 'existing Shield state renders a translucent glass-bubble guard');
 
   // Decision window timeout -> default auto-pick (Wild Jump)
   const cRel = await relOf('chaos');
@@ -316,7 +551,10 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await flowDone();
   s = await st();
   ok(s.lk.charge[3] === 0 && s.lk.kings.some(k => k.seat === 3 && k.piece === 0), 'Mega Crown made the lead token King, meter reset');
-  ok(await ev(() => { const e = document.querySelectorAll('#pieces .pc.king'); return e.length === 1 && getComputedStyle(e[0].querySelector('.crown')).display !== 'none'; }), 'King token wears a visible crown');
+  ok(await ev(() => { const e = document.querySelectorAll('#pieces .pc.is-king'); return e.length === 1 && getComputedStyle(e[0].querySelector('.crown')).display !== 'none' && getComputedStyle(e[0].querySelector('.crown')).color === 'rgb(255, 210, 74)' && getComputedStyle(e[0].querySelector('.crown')).animationName === 'crownbob'; }), 'King token wears a floating gold crown');
+  await edit('st.effects = st.effects.filter(function(e){ return !((e.type === "shield" && e.seat === 2 && e.piece === 0) || (e.type === "freeze" && e.seat === 1 && e.piece === 0)); }); st.effects.push({type:"shield",seat:2,piece:0,at:st.turnCount}); st.effects.push({type:"freeze",seat:1,piece:0,at:st.turnCount});');
+  await page.screenshot({ path: OUT + '/cf-crystal-states.png' });
+  await edit('st.effects = st.effects.filter(function(e){ return !((e.type === "shield" && e.seat === 2 && e.piece === 0) || (e.type === "freeze" && e.seat === 1 && e.piece === 0)); });');
   // lively board for the store screenshot: tiles (one resting), meters, streak, stored powers, King
   await edit('st.lk.charge=[2,4,1,3]; st.lk.streak=[1,0,0,2]; st.lk.powers[3]=["dbl","escape"]; st.lk.revenge[1]=true; st.tiles[2].until = st.turnCount + 4; st.tiles[9].until = st.turnCount + 8; st.faces=[4,2,5,1];');
   await idleHuman('roll', 3); await waitFor(() => document.getElementById('toast').classList.contains('hidden'), 4000, 'toast to clear'); await sleep(200);
@@ -345,12 +583,13 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   s = await st();
   ok(s.players.every(p => s.seats[p].type === 'human') && s.rules.rollStyle === 'classic', 'pass & play: all human seats, classic rules');
   await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
-  const first = s.turn;
-  await idleHuman('roll');
-  await ev(() => window.__cf.force([6]));
-  await roll(first); await idleHuman('move');
+  ok(s.players.join() === '1,3', '1v1 pass & play seats Jade and Cobalt');
+  await edit('st.pieces=[null,[-1,-1,-1,-1],null,[5,-1,-1,-1]]; st.queue=[]; st.moves=[]; st.phase="roll"; st.turn=3; st.sixes=0; st.bonus=0; st.rollAgain=false;');
+  await idleHuman('roll', 3);
+  const duelRolls = s.rolls, duelTurns = s.turnCount;
+  await keyboardMoveToHandoff(3, 1, 'Cobalt to Jade');
   s = await st();
-  ok(s.phase === 'move' && s.queue.join() === '6', 'classic: a 6 must be moved before rolling again');
+  ok(s.turn === 1 && s.phase === 'roll' && s.pieces[3][0] === 6 && s.rolls === duelRolls + 1 && s.turnCount === duelTurns + 1, 'valid Cobalt move advances exactly one square and hands the turn to Jade');
   await page.screenshot({ path: OUT + '/cf-pass.png' });
 
   // ---------- v1.3 Quick, Team, rules ----------
@@ -398,9 +637,99 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await tap('#btn-friendly'); await sleep(200);
   ok(/captures are off/i.test(await ev(() => document.getElementById('mode-note').textContent)), 'Friendly setup says captures are off');
   await tap('#btn-setup-back'); await sleep(150);
+  // ---------- keyboard focus handoff in four-player pass & play ----------
+  if (await visible('#game')) { await page.tap('#btn-home'); await sleep(150); await page.tap('#btn-m-home'); await sleep(250); }
+  await page.tap('#btn-pass'); await sleep(200);
+  await ev(() => document.querySelector('#presets [data-p="4"]').click()); await sleep(100);
+  await page.tap('#btn-start'); await sleep(250);
+  if (await visible('#confirm')) { await page.tap('#confirm-yes'); await sleep(350); }
+  s = await st();
+  ok(s.players.length === 4 && s.players.every(p => s.seats[p].type === 'human'), 'four-player pass & play has four human seats');
+  const seats4 = s.players.slice();
+  await edit('st.pieces=[[5,-1,-1,-1],[5,-1,-1,-1],[5,-1,-1,-1],[5,-1,-1,-1]]; st.queue=[]; st.moves=[]; st.phase="roll"; st.turn=' + seats4[0] + '; st.sixes=0; st.bonus=0; st.rollAgain=false; st.ranking=[];');
+  for (let i = 0; i < seats4.length; i++) {
+    const seat = seats4[i], nextSeat = seats4[(i + 1) % seats4.length];
+    await idleHuman('roll', seat);
+    await keyboardMoveToHandoff(seat, nextSeat, 'four-player seat ' + seat + ' to ' + nextSeat);
+    s = await st();
+    ok(s.turn === nextSeat && s.phase === 'roll' && s.pieces[seat][0] === 6, 'four-player move advances and activates the next seat');
+  }
+  const eliminated = seats4[1], current = seats4[0], afterEliminated = seats4[2];
+  await edit('st.pieces=[[5,-1,-1,-1],[5,-1,-1,-1],[5,-1,-1,-1],[5,-1,-1,-1]]; st.pieces[' + eliminated + ']=[57,57,57,57]; st.queue=[]; st.moves=[]; st.phase="roll"; st.turn=' + current + '; st.sixes=0; st.bonus=0; st.rollAgain=false; st.ranking=[' + eliminated + '];');
+  await idleHuman('roll', current);
+  await keyboardMoveToHandoff(current, afterEliminated, 'four-player skip of finished seat ' + eliminated);
+  s = await st();
+  ok(s.ranking.join() === String(eliminated) && s.turn === afterEliminated, 'finished seat is skipped without changing turn progression');
+
+  // ---------- result semantics + focus after Replay and confirmed Restart ----------
+  const replayPlayers = s.players.slice(), replayMode = s.mode, winner = replayPlayers[0];
+  await edit('st.phase="over"; st.turn=' + winner + '; st.ranking=' + JSON.stringify(replayPlayers) + '; st.queue=[]; st.moves=[]; st.pieces.forEach(function (pieces) { if (pieces) pieces.fill(57); });');
+  await waitFor(() => { const r = document.getElementById('result'); return r && !r.classList.contains('hidden'); }, 5000, 'synthetic winner result');
+  ok(await ev(() => {
+    const title = document.getElementById('r-title'), rank = document.getElementById('r-rank'), rows = [...rank.children];
+    const replay = document.getElementById('btn-r-again');
+    return title.tagName === 'H2' && title.textContent === rows[0].querySelector('.pdot').nextSibling.textContent.trim() + ' wins!' &&
+      rank.tagName === 'OL' && rows.length === 4 && rows[0].querySelector('.medal').textContent === '1' &&
+      replay.tagName === 'BUTTON' && replay.textContent.trim() === 'Play again';
+  }), 'winner heading, ordered ranking, and native Replay button label are clear in the DOM');
+  const firstSeat = replayPlayers[0];
+  await page.focus('#btn-r-again'); await page.keyboard.press('Enter');
+  await waitFor((players, mode, seat) => {
+    const c = window.__cf, die = document.querySelector('.pod[data-seat="' + seat + '"] .pdice');
+    return c.game.st.phase === 'roll' && c.game.st.players.join() === players && c.game.st.mode === mode &&
+      c.game.st.turn === seat && die && !die.disabled && document.activeElement === die;
+  }, 5000, 'Replay returns focus to the new match’s enabled human die', replayPlayers.join(), replayMode, firstSeat);
+  ok(await ev(() => {
+    const c = window.__cf, status = document.getElementById('hint');
+    return c.game.st.phase === 'roll' && c.game.st.ranking.length === 0 && c.game.st.pieces[0].every(p => p === -1) &&
+      status.getAttribute('role') === 'status' && status.getAttribute('aria-live') === 'polite' && /Tap your die to roll/.test(status.textContent);
+  }), 'Replay starts a fresh match with polite roll guidance in the status region');
+
+  await page.tap('#btn-home'); await sleep(150);
+  ok(await ev(() => { const b = document.getElementById('btn-m-restart'); return b.tagName === 'BUTTON' && b.textContent.trim() === 'Restart with same players'; }), 'Restart is a native button with a clear label');
+  await page.focus('#btn-m-restart'); await page.keyboard.press('Enter');
+  await waitFor(() => { const c = document.getElementById('confirm'); return c && !c.classList.contains('hidden'); }, 1500, 'restart confirmation');
+  ok(await ev(() => { const b = document.getElementById('confirm-yes'); return b.tagName === 'BUTTON' && b.textContent.trim() === 'Restart'; }), 'confirmed Restart action has a clear native button label');
+  await page.focus('#confirm-yes'); await page.keyboard.press('Enter');
+  await waitFor((players, mode, seat) => {
+    const c = window.__cf, die = document.querySelector('.pod[data-seat="' + seat + '"] .pdice');
+    return c.game.st.phase === 'roll' && c.game.st.players.join() === players && c.game.st.mode === mode &&
+      c.game.st.turn === seat && die && !die.disabled && document.activeElement === die;
+  }, 5000, 'confirmed Restart returns focus to the new match’s enabled human die', replayPlayers.join(), replayMode, firstSeat);
+  ok(await ev(() => {
+    const c = window.__cf, status = document.getElementById('hint');
+    return c.game.st.phase === 'roll' && c.game.st.ranking.length === 0 && c.game.st.pieces[0].every(p => p === -1) &&
+      status.getAttribute('role') === 'status' && status.getAttribute('aria-live') === 'polite' && /Tap your die to roll/.test(status.textContent);
+  }), 'confirmed Restart preserves the same players and starts a fresh turn with polite status guidance');
+
+  const hapticsPage = await browser.newPage(), hapticErrors = [];
+  hapticsPage.on('pageerror', e => hapticErrors.push('pageerror: ' + e.message));
+  hapticsPage.on('console', m => { if (m.type() === 'error') hapticErrors.push('console: ' + m.text()); });
+  await hapticsPage.evaluateOnNewDocument(() => { window.Capacitor = { isNativePlatform: () => true, Plugins: {} }; });
+  await hapticsPage.goto(URL, { waitUntil: 'networkidle0' });
+  await hapticsPage.waitForFunction(() => window.__cf && window.__cf.game !== undefined, { timeout: 8000 });
+  const hapticChecks = await hapticsPage.evaluate(async () => {
+    const c = window.__cf;
+    let missingPluginSafe = true;
+    try { c.save.settings.haptics = true; c.haptic('light'); } catch (e) { missingPluginSafe = false; }
+    let calls = 0;
+    window.Capacitor.Plugins.Haptics = {
+      impact() { calls++; return Promise.reject(new Error('native haptics unavailable')); },
+      notification() { calls++; return Promise.reject(new Error('native haptics unavailable')); }
+    };
+    c.save.settings.haptics = false; c.haptic('light');
+    const disabledSettingBlocks = calls === 0;
+    c.save.settings.haptics = true; c.haptic('light');
+    await new Promise(resolve => setTimeout(resolve, 20));
+    return { native: c.native, missingPluginSafe, disabledSettingBlocks, calls };
+  });
+  await sleep(30);
+  ok(hapticChecks.native && hapticChecks.missingPluginSafe && hapticChecks.disabledSettingBlocks && hapticChecks.calls === 1 && hapticErrors.length === 0,
+    'missing or rejecting native haptics fail gracefully, while the haptics setting blocks calls when disabled');
+  await hapticsPage.close();
 
   ok(errors.length === 0, 'no console errors / failed requests' + (errors.length ? ': ' + errors.join(' | ') : ''));
   console.log(`\n${n} checks passed`);
   await browser.close();
   global.__dbg = async () => {};
-})().catch(async e => { console.error(e.message || e); if (process.env.DEBUG && global.__page) { try { console.error(JSON.stringify(await global.__page.evaluate(() => { const g = window.__cf.game; return g && { st: { turn: g.st.turn, phase: g.st.phase, queue: g.st.queue, pieces: g.st.pieces, tiles: g.st.tiles, turnCount: g.st.turnCount }, busy: window.__cf.busy }; }))); await global.__page.screenshot({ path: '/tmp/cf-fail.png' }); } catch (x) {} } process.exit(1); });
+})().catch(async e => { console.error(e.stack || e.message || e); if (process.env.DEBUG && global.__page) { try { console.error(JSON.stringify(await global.__page.evaluate(() => { const c = window.__cf, g = c.game; return g && { st: { turn: g.st.turn, phase: g.st.phase, queue: g.st.queue, pieces: g.st.pieces, tiles: g.st.tiles, turnCount: g.st.turnCount }, busy: c.busy, validGame: c.isValidGame(g), validSave: c.isValidSave(c.save), lastSaveError: c.lastSaveError }; }))); await global.__page.screenshot({ path: '/tmp/cf-fail.png' }); } catch (x) {} } process.exit(1); });
