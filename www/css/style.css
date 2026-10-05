@@ -357,3 +357,31 @@ body.light .toast { background: rgba(35,38,44,.92); }
 .choice-time i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #3fdcaa, #f4b740); }
 .ev b em { font-style: normal; font-weight: 700; font-size: 10.5px; color: #ffb000; margin-left: 4px; }
 .ev.mega .ev-ico { background: linear-gradient(135deg, #f4c440, #d0621c); }
+
+/* v1.3 modes — home must fit a 360x740 phone (overflow hidden on body) */
+#home { overflow-y: auto; }
+@media (max-height: 820px) {
+  .home-top { padding-top: 6px; }
+  .home-main { gap: 10px; }
+  .logo-mark { width: 56px; height: 56px; margin: 0 auto 4px; }
+  .logo h1 { font-size: 32px; margin-top: 4px; }
+  .home-actions { gap: 6px; }
+  .btn.big { min-height: 46px; padding: 8px 12px; font-size: 15px; }
+  .mode-grid { gap: 6px; }
+  .mode-grid .btn { min-height: 42px; padding: 6px 8px; font-size: 13px; }
+  .home-row .btn { padding: 9px 6px; }
+}
+/* v1.3 modes */
+.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mode-grid .btn { min-height: 52px; }
+.mode-grid .btn small { display: block; font-weight: 500; opacity: .75; }
+#mode-seg { flex-wrap: wrap; }
+#mode-seg button { flex: 1 1 22%; font-size: 12px; padding: 8px 2px; }
+.team { display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 4px; font-size: 9px; color: #1c1204; margin-right: 3px; }
+.team.t0 { background: #ffd24a; } .team.t1 { background: #7ee0c8; }
+.pc.sel { z-index: 7; filter: brightness(1.15); }
+.pc.sel::before { border-color: #fff; border-width: 3px; }
+.pc.last { box-shadow: 0 0 0 3px #fff, 0 0 12px 2px rgba(255,255,255,.75), 0 4px 8px rgba(0,0,0,.45); }
+#trail { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+.trail { position: absolute; left: 0; top: 0; width: var(--cell); height: var(--cell); border-radius: 18%; }
+#r-meta { margin: 0 0 8px; font-weight: 700; letter-spacing: .04em; }

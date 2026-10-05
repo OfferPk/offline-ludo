@@ -1,6 +1,6 @@
 # Google Play store listing: Crossfour (English, en-US)
 
-Package: `com.offerpk.offlineludo` · Version: 1.2.0 (versionCode 3) · Audience: **13+**
+Package: `com.offerpk.offlineludo` · Version: 1.3.0 (versionCode 4) · Audience: **13+**
 
 Copy each block below into **Play Console → Grow users → Store presence → Main store listing**.
 Character counts are measured on the exact text inside the code blocks (Python `len()`).
@@ -23,18 +23,23 @@ The v1.1 mode is called **Mystery Tiles** (a generic descriptive name; a web sea
 
 ## Short description (limit 80)
 
-**79 / 80 characters**
+**70 / 80 characters**
 
 ```
-Offline Ludo: new Lucky Chaos Ludo mode, Mystery Tiles, stacked 6s, 3 AI levels
+Offline Ludo: Quick, Team, Arrow and Friendly modes, plus Lucky Chaos.
 ```
 
 ## Full description (limit 4000)
 
-**3682 / 4000 characters** (plain text, no emoji)
+**3976 / 4000 characters** (plain text, no emoji)
 
 ```
 Crossfour is a modern take on the classic Ludo board game that works completely offline. Play against computer players, pass one phone around with friends and family, or try the Lucky Chaos Ludo and Mystery Tiles modes, anywhere and without an internet connection.
+
+NEW IN 1.3
+• Quick Ludo (2 tokens, faster games) and Team Ludo (2v2, partners opposite, shared win).
+• Arrow Ludo: one-way tiles, one extra step clockwise. Friendly: no captures, pure race. App stays 13+.
+• Win screen shows moves and time. Free Midnight and Classic Wood boards. No purchases.
 
 NEW IN 1.2: LUCKY CHAOS LUDO
 • Normal Ludo plus luck you can steer. 4 Boost tiles spin the Boost wheel (Shield, Jump +3, Double Roll, Extra Roll, Lucky 6, Safe Escape) and 4 Chaos tiles spin the Chaos wheel (Bomb, Swap, Zap, Freeze, Back 3, Wild Jump).
@@ -84,12 +89,12 @@ GOOD TO KNOW
 Roll your dice and bring all four tokens home. Download Crossfour and play Ludo offline, your way.
 ```
 
-## Release notes for v1.2.0 (limit 500)
+## Release notes for v1.3.0 (limit 500)
 
-**377 / 500 characters**
+**281 / 500 characters**
 
 ```
-New in 1.2: Lucky Chaos Ludo, a new mode with Boost and Chaos wheels, High Risk / High Reward Danger tiles, Lucky Streaks, Revenge Charges, a Lucky Charge meter with a Mega Wheel, crowned King tokens and stored powers. 1 v 1 or 4 players, vs computer or pass & play, with a How to play page. Computer players use every new feature. Still fully offline, no stakes or entry fees.
+New in 1.3: Quick Ludo (2 tokens), Team Ludo (2v2, shared win), Arrow Ludo (one-way tiles) and Friendly (no captures). Last-move highlight, move count and match time on the win screen, haptics, and free Midnight and Classic Wood boards. Still fully offline. No stakes or purchases.
 ```
 
 ---
@@ -102,16 +107,16 @@ New in 1.2: Lucky Chaos Ludo, a new mode with Boost and Chaos wheels, High Risk 
 | Feature graphic | `store/feature-graphic-1024x500.png` | 1024 × 500 PNG (no transparency) |
 | Phone screenshots (upload in this order) | `store/screenshots/01.png` … `08.png` | 1080 × 1920 PNG (9:16) |
 
-The screenshots are real captures of v1.2.0 (headless Chrome at 360×640 @3x, made by `store/capture_screens.js`; the raw frames are in `store/raw/`) with a caption added by `store/make_store_art.py`. Upload all 8 (Play's maximum for phones) in this order; the old `05` (house rules) was dropped to make room:
+The screenshots are real captures of v1.3.0 (headless Chrome at 360×640 @3x, made by `store/capture_screens.js`; the raw frames are in `store/raw/`) with a caption added by `store/make_store_art.py`. Upload all 8 in this order. 01 and 02 are new in 1.3; chat and the Walnut pass-and-play shot were dropped to stay at Play's limit of 8:
 
-1. `01.png`: "New: Lucky Chaos Ludo" (4 players: Boost/Chaos/Danger tiles, a resting tile with its cooldown number, Lucky Charge meters, streak and revenge badges, stored powers and a crowned King)
-2. `02.png`: "Spin the Mega Wheel" (the Mega Wheel landing on Rocket)
-3. `03.png`: "Your own dice, your corner" (4 players vs computer, dice in every corner, stacked 6, 6, 3 chips)
-4. `04.png`: "Mystery Tiles mode" (the Boost wheel landing on Shield)
-5. `05.png`: "Capture and race home" (a capture with its burst and the bonus roll)
-6. `06.png`: "Quick chat & emotes" (Mystery Tiles 1 v 1 with chat bubbles, shield and freeze effects)
-7. `07.png`: "Ranked results, coins & XP" (4-player result, ranks 1st to 4th)
-8. `08.png`: "Pass & play, fully offline" (4 humans, Walnut board, Brass dice)
+1. `01.png`: "New: Quick Ludo" (2 tokens, last-move highlight)
+2. `02.png`: "Team Ludo, 2v2" (partners opposite)
+3. `03.png`: "Lucky Chaos Ludo" (Boost, Chaos and Danger tiles, King tokens)
+4. `04.png`: "Spin the Mega Wheel"
+5. `05.png`: "Your own dice, your corner" (stacked 6s)
+6. `06.png`: "Mystery Tiles mode"
+7. `07.png`: "Capture and race home"
+8. `08.png`: "Ranked results, coins and XP"
 
 Video (optional): leave empty for now, or record 15–30 s of real gameplay later.
 
@@ -146,13 +151,14 @@ Localized listings (ur, hi, bn, ar, id, pt-BR, es, tr) are strongly recommended 
 
 ## Claims check
 
-Every claim matches the current game (v1.2.0):
+Every claim matches the current game (v1.3.0):
 
 - **Completely offline, no online mode, no account; quick chat is preset and local:** the app has no server code; only the AdMob SDK uses the network, and the game works without it. Chat bubbles are drawn locally.
 - **Per-player dice in each corner, active glow, optional turn timer (off by default):** `www/js/game.js` (pods); positions checked by `test/browser.test.js`.
 - **Star-style stacked rolls, chips, three 6s forfeit, capture/home bonus, 6 to leave, exact home, safe squares, Classic option, capture to enter, blocks:** `www/js/logic.js`, each unit-tested in `test/logic.test.js`; documented in `RULES.md` and the in-game Rules screen.
 - **Mystery Tiles events (12) and wheels:** `applyEvent()` in `logic.js`; every event unit-tested; wheel checked in the browser test.
 - **Lucky Chaos Ludo (12 tiles, Boost/Chaos/Danger wheels, streak, revenge, charge meter + Mega Wheel, King tokens, up to 2 stored powers, choices, near-home protections, 1 v 1 / 4 players, vs AI and pass & play):** `luckyActivate()`, `mega()`, `usePower()`, `choose()` in `logic.js`; every effect unit-tested in `test/lucky.test.js` with 1000-game balance simulations; wheels, Danger tile, choice window, Mega Wheel and King crown checked in the browser test.
+- **Quick, Team, Arrow and Friendly modes:** `test/modes13.test.js` (300 games each, all finish).
 - **Undo dice roll within ~2 s, 3 per match:** `undoRoll()`; browser-tested.
 - **Three AI levels; Hard hunts captures, stays safe, builds blocks, uses events:** `chooseMove()`; tests check preferences and that Hard beats Easy/Normal in simulated games.
 - **Skins with coins; coins can't be bought, bet or cashed out; no entry fee:** `www/js/themes.js`; no billing library; no mode takes coins to play.

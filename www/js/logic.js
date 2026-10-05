@@ -17,8 +17,8 @@
  * Both: three 6s in a row forfeit the whole turn (the unused queue is lost), a capture and a token
  * reaching home each give a bonus roll (toggles), 6 to leave base, exact roll to reach home.
  *
- * Modes: 'classic', 'mystery' (Mystery Tiles: ? and ! tiles on the track spin a wheel of events) and
- *        'lucky' (Lucky Chaos Ludo: Lucky/Danger tiles, streaks, revenge, charge meter + Mega Wheel, King tokens, powers).
+ * Modes: 'classic', 'mystery', 'lucky' (Lucky Chaos Ludo), 'quick' (2 tokens), 'team' (2v2, partners
+ *        opposite), 'arrow' (one-way arrow squares) and 'friendly' (no captures).
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -29,9 +29,10 @@
   var TRACK = 52, LAST_TRACK = 50, CIRCLE = 51, COL0 = 52, HOME = 57, PIECES = 4;
   var START_SQUARES = [0, 13, 26, 39];
   var STAR_SQUARES = [8, 21, 34, 47];
-  var DEFAULT_RULES = { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true };
+  var ARROW_SQUARES = [2, 7, 15, 20, 28, 33, 41, 46]; // one-way, always clockwise; never a start or star
+  var DEFAULT_RULES = { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true, arrows: false, noCapture: false };
   var LEVELS = ['easy', 'medium', 'hard'];
-  var MODES = ['classic', 'mystery', 'lucky'];
+  var MODES = ['classic', 'mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'];
   var MAX_SIXES = 3;
 
   // Mystery Tiles: fixed tiles on the track (absolute squares, never a start or star square)
@@ -104,18 +105,31 @@
    * seats: array of 4 entries, each null (empty seat) or { type: 'human' | 'ai', level?: 'easy'|'medium'|'hard' }.
    * Needs at least 2 players. mode: 'classic' | 'mystery'.
    */
+  function nPieces(st) { return (st && st.nPieces) || PIECES; }
+  /** Team Ludo: partners sit opposite. Team 0 is seats 0 and 2, team 1 is seats 1 and 3. */
+  function teamOf(seat) { return seat % 2; }
+  function partnerOf(seat) { return (seat + 2) % 4; }
+  function arrowsOn(st) { return !!(st && st.rules && (st.mode === 'arrow' || st.rules.arrows)); }
   function newGame(seats, rules, seed, mode) {
     var players = [];
     for (var i = 0; i < 4; i++) if (seats[i]) players.push(i);
-    if (players.length < 2) throw new Error('need at least 2 players');
     var md = MODES.indexOf(mode) >= 0 ? mode : 'classic';
+    if (md === 'team') { if (players.length !== 4) throw new Error('Team Ludo needs all 4 seats'); }
+    else if (players.length < 2) throw new Error('need at least 2 players');
+    var np = md === 'quick' ? 2 : PIECES;
+    var rr = normRules(rules);
+    if (md === 'arrow') rr.arrows = true;
+    if (md === 'friendly') rr.noCapture = true;
+    var blank = function () { var a = []; for (var k = 0; k < np; k++) a.push(-1); return a; };
     var st = {
       v: 2,
       mode: md,
+      nPieces: np,
       seats: seats.map(function (x) { return x ? { type: x.type === 'ai' ? 'ai' : 'human', level: LEVELS.indexOf(x.level) >= 0 ? x.level : 'medium' } : null; }),
       players: players,
-      pieces: seats.map(function (x) { return x ? [-1, -1, -1, -1] : null; }),
-      rules: normRules(rules),
+      pieces: seats.map(function (x) { return x ? blank() : null; }),
+      rules: rr,
+      moveCount: 0,
       turn: players[0],
       phase: 'roll',        // 'roll' | 'move' | 'over'
       queue: [],            // die values waiting to be moved
@@ -152,15 +166,19 @@
     var out = [];
     for (var s = 0; s < 4; s++) {
       if (!st.pieces[s] || s === exceptSeat) continue;
-      for (var i = 0; i < PIECES; i++) { var p = st.pieces[s][i]; if (onTrack(p) && absOf(s, p) === abs) out.push({ seat: s, piece: i }); }
+      for (var i = 0; i < nPieces(st); i++) { var p = st.pieces[s][i]; if (onTrack(p) && absOf(s, p) === abs) out.push({ seat: s, piece: i }); }
     }
     return out;
   }
-  function countOwnAt(st, seat, abs) { var n = 0; for (var i = 0; i < PIECES; i++) { var p = st.pieces[seat][i]; if (onTrack(p) && absOf(seat, p) === abs) n++; } return n; }
+  function countOwnAt(st, seat, abs) { var n = 0; for (var i = 0; i < nPieces(st); i++) { var p = st.pieces[seat][i]; if (onTrack(p) && absOf(seat, p) === abs) n++; } return n; }
   /** Is there a block of another seat on track square abs (blocks rule on, 2+ tokens of one colour)? */
   function opponentBlockAt(st, seat, abs) {
     if (!st.rules.blocks) return false;
-    for (var o = 0; o < 4; o++) if (st.pieces[o] && o !== seat && countOwnAt(st, o, abs) >= 2) return true;
+    for (var o = 0; o < 4; o++) {
+      if (!st.pieces[o] || o === seat) continue;
+      if (st.mode === 'team' && teamOf(o) === teamOf(seat)) continue; // a partner never blocks you
+      if (countOwnAt(st, o, abs) >= 2) return true;
+    }
     return false;
   }
   function inBlock(st, seat, piece) {
@@ -169,8 +187,13 @@
   }
   /** Tokens that would be captured by `seat` landing on track square abs. */
   function capturesAt(st, seat, abs) {
+    if (st.mode === 'friendly' || st.rules.noCapture) return [];
     if (st.rules.safeSquares && isSafeAbs(abs)) return [];
-    return tokensAt(st, abs, seat).filter(function (t) { return !isShielded(st, t.seat, t.piece); });
+    return tokensAt(st, abs, seat).filter(function (t) {
+      if (isShielded(st, t.seat, t.piece)) return false;
+      if (st.mode === 'team' && teamOf(t.seat) === teamOf(seat)) return false; // partners are not captured
+      return true;
+    });
   }
 
   function stepFwd(p, enter) {
@@ -181,9 +204,21 @@
     return p + 1;
   }
   /** Squares visited moving `n` forward from p (null if it would overshoot home). */
-  function pathOf(p, n, enter) {
+  /** One extra clockwise square when a step lands on an arrow. Null if arrows are off, blocked or it would overshoot home. No chaining. */
+  function rideArrow(st, seat, c, enter) {
+    if (!st || !arrowsOn(st) || !onTrack(c) || ARROW_SQUARES.indexOf(absOf(seat, c)) < 0) return null;
+    var extra = stepFwd(c, enter);
+    if (extra === null) return null;
+    if (onTrack(extra) && opponentBlockAt(st, seat, absOf(seat, extra))) return null;
+    return extra;
+  }
+  function pathOf(p, n, enter, st, seat) {
     var out = [], c = p;
-    for (var k = 0; k < n; k++) { c = stepFwd(c, enter); if (c === null) return null; out.push(c); }
+    for (var k = 0; k < n; k++) {
+      c = stepFwd(c, enter); if (c === null) return null; out.push(c);
+      var extra = rideArrow(st, seat, c, enter);
+      if (extra !== null) { out.push(extra); c = extra; }
+    }
     return out;
   }
 
@@ -194,7 +229,7 @@
     if (p < 0) { if (v !== 6) return null; path = [0]; }
     else {
       var kg = st.lk && isKing(st, seat, piece);  // King's stride: +1 square when it fits
-      path = (kg && pathOf(p, v + 1, canEnter(st, seat))) || pathOf(p, v, canEnter(st, seat)); if (!path) return null; // exact roll needed to reach home
+      path = (kg && pathOf(p, v + 1, canEnter(st, seat), st, seat)) || pathOf(p, v, canEnter(st, seat), st, seat); if (!path) return null; // exact roll needed to reach home
     }
     to = path[path.length - 1];
     for (var k = 0; k < path.length; k++) if (onTrack(path[k]) && opponentBlockAt(st, seat, absOf(seat, path[k]))) return null; // blocks can't be passed or landed on
@@ -207,7 +242,7 @@
   function legalMoves(st, seat, v) {
     var out = [];
     if (!st.pieces[seat]) return out;
-    for (var i = 0; i < PIECES; i++) { var m = moveFor(st, seat, i, v); if (m) out.push(m); }
+    for (var i = 0; i < nPieces(st); i++) { var m = moveFor(st, seat, i, v); if (m) out.push(m); }
     return out;
   }
   /** All legal moves for the current player, one per (distinct queue value, token). */
@@ -228,7 +263,24 @@
   function progressOf(st, s) { return st.pieces[s].reduce(function (a, p) { return a + advance(p); }, 0); }
 
   /** Is the match over? Ends when one player is left, or when every human has finished (the rest are ranked by progress). */
+  function teamSeats(t) { return t === 0 ? [0, 2] : [1, 3]; }
+  function allHome(st, seat) { return !!(st.pieces[seat] && st.pieces[seat].length && st.pieces[seat].every(function (p) { return p === HOME; })); }
+  /** Team Ludo ends only when both partners of one team have every token home. Both winners share the win. */
+  function checkTeamOver(st) {
+    var win = allHome(st, 0) && allHome(st, 2) ? 0 : allHome(st, 1) && allHome(st, 3) ? 1 : -1;
+    if (win < 0) return false;
+    // Winners share the win and are listed first, even if an opponent finished their own tokens earlier.
+    function orderTeam(t) {
+      var out = st.ranking.filter(function (s) { return teamOf(s) === t; });
+      teamSeats(t).forEach(function (s) { if (out.indexOf(s) < 0) out.push(s); });
+      return out;
+    }
+    st.ranking = orderTeam(win).concat(orderTeam(1 - win));
+    st.phase = 'over'; st.moves = []; st.queue = [];
+    return true;
+  }
   function checkOver(st) {
+    if (st.mode === 'team') return checkTeamOver(st);
     var left = activeLeft(st);
     var humansLeft = left.filter(function (s) { return st.seats[s].type === 'human'; }).length;
     if (left.length <= 1 || (hasHuman(st) && humansLeft === 0)) {
@@ -330,7 +382,7 @@
     var best = null, bd = Infinity;
     for (var o = 0; o < 4; o++) {
       if (!st.pieces[o] || o === seat || st.ranking.indexOf(o) >= 0) continue;
-      for (var i = 0; i < PIECES; i++) {
+      for (var i = 0; i < nPieces(st); i++) {
         var p = st.pieces[o][i]; if (!onTrack(p)) continue;
         var a = absOf(o, p), fwd = (a - abs + TRACK) % TRACK, back = (abs - a + TRACK) % TRACK;
         var d = dir > 0 ? fwd : dir < 0 ? back : Math.min(fwd, back);
@@ -353,7 +405,11 @@
   }
   function jumpDest(st, seat, piece, n) {
     var p = st.pieces[seat][piece], path = [], c = p, enter = canEnter(st, seat);
-    for (var k = 0; k < n; k++) { var nx = stepFwd(c, enter); if (nx === null) break; path.push(nx); c = nx; }
+    for (var k = 0; k < n; k++) {
+      var nx = stepFwd(c, enter); if (nx === null) break; path.push(nx); c = nx;
+      var extra = rideArrow(st, seat, c, enter);
+      if (extra !== null) { path.push(extra); c = extra; }
+    }
     while (path.length && onTrack(path[path.length - 1]) && opponentBlockAt(st, seat, absOf(seat, path[path.length - 1]))) path.pop();
     return path;
   }
@@ -422,6 +478,7 @@
     if (!m) throw new Error('illegal move');
     var seat = st.turn;
     st.pieces[seat][piece] = m.to;
+    st.moveCount = (st.moveCount || 0) + 1;
     removeQueueValue(st, m.v);
     var kingCaps = m.captures.filter(function (t) { return isKing(st, t.seat, t.piece); });
     m.captures.forEach(function (t) { sendHome(st, seat, t, piece); });
@@ -515,7 +572,7 @@
   /** Comeback level 0..2 from the progress gap to the leader (capped). */
   function comebackLevel(st, seat) {
     var lead = 0; activeLeft(st).forEach(function (s) { lead = Math.max(lead, progressOf(st, s)); });
-    var gap = (lead - progressOf(st, seat)) / (PIECES * 58);
+    var gap = (lead - progressOf(st, seat)) / (nPieces(st) * 58);
     return gap >= 0.3 ? 2 : gap >= 0.15 ? 1 : 0;
   }
   function addCharge(st, seat, n) { st.lk.charge[seat] = Math.min(MAX_CHARGE, st.lk.charge[seat] + n); }
@@ -564,7 +621,7 @@
     var a = absOf(seat, st.pieces[seat][piece]), out = [];
     for (var s = 0; s < 4; s++) {
       if (!st.pieces[s]) continue;
-      for (var i = 0; i < PIECES; i++) {
+      for (var i = 0; i < nPieces(st); i++) {
         if (s === seat && i === piece) continue;
         var p = st.pieces[s][i]; if (!onMainTrack(p) || p === 0) continue;
         var b = absOf(s, p);
@@ -586,7 +643,7 @@
   }
   function escapeTarget(st, seat) {
     var best = null, bs = -Infinity;
-    for (var i = 0; i < PIECES; i++) {
+    for (var i = 0; i < nPieces(st); i++) {
       var p = st.pieces[seat][i]; if (p < 0 || p > LAST_TRACK || isFrozen(st, seat, i)) continue;
       if (isSafeAbs(absOf(seat, p))) continue;
       for (var d = 1; d <= 8 && p + d <= LAST_TRACK; d++) {
@@ -741,7 +798,7 @@
     var me = progressOf(st, seat) * 2, riv = 0, n = 0;
     st.players.forEach(function (o) { if (o !== seat && st.ranking.indexOf(o) < 0) { riv += progressOf(st, o); n++; } });
     var sc = me - (n ? riv / n : 0) * 1.2;
-    for (var i = 0; i < PIECES; i++) {
+    for (var i = 0; i < nPieces(st); i++) {
       var p = st.pieces[seat][i];
       if (p >= 0 && p <= LAST_TRACK && !immune(st, seat, i)) sc -= threatsTo(st, seat, absOf(seat, p)) * (6 + p * 0.35);
     }
@@ -790,7 +847,7 @@
   // ---- Mega Wheel (5/5 charge, activated manually before a roll) ----
   function rocketPick(st, seat) {
     var best = null, bs = -Infinity;
-    for (var i = 0; i < PIECES; i++) {
+    for (var i = 0; i < nPieces(st); i++) {
       var p = st.pieces[seat][i]; if (p < 0 || p === HOME || isFrozen(st, seat, i)) continue;
       var path = jumpDest(st, seat, i, 8); if (!path.length) continue;
       var to = path[path.length - 1];
@@ -802,10 +859,10 @@
   }
   function stormTargets(st, seat) {
     var mine = [], out = [];
-    for (var i = 0; i < PIECES; i++) { var p = st.pieces[seat][i]; if (onMainTrack(p)) mine.push(absOf(seat, p)); }
+    for (var i = 0; i < nPieces(st); i++) { var p = st.pieces[seat][i]; if (onMainTrack(p)) mine.push(absOf(seat, p)); }
     for (var o = 0; o < 4; o++) {
       if (!st.pieces[o] || o === seat) continue;
-      for (var j = 0; j < PIECES; j++) {
+      for (var j = 0; j < nPieces(st); j++) {
         var q = st.pieces[o][j]; if (!onMainTrack(q) || q === 0) continue;
         var b = absOf(o, q);
         if (safeHere(st, b) || immune(st, o, j)) continue;
@@ -816,7 +873,7 @@
   }
   function crownPick(st, seat) {
     var best = -1, bp = -1;
-    for (var i = 0; i < PIECES; i++) { var p = st.pieces[seat][i]; if (onMainTrack(p) && !isKing(st, seat, i) && advance(p) > bp) { bp = advance(p); best = i; } }
+    for (var i = 0; i < nPieces(st); i++) { var p = st.pieces[seat][i]; if (onMainTrack(p) && !isKing(st, seat, i) && advance(p) > bp) { bp = advance(p); best = i; } }
     return best;
   }
   function megaValid(st, seat, ev) {
@@ -842,7 +899,7 @@
     switch (ev) {
       case 'rocket': var r = rocketPick(st, seat); out.piece = r.piece; jumpCapture(st, seat, r.piece, r.path, out); break;
       case 'free':
-        for (i = 0; i < PIECES; i++) if (st.pieces[seat][i] < 0) break;
+        for (i = 0; i < nPieces(st); i++) if (st.pieces[seat][i] < 0) break;
         out.piece = i; jumpCapture(st, seat, i, [0], out); break;
       case 'guard': st.pieces[seat].forEach(function (p, k) { if (onMainTrack(p) && !isShielded(st, seat, k)) { st.effects.push({ type: 'shield', seat: seat, piece: k, at: st.turnCount }); out.moves.push({ seat: seat, piece: k, from: p, to: p, shield: true }); } }); break;
       case 'turn2': st.bonus += 2; break;
@@ -878,7 +935,7 @@
     var n = 0, star = st.rules.rollStyle === 'star';
     for (var o = 0; o < 4; o++) {
       if (!st.pieces[o] || o === seat || st.ranking.indexOf(o) >= 0) continue;
-      for (var i = 0; i < PIECES; i++) {
+      for (var i = 0; i < nPieces(st); i++) {
         var p = st.pieces[o][i];
         if (isFrozen(st, o, i)) continue;
         if (p >= 0 && p <= LAST_TRACK) {
@@ -919,7 +976,7 @@
       var t = shielded || formsBlock ? 0 : threatsTo(st, seat, a);
       // chase value: rival tokens 1..6 ahead that we could hit next roll
       var chase = 0;
-      for (var o = 0; o < 4; o++) { if (!st.pieces[o] || o === seat) continue; for (var i = 0; i < PIECES; i++) { var p = st.pieces[o][i]; if (!onTrack(p)) continue; var d = (absOf(o, p) - a + TRACK) % TRACK; if (d >= 1 && d <= 6 && !(st.rules.safeSquares && isSafeAbs(absOf(o, p))) && m.to + d <= LAST_TRACK) chase++; } }
+      for (var o = 0; o < 4; o++) { if (!st.pieces[o] || o === seat) continue; for (var i = 0; i < nPieces(st); i++) { var p = st.pieces[o][i]; if (!onTrack(p)) continue; var d = (absOf(o, p) - a + TRACK) % TRACK; if (d >= 1 && d <= 6 && !(st.rules.safeSquares && isSafeAbs(absOf(o, p))) && m.to + d <= LAST_TRACK) chase++; } }
       st.pieces[seat][m.piece] = old;
       m.captures.forEach(function (c, k) { st.pieces[c.seat][c.piece] = saved[k]; });
       if (t > 0) sc -= (40 + m.to * 0.9) * Math.min(t, 2.5);
@@ -1021,11 +1078,11 @@
   function clone(st) { return JSON.parse(JSON.stringify(st)); }
 
   return {
-    TRACK: TRACK, LAST_TRACK: LAST_TRACK, CIRCLE: CIRCLE, COL0: COL0, HOME: HOME, START_SQUARES: START_SQUARES, STAR_SQUARES: STAR_SQUARES,
+    TRACK: TRACK, LAST_TRACK: LAST_TRACK, CIRCLE: CIRCLE, COL0: COL0, HOME: HOME, PIECES: PIECES, START_SQUARES: START_SQUARES, STAR_SQUARES: STAR_SQUARES, ARROW_SQUARES: ARROW_SQUARES,
     DEFAULT_RULES: DEFAULT_RULES, LEVELS: LEVELS, MODES: MODES, BOOST_TILES: BOOST_TILES, CHAOS_TILES: CHAOS_TILES, WHEELS: WHEELS, EVENT_INFO: EVENT_INFO,
     TRACK_CELLS: TRACK_CELLS, HOME_COLS: HOME_COLS, BASE_SPOTS: BASE_SPOTS, HOME_SPOTS: HOME_SPOTS, rot: rot,
     cellOf: cellOf, absOf: absOf, posFromAbs: posFromAbs, onTrack: onTrack, isSafeAbs: isSafeAbs, advance: advance, rngNext: rngNext, rollDie: rollDie,
-    normRules: normRules, newGame: newGame, legalMoves: legalMoves, queueMoves: queueMoves, moveFor: moveFor, pathOf: pathOf, roll: roll, move: move, mustChoose: mustChoose,
+    normRules: normRules, newGame: newGame, nPieces: nPieces, teamOf: teamOf, partnerOf: partnerOf, arrowsOn: arrowsOn, legalMoves: legalMoves, queueMoves: queueMoves, moveFor: moveFor, pathOf: pathOf, roll: roll, move: move, mustChoose: mustChoose,
     nextTurn: nextTurn, activeLeft: activeLeft, progressOf: progressOf, canEnter: canEnter, isShielded: isShielded, isFrozen: isFrozen, opponentBlockAt: opponentBlockAt,
     tileAt: tileAt, applyEvent: applyEvent, eventValid: eventValid, eventTarget: eventTarget,
     threatsTo: threatsTo, evalHard: evalHard, chooseMove: chooseMove, chooseDieValue: chooseDieValue, distinctMoves: distinctMoves,

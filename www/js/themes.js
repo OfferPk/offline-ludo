@@ -15,7 +15,13 @@
       seats: ['#d9533f', '#2f9a6f', '#e0a232', '#3a67c9'] },
     { id: 'aurora', name: 'Aurora', price: 400, dark: true,
       bg: '#0a0f1f', page: '#0e1428', board: '#121a33', cell: '#1a2446', cellEdge: '#2b3a6a', ink: '#e6ecff', muted: '#8f9bc4', center: '#16204a',
-      seats: ['#ff5d8f', '#27e0b3', '#ffd166', '#5c8bff'], glow: true }
+      seats: ['#ff5d8f', '#27e0b3', '#ffd166', '#5c8bff'], glow: true },
+    { id: 'midnight', name: 'Midnight', price: 0, dark: true,
+      bg: '#07080c', page: '#0c0e14', board: '#10131a', cell: '#1c2230', cellEdge: '#31384a', ink: '#f4f7fb', muted: '#9aa3b5', center: '#161b26',
+      seats: ['#ff5a4d', '#1ed0a4', '#ffc14d', '#6aa2ff'] },
+    { id: 'timber', name: 'Classic Wood', price: 0, dark: false,
+      bg: '#6a4b2e', page: '#7b5736', board: '#c4925a', cell: '#f6e6c8', cellEdge: '#a8743e', ink: '#2a1c10', muted: '#6e5438', center: '#e8cb9c',
+      seats: ['#c0392b', '#1e7a4d', '#d68910', '#1f4e89'] }
   ];
   var DICE = [
     { id: 'ivory', name: 'Ivory', price: 0, face: '#fbfaf6', edge: '#d8d3c8', pip: '#1f232b' },

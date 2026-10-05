@@ -30,6 +30,12 @@
           <button id="btn-lucky" class="btn big lucky-btn"><span><em class="new-badge">NEW</em>Lucky Chaos Ludo</span><small>Wheels · Danger tiles · Mega Wheel · Kings</small></button>
           <button id="btn-mystery" class="btn big mystery-btn"><span>Mystery Tiles</span><small>1 v 1 or 4 players · wheels of surprises</small></button>
           <button id="btn-pass" class="btn big"><span>Pass &amp; Play</span><small>2–4 players on one phone</small></button>
+          <div class="mode-grid">
+            <button id="btn-quick" class="btn plate"><span><em class="new-badge">NEW</em>Quick Ludo</span><small>2 tokens · fast games</small></button>
+            <button id="btn-team" class="btn plate"><span>Team Ludo</span><small>2v2 · partners opposite</small></button>
+            <button id="btn-arrow" class="btn plate"><span>Arrow Ludo</span><small>One-way tiles</small></button>
+            <button id="btn-friendly" class="btn plate"><span>Friendly</span><small>No captures · race home</small></button>
+          </div>
         </div>
         <div class="home-row">
           <button id="btn-skins" class="btn plate">Skins</button>
@@ -49,7 +55,7 @@
       </header>
       <div class="setup-body">
         <div class="sect">Mode</div>
-        <div class="seg big-seg" id="mode-seg"><button data-mode="classic">Classic</button><button data-mode="mystery">Mystery</button><button data-mode="lucky">Lucky Chaos</button></div>
+        <div class="seg big-seg" id="mode-seg"><button data-mode="classic">Classic</button><button data-mode="quick">Quick</button><button data-mode="team">Team</button><button data-mode="arrow">Arrows</button><button data-mode="friendly">Friendly</button><button data-mode="mystery">Mystery</button><button data-mode="lucky">Lucky</button></div>
         <p class="note" id="mode-note"></p>
         <button id="btn-howto" class="btn plate small-btn hidden">How to play Lucky Chaos Ludo</button>
         <div class="sect">Players</div>
@@ -74,6 +80,7 @@
         <div class="pods top"><div class="pod" data-slot="0"></div><div class="pod right" data-slot="1"></div></div>
         <div id="board-wrap">
           <canvas id="board"></canvas>
+          <div id="trail"></div>
           <div id="tiles"></div>
           <div id="pieces"></div>
           <div id="fx"></div>
@@ -113,6 +120,7 @@
       <div class="panel">
         <div class="kicker" id="r-kicker">MATCH OVER</div>
         <h2 id="r-title">You win!</h2>
+        <p class="note" id="r-meta"></p>
         <ol id="r-rank" class="rank"></ol>
         <div class="r-rewards">
           <div class="r-coins"><span class="coin-ico"></span><b id="r-coins">+0</b><small>coins</small></div>
@@ -175,7 +183,7 @@
     <div id="rules" class="overlay hidden">
       <div class="panel wide">
         <div class="panel-head"><h3>Rules</h3><button class="icon-btn close" data-close="rules" aria-label="Close">✕</button></div>
-        <div class="tabs" id="rules-tabs"><button data-tab="basics" class="on">Basics</button><button data-tab="rolls">Rolls</button><button data-tab="mystery">Mystery</button><button data-tab="lucky">Lucky</button><button data-tab="house">House</button></div>
+        <div class="tabs" id="rules-tabs"><button data-tab="basics" class="on">Basics</button><button data-tab="rolls">Rolls</button><button data-tab="mystery">Mystery</button><button data-tab="lucky">Lucky</button><button data-tab="modes">Modes</button><button data-tab="house">House</button></div>
         <div class="rules-page" data-page="basics">
           <ul class="rules-list">
             <li>2–4 players, 4 tokens each. The first to bring all 4 tokens home to the centre wins; the others are ranked 2nd, 3rd and 4th.</li>
@@ -225,6 +233,15 @@
           <div class="ev-head"><span class="tile-ico mega">M</span><b>Mega Wheel</b><small>strong, never game-deciding</small></div>
           <div class="ev-list" id="ev-mega"></div>
         </div>
+        <div class="rules-page hidden" data-page="modes">
+          <ul class="rules-list">
+            <li><b>Quick Ludo.</b> Two tokens each, same board and the same rules: a 6 to leave base, the exact roll to get home, safe squares. 1 v 1 or more, vs computer or pass &amp; play. Matches end much faster.</li>
+            <li><b>Team Ludo, 2v2.</b> All four corners play. Partners sit opposite: Coral with Saffron, Jade with Cobalt. A team wins when <b>both</b> partners have every token home. You cannot capture your partner, and a partner's block does not stop you. Pass &amp; play, or you plus a computer partner against two computers.</li>
+            <li><b>Arrow Ludo.</b> Amber arrows point clockwise, the only direction. Stepping onto one (landing or passing) carries the token one extra square the same way. You cannot choose to stop on an arrow. If the extra square is blocked, or the ride would overshoot home, the token stays on the arrow. Nothing in the home lane is an arrow. The same arrows can be turned on for any mode under House rules.</li>
+            <li><b>Friendly.</b> Captures are off. It is a pure race to home. Safe for a calmer game. The app as a whole stays 13+.</li>
+            <li>No mode has an entry fee, a stake or a bet. Coins stay cosmetic.</li>
+          </ul>
+        </div>
         <div class="rules-page hidden" data-page="house">
           <ul class="rules-list">
             <li>House rules are in <b>Settings</b> and apply to new matches.</li>
@@ -243,7 +260,7 @@
       <div class="panel">
         <div class="panel-head"><h3>Settings</h3><button class="icon-btn close" data-close="settings" aria-label="Close">✕</button></div>
         <label class="row"><span>Sound effects</span><input type="checkbox" id="set-sound"><i class="sw"></i></label>
-        <label class="row"><span>Haptics</span><input type="checkbox" id="set-haptics"><i class="sw"></i></label>
+        <label class="row"><span>Haptics <small>dice roll and captures</small></span><input type="checkbox" id="set-haptics"><i class="sw"></i></label>
         <label class="row"><span>Auto-move when only one move</span><input type="checkbox" id="set-auto"><i class="sw"></i></label>
         <label class="row"><span>Undo dice roll <small>about 2 s to undo after your roll</small></span><input type="checkbox" id="set-undo"><i class="sw"></i></label>
         <label class="row"><span>Turn timer <small>20 s per turn for human players</small></span><input type="checkbox" id="set-timer"><i class="sw"></i></label>
@@ -256,12 +273,14 @@
         <label class="row"><span>Blocks <small>2 tokens on a square can't be passed</small></span><input type="checkbox" id="rule-blocks"><i class="sw"></i></label>
         <label class="row"><span>Bonus roll on capture</span><input type="checkbox" id="rule-bonusOnCapture"><i class="sw"></i></label>
         <label class="row"><span>Bonus roll on reaching home</span><input type="checkbox" id="rule-bonusOnHome"><i class="sw"></i></label>
+        <label class="row"><span>Arrow tiles <small>one extra step clockwise</small></span><input type="checkbox" id="rule-arrows"><i class="sw"></i></label>
+        <label class="row"><span>No captures <small>friendly race</small></span><input type="checkbox" id="rule-noCapture"><i class="sw"></i></label>
         <div class="panel-actions col">
           <a class="btn plate" href="privacy.html">Privacy policy</a>
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.2.0 · © OfferPk</p>
+        <p class="ver">Crossfour v1.3.0 · © OfferPk</p>
       </div>
     </div>
 

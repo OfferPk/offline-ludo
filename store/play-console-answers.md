@@ -1,6 +1,6 @@
 # Play Console: App content answers for Crossfour: Offline Ludo
 
-App: **Crossfour** (store title "Crossfour: Offline Ludo") · Package `com.offerpk.offlineludo` · v1.2.0 (versionCode 3)
+App: **Crossfour** (store title "Crossfour: Offline Ludo") · Package `com.offerpk.offlineludo` · v1.3.0 (versionCode 4)
 Where: **Play Console → your app → Policy and programs → App content** (also listed in Dashboard → "Set up your app").
 
 The app itself has **no accounts, no login, no analytics, no in-app purchases, no online chat, no online mode and no location permission**. (The quick-chat phrases and emoji faces added in v1.1 are a fixed, preset list shown only on the same phone; nothing is typed, sent or received.) The match in progress, statistics, coins, skins and settings stay on the device (local storage) and are never sent anywhere.

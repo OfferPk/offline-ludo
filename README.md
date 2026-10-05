@@ -140,8 +140,8 @@ ANDROID_KEYSTORE_FILE=/path/upload.jks KEYSTORE_PASSWORD=... KEY_ALIAS=upload KE
 
 See **[`store/LAUNCH-CHECKLIST.md`](store/LAUNCH-CHECKLIST.md)** (it opens with a Roman Urdu summary), [`store/listing-en.md`](store/listing-en.md) and [`store/play-console-answers.md`](store/play-console-answers.md).
 
-1. Bump `versionCode` (+1 every upload) and `versionName` (the real-ads build is planned as **v1.2.1 / versionCode 4**), and switch to your real AdMob IDs.
-2. `git tag v1.2.1 && git push origin v1.2.1`. CI attaches `offline-ludo-v1.2.1.aab` and `.apk` to a Release.
+1. Bump `versionCode` (+1 every upload) and `versionName` (the real-ads build is planned as **v1.3.1 / versionCode 5**), and switch to your real AdMob IDs.
+2. `git tag v1.3.1 && git push origin v1.3.1`. CI attaches `offline-ludo-v1.3.1.aab` and `.apk` to a Release.
 3. Upload the `.aab` in Play Console with **Play App Signing** turned on. The CI keystore is your **upload key**.
 
 ## License

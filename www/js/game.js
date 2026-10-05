@@ -16,7 +16,7 @@
   // ---------------- save ----------------
   function defaults() {
     return {
-      coins: 0, xp: 0, owned: { boards: ['graphite', 'linen'], dice: ['ivory'] }, board: 'graphite', dice: 'ivory',
+      coins: 0, xp: 0, owned: { boards: ['graphite', 'linen', 'midnight', 'timber'], dice: ['ivory'] }, board: 'graphite', dice: 'ivory',
       settings: { sound: true, haptics: true, auto: true, fast: false, undo: true, timer: false, chat: true },
       rules: L.normRules({}),
       setup: {
@@ -24,7 +24,7 @@
         pass: [null, { type: 'human' }, null, { type: 'human' }],
         mode: { ai: 'classic', pass: 'classic' }
       },
-      stats: { played: 0, won: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], duel: [0, 0], four: [0, 0] },
+      stats: { played: 0, won: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], quick: [0, 0], team: [0, 0], arrow: [0, 0], friendly: [0, 0], duel: [0, 0], four: [0, 0] },
       game: null, ad: {}
     };
   }
@@ -44,6 +44,7 @@
     if (!s.setup || !Array.isArray(s.setup.ai) || !Array.isArray(s.setup.pass)) s.setup = d.setup;
     if (!s.setup.mode) s.setup.mode = d.setup.mode;
     if (!s.owned || !Array.isArray(s.owned.boards) || !Array.isArray(s.owned.dice)) s.owned = d.owned;
+    ['midnight', 'timber'].forEach(function (id) { if (s.owned.boards.indexOf(id) < 0) s.owned.boards.push(id); });
     ['coins', 'xp'].forEach(function (k) { if (typeof s[k] !== 'number' || !isFinite(s[k]) || s[k] < 0) s[k] = 0; });
     return s;
   }
@@ -66,7 +67,11 @@
   function mix(h, to, f) { var a = hex2rgb(h), b = to === 'w' ? [255, 255, 255] : [0, 0, 0]; return 'rgb(' + a.map(function (v, i) { return Math.round(v + (b[i] - v) * f); }).join(',') + ')'; }
   function rgba(h, a) { var c = hex2rgb(h); return 'rgba(' + c.join(',') + ',' + a + ')'; }
   function haptic(kind) {
-    if (!save.settings.haptics || !native) return;
+    if (!save.settings.haptics) return;
+    if (!native) {
+      if (navigator.vibrate) { try { navigator.vibrate(kind === 'heavy' || kind === 'warn' ? 36 : kind === 'success' ? [16, 30, 16] : 12); } catch (e) {} }
+      return;
+    }
     var Hp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
     if (!Hp) return;
     try {
@@ -143,8 +148,16 @@
         ctx.lineWidth = Math.max(1.5, c * 0.09); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke(); ctx.restore();
       } else if (isStar) {
         star(ctx, cx, cy, c * 0.3, c * 0.13);
-        if (rules.safeSquares) { ctx.fillStyle = rgba(b.muted.length === 7 ? b.muted : '#888888', 0.9); ctx.fill(); }
+        if (rules && rules.safeSquares) { ctx.fillStyle = rgba(b.muted.length === 7 ? b.muted : '#888888', 0.9); ctx.fill(); }
         else { ctx.lineWidth = 1; ctx.strokeStyle = rgba(b.muted, 0.35); ctx.stroke(); }
+      }
+      if (rules && rules.arrows && L.ARROW_SQUARES.indexOf(a) >= 0) {
+        ctx.save(); ctx.translate(cx, cy);
+        var nx2 = L.TRACK_CELLS[(a + 1) % 52]; ctx.rotate(Math.atan2(nx2[0] - rc[0], nx2[1] - rc[1]));
+        ctx.beginPath(); ctx.moveTo(-c * 0.22, -c * 0.16); ctx.lineTo(c * 0.16, 0); ctx.lineTo(-c * 0.22, c * 0.16); ctx.closePath();
+        ctx.fillStyle = '#e8a317'; ctx.fill();
+        ctx.lineWidth = Math.max(1, c * 0.04); ctx.strokeStyle = 'rgba(40,24,0,.55)'; ctx.stroke();
+        ctx.restore();
       }
     });
     for (s = 0; s < 4; s++) L.HOME_COLS[s].forEach(function (rc, k) { cell(rc, rgba(b.seats[s], 0.55 + k * 0.08), null); });
@@ -221,7 +234,7 @@
     for (var s = 0; s < 4; s++) {
       if (!G.st.pieces[s]) continue;
       var col = seatColor(s);
-      for (var i = 0; i < 4; i++) {
+      for (var i = 0; i < G.st.pieces[s].length; i++) {
         var el = document.createElement('div'); el.className = 'pc'; el.innerHTML = '<i class="crown">' + ART.icon('crown', 16) + '</i>';
         el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45));
         el.dataset.seat = s; el.dataset.piece = i;
@@ -238,7 +251,7 @@
     var st = G.st, groups = {};
     for (var s = 0; s < 4; s++) {
       if (!st.pieces[s]) continue;
-      for (var i = 0; i < 4; i++) {
+      for (var i = 0; i < st.pieces[s].length; i++) {
         var p = st.pieces[s][i];
         var key = (p < 0 || p === L.HOME) ? 's' + s + 'p' + i + 'b' + p : (L.onTrack(p) ? 'a' + L.absOf(s, p) : 'h' + s + '-' + p);
         (groups[key] = groups[key] || []).push([s, i]);
@@ -257,10 +270,12 @@
         el.classList.toggle('shield', L.isShielded(st, s, i));
         el.classList.toggle('frozen', L.isFrozen(st, s, i));
         el.classList.toggle('king', !!(st.lk && L.isKing(st, s, i)));
+        el.classList.toggle('last', !!(G.lastMove && G.lastMove.seat === s && G.lastMove.piece === i));
         piecePos[id] = c;
       });
     });
     layoutTiles();
+    layoutTrail();
   }
   function layout() {
     var stage = $('stage'); if (!stage || $('game').classList.contains('hidden')) return;
@@ -272,6 +287,18 @@
     var root = document.documentElement.style; root.setProperty('--bs', bs + 'px'); root.setProperty('--cell', CELL + 'px'); root.setProperty('--step-ms', stepMs() + 'ms');
     drawBoard($('board'), bs, board(), G ? G.st.rules : L.DEFAULT_RULES, G ? G.st.seats : null, VIEW());
     layoutPieces(true);
+    layoutTrail();
+  }
+  function layoutTrail() {
+    var box = $('trail'); if (!box) return;
+    box.innerHTML = '';
+    var lm = G && G.lastMove; if (!lm || !lm.cells) return;
+    lm.cells.forEach(function (rc) {
+      var c = center(rc), e = document.createElement('i');
+      e.className = 'trail'; e.style.background = rgba(seatColor(lm.seat), 0.45);
+      e.style.transform = 'translate(' + (c.x - CELL / 2).toFixed(1) + 'px,' + (c.y - CELL / 2).toFixed(1) + 'px)';
+      box.appendChild(e);
+    });
   }
 
   // ---------------- flow control ----------------
@@ -330,7 +357,8 @@
       var home = st.pieces[s].filter(function (p) { return p === L.HOME; }).length, rank = st.ranking.indexOf(s), active = !over && cur === s;
       el.classList.toggle('active', active); el.classList.toggle('done', rank >= 0);
       el.querySelector('.pname').textContent = nameOf(s);
-      var dots = ''; for (var k = 0; k < 4; k++) dots += '<i' + (k < home ? ' class="on"' : '') + '></i>';
+      var dots = ''; for (var k = 0; k < (st.nPieces || 4); k++) dots += '<i' + (k < home ? ' class="on"' : '') + '></i>';
+      if (st.mode === 'team' && rank < 0) dots = '<b class="team t' + L.teamOf(s) + '">' + (L.teamOf(s) ? 'B' : 'A') + '</b>' + dots;
       var lk = st.lk;
       if (rank >= 0) el.querySelector('.plvl').innerHTML = '<span class="prank">' + ['1st', '2nd', '3rd', '4th'][rank] + '</span>';
       else if (lk) el.querySelector('.plvl').innerHTML = luckyMeter(st, s);
@@ -352,7 +380,7 @@
     var s = cur, lbl = $('turn-label');
     if (over) lbl.innerHTML = 'Match over';
     else lbl.innerHTML = '<span class="dot" style="background:' + seatColor(s) + '"></span>' + (isHuman(s) ? (nameOf(s) === 'You' ? 'Your turn' : NAMES[s] + "'s turn") : NAMES[s] + ' is playing') +
-      (st.mode === 'mystery' ? '<span class="mode-tag">Mystery</span>' : st.mode === 'lucky' ? '<span class="mode-tag lucky">Lucky Chaos</span>' : '');
+      (st.mode === 'mystery' ? '<span class="mode-tag">Mystery</span>' : st.mode === 'lucky' ? '<span class="mode-tag lucky">Lucky Chaos</span>' : st.mode === 'quick' ? '<span class="mode-tag">Quick</span>' : st.mode === 'team' ? '<span class="mode-tag">Team</span>' : st.mode === 'arrow' ? '<span class="mode-tag">Arrows</span>' : st.mode === 'friendly' ? '<span class="mode-tag">Friendly</span>' : '');
     var hint = '';
     if (!over && st.phase === 'choose') hint = isHuman(st.turn) ? 'Make your choice' : NAMES[st.turn] + ' is choosing…';
     else if (!over && isHuman(s) && !busy) {
@@ -367,12 +395,12 @@
     $('undo-label').textContent = G.undoLeft > 0 ? 'Undo (' + G.undoLeft + ')' : 'Undo';
     $('undo-ad').classList.toggle('hidden', G.undoLeft > 0);
   }
-  function clearHighlights() { each(document.querySelectorAll('.pc.can'), function (e) { e.classList.remove('can'); }); }
+  function clearHighlights() { each(document.querySelectorAll('.pc.can, .pc.sel'), function (e) { e.classList.remove('can'); e.classList.remove('sel'); }); }
   function highlight() {
     clearHighlights();
     var st = G.st; if (st.phase !== 'move' || !isHuman(st.turn) || busy) return;
     var ms = G.sel != null ? chipMoves(G.sel) : st.moves;
-    ms.forEach(function (m) { var el = pieceEls[m.seat][m.piece]; if (el) el.classList.add('can'); });
+    ms.forEach(function (m) { var el = pieceEls[m.seat][m.piece]; if (!el) return; el.classList.add('can'); if (G.sel != null && m.v === G.sel) el.classList.add('sel'); });
   }
   function offerMoves() {
     var st = G.st; if (st.phase !== 'move' || !isHuman(st.turn)) return;
@@ -559,6 +587,7 @@
     var res = L.move(st, piece, v, forcedEvents.length ? forcedEvents.shift() : undefined);
     if (human) { save.stats.captures += res.captures.length; if (res.finish) save.stats.home++; if (res.event) save.stats.events++; }
     G.sel = null;
+    G.lastMove = { seat: s, piece: piece, cells: res.path.map(function (pp) { return L.cellOf(s, pp, piece); }) };
     render(); persist();
     animatePath(s, piece, res.from, res.path, function () {
       var c = piecePos[s + '-' + piece] || { x: 0, y: 0 }, pause = 260;
@@ -829,7 +858,11 @@
     if (!G.counted) {
       G.counted = true;
       var hs = humans(st), best = 99;
-      hs.forEach(function (s) { best = Math.min(best, st.ranking.indexOf(s) + 1); });
+      if (st.mode === 'team') {
+        var winT = L.teamOf(st.ranking[0]);
+        best = hs.some(function (s) { return L.teamOf(s) === winT; }) ? 1 : 2;
+      } else hs.forEach(function (s) { best = Math.min(best, st.ranking.indexOf(s) + 1); });
+      G.moves = st.moveCount || 0; G.elapsed = Math.max(0, Date.now() - (G.started || Date.now()));
       var ai = st.players.filter(function (s) { return st.seats[s].type === 'ai'; }).map(function (s) { return st.seats[s].level; });
       G.place = best; G.coins = L.coinsFor(best, st.players.length, ai, st.mode); G.xp = L.xpFor(best, st.players.length);
       save.coins += G.coins; save.xp += G.xp;
@@ -837,6 +870,7 @@
       if (ai.length) { var top = ai.indexOf('hard') >= 0 ? 'hard' : ai.indexOf('medium') >= 0 ? 'medium' : 'easy'; S.vs[top][0]++; if (best === 1) S.vs[top][1]++; } else S.pass++;
       if (st.mode === 'mystery') { S.mystery[0]++; if (best === 1) S.mystery[1]++; }
       if (st.mode === 'lucky') { S.lucky[0]++; if (best === 1) S.lucky[1]++; }
+      ['quick', 'team', 'arrow', 'friendly'].forEach(function (m) { if (st.mode === m) { S[m][0]++; if (best === 1) S[m][1]++; } });
       if (st.players.length === 2) { S.duel[0]++; if (best === 1) S.duel[1]++; } else if (st.players.length === 4) { S.four[0]++; if (best === 1) S.four[1]++; }
       gate.matchCompleted();
       persist();
@@ -847,11 +881,15 @@
   }
   function showResult() {
     var st = G.st, hs = humans(st), single = hs.length === 1, winner = st.ranking[0];
-    $('r-title').textContent = single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
-    $('r-kicker').textContent = (st.mode === 'mystery' ? 'MYSTERY TILES · ' : st.mode === 'lucky' ? 'LUCKY CHAOS LUDO · ' : '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
+    var teamWin = st.mode === 'team', tName = function (seat) { return L.teamOf(seat) ? 'Jade & Cobalt' : 'Coral & Saffron'; };
+    $('r-title').textContent = teamWin ? (tName(winner) + ' win') : single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
+    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'ARROW LUDO · ', friendly: 'FRIENDLY · ' };
+    $('r-kicker').textContent = (MODE_KICK[st.mode] || '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
+    var sec = Math.round((G.elapsed || 0) / 1000), mm = Math.floor(sec / 60), ss = sec % 60;
+    $('r-meta').textContent = (G.moves || 0) + ' moves · ' + mm + ':' + (ss < 10 ? '0' : '') + ss;
     $('r-rank').innerHTML = st.ranking.map(function (s, k) {
       return '<li class="' + (isHuman(s) ? 'me' : '') + '"><span class="medal m' + (k + 1) + '">' + (k + 1) + '</span><span class="pdot" style="background:' + seatColor(s) + '"></span>' + nameOf(s) +
-        '<small>' + levelOf(s) + (st.seats[s].type === 'ai' ? ' AI' : '') + ' · ' + st.pieces[s].filter(function (p) { return p === L.HOME; }).length + '/4 home</small></li>';
+        '<small>' + levelOf(s) + (st.seats[s].type === 'ai' ? ' AI' : '') + ' · ' + st.pieces[s].filter(function (p) { return p === L.HOME; }).length + '/' + (st.nPieces || 4) + ' home</small></li>';
     }).join('');
     $('r-coins').textContent = '+' + (G.coins * (G.doubled ? 2 : 1));
     $('r-xp').textContent = '+' + G.xp;
@@ -889,12 +927,13 @@
   function updateHome() {
     var cont = G && G.st.phase !== 'over';
     $('btn-continue').classList.toggle('hidden', !cont);
-    if (cont) { var st = G.st; $('continue-sub').textContent = (st.mode === 'mystery' ? 'Mystery Tiles · ' : st.mode === 'lucky' ? 'Lucky Chaos Ludo · ' : '') + (hasAI(st) ? 'vs Computer' : 'Pass & Play') + ' · ' + st.players.length + ' players'; }
+    if (cont) { var st = G.st; $('continue-sub').textContent = (st.mode === 'mystery' ? 'Mystery Tiles · ' : st.mode === 'lucky' ? 'Lucky Chaos Ludo · ' : st.mode === 'quick' ? 'Quick Ludo · ' : st.mode === 'team' ? 'Team Ludo · ' : st.mode === 'arrow' ? 'Arrow Ludo · ' : st.mode === 'friendly' ? 'Friendly · ' : '') + (hasAI(st) ? 'vs Computer' : 'Pass & Play') + ' · ' + st.players.length + ' players'; }
   }
   var setupKind = 'ai', setupMode = 'classic';
   function showSetup(kind, mode) {
     setupKind = kind; setupMode = mode || save.setup.mode[kind] || 'classic'; screen('setup');
-    $('setup-title').textContent = kind === 'ai' ? (setupMode === 'mystery' ? 'Mystery Tiles' : setupMode === 'lucky' ? 'Lucky Chaos Ludo' : 'Play vs Computer') : 'Pass & Play';
+    var TITLES = { mystery: 'Mystery Tiles', lucky: 'Lucky Chaos Ludo', quick: 'Quick Ludo', team: 'Team Ludo', arrow: 'Arrow Ludo', friendly: 'Friendly Ludo' };
+    $('setup-title').textContent = TITLES[setupMode] || (kind === 'ai' ? 'Play vs Computer' : 'Pass & Play');
     renderSetup();
   }
   function rulesSummary() {
@@ -904,14 +943,24 @@
     if (r.blocks) out.push('blocks');
     if (!r.bonusOnCapture) out.push('no capture bonus');
     if (!r.bonusOnHome) out.push('no home bonus');
+    if (r.arrows) out.push('arrow tiles');
+    if (r.noCapture) out.push('no captures');
     return out.join(' · ');
   }
   function renderSetup() {
     var seats = save.setup[setupKind], list = $('seat-list'); list.innerHTML = '';
     each($('mode-seg').children, function (b) { b.classList.toggle('on', b.dataset.mode === setupMode); });
-    $('mode-note').textContent = setupMode === 'mystery' ? 'Mystery Tiles: ? and ! tiles on the track spin a wheel of events (shield, jump, swap, zap, freeze…). No stakes: every match is free.' :
-      setupMode === 'lucky' ? 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.' : 'Classic Ludo on a clean board.';
-    $('btn-howto').classList.toggle('hidden', setupMode !== 'lucky');
+    var NOTES = {
+      mystery: 'Mystery Tiles: ? and ! tiles on the track spin a wheel of events (shield, jump, swap, zap, freeze…). No stakes: every match is free.',
+      lucky: 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.',
+      quick: 'Quick Ludo: 2 tokens each on the normal board. Same rules (6 to leave base, exact home, safe squares) so matches finish much faster. 1 v 1 or more.',
+      team: 'Team Ludo, 2v2. Partners sit opposite: Coral with Saffron, Jade with Cobalt. A team wins when both partners have every token home. You cannot capture your partner.',
+      arrow: 'Arrow Ludo: amber one-way arrows. Stepping onto one carries you one extra square clockwise, whether you land or pass through. You cannot stop on an arrow unless the extra square is blocked.',
+      friendly: 'Friendly: captures are off. It is a pure race home. The app stays 13+.'
+    };
+    $('mode-note').textContent = NOTES[setupMode] || 'Classic Ludo on a clean board.';
+    $('btn-howto').classList.toggle('hidden', ['lucky', 'quick', 'team', 'arrow', 'friendly'].indexOf(setupMode) < 0);
+    $('btn-howto').textContent = setupMode === 'lucky' ? 'How to play Lucky Chaos Ludo' : 'How to play this mode';
     var order = [0, 1, 3, 2], pos = ['top left', 'top right', 'bottom right', 'bottom left'];
     order.forEach(function (s) {
       var x = seats[s], cur = !x ? 'off' : x.type === 'human' ? 'human' : x.level;
@@ -930,7 +979,7 @@
       list.appendChild(row);
     });
     var n = seats.filter(Boolean).length, h = seats.filter(function (x) { return x && x.type === 'human'; }).length;
-    var msg = n < 2 ? 'Choose at least 2 players.' : h < 1 ? 'At least one player must be human.' : '';
+    var msg = setupMode === 'team' && n !== 4 ? 'Team Ludo needs all 4 corners. Partners sit opposite.' : n < 2 ? 'Choose at least 2 players.' : h < 1 ? 'At least one player must be human.' : setupMode === 'quick' && n > 4 ? '' : '';
     $('setup-msg').textContent = msg; $('btn-start').disabled = !!msg;
     $('rules-sum').textContent = rulesSummary();
   }
@@ -962,7 +1011,7 @@
     var S = save.stats, rate = S.played ? Math.round(S.won / S.played * 100) + '%' : '–', lv = L.levelFromXp(save.xp);
     var cells = [['Level', lv.level], ['XP', save.xp], ['Matches', S.played], ['Wins', S.won], ['Win rate', rate], ['Captures', S.captures], ['Tokens home', S.home], ['Sixes rolled', S.sixes],
       ['Wins vs Easy', S.vs.easy[1] + ' / ' + S.vs.easy[0]], ['Wins vs Normal', S.vs.medium[1] + ' / ' + S.vs.medium[0]], ['Wins vs Hard', S.vs.hard[1] + ' / ' + S.vs.hard[0]], ['Mystery events', S.events],
-      ['Mystery wins', S.mystery[1] + ' / ' + S.mystery[0]], ['Lucky Chaos wins', S.lucky[1] + ' / ' + S.lucky[0]], ['1 v 1 wins', S.duel[1] + ' / ' + S.duel[0]], ['4-player wins', S.four[1] + ' / ' + S.four[0]], ['Pass & Play', S.pass]];
+      ['Mystery wins', S.mystery[1] + ' / ' + S.mystery[0]], ['Lucky Chaos wins', (S.lucky||[0,0])[1] + ' / ' + (S.lucky||[0,0])[0]], ['Quick wins', (S.quick||[0,0])[1] + ' / ' + (S.quick||[0,0])[0]], ['Team wins', (S.team||[0,0])[1] + ' / ' + (S.team||[0,0])[0]], ['Arrow wins', (S.arrow||[0,0])[1] + ' / ' + (S.arrow||[0,0])[0]], ['Friendly wins', (S.friendly||[0,0])[1] + ' / ' + (S.friendly||[0,0])[0]], ['1 v 1 wins', S.duel[1] + ' / ' + S.duel[0]], ['4-player wins', S.four[1] + ' / ' + S.four[0]], ['Pass & Play', S.pass]];
     $('stats-body').innerHTML = cells.map(function (c) { return '<div><b>' + c[1] + '</b><span>' + c[0] + '</span></div>'; }).join('');
   }
   var skinTab = 'boards';
@@ -990,7 +1039,7 @@
     });
   }
   var SETTINGS = ['sound', 'haptics', 'auto', 'undo', 'timer', 'chat', 'fast'];
-  var RULE_KEYS = ['safeSquares', 'captureToEnter', 'blocks', 'bonusOnCapture', 'bonusOnHome'];
+  var RULE_KEYS = ['safeSquares', 'captureToEnter', 'blocks', 'bonusOnCapture', 'bonusOnHome', 'arrows', 'noCapture'];
   function syncSettingsUI() {
     SETTINGS.forEach(function (k) { $('set-' + k).checked = !!save.settings[k]; });
     RULE_KEYS.forEach(function (k) { $('rule-' + k).checked = !!save.rules[k]; });
@@ -1020,7 +1069,13 @@
   $('btn-vs-ai').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('ai', 'classic'); });
   $('btn-mystery').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('ai', 'mystery'); });
   $('btn-lucky').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('ai', 'lucky'); });
-  $('btn-howto').addEventListener('click', function () { SFX.click(); openRules('lucky'); });
+  $('btn-howto').addEventListener('click', function () { SFX.click(); openRules(setupMode === 'lucky' ? 'lucky' : 'modes'); });
+  [['btn-quick', 'quick'], ['btn-team', 'team'], ['btn-arrow', 'arrow'], ['btn-friendly', 'friendly']].forEach(function (x) {
+    $(x[0]).addEventListener('click', function () {
+      SFX.unlock(); SFX.click(); showSetup('ai', x[1]);
+      if (x[1] === 'team' && save.setup.ai.filter(Boolean).length !== 4) applyPreset('4');
+    });
+  });
   // Lucky Chaos: stored powers and the Mega Wheel (buttons live in the active player's pod)
   $('stage').addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('.pw, .mega-btn') : null;
@@ -1059,7 +1114,7 @@
   $('btn-chat').addEventListener('click', function () { SFX.click(); if (isOpen('chat')) hide('chat'); else show('chat'); });
   $('btn-home').addEventListener('click', function () { SFX.click(); hide('chat'); openMenu(); });
   $('btn-m-resume').addEventListener('click', function () { SFX.click(); resumeFromMenu(); });
-  $('btn-m-rules').addEventListener('click', function () { SFX.click(); openRules(G && G.st.mode === 'mystery' ? 'mystery' : G && G.st.mode === 'lucky' ? 'lucky' : 'basics'); });
+  $('btn-m-rules').addEventListener('click', function () { SFX.click(); openRules(G && G.st.mode === 'mystery' ? 'mystery' : G && G.st.mode === 'lucky' ? 'lucky' : G && ['quick','team','arrow','friendly'].indexOf(G.st.mode) >= 0 ? 'modes' : 'basics'); });
   $('btn-m-home').addEventListener('click', function () { SFX.click(); hide('menu'); showHome(); });
   $('btn-m-restart').addEventListener('click', function () { SFX.click(); hide('menu'); askConfirm('Restart the match?', 'The current match starts again with the same players.', 'Restart', function () { startMatch(G.seats, G.mode); }); });
   $('btn-r-again').addEventListener('click', function () { leaveResult('again'); });

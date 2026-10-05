@@ -1,7 +1,7 @@
-# Crossfour: Offline Ludo — Rules (v1.2)
+# Crossfour: Offline Ludo — Rules (v1.3)
 
 The same rules are shown in the game (**Rules** on the home screen or in the match menu). The rules engine is
-`www/js/logic.js` and every rule below is covered by `test/logic.test.js`.
+`www/js/logic.js` and every rule below is covered by `test/logic.test.js`, `test/lucky.test.js` and `test/modes13.test.js`.
 
 These rules follow standard Ludo (Pachisi family): 4 tokens per player, 6 to leave base, a 52-square
 shared track, a private 5-square home column and an exact roll to finish. Crossfour then adds the
@@ -194,6 +194,33 @@ About 9.5 Mega spins and 2.4 Kings per 1 v 1 game (27 and 10 in 4-player games).
 
 There is **no entry fee, stake or bet** in Lucky Chaos Ludo (or anywhere in the game). The wheels only
 change the board; they never award or cost coins. Finishing a match awards cosmetic coins and XP only.
+
+## Quick, Team, Arrow and Friendly (new in v1.3)
+
+Classic, Mystery Tiles and Lucky Chaos Ludo are unchanged. These modes use the same board and the same core rules
+(6 to leave base, exact roll to reach home, safe squares unless you turn them off).
+
+**Quick Ludo.** Two tokens per player instead of four, on the same 52-square track. 1 v 1 or more, vs computer or
+pass & play. In 300 simulated 1 v 1 games the average was about 86 rolls (a 4-token 1 v 1 is about 170).
+
+**Team Ludo (2v2).** All four corners play. Partners sit opposite: Coral with Saffron (team A), Jade with Cobalt
+(team B). A team wins when **both** partners have every token home, and both partners share that win. You cannot
+capture your partner, and a partner's block does not stop you. Pass & play, or you with a computer partner against
+two computers, or four computers. An opponent who finishes their own tokens first does not win the match.
+
+**Arrow Ludo.** Eight amber one-way arrows on the track (squares 2, 7, 15, 20, 28, 33, 41 and 46), always pointing
+clockwise, which is the only direction tokens move. Stepping onto an arrow, whether the die **lands** there or
+**passes through**, carries the token one extra square clockwise. You cannot choose to stop on an arrow. If that
+extra square is blocked, or the ride would overshoot home, the token stays on the arrow. The home column has no
+arrows. The same arrows are a house rule ("Arrow tiles") and can be turned on for Classic too.
+
+**Friendly.** Captures are off: landing on a rival does nothing. It is a pure race home. The same switch is the
+house rule "No captures". The app stays **13+** even in this mode.
+
+Two extra board themes, **Midnight** (dark) and **Classic Wood**, are free. Coins stay cosmetic: there is no
+coin shop for these themes and no purchases. The win screen shows how many token moves were played and how long
+the match took. The selected token is highlighted, and the squares of the last move stay lit until the next move.
+Haptics on the dice landing and on a capture follow the Haptics setting, which is on by default.
 
 ## Computer players
 

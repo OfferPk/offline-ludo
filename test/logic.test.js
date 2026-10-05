@@ -18,7 +18,7 @@ t('track geometry: 52 unique track cells, 4 home columns of 5, start/star square
   assert.strictEqual(L.absOf(1, 0), 13); assert.strictEqual(L.posFromAbs(1, 13), 0); assert.strictEqual(L.posFromAbs(3, 2), 15);
 });
 t('default rules: Star style, safe squares on, capture-to-enter off, blocks off, capture & home bonus on', () => {
-  assert.deepStrictEqual(L.normRules({}), { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true });
+  assert.deepStrictEqual(L.normRules({}), { rollStyle: 'star', safeSquares: true, captureToEnter: false, blocks: false, bonusOnCapture: true, bonusOnHome: true, arrows: false, noCapture: false });
   assert.strictEqual(L.normRules({ rollStyle: 'x' }).rollStyle, 'star');
 });
 t('needs at least two players', () => { assert.throws(() => L.newGame([H, null, null, null], {}, 1)); });

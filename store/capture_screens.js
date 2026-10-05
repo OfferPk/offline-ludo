@@ -20,6 +20,10 @@ const baseSave = extra => Object.assign({
   await page.emulate({ viewport: { width: 360, height: 640, deviceScaleFactor: 3, isMobile: true, hasTouch: true }, userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) Mobile' });
   const errors = []; page.on('pageerror', e => errors.push(e.message)); page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   const ev = (fn, ...a) => page.evaluate(fn, ...a);
+  async function tap(sel) {
+    await page.evaluate(q => { const e = document.querySelector(q); if (!e) throw new Error('missing ' + q); e.scrollIntoView({ block: 'center' }); }, sel);
+    await page['tap'](sel);
+  }
   const shot = async n => { await page.screenshot({ path: `${OUT}/${n}.png` }); console.log('shot', n); };
   const waitFor = (fn, ms, ...a) => page.waitForFunction(fn, { timeout: ms || 15000, polling: 50 }, ...a);
   const humanIdle = (phase) => waitFor(ph => { const c = window.__cf, g = c.game; return g && !c.busy && g.st.seats[g.st.turn].type === 'human' && g.st.phase === ph && document.getElementById('wheel').classList.contains('hidden'); }, 20000, phase);
@@ -33,10 +37,10 @@ const baseSave = extra => Object.assign({
     await page.goto(URL, { waitUntil: 'networkidle0' }); await sleep(300);
   }
   async function start(btn, preset, mode) {
-    await page.tap(btn); await sleep(250);
+    await tap(btn); await sleep(250);
     if (mode) await ev(m => { const b = document.querySelector('#mode-seg [data-v="' + m + '"], [data-mode="' + m + '"]'); if (b) b.click(); }, mode);
     if (preset) await ev(p => document.querySelector('#presets [data-p="' + p + '"]').click(), preset);
-    await sleep(100); await page.tap('#btn-start'); await sleep(500);
+    await sleep(100); await tap('#btn-start'); await sleep(500);
   }
   const RESET = 'st.queue=[]; st.phase="roll"; st.sixes=0; st.bonus=0; st.turn=3; st.tiles && st.tiles.forEach(t => { t.until = 0; });';
 
@@ -78,13 +82,13 @@ const baseSave = extra => Object.assign({
   await humanIdle('roll');
   await edit('st.pieces=[[-1,-1,-1,-1],[5,27,-1,-1],[-1,-1,-1,-1],[9,33,-1,-1]]; st.effects=[{type:"shield",seat:3,piece:1,at:st.turnCount},{type:"freeze",seat:1,piece:0,at:st.turnCount}];' + RESET);
   await humanIdle('roll');
-  await page.tap('#btn-chat'); await sleep(200);
+  await tap('#btn-chat'); await sleep(200);
   await ev(() => document.querySelector('#chat-phrases button').click());
   await waitFor(() => { const b = document.querySelector('.pod[data-seat="1"] .bubble'); return b && !b.classList.contains('hidden'); }, 8000); await sleep(150);
   await shot('4-chat');
 
   // 5) Settings: house rules
-  await load(baseSave()); await page.tap('#btn-settings'); await sleep(300);
+  await load(baseSave()); await tap('#btn-settings'); await sleep(300);
   await ev(() => { const p = document.querySelector('#settings .panel'); p.scrollTop = p.scrollHeight; }); await sleep(200);
   await shot('5-rules');
 
@@ -122,6 +126,28 @@ const baseSave = extra => Object.assign({
   await ev(() => document.querySelector('.pod[data-seat="3"] .mega-btn').click());
   await waitFor(() => /\w/.test(document.getElementById('wheel-result').textContent) && !document.getElementById('wheel').classList.contains('hidden'), 8000); await sleep(200);
   await shot('10-lucky-mega');
+
+  // 11) Quick Ludo: 2 tokens and a highlighted last move
+  await load(baseSave());
+  await start('#btn-quick', '1v1', 'quick');
+  await humanIdle('roll');
+  await edit('st.pieces=[[-1,-1],[6,-1],[-1,-1],[10,-1]];' + RESET);
+  await humanIdle('roll');
+  await ev(() => window.__cf.force([3]));
+  await roll(3); await humanIdle('move'); await noUndo();
+  await tapPiece(3, 0);
+  await waitFor(() => !window.__cf.busy && window.__cf.game.st.pieces[3][0] === 13, 8000);
+  await sleep(250);
+  await shot('11-quick');
+
+  // 12) Team Ludo: 2v2, partners opposite
+  await load(baseSave());
+  await start('#btn-team', '4', 'team');
+  await humanIdle('roll');
+  await edit('st.pieces=[[6,18,-1,-1],[4,22,-1,-1],[9,30,-1,-1],[3,14,-1,-1]]; st.faces=[2,5,3,4];' + RESET);
+  await humanIdle('roll');
+  await sleep(300);
+  await shot('12-team');
 
   // 8) home
   await load(baseSave()); await sleep(200); await shot('8-home');

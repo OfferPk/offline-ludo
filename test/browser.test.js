@@ -32,6 +32,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   const idleHuman = (phase, seat) => waitFor((ph, se) => { const c = window.__cf, g = c.game; return g && !c.busy && !c.paused && g.st.turn === (se == null ? g.st.turn : se) && g.st.seats[g.st.turn].type === 'human' && g.st.phase === ph && !document.querySelector('#wheel:not(.hidden)'); }, 20000, 'human ' + phase, phase, seat);
   const st = () => ev(() => { const g = window.__cf.game; return g ? JSON.parse(JSON.stringify(g.st)) : null; });
   async function tapPiece(seat, i) { const p = await ev((s, k) => window.__cf.piecePoint(s, k), seat, i); await page.touchscreen.tap(p.x, p.y); }
+  async function tap(sel){ await page.evaluate(q=>{ const e=document.querySelector(q); if(!e) throw new Error('missing '+q); e.scrollIntoView({block:'center'}); }, sel); await page.tap(sel); }
   const roll = seat => ev(s => document.querySelector('.pod[data-seat="' + s + '"] .pdice').click(), seat);
   const chip = (seat, v) => ev((s, x) => document.querySelector('.pod[data-seat="' + s + '"] .chip-v[data-v="' + x + '"]').click(), seat, v);
   const chips = seat => ev(s => [...document.querySelectorAll('.pod[data-seat="' + s + '"] .chip-v')].map(c => +c.dataset.v), seat);
@@ -43,27 +44,27 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(await visible('#home') && !(await visible('#btn-continue')), 'home on launch, nothing to continue');
   ok(await visible('#btn-mystery'), 'Mystery Tiles mode on home screen');
   ok((await ev(() => window.__cf.gate.state.sessions)) === 1, 'first session counted');
-  ok(/1\.2\.0/.test(await ev(() => document.body.innerText + document.documentElement.innerHTML)), 'version 1.2.0 in page');
+  ok(/1\.3\.0/.test(await ev(() => document.body.innerText + document.documentElement.innerHTML)), 'version 1.3.0 in page');
   await page.screenshot({ path: OUT + '/cf-home.png' });
 
   // ---------- rules & settings ----------
-  await page.tap('#btn-rules'); await sleep(200);
+  await tap('#btn-rules'); await sleep(200);
   ok(await visible('#rules'), 'rules screen opens');
   await ev(() => document.querySelector('#rules-tabs [data-tab="mystery"]').click()); await sleep(100);
   ok(await ev(() => document.querySelectorAll('#ev-boost .ev').length === 6 && document.querySelectorAll('#ev-chaos .ev').length === 6), 'rules list 6 boost + 6 chaos events');
   await ev(() => document.querySelector('#rules [data-close="rules"]').click()); await sleep(150);
-  await page.tap('#btn-settings'); await sleep(200);
+  await tap('#btn-settings'); await sleep(200);
   ok(await visible('#settings') && await ev(() => !!document.getElementById('rule-captureToEnter') && !!document.getElementById('rule-blocks') && document.querySelector('#rule-style .on').dataset.v === 'star'), 'settings: house rules, Star style default');
   ok(await ev(() => document.getElementById('set-undo').checked && !document.getElementById('set-timer').checked), 'undo on, turn timer off by default');
   await ev(() => document.querySelector('#settings [data-close="settings"]').click()); await sleep(150);
 
   // ---------- 1 v 1 vs Hard computer ----------
-  await page.tap('#btn-vs-ai'); await sleep(200);
+  await tap('#btn-vs-ai'); await sleep(200);
   ok(await visible('#setup'), 'setup screen');
   await ev(() => document.querySelector('#presets [data-p="1v1"]').click()); await sleep(100);
   await ev(() => document.querySelector('.seg button[data-seat="1"][data-v="hard"]').click()); await sleep(100);
   ok(!(await ev(() => document.getElementById('btn-start').disabled)), '1 v 1: You (Cobalt) vs Jade (Hard) is valid');
-  await page.tap('#btn-start'); await sleep(500);
+  await tap('#btn-start'); await sleep(500);
   ok(await visible('#game') && await visible('#board'), 'match started, board drawn');
   let s = await st();
   ok(s.v === 2 && s.players.join() === '1,3' && s.seats[1].level === 'hard' && s.seats[3].type === 'human' && s.mode === 'classic', '2 players on opposite corners: Jade Hard AI, Cobalt human');
@@ -96,7 +97,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(s.queue.join() === '6,6,3' && (await chips(3)).join() === '6,6,3', 'queue 6,6,3 shown as dice chips on the human pod');
   // ---------- undo dice roll ----------
   ok(await ev(() => window.__cf.undoActive), 'undo window open after the roll');
-  await page.tap('#btn-undo'); await sleep(200);
+  await tap('#btn-undo'); await sleep(200);
   await idleHuman('roll', 3); s = await st();
   ok(s.queue.join() === '6,6' && s.phase === 'roll' && (await ev(() => window.__cf.game.undoLeft)) === 2, 'undo took back the 3 (6,6 kept), 2 free undos left');
   await ev(() => window.__cf.force([4]));
@@ -118,11 +119,11 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await page.screenshot({ path: OUT + '/cf-duel.png' });
 
   // ---------- quick chat ----------
-  await page.tap('#btn-chat'); await sleep(150);
+  await tap('#btn-chat'); await sleep(150);
   ok(await visible('#chat'), 'quick chat panel opens');
   await ev(() => document.querySelector('#chat-emotes button').click()); await sleep(150);
   ok(await ev(() => { const b = document.querySelector('.pod[data-seat="3"] .bubble'); return b && !b.classList.contains('hidden') && !!b.querySelector('svg'); }), 'emote bubble shows at the human pod');
-  if (await visible('#chat')) await page.tap('#btn-chat');
+  if (await visible('#chat')) await tap('#btn-chat');
 
   // ---------- triple 6 forfeits the whole queue ----------
   await idleHuman('roll', 3);
@@ -153,14 +154,14 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(await ev(() => /\+\d+/.test(document.getElementById('r-coins').textContent) && /\+\d+/.test(document.getElementById('r-xp').textContent)), 'cosmetic coins and XP awarded');
   ok((await ev(() => window.__cf.gate.state.matchesCompleted)) === 1, 'match counted once for the ad gate');
   await page.screenshot({ path: OUT + '/cf-result.png' });
-  await page.tap('#btn-r-home'); await sleep(300);
+  await tap('#btn-r-home'); await sleep(300);
   ok(await visible('#home'), 'result -> home (no interstitial on first matches)');
 
   // ---------- Mystery Tiles, 4 players ----------
-  await page.tap('#btn-mystery'); await sleep(200);
+  await tap('#btn-mystery'); await sleep(200);
   ok(await ev(() => document.querySelector('#mode-seg .on, [data-mode].on') ? true : true) && await visible('#setup'), 'Mystery Tiles setup');
   await ev(() => document.querySelector('#presets [data-p="4"]').click()); await sleep(100);
-  await page.tap('#btn-start'); await sleep(600);
+  await tap('#btn-start'); await sleep(600);
   s = await st();
   ok(s.mode === 'mystery' && s.players.length === 4 && s.tiles.length === 8, 'mystery match: 4 players, 8 mystery tiles');
   ok(await ev(() => document.querySelectorAll('#tiles .tile').length === 8 && document.querySelectorAll('.pod:not(.empty)').length === 4), '8 tiles drawn, 4 player pods with their own dice');
@@ -210,21 +211,21 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await waitFor(() => { const g = window.__cf.game; return g.st.turn !== 3; }, 8000, 'computers take turns');
   await idleHuman('roll', 3);
   ok(true, 'computers played their mystery turns without errors');
-  await page.tap('#btn-home'); await sleep(200);
-  await page.tap('#btn-m-home'); await sleep(300);
+  await tap('#btn-home'); await sleep(200);
+  await tap('#btn-m-home'); await sleep(300);
 
   // ---------- Lucky Chaos Ludo, 4 players ----------
   ok(await visible('#btn-lucky') && /Lucky Chaos Ludo/.test(await ev(() => document.getElementById('btn-lucky').textContent)), 'Lucky Chaos Ludo on home screen');
-  await page.tap('#btn-lucky'); await sleep(200);
+  await tap('#btn-lucky'); await sleep(200);
   ok(await visible('#setup') && (await ev(() => document.getElementById('setup-title').textContent)) === 'Lucky Chaos Ludo' && await ev(() => document.querySelector('#mode-seg [data-mode="lucky"]').classList.contains('on')), 'Lucky Chaos setup selected');
   ok(await visible('#btn-howto'), 'How to play button in Lucky Chaos setup');
-  await page.tap('#btn-howto'); await sleep(200);
+  await tap('#btn-howto'); await sleep(200);
   ok(await visible('#rules') && await ev(() => !document.querySelector('.rules-page[data-page="lucky"]').classList.contains('hidden') && document.querySelectorAll('#ev-lboost .ev').length === 6 && document.querySelectorAll('#ev-lchaos .ev').length === 6 && document.querySelectorAll('#ev-mega .ev').length === 6), 'in-game How to play: Boost, Chaos and Mega wheels listed');
   ok(await ev(() => /High Risk \/ High Reward/.test(document.querySelector('.rules-page[data-page="lucky"]').textContent)), 'How to play explains Danger tiles');
   await ev(() => document.querySelector('#rules [data-close="rules"]').click()); await sleep(150);
   await ev(() => document.querySelector('#presets [data-p="4"]').click()); await sleep(100);
-  await page.tap('#btn-start'); await sleep(300);
-  if (await visible('#confirm')) { await page.tap('#confirm-yes'); await sleep(400); }
+  await tap('#btn-start'); await sleep(300);
+  if (await visible('#confirm')) { await tap('#confirm-yes'); await sleep(400); }
   s = await st();
   ok(s.mode === 'lucky' && s.players.length === 4 && s.tiles.length === 12 && !!s.lk, 'lucky match: 4 players, 12 special tiles');
   ok(await ev(() => document.querySelectorAll('#tiles .tile.boost').length === 4 && document.querySelectorAll('#tiles .tile.chaos').length === 4 && document.querySelectorAll('#tiles .tile.danger').length === 4), '4 Boost, 4 Chaos and 4 Danger tiles drawn');
@@ -329,18 +330,18 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   await waitFor(() => { const g = window.__cf.game; return g.st.turn === 3 && !window.__cf.busy; }, 40000, 'back to the human');
   s = await st();
   ok(s.lk.charge[0] < 5 && s.lk.charge[1] < 5 && s.lk.charge[2] < 5, 'computer players spent their Mega Wheels');
-  await page.tap('#btn-home'); await sleep(200);
-  await page.tap('#btn-m-home'); await sleep(300);
+  await tap('#btn-home'); await sleep(200);
+  await tap('#btn-m-home'); await sleep(300);
 
   // ---------- Pass & Play with Classic house rule ----------
-  await page.tap('#btn-settings'); await sleep(200);
+  await tap('#btn-settings'); await sleep(200);
   await ev(() => document.querySelector('#rule-style [data-v="classic"]').click()); await sleep(100);
   await ev(() => document.querySelector('#settings [data-close="settings"]').click()); await sleep(150);
-  await page.tap('#btn-pass'); await sleep(200);
+  await tap('#btn-pass'); await sleep(200);
   ok(await ev(() => /Classic/.test(document.getElementById('rules-sum').textContent)), 'setup shows Classic house rule');
   await ev(() => document.querySelector('#presets [data-p="1v1"]').click()); await sleep(100);
-  await page.tap('#btn-start'); await sleep(300);
-  if (await visible('#confirm')) { await page.tap('#confirm-yes'); await sleep(400); }
+  await tap('#btn-start'); await sleep(300);
+  if (await visible('#confirm')) { await tap('#confirm-yes'); await sleep(400); }
   s = await st();
   ok(s.players.every(p => s.seats[p].type === 'human') && s.rules.rollStyle === 'classic', 'pass & play: all human seats, classic rules');
   await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
@@ -351,6 +352,52 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   s = await st();
   ok(s.phase === 'move' && s.queue.join() === '6', 'classic: a 6 must be moved before rolling again');
   await page.screenshot({ path: OUT + '/cf-pass.png' });
+
+  // ---------- v1.3 Quick, Team, rules ----------
+  await tap('#btn-home'); await sleep(150); await tap('#btn-m-home'); await sleep(250);
+  await tap('#btn-quick'); await sleep(250);
+  ok((await ev(() => document.getElementById('setup-title').textContent)) === 'Quick Ludo', 'Quick Ludo setup');
+  await ev(() => document.querySelector('#presets [data-p="1v1"]').click()); await sleep(80);
+  await tap('#btn-start'); await sleep(300);
+  if (await visible('#confirm')) { await tap('#confirm-yes'); await sleep(400); }
+  s = await st();
+  ok(s.mode === 'quick' && s.pieces[3].length === 2, 'quick match: 2 tokens per player');
+  ok(await ev(() => document.querySelectorAll('#pieces .pc').length === 4), '1v1 quick draws 4 tokens');
+  await ev(() => { const c = window.__cf.save.settings; c.fast = true; c.auto = false; });
+  await edit('st.pieces[3]=[10,-1]; st.queue=[]; st.phase="roll"; st.sixes=0; st.bonus=0; st.turn=3;');
+  await idleHuman('roll', 3);
+  await ev(() => window.__cf.force([3]));
+  await roll(3); await idleHuman('move', 3); await waitUndoGone();
+  await tapPiece(3, 0);
+  await waitFor(() => !window.__cf.busy && window.__cf.game.st.pieces[3][0] === 13, 8000, 'quick move');
+  ok(await ev(() => !!document.querySelector('#pieces .pc.last') && document.querySelectorAll('#trail .trail').length >= 1), 'last move highlights the token and the squares');
+  await page.screenshot({ path: OUT + '/cf-quick.png' });
+  await tap('#btn-home'); await sleep(150); await tap('#btn-m-home'); await sleep(250);
+
+  await tap('#btn-team'); await sleep(400);
+  ok((await ev(() => document.getElementById('setup-title').textContent)) === 'Team Ludo', 'Team Ludo setup');
+  await ev(() => document.querySelector('#presets [data-p="4"]').click()); await sleep(80);
+  await tap('#btn-start'); await sleep(200);
+  if (await visible('#confirm')) { await tap('#confirm-yes'); await sleep(400); }
+  s = await st();
+  ok(s.mode === 'team' && s.players.length === 4, 'team match is 2v2');
+  ok(await ev(() => document.querySelectorAll('.pod:not(.empty) .team').length === 4), 'team badge on every pod');
+  await ev(() => window.__cf.edit(st => { st.pieces=[[6,18,-1,-1],[4,22,-1,-1],[9,30,-1,-1],[3,14,-1,-1]]; st.faces=[2,5,3,4]; st.queue=[]; st.phase='roll'; st.sixes=0; st.bonus=0; st.turn=3; }));
+  await idleHuman('roll', 3); await sleep(200);
+  await page.screenshot({ path: OUT + '/cf-team.png' });
+  await tap('#btn-home'); await sleep(150); await tap('#btn-m-home'); await sleep(250);
+
+  await tap('#btn-rules'); await sleep(150);
+  await ev(() => document.querySelector('#rules-tabs [data-tab="modes"]').click()); await sleep(80);
+  ok(/Quick Ludo/.test(await ev(() => document.querySelector('.rules-page[data-page="modes"]').textContent)) && /Arrow Ludo/.test(await ev(() => document.querySelector('.rules-page[data-page="modes"]').textContent)), 'in-game rules cover the new modes');
+  await ev(() => document.querySelector('#rules [data-close="rules"]').click()); await sleep(100);
+
+  await tap('#btn-arrow'); await sleep(200);
+  ok(/one-way/.test(await ev(() => document.getElementById('mode-note').textContent)), 'Arrow setup explains one-way tiles');
+  await tap('#btn-setup-back'); await sleep(150);
+  await tap('#btn-friendly'); await sleep(200);
+  ok(/captures are off/i.test(await ev(() => document.getElementById('mode-note').textContent)), 'Friendly setup says captures are off');
+  await tap('#btn-setup-back'); await sleep(150);
 
   ok(errors.length === 0, 'no console errors / failed requests' + (errors.length ? ': ' + errors.join(' | ') : ''));
   console.log(`\n${n} checks passed`);
