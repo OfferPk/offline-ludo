@@ -299,7 +299,7 @@
     // soft drop shadow under the board (drawn into canvas so canvas box-shadow can stay light)
     ctx.save();
     rr(ctx, c * 0.12, c * 0.22, sz - c * 0.24, sz - c * 0.18, c * 0.75);
-    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = c * 1.1; ctx.shadowOffsetY = c * 0.18; ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,.32)'; ctx.shadowColor = 'rgba(0,0,0,.52)'; ctx.shadowBlur = c * 1.25; ctx.shadowOffsetY = c * 0.22; ctx.fill();
     ctx.restore();
     paintBoardTexture(ctx, sz, b, c);
     ctx.save(); ctx.translate(sz / 2, sz / 2); ctx.rotate((view || 0) * Math.PI / 2); ctx.translate(-sz / 2, -sz / 2);
@@ -310,16 +310,16 @@
       g.addColorStop(0, mix(col, 'w', 0.16)); g.addColorStop(0.45, col); g.addColorStop(1, mix(col, 'b', 0.22));
       rr(ctx, x + gap * 1.6, y + gap * 1.6, 6 * c - gap * 3.2, 6 * c - gap * 3.2, c * 0.55);
       ctx.fillStyle = g; ctx.fill();
-      ctx.lineWidth = Math.max(1.5, c * 0.06); ctx.strokeStyle = alpha(mix(col, 'w', 0.4), 0.45); ctx.stroke();
+      ctx.lineWidth = Math.max(1.7, c * 0.07); ctx.strokeStyle = alpha(mix(col, 'w', 0.48), 0.55); ctx.stroke();
       rr(ctx, x + c * 0.9, y + c * 0.9, 4.2 * c, 4.2 * c, c * 0.48);
-      var yard = ctx.createRadialGradient(x + 3 * c, y + 2.6 * c, c * 0.4, x + 3 * c, y + 3 * c, c * 3.2);
-      yard.addColorStop(0, mix(b.center, 'w', 0.08)); yard.addColorStop(1, b.center);
+      var yard = ctx.createRadialGradient(x + 2.7 * c, y + 2.4 * c, c * 0.35, x + 3 * c, y + 3 * c, c * 3.2);
+      yard.addColorStop(0, mix(b.center, 'w', 0.14)); yard.addColorStop(0.55, b.center); yard.addColorStop(1, mix(b.center, 'b', 0.12));
       ctx.fillStyle = yard; ctx.fill();
-      ctx.lineWidth = Math.max(1, c * 0.045); ctx.strokeStyle = rgba(col, 0.35); ctx.stroke();
+      ctx.lineWidth = Math.max(1.2, c * 0.05); ctx.strokeStyle = rgba(col, 0.42); ctx.stroke();
       L.BASE_SPOTS[s].forEach(function (p) {
         var cx = (p[1] + 0.5) * c, cy = (p[0] + 0.5) * c;
-        ctx.beginPath(); ctx.arc(cx, cy + c * 0.04, c * 0.5, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(0,0,0,.16)'; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy + c * 0.05, c * 0.52, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fill();
         ctx.beginPath(); ctx.arc(cx, cy, c * 0.48, 0, Math.PI * 2);
         var nest = ctx.createRadialGradient(cx - c * 0.12, cy - c * 0.14, c * 0.05, cx, cy, c * 0.48);
         nest.addColorStop(0, rgba(col, 0.32)); nest.addColorStop(1, rgba(col, 0.12));
@@ -334,12 +334,12 @@
       var x = rc[1] * c + gap / 2, y = rc[0] * c + gap / 2, w = c - gap, h = c - gap;
       if (raised) {
         ctx.save();
-        rr(ctx, x + 0.6, y + 1.1, w, h, c * 0.18); ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fill();
+        rr(ctx, x + 0.7, y + 1.35, w, h, c * 0.18); ctx.fillStyle = 'rgba(0,0,0,.24)'; ctx.fill();
         ctx.restore();
       }
       rr(ctx, x, y, w, h, c * 0.18); ctx.fillStyle = fill; ctx.fill();
       if (edge) {
-        ctx.lineWidth = Math.max(1, c * 0.045); ctx.strokeStyle = edge; ctx.stroke();
+        ctx.lineWidth = Math.max(1.15, c * 0.05); ctx.strokeStyle = edge; ctx.stroke();
         ctx.save();
         rr(ctx, x + 0.8, y + 0.8, w - 1.6, h - 1.6, c * 0.14);
         ctx.strokeStyle = alpha(mix(fill.indexOf('rgb') === 0 ? b.cell : (fill[0] === '#' ? fill : b.cell), 'w', 0.5), 0.22);
@@ -361,9 +361,9 @@
         ctx.beginPath(); ctx.moveTo(-c * 0.18, -c * 0.2); ctx.lineTo(c * 0.12, 0); ctx.lineTo(-c * 0.18, c * 0.2);
         ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.stroke(); ctx.restore();
       } else if (isStar) {
-        star(ctx, cx + 0.4, cy + 0.7, c * 0.3, c * 0.13);
-        ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fill();
-        star(ctx, cx, cy, c * 0.3, c * 0.13);
+        star(ctx, cx + 0.45, cy + 0.8, c * 0.32, c * 0.14);
+        ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
+        star(ctx, cx, cy, c * 0.32, c * 0.14);
         if (rules && rules.safeSquares) {
           var sg = ctx.createRadialGradient(cx - c * 0.06, cy - c * 0.08, c * 0.02, cx, cy, c * 0.3);
           sg.addColorStop(0, mix(b.muted, 'w', 0.7)); sg.addColorStop(1, rgba(b.muted.length === 7 ? b.muted : '#888888', 0.98));
@@ -376,14 +376,17 @@
       if (rules && rules.arrows && L.ARROW_SQUARES.indexOf(a) >= 0) {
         ctx.save(); ctx.translate(cx, cy);
         var nx2 = L.TRACK_CELLS[(a + 1) % 52]; ctx.rotate(Math.atan2(nx2[0] - rc[0], nx2[1] - rc[1]));
-        // plate behind the glyph so it stays readable on every theme
-        rr(ctx, -c * 0.32, -c * 0.28, c * 0.64, c * 0.56, c * 0.12);
-        ctx.fillStyle = alpha(mix(b.cell, 'b', b.dark ? 0.15 : 0.08), 0.72); ctx.fill();
+        // soft plate + clearer chevron so one-way tiles read at a glance
+        rr(ctx, -c * 0.34, -c * 0.3, c * 0.68, c * 0.6, c * 0.14);
+        ctx.fillStyle = alpha(mix(b.cell, b.dark ? 'w' : 'b', b.dark ? 0.12 : 0.1), 0.78); ctx.fill();
+        ctx.lineWidth = Math.max(1, c * 0.04); ctx.strokeStyle = alpha('#f0b429', 0.35); ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(-c * 0.2, -c * 0.18); ctx.lineTo(c * 0.2, 0); ctx.lineTo(-c * 0.2, c * 0.18);
-        ctx.lineTo(-c * 0.08, 0); ctx.closePath();
-        ctx.fillStyle = '#f0b429'; ctx.fill();
-        ctx.lineWidth = Math.max(1.2, c * 0.05); ctx.strokeStyle = 'rgba(40,24,0,.7)'; ctx.stroke();
+        ctx.moveTo(-c * 0.22, -c * 0.2); ctx.lineTo(c * 0.24, 0); ctx.lineTo(-c * 0.22, c * 0.2);
+        ctx.lineTo(-c * 0.06, 0); ctx.closePath();
+        var ag = ctx.createLinearGradient(-c * 0.2, -c * 0.15, c * 0.22, c * 0.1);
+        ag.addColorStop(0, '#ffe08a'); ag.addColorStop(0.45, '#f0b429'); ag.addColorStop(1, '#c48410');
+        ctx.fillStyle = ag; ctx.fill();
+        ctx.lineWidth = Math.max(1.3, c * 0.055); ctx.strokeStyle = 'rgba(40,24,0,.78)'; ctx.stroke();
         ctx.restore();
       }
     });
@@ -1371,7 +1374,7 @@
     var entering = !isOpen('result');
     var teamWin = st.mode === 'team', tName = function (seat) { return L.teamOf(seat) ? 'Jade & Cobalt' : 'Coral & Saffron'; };
     $('r-title').textContent = teamWin ? (tName(winner) + ' win') : single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
-    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: each player starts with 1 token already on their start square (no 6 needed for that token). Amber one-way tiles on board number 4: land on or pass and ride one extra square clockwise.', friendly: 'FRIENDLY · ' };
+    var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: 1 token starts on the board. One-way tiles ride +1 clockwise (no chaining, no capture from a forced ride). Arrow tiles are safe. When behind, a 5 also leaves base.', friendly: 'FRIENDLY · ' };
     $('r-kicker').textContent = (MODE_KICK[st.mode] || '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
     var sec = Math.round((G.elapsed || 0) / 1000), mm = Math.floor(sec / 60), ss = sec % 60;
     $('r-meta').textContent = (G.moves || 0) + ' moves · ' + mm + ':' + (ss < 10 ? '0' : '') + ss;
@@ -1445,7 +1448,7 @@
       lucky: 'Lucky Chaos Ludo: Boost & Chaos wheels, Danger tiles, Lucky Streaks, Revenge, a Mega Wheel and King tokens. Pure fun, no stakes: every match is free.',
       quick: 'Quick Ludo: 2 tokens each on the normal board. Same rules (6 to leave base, exact home, safe squares) so matches finish much faster. 1 v 1 or more.',
       team: 'Team Ludo, 2v2. Partners sit opposite: Coral with Saffron, Jade with Cobalt. A team wins when both partners have every token home. You cannot capture your partner.',
-      arrow: 'Arrow Ludo: amber one-way arrows. Stepping onto one carries you one extra square clockwise, whether you land or pass through. You cannot stop on an arrow unless the extra square is blocked.',
+      arrow: 'Arrow Ludo: 1 starter token out. Forced rides never capture; arrow tiles are safe. When behind, a 5 leaves base. Amber one-way tiles on board number 4.',
       friendly: 'Friendly: captures are off. It is a pure race home. The app stays 13+.'
     };
     $('mode-note').textContent = NOTES[setupMode] || 'Classic Ludo on a clean board.';

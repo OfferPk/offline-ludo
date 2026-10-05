@@ -1,6 +1,6 @@
 # Google Play store listing: Crossfour (English, en-US)
 
-Package: `com.offerpk.offlineludo` · Version: 1.5.1 (versionCode 8) · Audience: **13+**
+Package: `com.offerpk.offlineludo` · Version: 1.5.2 (versionCode 9) · Audience: **13+**
 
 Copy each block below into **Play Console → Grow users → Store presence → Main store listing**.
 Character counts are measured on the exact text inside the code blocks (Python `len()`).
@@ -35,6 +35,9 @@ Offline Ludo: Quick, Team, Arrow and Friendly modes, plus Lucky Chaos.
 
 ```
 Crossfour is a modern take on the classic Ludo board game that works completely offline. Play against computer players, pass one phone around with friends and family, or try the Lucky Chaos Ludo and Mystery Tiles modes, anywhere and without an internet connection.
+
+NEW IN 1.5.2
+• Arrow fair play: forced rides never capture; arrow tiles are safe; trailing players leave base on a 5. Extra board polish.
 
 NEW IN 1.5.1
 • Arrow Ludo starts with 1 token already on the start square (no 6 wait for that token). Extra board and dice polish.

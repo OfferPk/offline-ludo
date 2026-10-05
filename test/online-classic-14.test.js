@@ -40,5 +40,5 @@ ok(/settings: \{ sound: true, haptics: true, auto: true, fast: false, undo: true
 ok(/if \(!save\.settings\.undo\) return;/.test(game), 'turning undo off blocks the undo action, including the ad undo');
 ok(/id="howto-card"/.test(html) && /<th>Rule<\/th><th>Kaise<\/th>/.test(html), 'home screen has the Rule / Kaise table');
 ok(html.indexOf('id="btn-howto-home"') > html.indexOf('id="howto-card"') && html.indexOf('id="btn-howto-home"') < html.indexOf('id="howto-panel"') && /howto-panel hidden/.test(html), 'How to play is inside the Ludo card and opens Rule | Kaise');
-ok(/Online Classic/.test(html) && /One-way tiles/.test(html) && /Arrow start/.test(html) && /Friendly/.test(html), 'the table covers online Classic, arrows and Friendly');
+ok(/Online Classic/.test(html) && /One-way tiles/.test(html) && /Arrow start/.test(html) && /Arrow fair/.test(html) && /Friendly/.test(html), 'the table covers online Classic, arrows and Friendly');
 console.log('\nOnline Classic v1.4.0 checks passed (' + checks + ' checks).');

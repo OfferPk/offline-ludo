@@ -1,3 +1,9 @@
+## v1.5.2 update — Arrow fair play + board polish
+
+- **Upload:** `offline-ludo-v1.5.2.aab` (version 1.5.2, **versionCode 9**), wahi upload key.
+- Arrow: forced ride capture nahi; arrow tiles safe; peeche hon to 5 se bhi base leave. Classic/Lucky/Mystery same.
+- Board lanes / arrows / stars / yards polish only.
+
 ## v1.5.1 update — Arrow start + polish
 
 - **Upload:** `offline-ludo-v1.5.1.aab` (version 1.5.1, **versionCode 8**), wahi upload key.
