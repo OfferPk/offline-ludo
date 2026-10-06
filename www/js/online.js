@@ -584,7 +584,7 @@
       : 'Standard chess rules · Red pieces move first · Select a piece, then a highlighted square.';
     celebrateChessWin(state, room);
     $('online-chess-claim-draw').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || pendingMatchAction || !chess.canClaimDraw(state));
-    $('online-chess-resign').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || !!pendingMatchAction);
+    $('online-chess-resign').classList.toggle('hidden', state.phase !== 'active' || !!pendingMatchAction);
     $('online-chess-promotion').classList.toggle('hidden', !pendingChessPromotion || !!pendingMatchAction);
     board.replaceChildren();
     for (var row = 0; row < 8; row++) {
