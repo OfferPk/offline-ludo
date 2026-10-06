@@ -197,10 +197,27 @@
       }
     }
 
+    function inspectSnapshot(snapshot) {
+      try {
+        if (!validSnapshot(snapshot, version, validate)) return { ok: false, reason: 'invalid-snapshot' };
+        var data = normalize(clone(snapshot.payload));
+        if (!data || !validate(data)) return { ok: false, reason: 'invalid-snapshot' };
+        return { ok: true, data: clone(data), savedAt: snapshot.savedAt };
+      } catch (e) { return { ok: false, reason: 'invalid-snapshot' }; }
+    }
+
+    function importSnapshot(snapshot) {
+      var inspected = inspectSnapshot(snapshot);
+      if (!inspected.ok) return { ok: false, reason: inspected.reason, stage: 'validate' };
+      return save(inspected.data);
+    }
+
     return {
       load: load,
       save: save,
       reset: reset,
+      inspectSnapshot: inspectSnapshot,
+      importSnapshot: importSnapshot,
       get lastKnownGood() { return lastGood ? clone(lastGood) : null; },
       keys: { primary: primaryKey, checkpoint: checkpointKey, legacyV2: legacyV2Key, legacyV1: legacyV1Key },
       version: version

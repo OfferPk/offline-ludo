@@ -151,6 +151,10 @@ See **[`store/LAUNCH-CHECKLIST.md`](store/LAUNCH-CHECKLIST.md)** (it opens with 
 2. `git tag v1.3.1 && git push origin v1.3.1`. CI attaches `offline-ludo-v1.3.1.aab` and `.apk` to a Release.
 3. Upload the `.aab` in Play Console with **Play App Signing** turned on. The CI keystore is your **upload key**.
 
+## Offline backup restore
+
+In **Settings**, choose a compatible Crossfour JSON backup (up to 1 MB) to restore this device's local profile, progression, settings, statistics and saved match. The game validates the file and checkpoints the current save before replacement; it never uploads the backup or changes online account data. Restore is disabled during an online match. Run `npm run test:local-save-restore` for the local browser regression flow.
+
 ## License
 
 [MIT](LICENSE) © 2026 OfferPk. See also the [Privacy Policy](PRIVACY.md).
