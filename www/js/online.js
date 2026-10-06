@@ -36,6 +36,12 @@
   var walletChannel = null;
   var profileChannel = null;
   var historyChannel = null;
+  var HISTORY_PAGE_SIZE = 10;
+  var historyRows = [];
+  var historyHasMore = false;
+  var historyLoadingMore = false;
+  var historyRefreshPending = false;
+  var historyRequestSequence = 0;
   var client = null;
   var sdkLoading = null;
   var nativeCallbackConfigured = false;
@@ -105,6 +111,24 @@
     walletChannel = null;
     profileChannel = null;
     historyChannel = null;
+    historyRequestSequence++;
+    historyRows = [];
+    historyHasMore = false;
+    historyLoadingMore = false;
+    historyRefreshPending = false;
+    var historyList = $('online-history-list');
+    if (historyList) historyList.replaceChildren();
+    var historyEmpty = $('online-history-empty');
+    if (historyEmpty) historyEmpty.classList.remove('hidden');
+    var historyButton = $('online-history-load-more');
+    if (historyButton) {
+      historyButton.classList.add('hidden');
+      historyButton.disabled = false;
+      historyButton.setAttribute('aria-busy', 'false');
+      historyButton.textContent = 'Load more tables';
+    }
+    var historyStatus = $('online-history-more-status');
+    if (historyStatus) { historyStatus.textContent = ''; historyStatus.classList.add('hidden'); }
   }
   function clearRoomSelection(clearStoredState) {
     roomRestoreSequence++;
@@ -297,30 +321,92 @@
       announce('Account data could not be loaded: ' + errorText(error), true);
     });
   }
+  function renderHistoryRows() {
+    var list = $('online-history-list');
+    list.replaceChildren();
+    historyRows.forEach(function (match) {
+      var item = document.createElement('li');
+      var title = document.createElement('b');
+      title.textContent = modeLabel(match.mode) + ' · ' + match.status;
+      var detail = document.createElement('small');
+      detail.textContent = new Date(match.started_at).toLocaleString();
+      item.append(title, detail);
+      list.appendChild(item);
+    });
+    $('online-history-empty').classList.toggle('hidden', historyRows.length > 0);
+    var button = $('online-history-load-more');
+    if (button) {
+      button.classList.toggle('hidden', !historyHasMore);
+      button.disabled = historyLoadingMore;
+      button.setAttribute('aria-busy', historyLoadingMore ? 'true' : 'false');
+      button.textContent = historyLoadingMore ? 'Loading…' : 'Load more tables';
+    }
+    var status = $('online-history-more-status');
+    if (status) {
+      status.textContent = !historyRows.length ? '' : historyLoadingMore
+        ? 'Loading older tables…'
+        : historyHasMore ? 'Showing ' + historyRows.length + ' recent tables.' : 'All ' + historyRows.length + ' tables loaded.';
+      status.classList.toggle('hidden', historyRows.length === 0);
+    }
+  }
   function refreshHistory() {
     if (!client || !currentUser) return Promise.resolve();
+    if (historyLoadingMore) { historyRefreshPending = true; return Promise.resolve(); }
     var requestedUserId = currentUser.id;
+    var requestedSequence = ++historyRequestSequence;
+    var requestedCount = Math.max(HISTORY_PAGE_SIZE, historyRows.length);
     return client.from('match_history')
       .select('id,mode,status,winner_id,started_at,finished_at')
       .order('started_at', { ascending: false })
-      .limit(10)
+      .range(0, requestedCount)
       .then(function (result) {
         if (result.error) throw result.error;
-        if (!currentUser || currentUser.id !== requestedUserId) return;
-        var list = $('online-history-list');
-        list.replaceChildren();
-        (result.data || []).forEach(function (match) {
-          var item = document.createElement('li');
-          var title = document.createElement('b');
-          title.textContent = modeLabel(match.mode) + ' · ' + match.status;
-          var detail = document.createElement('small');
-          detail.textContent = new Date(match.started_at).toLocaleString();
-          item.append(title, detail);
-        list.appendChild(item);
-      });
-      $('online-history-empty').classList.toggle('hidden', !!(result.data && result.data.length));
+        if (requestedSequence !== historyRequestSequence || !currentUser || currentUser.id !== requestedUserId) return;
+        var data = Array.isArray(result.data) ? result.data : [];
+        historyRows = data.slice(0, requestedCount);
+        historyHasMore = data.length > requestedCount;
+        renderHistoryRows();
       }).catch(function () {
+        if (requestedSequence !== historyRequestSequence || !currentUser || currentUser.id !== requestedUserId) return;
         announce('Match history could not be refreshed. Try again when your connection is stable.', true);
+      });
+  }
+  function loadMoreHistory() {
+    if (!client || !currentUser || !historyHasMore || historyLoadingMore) return Promise.resolve();
+    var requestedUserId = currentUser.id;
+    var requestedSequence = ++historyRequestSequence;
+    var offset = historyRows.length;
+    historyLoadingMore = true;
+    renderHistoryRows();
+    return client.from('match_history')
+      .select('id,mode,status,winner_id,started_at,finished_at')
+      .order('started_at', { ascending: false })
+      .range(offset, offset + HISTORY_PAGE_SIZE)
+      .then(function (result) {
+        if (result.error) throw result.error;
+        if (requestedSequence !== historyRequestSequence || !currentUser || currentUser.id !== requestedUserId) return;
+        var page = Array.isArray(result.data) ? result.data : [];
+        var seen = Object.create(null);
+        historyRows = historyRows.concat(page.slice(0, HISTORY_PAGE_SIZE)).filter(function (match) {
+          if (!match || match.id == null) return true;
+          var id = String(match.id);
+          if (seen[id]) return false;
+          seen[id] = true;
+          return true;
+        });
+        historyHasMore = page.length > HISTORY_PAGE_SIZE;
+        renderHistoryRows();
+      }).catch(function () {
+        if (requestedSequence !== historyRequestSequence || !currentUser || currentUser.id !== requestedUserId) return;
+        announce('Older match history could not be loaded. Try again when your connection is stable.', true);
+      }).finally(function () {
+        if (requestedSequence !== historyRequestSequence || !currentUser || currentUser.id !== requestedUserId) return;
+        historyLoadingMore = false;
+        renderHistoryRows();
+        if (historyRefreshPending) {
+          historyRefreshPending = false;
+          refreshHistory();
+        }
       });
   }
   function renderRoom() {
@@ -1055,6 +1141,7 @@
   function bindEvents() {
     $('btn-online').addEventListener('click', openOnline);
     $('online-back').addEventListener('click', closeOnline);
+    $('online-history-load-more').addEventListener('click', loadMoreHistory);
     $('online-auth-form').addEventListener('submit', function (event) {
       event.preventDefault();
       signInWithPassword();
