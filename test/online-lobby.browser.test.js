@@ -433,6 +433,67 @@ function startLocalServer() {
     assert.equal(await page.$eval('#online-email', el => el.value), '', 'email is not prefilled or hardcoded in the portal');
     assert.equal(await page.$eval('#online-signin', el => el.disabled), false, 'verified email/password auth enables sign-in');
     assert.equal(await page.$eval('#online-signup', el => el.disabled), false, 'enabled project signup enables account creation');
+    if (process.env.ONLINE_AUTH_GUARD_ONLY === '1') {
+      if (process.env.PREVIEW_DIR) {
+        await fs.promises.mkdir(process.env.PREVIEW_DIR, { recursive: true });
+        await page.$eval('#online-auth-form', el => el.scrollIntoView({ block: 'start' }));
+        await page.screenshot({ path: path.join(process.env.PREVIEW_DIR, 'mobile.png'), fullPage: true });
+      }
+      await page.$eval('#online-email', el => { el.value = 'alice@example.test'; });
+      await page.$eval('#online-password', el => { el.value = 'synthetic-test-password'; });
+      const signInState = await page.evaluate(() => {
+        const state = window.__mockBackend;
+        const form = document.querySelector('#online-auth-form');
+        const start = state.authCalls.filter(call => call.method === 'signInWithPassword').length;
+        const submit = () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        submit();
+        const pending = {
+          busy: document.querySelector('#online-auth-panel').getAttribute('aria-busy'),
+          emailDisabled: document.querySelector('#online-email').disabled,
+          passwordDisabled: document.querySelector('#online-password').disabled,
+          signInDisabled: document.querySelector('#online-signin').disabled,
+          signUpDisabled: document.querySelector('#online-signup').disabled,
+          resetDisabled: document.querySelector('#online-reset-request').disabled
+        };
+        submit();
+        return { pending, calls: state.authCalls.filter(call => call.method === 'signInWithPassword').length - start };
+      });
+      assert.equal(signInState.calls, 1, 'duplicate form submits start only one sign-in request');
+      assert.deepEqual(signInState.pending, { busy: 'true', emailDisabled: true, passwordDisabled: true, signInDisabled: true, signUpDisabled: true, resetDisabled: true }, 'all email-auth controls expose one shared pending state');
+      await page.waitForFunction(() => !document.querySelector('#online-auth-panel').hasAttribute('aria-busy') && !document.querySelector('#online-account-panel').classList.contains('hidden'));
+      await page.click('#online-signout');
+      await page.waitForFunction(() => !document.querySelector('#online-auth-panel').classList.contains('hidden') && !document.querySelector('#online-auth-panel').hasAttribute('aria-busy'));
+
+      await page.evaluate(() => { window.__mockBackend.failAuth = 'signUp'; });
+      await page.$eval('#online-password', el => { el.value = 'synthetic-test-password'; });
+      const signUpState = await page.evaluate(() => {
+        const state = window.__mockBackend;
+        const button = document.querySelector('#online-signup');
+        const start = state.authCalls.filter(call => call.method === 'signUp').length;
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        return { calls: state.authCalls.filter(call => call.method === 'signUp').length - start, busy: document.querySelector('#online-auth-panel').getAttribute('aria-busy') };
+      });
+      assert.deepEqual(signUpState, { calls: 1, busy: 'true' }, 'duplicate account-create events share the same request lock');
+      await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Account creation failed:') && !document.querySelector('#online-auth-panel').hasAttribute('aria-busy'));
+      assert.equal(await page.$eval('#online-signup', el => el.disabled), false, 'failed account creation unlocks the controls for retry');
+
+      await page.evaluate(() => { window.__mockBackend.failAuth = 'resetPasswordForEmail'; });
+      const resetState = await page.evaluate(() => {
+        const state = window.__mockBackend;
+        const button = document.querySelector('#online-reset-request');
+        const start = state.authCalls.filter(call => call.method === 'resetPasswordForEmail').length;
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        return { calls: state.authCalls.filter(call => call.method === 'resetPasswordForEmail').length - start, busy: document.querySelector('#online-auth-panel').getAttribute('aria-busy') };
+      });
+      assert.deepEqual(resetState, { calls: 1, busy: 'true' }, 'duplicate reset events share the same request lock');
+      await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Password reset could not be requested:') && !document.querySelector('#online-auth-panel').hasAttribute('aria-busy'));
+      assert.equal(await page.$eval('#online-reset-request', el => el.disabled), false, 'failed password reset unlocks the controls for retry');
+      assert.deepEqual(errors, [], 'the auth single-flight flow has no uncaught JavaScript errors');
+      console.log('Online email-auth single-flight browser regression passed.');
+      return;
+    }
     await page.select('#online-mode', 'classic');
     const clientConfig = await page.evaluate(() => window.__mockBackend.clientCalls[0]);
     assert.equal(clientConfig.url, 'https://exggyvbsqhoasrqgzerf.supabase.co', 'client is constructed for the dedicated Online Ludo project');
