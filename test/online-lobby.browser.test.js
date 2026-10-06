@@ -31,7 +31,8 @@ function startLocalServer() {
 }
 (async () => {
   let localServer = null;
-  let url = process.argv[2];
+  const readinessOnly = process.argv.includes('--readiness-only');
+  let url = process.argv.slice(2).find(argument => argument !== '--readiness-only');
   if (!url) { localServer = await startLocalServer(); url = localServer.url; }
   const origin = new URL(url).origin;
   const browser = await puppeteer.launch({
@@ -489,8 +490,43 @@ function startLocalServer() {
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
     await page.click('#online-create-room');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'HOSTROOM12345678');
+    assert.equal(await page.$eval('#online-start-room', button => button.disabled), true, 'the host cannot start until every room member is ready');
     await page.click('#online-ready');
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
+    assert.equal(await page.$eval('#online-start-room', button => button.disabled), false, 'the start control enables when at least two players are all ready');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const index = state.tables.room_members.findIndex(row => row.room_id === 'host-room' && row.user_id === 'user-two');
+      state.readinessRemovedMember = state.tables.room_members.splice(index, 1)[0];
+      state.emit('room_members', { event: 'DELETE', old: state.readinessRemovedMember });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-start-room').disabled && document.querySelector('#online-room-status').textContent.includes('1/2 minimum players joined'));
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const member = state.readinessRemovedMember;
+      state.readinessRemovedMember = null;
+      state.tables.room_members.push(member);
+      state.emit('room_members', { event: 'INSERT', new: member });
+    });
+    await page.waitForFunction(() => !document.querySelector('#online-start-room').disabled && document.querySelector('#online-room-status').textContent.includes('everyone is ready'));
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const member = state.tables.room_members.find(row => row.room_id === 'host-room' && row.user_id === 'user-two');
+      member.ready = false;
+      state.emit('room_members', { event: 'UPDATE', old: member, new: member });
+    });
+    await page.waitForFunction(() => document.querySelector('#online-start-room').disabled && document.querySelector('#online-room-status').textContent.includes('1/2 ready'));
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      const member = state.tables.room_members.find(row => row.room_id === 'host-room' && row.user_id === 'user-two');
+      member.ready = true;
+      state.emit('room_members', { event: 'UPDATE', old: member, new: member });
+    });
+    await page.waitForFunction(() => !document.querySelector('#online-start-room').disabled && document.querySelector('#online-room-status').textContent.includes('everyone is ready'));
+    if (readinessOnly) {
+      console.log('Online Ludo lobby readiness browser checks passed (two-player minimum and live all-ready gate).');
+      return;
+    }
     await page.click('#online-start-room');
       await page.waitForFunction(() => document.querySelector('#online-room-status').textContent.includes('validated by the server'));
     await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · active'));

@@ -327,14 +327,26 @@
     var room = currentRoom;
     var card = $('online-room-card');
     card.classList.toggle('hidden', !room);
-    if (!room) { $('online-chess-resume').classList.add('hidden'); renderMatch(); return; }
+    if (!room) { $('online-start-room').disabled = true; $('online-chess-resume').classList.add('hidden'); renderMatch(); return; }
     if (room.status === 'completed' || room.status === 'cancelled' || (room.matchState && room.matchState.state && room.matchState.state.phase === 'over')) setRoomConnectionState('ended');
     $('online-room-mode').textContent = modeLabel(room.mode) + ' · ' + room.capacity + ' seats';
+    var roster = Array.isArray(room.roster) ? room.roster : [];
+    var readyCount = roster.filter(function (member) { return !!member.ready; }).length;
+    var unreadyCount = roster.length - readyCount;
+    var isHost = room.created_by === (currentUser && currentUser.id);
+    var canStart = room.status === 'waiting' && isHost && roster.length >= 2 && unreadyCount === 0;
     $('online-room-status').textContent = room.status === 'active'
       ? (room.matchState ? (room.mode === 'ludo_chess' ? 'Ludo Chess is active. Legal moves and match state are validated by the server.' : 'Online Classic match is active. Dice and moves are validated by the server.') : 'This table predates the current online gameplay update. Create a new table to play online.')
-      : room.status === 'completed' ? 'This table is complete.' : room.status === 'cancelled' ? 'This table was cancelled.' : 'Waiting for players to join and ready up.';
+      : room.status === 'completed' ? 'This table is complete.' : room.status === 'cancelled' ? 'This table was cancelled.'
+        : roster.length < 2 ? 'Waiting for players · ' + roster.length + '/2 minimum players joined; ' + readyCount + ' ready.'
+          : unreadyCount ? roster.length + ' players joined · ' + readyCount + '/' + roster.length + ' ready. The host can start when everyone is ready.'
+            : roster.length + ' players joined · everyone is ready. The host can start the table.';
     $('online-invite-code').value = room.inviteCode || '';
-    $('online-start-room').classList.toggle('hidden', room.status !== 'waiting' || room.created_by !== (currentUser && currentUser.id));
+    var startButton = $('online-start-room');
+    startButton.classList.toggle('hidden', room.status !== 'waiting' || !isHost);
+    startButton.disabled = !canStart;
+    startButton.title = canStart ? 'Start the table.' : room.status !== 'waiting' ? '' : roster.length < 2 ? 'At least two players must join before the match can start.' : unreadyCount ? 'Every player must be ready before the match can start.' : '';
+    startButton.setAttribute('aria-describedby', 'online-room-status');
     $('online-ready').classList.toggle('hidden', room.status !== 'waiting');
     $('online-ready').textContent = room.myReady ? 'Mark not ready' : 'Ready';
     $('online-ready').setAttribute('aria-pressed', String(!!room.myReady));
