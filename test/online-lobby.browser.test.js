@@ -449,6 +449,38 @@ function startLocalServer() {
     assert.deepEqual(sdkRequests, [], 'mocked Supabase client prevents external SDK or project traffic in this deterministic test');
 
     await page.waitForFunction(() => document.querySelector('#online-account-panel').classList.contains('hidden') === false && document.querySelector('#online-profile-name').value === 'Alice');
+    if (process.env.ONLINE_JOIN_GUARD_ONLY === '1') {
+      await page.$eval('#online-join-code', el => { el.value = 'invite-room-code'; });
+      if (process.env.PREVIEW_DIR) {
+        await fs.promises.mkdir(process.env.PREVIEW_DIR, { recursive: true });
+        await page.$eval('#online-join-code', el => el.scrollIntoView({ block: 'center' }));
+        await page.screenshot({ path: path.join(process.env.PREVIEW_DIR, 'mobile.png'), fullPage: true });
+      }
+      const pendingState = await page.evaluate(() => {
+        const button = document.querySelector('#online-join-room');
+        const state = window.__mockBackend;
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        const firstClick = { disabled: button.disabled, codeDisabled: document.querySelector('#online-join-code').disabled, ariaBusy: button.getAttribute('aria-busy'), label: button.textContent, status: document.querySelector('#online-status').textContent };
+        button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        return { firstClick, joinCalls: state.rpcCalls.filter(call => call.name === 'join_room').length };
+      });
+      assert.equal(pendingState.joinCalls, 1, 'two synchronous Join events send only one room-join RPC');
+      assert.deepEqual(pendingState.firstClick, { disabled: true, codeDisabled: true, ariaBusy: 'true', label: 'Joining…', status: 'Joining room…' }, 'the Join control, code field, and live status expose the pending state immediately');
+      await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && !document.querySelector('#online-join-room').disabled);
+      assert.equal(await page.$eval('#online-join-room', el => el.getAttribute('aria-busy')), null, 'the busy state clears after the room is attached');
+      assert.equal(await page.$eval('#online-join-code', el => el.disabled), false, 'the invite field becomes available again after completion');
+      await page.click('#online-leave-room');
+      await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+      await page.evaluate(() => { window.__mockBackend.failRpc = 'join_room'; });
+      await page.$eval('#online-join-code', el => { el.value = 'retry-room-code'; });
+      await page.click('#online-join-room');
+      await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Could not join room:'));
+      await page.waitForFunction(() => !document.querySelector('#online-join-room').disabled && !document.querySelector('#online-join-code').disabled);
+      assert.equal(await page.$eval('#online-join-room', el => el.textContent), 'Join', 'a failed join restores the original control label for retry');
+      assert.deepEqual(errors, [], 'the join single-flight flow has no uncaught JavaScript errors');
+      console.log('Online invite-join single-flight browser regression passed.');
+      return;
+    }
     const signInCall = await page.evaluate(() => window.__mockBackend.authCalls.find(call => call.method === 'signInWithPassword'));
     assert.equal(signInCall.email, 'alice@example.test', 'typed email is passed to Supabase Auth');
     assert.equal(Object.hasOwn(signInCall, 'password'), false, 'auth mock records no password value');

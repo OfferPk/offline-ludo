@@ -29,6 +29,7 @@
   var roomChannelStatus = 'idle';
   var roomConnectionState = 'idle';
   var roomRefreshSequence = 0;
+  var joinRoomInFlight = false;
   var roomRestoreSequence = 0;
   var roomRestorePromise = null;
   var roomRestoreUserId = '';
@@ -1006,13 +1007,30 @@
     return refreshRoom();
   }
   function joinInvite(code) {
-    if (!client || !currentUser || !code) return Promise.resolve();
+    if (!client || !currentUser || !code || joinRoomInFlight) return Promise.resolve();
+    joinRoomInFlight = true;
+    var joinButton = $('online-join-room');
+    var joinCode = $('online-join-code');
+    joinButton.disabled = true;
+    joinButton.setAttribute('aria-busy', 'true');
+    joinButton.textContent = 'Joining…';
+    joinCode.disabled = true;
     pendingInvite = '';
     sessionStorage.removeItem('crossfour.online.pending-invite');
     window.history.replaceState({}, '', window.location.pathname + window.location.hash);
-    return callRpc('join_room', { p_invite_code: code.trim().toUpperCase() })
-      .then(attachRoom)
-      .catch(function (error) { announce('Could not join room: ' + errorText(error), true); });
+    announce('Joining room…');
+    var request;
+    try { request = callRpc('join_room', { p_invite_code: code.trim().toUpperCase() }); }
+    catch (error) { request = Promise.reject(error); }
+    return Promise.resolve(request).then(attachRoom)
+      .catch(function (error) { announce('Could not join room: ' + errorText(error), true); })
+      .finally(function () {
+        joinRoomInFlight = false;
+        joinButton.disabled = false;
+        joinButton.removeAttribute('aria-busy');
+        joinButton.textContent = 'Join';
+        joinCode.disabled = false;
+      });
   }
   function handleNativeCallback(url) {
     if (!url) return Promise.resolve();
