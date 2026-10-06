@@ -1052,6 +1052,113 @@
       $('online-mode-note').textContent = 'Classic Ludo plays on the same board as offline. House rules lock when the room is created. Mystery and Lucky Chaos remain offline modes.';
     }
   }
+  var pendingOnlineLeaveConfirmation = null;
+  function closeOnlineLeaveConfirmation(prompt, restoreFocus) {
+    if (pendingOnlineLeaveConfirmation !== prompt) return;
+    pendingOnlineLeaveConfirmation = null;
+    document.removeEventListener('keydown', prompt.onKeydown, true);
+    prompt.dialog.removeEventListener('click', prompt.onBackdrop);
+    prompt.leave.removeEventListener('click', prompt.onLeave);
+    prompt.stay.removeEventListener('click', prompt.onStay);
+    prompt.leave.onclick = prompt.oldLeaveHandler;
+    prompt.stay.onclick = prompt.oldStayHandler;
+    prompt.dialog.classList.add('hidden');
+    prompt.dialog.classList.toggle('exit-confirm', prompt.hadExitStyle);
+    prompt.title.textContent = prompt.titleText;
+    prompt.description.textContent = prompt.descriptionText;
+    prompt.leave.textContent = prompt.leaveText;
+    prompt.leave.className = prompt.leaveClass;
+    prompt.stay.textContent = prompt.stayText;
+    if (restoreFocus) {
+      var target = prompt.returnFocus;
+      if (!target || !target.isConnected || (target.closest && target.closest('.hidden'))) target = $('online-quick-match');
+      if (target && typeof target.focus === 'function') target.focus({ preventScroll: true });
+    }
+  }
+  function confirmOnlineActiveRoomLeave(roomId) {
+    if (pendingOnlineLeaveConfirmation) return;
+    var dialog = $('confirm'), leave = $('confirm-yes'), stay = $('confirm-no');
+    var title = $('confirm-title'), description = $('confirm-text');
+    if (!dialog || !leave || !stay || !title || !description || !dialog.classList.contains('hidden')) {
+      announce('The leave confirmation could not be opened. Your room was not changed.', true);
+      return;
+    }
+    var prompt = {
+      dialog: dialog, leave: leave, stay: stay, title: title, description: description,
+      titleText: title.textContent, descriptionText: description.textContent,
+      leaveText: leave.textContent, stayText: stay.textContent, leaveClass: leave.className,
+      hadExitStyle: dialog.classList.contains('exit-confirm'),
+      oldLeaveHandler: leave.onclick, oldStayHandler: stay.onclick, returnFocus: document.activeElement
+    };
+    prompt.onLeave = function () {
+      closeOnlineLeaveConfirmation(prompt, true);
+      if (currentRoomId !== roomId) {
+        announce('The room changed before confirmation. No room was left.', true);
+        return;
+      }
+      leaveCurrentRoom(roomId);
+    };
+    prompt.onStay = function () { closeOnlineLeaveConfirmation(prompt, true); };
+    prompt.onBackdrop = function (event) {
+      if (event.target === dialog) closeOnlineLeaveConfirmation(prompt, true);
+    };
+    prompt.onKeydown = function (event) {
+      if (pendingOnlineLeaveConfirmation !== prompt) return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeOnlineLeaveConfirmation(prompt, true);
+      } else if (event.key === 'Tab') {
+        var active = document.activeElement;
+        if (event.shiftKey && active === stay) { event.preventDefault(); leave.focus(); }
+        else if (!event.shiftKey && active === leave) { event.preventDefault(); stay.focus(); }
+        else if (active !== leave && active !== stay) { event.preventDefault(); (event.shiftKey ? leave : stay).focus(); }
+      }
+    };
+    pendingOnlineLeaveConfirmation = prompt;
+    leave.onclick = null;
+    stay.onclick = null;
+    title.textContent = 'Leave active match?';
+    description.textContent = 'Leaving now ends this match for everyone and marks it abandoned. You will not be able to resume it.';
+    leave.textContent = 'Leave match';
+    leave.className = 'btn plate danger';
+    stay.textContent = 'Stay in room';
+    dialog.classList.add('exit-confirm');
+    dialog.classList.remove('hidden');
+    leave.addEventListener('click', prompt.onLeave);
+    stay.addEventListener('click', prompt.onStay);
+    dialog.addEventListener('click', prompt.onBackdrop);
+    document.addEventListener('keydown', prompt.onKeydown, true);
+    stay.focus({ preventScroll: true });
+  }
+  function leaveCurrentRoom(roomId) {
+    if (!roomId || roomId !== currentRoomId) return Promise.resolve(false);
+    announce('Leaving the room…');
+    return callRpc('leave_room', { p_room_id: roomId })
+      .then(function () {
+        if (currentRoomId !== roomId) return false;
+        clearRoomSelection(true);
+        announce('You left the room.');
+        if (!screen.classList.contains('hidden')) $('online-quick-match').focus({ preventScroll: true });
+        return refreshHistory().then(function () { return true; });
+      })
+      .catch(function (error) {
+        if (currentRoomId === roomId) {
+          announce('Could not leave room: ' + errorText(error), true);
+          $('online-leave-room').focus({ preventScroll: true });
+        }
+        return false;
+      });
+  }
+  function requestLeaveRoom() {
+    var roomId = currentRoomId;
+    if (!roomId) return;
+    if (currentRoom && currentRoom.id === roomId && currentRoom.status === 'active') {
+      confirmOnlineActiveRoomLeave(roomId);
+      return;
+    }
+    leaveCurrentRoom(roomId);
+  }
   function bindEvents() {
     $('btn-online').addEventListener('click', openOnline);
     $('online-back').addEventListener('click', closeOnline);
@@ -1184,16 +1291,7 @@
       renderMatch();
       $('online-chess-screen-title').focus({ preventScroll: true });
     });
-    $('online-leave-room').addEventListener('click', function () {
-      if (!currentRoomId) return;
-      callRpc('leave_room', { p_room_id: currentRoomId })
-        .then(function () {
-          clearRoomSelection(true);
-          announce('You left the room.');
-          return refreshHistory();
-        })
-        .catch(function (error) { announce('Could not leave room: ' + errorText(error), true); });
-    });
+    $('online-leave-room').addEventListener('click', requestLeaveRoom);
     function refreshAfterReconnect() {
       if (!currentUser || !client || screen.classList.contains('hidden')) return;
       if (!currentRoomId) { restoreActiveRoom(); return; }
