@@ -27,6 +27,10 @@
   var recoveryMode = false;
   var roomChannel = null;
   var roomChannelStatus = 'idle';
+  var roomDisconnectKey = '';
+  var roomDisconnectPromise = null;
+  var roomRecoveryAttemptKey = '';
+  var roomRecoveryAttempt = null;
   var roomConnectionState = 'idle';
   var roomRefreshSequence = 0;
   var roomRestoreSequence = 0;
@@ -91,6 +95,56 @@
   function removeRealtimeChannel(channel) {
     if (client && channel) client.removeChannel(channel);
   }
+  function roomRecoveryToken(roomId, userId) {
+    return String(roomId || '') + ':' + String(userId || '');
+  }
+  function resetRoomRecovery() {
+    roomDisconnectKey = '';
+    roomDisconnectPromise = null;
+    roomRecoveryAttemptKey = '';
+    roomRecoveryAttempt = null;
+  }
+  function noteRoomDisconnect(roomId, userId) {
+    if (!roomId || !userId || currentRoomId !== roomId || !currentUser || currentUser.id !== userId ||
+        !currentRoom || currentRoom.mode !== 'classic' || currentRoom.status !== 'active') return Promise.resolve(null);
+    var key = roomRecoveryToken(roomId, userId);
+    if (roomDisconnectKey === key) return roomDisconnectPromise || Promise.resolve(null);
+    roomDisconnectKey = key;
+    roomDisconnectPromise = callRpc('note_disconnect', { p_room_id: roomId }).catch(function () { return null; });
+    return roomDisconnectPromise;
+  }
+  function recoverRoomConnection(roomId, userId) {
+    if (!client || !roomId || !userId) return Promise.resolve(null);
+    var key = roomRecoveryToken(roomId, userId);
+    if (roomRecoveryAttempt && roomRecoveryAttemptKey === key) return roomRecoveryAttempt;
+    var waitForDisconnect = roomDisconnectKey === key ? roomDisconnectPromise : null;
+    var attempt = Promise.resolve(waitForDisconnect).then(function () {
+      if (currentRoomId !== roomId || !currentUser || currentUser.id !== userId ||
+          !currentRoom || currentRoom.mode !== 'classic' || currentRoom.status !== 'active') return null;
+      return callRpc('rejoin_match', { p_room_id: roomId });
+    }).then(function (result) {
+      if (roomDisconnectKey === key) {
+        roomDisconnectKey = '';
+        roomDisconnectPromise = null;
+      }
+      return result;
+    }).catch(function (error) {
+      if (currentRoomId === roomId && currentUser && currentUser.id === userId &&
+          !/rejoin_match|schema cache|Could not find the function|PGRST202/i.test(errorText(error))) {
+        announce('Rejoin failed: ' + errorText(error), true);
+      }
+      return null;
+    });
+    roomRecoveryAttemptKey = key;
+    roomRecoveryAttempt = attempt;
+    attempt.then(function () {
+      if (roomRecoveryAttempt === attempt) {
+        roomRecoveryAttempt = null;
+        roomRecoveryAttemptKey = '';
+      }
+    });
+    return attempt;
+  }
   function clearRoomChannel() {
     var channel = roomChannel;
     roomChannel = null;
@@ -112,6 +166,7 @@
     roomRestoreUserId = '';
     roomRestoreRoomId = '';
     roomRefreshSequence++;
+    resetRoomRecovery();
     clearRoomChannel();
     currentRoomId = '';
     currentRoom = null;
@@ -888,12 +943,18 @@
     roomChannelStatus = 'joining';
     channel.subscribe(function (state) {
       if (roomChannel !== channel || currentRoomId !== roomId || !currentUser || currentUser.id !== userId) return;
+      var wasSubscribed = roomChannelStatus === 'SUBSCRIBED';
       roomChannelStatus = state;
       if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT' || state === 'CLOSED') {
         setRoomConnectionState('reconnecting');
         announce('Live room updates are reconnecting. Match actions are paused until the room is synchronized.', true);
+        if (wasSubscribed) noteRoomDisconnect(roomId, userId);
       } else if (state === 'SUBSCRIBED') {
-        refreshRoom();
+        if (roomDisconnectKey === roomRecoveryToken(roomId, userId)) {
+          recoverRoomConnection(roomId, userId).then(function () {
+            if (currentRoomId === roomId && currentUser && currentUser.id === userId) return refreshRoom();
+          });
+        } else refreshRoom();
       }
     });
     return channel;
@@ -1197,15 +1258,16 @@
     function refreshAfterReconnect() {
       if (!currentUser || !client || screen.classList.contains('hidden')) return;
       if (!currentRoomId) { restoreActiveRoom(); return; }
+      var roomId = currentRoomId;
+      var userId = currentUser.id;
       if (roomChannel && ['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].indexOf(roomChannelStatus) >= 0) clearRoomChannel();
       subscribeRoom();
       var rejoin = currentRoom && currentRoom.mode === 'classic' && currentRoom.status === 'active'
-        ? callRpc('rejoin_match', { p_room_id: currentRoomId }).catch(function (error) {
-          if (!/rejoin_match|schema cache|Could not find the function|PGRST202/i.test(errorText(error))) announce('Rejoin failed: ' + errorText(error), true);
-          return null;
-        })
+        ? recoverRoomConnection(roomId, userId)
         : Promise.resolve(null);
-      rejoin.then(function () { return refreshRoom(); });
+      rejoin.then(function () {
+        if (currentRoomId === roomId && currentUser && currentUser.id === userId) return refreshRoom();
+      });
     }
     window.addEventListener('online', refreshAfterReconnect);
     window.addEventListener('offline', function () {
@@ -1213,7 +1275,7 @@
         setRoomConnectionState('reconnecting');
         announce('Connection lost. You have a short reconnect window to rejoin the same seat. No computer takes your place.', true);
         if (currentRoom && currentRoom.mode === 'classic' && currentRoom.status === 'active') {
-          callRpc('note_disconnect', { p_room_id: currentRoomId }).catch(function () {});
+          noteRoomDisconnect(currentRoomId, currentUser.id);
         }
       }
     });
