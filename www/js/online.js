@@ -641,11 +641,93 @@
       if (focusTarget) focusTarget.focus({ preventScroll: true });
     }
   }
+  var onlineTurnExpiryRetryTimer = null;
+  var onlineTurnExpiryRetryKey = '';
+  var onlineTurnExpiryRetryAttempt = 0;
+  var onlineTurnExpiryInFlight = null;
+  function onlineTurnExpirySnapshot() {
+    var room = currentRoom;
+    var state = room && room.matchState && room.matchState.state;
+    var turn = Number(state && state.turn);
+    var deadline = Number(state && state.turn_deadline) || 0;
+    if (!room || room.id !== currentRoomId || room.mode !== 'classic' || room.status !== 'active' ||
+        !state || state.phase === 'over' || !Number.isInteger(turn) || deadline <= 0) return null;
+    return { roomId: room.id, turn: turn, deadline: deadline, key: room.id + ':' + turn + ':' + deadline };
+  }
+  function onlineTurnExpiryStillCurrent(snapshot) {
+    var current = onlineTurnExpirySnapshot();
+    return !!(current && snapshot && current.key === snapshot.key);
+  }
+  function clearOnlineTurnExpiryRetry(key) {
+    if (key && onlineTurnExpiryRetryKey !== key) return;
+    if (onlineTurnExpiryRetryTimer) window.clearTimeout(onlineTurnExpiryRetryTimer);
+    onlineTurnExpiryRetryTimer = null;
+    onlineTurnExpiryRetryKey = '';
+    onlineTurnExpiryRetryAttempt = 0;
+  }
+  function isTransientTurnExpiryError(error) {
+    var code = String(error && error.code || '');
+    var status = Number(error && (error.status || error.statusCode));
+    return [408, 429, 500, 502, 503, 504].indexOf(status) >= 0 ||
+      ['408', '429', '500', '502', '503', '504'].indexOf(code) >= 0 ||
+      /network|fetch|timed? ?out|connection|temporarily unavailable|econnreset|failed to load/i.test(errorText(error));
+  }
+  function scheduleOnlineTurnExpiryRetry(snapshot) {
+    if (!onlineTurnExpiryStillCurrent(snapshot)) {
+      clearOnlineTurnExpiryRetry(snapshot && snapshot.key);
+      return;
+    }
+    var attempt = onlineTurnExpiryRetryKey === snapshot.key ? onlineTurnExpiryRetryAttempt + 1 : 1;
+    onlineTurnExpiryRetryKey = snapshot.key;
+    onlineTurnExpiryRetryAttempt = attempt;
+    if (onlineTurnExpiryRetryTimer) window.clearTimeout(onlineTurnExpiryRetryTimer);
+    var delay = Math.min(15000, 500 * Math.pow(2, Math.min(attempt - 1, 5)));
+    onlineTurnExpiryRetryTimer = window.setTimeout(function () {
+      onlineTurnExpiryRetryTimer = null;
+      if (!onlineTurnExpiryStillCurrent(snapshot)) {
+        clearOnlineTurnExpiryRetry(snapshot.key);
+        return;
+      }
+      if (roomConnectionState !== 'connected') {
+        scheduleOnlineTurnExpiryRetry(snapshot);
+        return;
+      }
+      expireOnlineTurn();
+    }, delay);
+  }
   function expireOnlineTurn() {
-    if (!currentRoomId || !client || roomConnectionState !== 'connected') return;
-    callRpc('expire_turn', { p_room_id: currentRoomId }).then(function () { return refreshRoom(); }).catch(function (error) {
-      if (!/expire_turn|schema cache|Could not find the function|PGRST202/i.test(errorText(error))) announce('Turn timer could not be applied: ' + errorText(error), true);
+    var snapshot = onlineTurnExpirySnapshot();
+    if (!snapshot || !client) return;
+    if (roomConnectionState !== 'connected') {
+      scheduleOnlineTurnExpiryRetry(snapshot);
+      return;
+    }
+    if (onlineTurnExpiryInFlight && onlineTurnExpiryInFlight.key === snapshot.key) return onlineTurnExpiryInFlight.promise;
+    if (onlineTurnExpiryRetryKey === snapshot.key) clearOnlineTurnExpiryRetry(snapshot.key);
+    var request;
+    request = callRpc('expire_turn', { p_room_id: snapshot.roomId }).then(function (result) {
+      var returnedState = result && result.state;
+      var stillSameServerTurn = returnedState && returnedState.phase !== 'over' &&
+        Number(returnedState.turn) === snapshot.turn && Number(returnedState.turn_deadline) === snapshot.deadline;
+      if (result && result.expired === false && stillSameServerTurn) {
+        return refreshRoom().then(function () {
+          if (onlineTurnExpiryStillCurrent(snapshot)) scheduleOnlineTurnExpiryRetry(snapshot);
+          else clearOnlineTurnExpiryRetry(snapshot.key);
+        });
+      }
+      clearOnlineTurnExpiryRetry(snapshot.key);
+      return refreshRoom();
+    }).catch(function (error) {
+      if (!/expire_turn|schema cache|Could not find the function|PGRST202/i.test(errorText(error))) {
+        announce('Turn timer could not be applied: ' + errorText(error), true);
+      }
+      if (isTransientTurnExpiryError(error) && onlineTurnExpiryStillCurrent(snapshot)) scheduleOnlineTurnExpiryRetry(snapshot);
+      else clearOnlineTurnExpiryRetry(snapshot.key);
+    }).finally(function () {
+      if (onlineTurnExpiryInFlight && onlineTurnExpiryInFlight.promise === request) onlineTurnExpiryInFlight = null;
     });
+    onlineTurnExpiryInFlight = { key: snapshot.key, promise: request };
+    return request;
   }
   function renderMatch() {
     var room = currentRoom;
