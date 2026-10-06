@@ -688,10 +688,12 @@
     var isMyTurn = !!(myMember && Number(myMember.seat) === Number(state.turn));
     $('online-match-version').textContent = 'Version ' + record.version;
     $('online-match-eyebrow').textContent = isChess ? 'LUDO CHESS · LIVE STATE' : 'ONLINE CLASSIC · LIVE STATE';
-    $('online-match-heading').textContent = isChess ? (state.phase === 'over' ? 'Game complete' : 'Move ' + (state.fullmove || 1)) : (state.phase === 'over' ? 'Match complete' : 'Turn ' + ((state.turn_count || 0) + 1));
+    $('online-match-heading').textContent = isChess ? (state.phase === 'over' ? 'Game complete' : 'Move ' + (state.fullmove || 1)) : (state.phase === 'over' ? (state.result === 'abandoned' ? 'Match abandoned' : 'Match complete') : 'Turn ' + ((state.turn_count || 0) + 1));
     $('online-match-turn').textContent = isChess
       ? (state.phase === 'over' ? chessResultLabel(state, room) : chessSeatName(room, state.turn) + (isMyTurn ? ' · your move' : ' · waiting for their move') + (state.check ? ' · check' : ''))
-      : (state.phase === 'over' ? 'Match complete. Winner: ' + ((room.roster.find(function (member) { return member.seat === Number((state.ranking || [])[0]); }) || {}).displayName || '—')
+      : (state.phase === 'over' ? (state.result === 'abandoned'
+        ? 'Match abandoned after reconnect grace expired. No winner was recorded.'
+        : 'Match complete. Winner: ' + ((room.roster.find(function (member) { return member.seat === Number((state.ranking || [])[0]); }) || {}).displayName || '—'))
         : (turnMember ? turnMember.displayName || turnMember.handle || 'Player' : 'Player') + (isMyTurn ? ' · your turn' : ' · waiting for their turn') + (state.phase === 'move' ? ' · choose a legal token move' : ' · roll phase'));
     $('online-chess-play').classList.toggle('hidden', !isChess);
     ['online-match-dice', 'online-match-pieces', 'online-match-moves', 'online-classic-note', 'online-roll'].forEach(function (id) { $(id).classList.toggle('hidden', true); });
