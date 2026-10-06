@@ -29,6 +29,12 @@ function startLocalServer() {
     server.listen(0, '127.0.0.1', () => resolve({ server, url: 'http://127.0.0.1:' + server.address().port + '/' }));
   });
 }
+async function captureRoomPreview(page) {
+  if (!process.env.PREVIEW_DIR) return;
+  await fs.promises.mkdir(process.env.PREVIEW_DIR, { recursive: true });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({ path: path.join(process.env.PREVIEW_DIR, 'mobile.png'), fullPage: true });
+}
 (async () => {
   let localServer = null;
   let url = process.argv[2];
@@ -473,6 +479,9 @@ function startLocalServer() {
 
     await page.click('#online-quick-match');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-mode').textContent === 'Classic · 2 seats');
+    assert.equal(await page.$eval('#online-room-entry', el => el.classList.contains('hidden')), true, 'room-entry actions are hidden while a table is open');
+    assert.equal(await page.$eval('#online-room-entry-note', el => !el.classList.contains('hidden')), true, 'the user is told to leave the current table before matchmaking again');
+    await captureRoomPreview(page);
     assert.match(await page.$eval('#online-room-roster', el => el.textContent), /Alice Online[\s\S]*Bob/, 'matchmaking loads a room roster with cloud names');
     await page.evaluate(() => {
       const state = window.__mockBackend;
@@ -487,8 +496,26 @@ function startLocalServer() {
 
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online-room-entry', el => !el.classList.contains('hidden')), true, 'leaving a room restores matchmaking and invite controls');
+    assert.equal(await page.$eval('#online-room-entry-note', el => el.classList.contains('hidden')), true, 'the room-entry note disappears after leaving');
     await page.click('#online-create-room');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'HOSTROOM12345678');
+    assert.equal(await page.$eval('#online-room-entry', el => el.classList.contains('hidden')), true, 'creating a room also hides other room-entry actions');
+    if (process.env.ROOM_ENTRY_ONLY) {
+      await page.click('#online-leave-room');
+      await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+      assert.equal(await page.$eval('#online-room-entry', el => !el.classList.contains('hidden')), true, 'leaving a created room restores the room-entry actions');
+      await page.$eval('#online-join-code', el => { el.value = ' invite-room-code '; });
+      await page.click('#online-join-room');
+      await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'INVITEROOM123456');
+      assert.equal(await page.$eval('#online-room-entry', el => el.classList.contains('hidden')), true, 'joining by invite hides the room-entry actions');
+      await page.click('#online-leave-room');
+      await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+      assert.equal(await page.$eval('#online-room-entry', el => !el.classList.contains('hidden')), true, 'leaving an invite room restores the room-entry actions');
+      assert.deepEqual(errors, [], 'focused room-entry flow has no uncaught JavaScript errors');
+      console.log('Online room-entry lifecycle passed (quick match, create, invite join, and leave).');
+      return;
+    }
     await page.click('#online-ready');
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     await page.click('#online-start-room');
@@ -519,6 +546,7 @@ function startLocalServer() {
     await page.evaluate(() => document.querySelector('#btn-home').click());
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online-room-entry', el => !el.classList.contains('hidden')), true, 'leaving an active Classic match restores matchmaking');
     await page.$eval('#online-capacity', el => { el.value = '3'; el.dispatchEvent(new Event('change', { bubbles: true })); });
     await page.select('#online-mode', 'ludo_chess');
     assert.equal(await page.$eval('#online-capacity', el => el.value + ':' + el.disabled), '2:true', 'Chess mode forces and locks a two-player table');
@@ -528,6 +556,7 @@ function startLocalServer() {
     await page.select('#online-mode', 'ludo_chess');
     await page.click('#online-create-room');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'INVITEROOM123456');
+    assert.equal(await page.$eval('#online-room-entry', el => el.classList.contains('hidden')), true, 'Ludo Chess rooms use the same one-current-room navigation state');
     await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats');
     await page.click('#online-ready');
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
@@ -853,12 +882,17 @@ function startLocalServer() {
 
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online-room-entry', el => !el.classList.contains('hidden')), true, 'leaving a completed Chess room restores the room-entry controls');
     await page.select('#online-mode', 'classic');
     await page.$eval('#online-join-code', el => { el.value = ' invite-room-code '; });
     await page.click('#online-join-room');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'INVITEROOM123456');
+    assert.equal(await page.$eval('#online-room-entry', el => el.classList.contains('hidden')), true, 'joining with an invite also hides room-entry controls');
     assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'join_room').args.p_invite_code), 'INVITE-ROOM-CODE', 'join-by-code normalizes invite codes before calling the RPC');
 
+    await page.click('#online-leave-room');
+    await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online-room-entry', el => !el.classList.contains('hidden')), true, 'leaving an invite room restores the room-entry controls');
     await page.evaluate(() => { window.__mockBackend.failRpc = 'quick_match'; });
     await page.click('#online-quick-match');
     await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Matchmaking failed: The matching service is unavailable.'));
