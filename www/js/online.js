@@ -37,6 +37,7 @@
   var profileChannel = null;
   var historyChannel = null;
   var client = null;
+  var startRoomRequestRoomId = '';
   var sdkLoading = null;
   var nativeCallbackConfigured = false;
   var pendingInvite = new URLSearchParams(window.location.search).get('room') || sessionStorage.getItem('crossfour.online.pending-invite') || '';
@@ -1148,13 +1149,31 @@
         .catch(function (error) { announce('Ready status could not be changed: ' + errorText(error), true); });
     });
     $('online-start-room').addEventListener('click', function () {
-      if (!currentRoomId) return;
-      callRpc('start_room', { p_room_id: currentRoomId })
+      var roomId = currentRoomId;
+      if (!roomId || !currentRoom || startRoomRequestRoomId) return;
+      var mode = currentRoom.mode;
+      startRoomRequestRoomId = roomId;
+      var button = $('online-start-room');
+      button.textContent = 'Starting…';
+      button.setAttribute('aria-busy', 'true');
+      var request;
+      try { request = callRpc('start_room', { p_room_id: roomId }); }
+      catch (error) { request = Promise.reject(error); }
+      Promise.resolve(request)
         .then(function () {
-          announce(currentRoom && currentRoom.mode === 'ludo_chess' ? 'Ludo Chess table started. The server owns legal-move validation and match state.' : 'Online Classic table started. The server owns dice, turn validation and match state.');
+          if (currentRoomId !== roomId) return;
+          announce(mode === 'ludo_chess' ? 'Ludo Chess table started. The server owns legal-move validation and match state.' : 'Online Classic table started. The server owns dice, turn validation and match state.');
           return refreshRoom();
         })
-        .catch(function (error) { announce('Table could not be started: ' + errorText(error), true); });
+        .catch(function (error) {
+          if (currentRoomId === roomId) announce('Table could not be started: ' + errorText(error), true);
+        })
+        .finally(function () {
+          if (startRoomRequestRoomId !== roomId) return;
+          startRoomRequestRoomId = '';
+          button.textContent = 'Start table';
+          button.removeAttribute('aria-busy');
+        });
     });
     $('online-roll').addEventListener('click', function () { submitMatchAction('roll_match', {}); });
     $('online-match-retry').addEventListener('click', runPendingMatchAction);
