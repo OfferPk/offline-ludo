@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
+const verifyStartRoomGuard = require('./online-start-room.helper');
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
 const webRoot = path.resolve(__dirname, '..', 'www');
 const mime = {
@@ -73,6 +74,7 @@ function startLocalServer() {
         removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
         delayNextRead: null,
         actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false, dropNextDrawResponseAfterCommit: false,
+        deferNextStartRpc: false, releaseStartRoomRpc: null,
         tables: resumeFixture && resumeFixture.tables || {
           profiles: [
             { id: 'user-one', handle: 'alice123', display_name: 'Alice' },
@@ -223,6 +225,17 @@ function startLocalServer() {
             rpc(name, args) {
               state.rpcCalls.push({ name, args });
               if (state.failRpc === name) return Promise.resolve({ data: null, error: { message: 'The matching service is unavailable.' } });
+              if (name === 'start_room' && state.deferNextStartRpc) {
+                state.deferNextStartRpc = false;
+                return new Promise(resolve => {
+                  state.releaseStartRoomRpc = () => {
+                    state.releaseStartRoomRpc = null;
+                    const room = state.tables.rooms.find(row => row.id === args.p_room_id);
+                    if (room) room.status = 'active';
+                    resolve({ data: { started: true }, error: null });
+                  };
+                });
+              }
               let data = {};
               if (name === 'quick_match') {
                 const roomId = args.p_mode === 'ludo_chess' ? 'quick-chess-room' : 'quick-room';
@@ -461,6 +474,15 @@ function startLocalServer() {
     await page.click('#online-profile-form button[type="submit"]');
     await page.waitForFunction(() => document.querySelector('#online-profile-name').value === 'Alice Online');
     assert.equal(await page.evaluate(() => window.__mockBackend.tables.profiles.find(row => row.id === 'user-one').display_name), 'Alice Online', 'profile edit persists through the Supabase client path');
+    if (process.env.ONLINE_START_GUARD_ONLY === '1') {
+      await page.click('#online-create-room');
+      await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'HOSTROOM12345678');
+      await page.click('#online-ready');
+      await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
+      await verifyStartRoomGuard(page);
+      console.log('Online Ludo Start-room browser checks passed (duplicate submission blocked; success and failure clear pending state).');
+      return;
+    }
 
     await page.evaluate(() => {
       const state = window.__mockBackend;
