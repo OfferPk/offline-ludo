@@ -12,6 +12,7 @@
   var roomPanel = document.getElementById('online-room-panel');
   var currentRoomId = sessionStorage.getItem('crossfour.online.room') || '';
   var currentRoom = null;
+  var readyRequestRoomId = '';
   var currentUser = null;
   var pendingMatchAction = null;
   var selectedChessSquare = -1;
@@ -1142,10 +1143,23 @@
         .catch(function () { $('online-invite-code').focus(); $('online-invite-code').select(); announce('Copy is unavailable; select the invite code and share it manually.'); });
     });
     $('online-ready').addEventListener('click', function () {
-      if (!currentRoomId || !currentRoom) return;
-      callRpc('set_room_ready', { p_room_id: currentRoomId, p_ready: !currentRoom.myReady })
-        .then(refreshRoom)
-        .catch(function (error) { announce('Ready status could not be changed: ' + errorText(error), true); });
+      var roomId = currentRoomId;
+      if (!roomId || !currentRoom || readyRequestRoomId) return;
+      readyRequestRoomId = roomId;
+      var button = $('online-ready');
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      callRpc('set_room_ready', { p_room_id: roomId, p_ready: !currentRoom.myReady })
+        .then(function () { if (currentRoomId === roomId) return refreshRoom(); })
+        .catch(function (error) {
+          if (currentRoomId === roomId) announce('Ready status could not be changed: ' + errorText(error), true);
+        })
+        .finally(function () {
+          if (readyRequestRoomId !== roomId) return;
+          readyRequestRoomId = '';
+          button.disabled = false;
+          button.removeAttribute('aria-busy');
+        });
     });
     $('online-start-room').addEventListener('click', function () {
       if (!currentRoomId) return;
