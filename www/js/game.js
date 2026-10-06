@@ -2576,6 +2576,15 @@
     var pieces = $('online-match-pieces'); if (pieces) pieces.replaceChildren();
     var moves = $('online-match-moves'); if (moves) moves.replaceChildren();
   }
+  function paintOnlineLastAction(state, names) {
+    var status = $('online-last-action');
+    if (!status) return;
+    var detail = window.OnlineClassicLastAction && typeof window.OnlineClassicLastAction.format === 'function'
+      ? window.OnlineClassicLastAction.format(state && state.last_action, names)
+      : '';
+    status.textContent = detail ? 'Last server action: ' + detail : '';
+    status.classList.toggle('hidden', !detail);
+  }
   function paintOnlineChrome() {
     var timer = $('online-turn-timer'), meter = $('online-turn-meter'), fill = $('online-turn-fill');
     var grace = $('online-grace'), graceText = $('online-grace-text'), graceFill = $('online-grace-fill');
@@ -2625,6 +2634,7 @@
     opts = opts || {};
     if (!G || !G.online) parkedLocal = G;
     onlineHooks = opts;
+    paintOnlineLastAction(opts.state || {}, opts.names || null);
     hideClassicTextPanel();
     document.body.classList.add('online-classic-board');
     var mySeat = Number(opts.mySeat);
@@ -2650,6 +2660,7 @@
     if (G && G.online) stopCelebration();
     onlineHooks = null;
     onlineExpireKey = '';
+    paintOnlineLastAction(null, null);
     if ($('online-turn-timer')) $('online-turn-timer').classList.add('hidden');
     if ($('online-turn-meter')) $('online-turn-meter').classList.add('hidden');
     if ($('online-grace')) $('online-grace').classList.add('hidden');

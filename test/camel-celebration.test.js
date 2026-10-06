@@ -26,8 +26,8 @@ const vEsc = pkg.version.replace(/\./g, '\\.');
 assert.match(gradle, new RegExp('versionName "' + vEsc + '"'));
 assert.match(html, new RegExp('Crossfour v' + vEsc));
 assert.doesNotMatch(html, /\?v=1\.6\.2/);
-assert.match(html, new RegExp('<script src="js/celebration\\.js\\?v=' + vEsc + '"></script>\\s*<script src="js/game\\.js\\?v=' + vEsc + '">'));
-console.log('  ok - version ' + pkg.version + ' / versionCode ' + vCode + ' (>= 1.6.3 / 20), celebration.js loads before game.js');
+assert.match(html, new RegExp('<script src="js/celebration\\.js\\?v=' + vEsc + '"></script>\\s*<script src="js/online-classic-last-action\\.js\\?v=' + vEsc + '"></script>\\s*<script src="js/game\\.js\\?v=' + vEsc + '">'));
+console.log('  ok - version ' + pkg.version + ' / versionCode ' + vCode + ' (>= 1.6.3 / 20), celebration and online action formatter load before game.js');
 
 // Geometry: 390x844 phone, seats as laid out by buildPods (slot 0 TL, 1 TR, 2 BR, 3 BL).
 const VW = 390, VH = 844;
