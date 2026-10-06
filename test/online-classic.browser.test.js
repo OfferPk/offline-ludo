@@ -6,6 +6,7 @@ const path = require('node:path');
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
 const webRoot = path.resolve(__dirname, '..', 'www');
 const shotDir = process.env.SHOT_DIR || '/workspace/offline-ludo-shots';
+const previewDir = process.env.PREVIEW_DIR || '/workspace/artifacts/online-classic-last-action';
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon' };
 function startLocalServer() {
   return new Promise(resolve => {
@@ -65,7 +66,8 @@ function startLocalServer() {
           turn: 0, phase: 'move', queue: [3], sixes: 0, bonus: 0, ranking: [],
           rules: Object.assign({}, L.DEFAULT_RULES), capd: [false, false, false, false],
           faces: [6, 1, 4, 1], turn_count: 1, turn_deadline: deadline,
-          grace: { seat: 2, until: Date.now() + 20000 }
+          grace: { seat: 2, until: Date.now() + 20000 },
+          last_action: { type: 'move', seat: 0, piece: 0, die: 3, from: 4, to: 7, captures: [{ seat: 2, piece: 1 }], finish: false }
         },
         mySeat: 0,
         names: { 0: 'You', 2: 'Rival' },
@@ -77,6 +79,47 @@ function startLocalServer() {
       });
     });
     await page.waitForSelector('#game:not(.hidden) #board');
+    const lastAction = await page.$eval('#online-last-action', el => ({ text: el.textContent, hidden: el.classList.contains('hidden') }));
+    assert.deepEqual(lastAction, { text: 'Last server action: You moved token 1 by 3; captured 1 token.', hidden: false });
+    fs.mkdirSync(previewDir, { recursive: true });
+    await page.screenshot({ path: path.join(previewDir, 'mobile.png'), fullPage: true });
+    const desktopPage = await browser.newPage();
+    await desktopPage.setViewport({ width: 1280, height: 900, isMobile: false, hasTouch: false });
+    desktopPage.on('pageerror', error => errors.push(error.message));
+    await desktopPage.goto(local.url, { waitUntil: 'networkidle0', timeout: 30000 });
+    await desktopPage.waitForSelector('#home:not(.hidden)');
+    await desktopPage.evaluate(() => {
+      const L = window.__cf.logic;
+      window.__cf.presentOnline({
+        state: {
+          players: [0, 2], pieces: [[4, -1, -1, -1], null, [10, -1, -1, -1], null],
+          turn: 0, phase: 'move', queue: [3], sixes: 0, bonus: 0, ranking: [],
+          rules: Object.assign({}, L.DEFAULT_RULES), capd: [false, false, false, false],
+          faces: [6, 1, 4, 1], turn_count: 1,
+          last_action: { type: 'move', seat: 0, piece: 0, die: 3, from: 4, to: 7, captures: [{ seat: 2, piece: 1 }], finish: false }
+        },
+        mySeat: 0, names: { 0: 'You', 2: 'Rival' }, deadline: Date.now() + 45000,
+        onMove: function () {}, onRoll: function () {}
+      });
+    });
+    await desktopPage.waitForSelector('#game:not(.hidden) #board');
+    await desktopPage.screenshot({ path: path.join(previewDir, 'desktop.png'), fullPage: true });
+    await desktopPage.close();
+    if (process.env.ONLINE_LAST_ACTION_ONLY === '1') {
+      await page.evaluate(() => {
+        const L = window.__cf.logic;
+        window.__cf.presentOnline({ state: {
+          players: [0, 2], pieces: [[-1, -1, -1, -1], null, [-1, -1, -1, -1], null],
+          turn: 1, phase: 'roll', queue: [], rules: Object.assign({}, L.DEFAULT_RULES), ranking: [], last_action: null
+        }, mySeat: 0, names: { 0: 'You', 2: 'Rival' } });
+      });
+      await page.waitForFunction(() => document.querySelector('#online-last-action').classList.contains('hidden'));
+      await page.evaluate(() => window.__cf.clearOnline());
+      assert.equal(await page.$eval('#online-last-action', el => el.classList.contains('hidden') && el.textContent === ''), true, 'the cue clears when the online board closes');
+      assert.deepEqual(errors, [], 'the focused last-action flow has no uncaught browser errors');
+      console.log('Online Classic last-action browser checks passed. Previews:', path.join(previewDir, 'mobile.png'), path.join(previewDir, 'desktop.png'));
+      return;
+    }
     const board = await page.evaluate(() => ({
       game: !document.querySelector('#game').classList.contains('hidden'),
       canvas: !!document.querySelector('#board'),
@@ -108,6 +151,7 @@ function startLocalServer() {
     });
     const second = await page.evaluate(() => ({ to: window.__landed, seen: window.__cf.game.st.pieces[0][0] }));
     assert.equal(second.seen, second.to, 'the other client sees the same landed square');
+    await page.waitForFunction(() => document.querySelector('#online-last-action').classList.contains('hidden'), { timeout: 5000 });
     await page.click('#btn-game-settings');
     const locked = await page.$eval('#rule-safeSquares', el => el.disabled);
     assert.equal(locked, true, 'house rules lock while the online match is open');
@@ -141,7 +185,7 @@ function startLocalServer() {
     const expired = await page.evaluate(() => window.__expired);
     assert.equal(expired, 1, 'a past turn deadline fires once');
     assert.deepEqual(errors, []);
-    console.log('Online Classic phone checks passed. shots', shot, diceShot);
+    console.log('Online Classic phone checks passed. shots', shot, diceShot, 'previews', path.join(previewDir, 'mobile.png'), path.join(previewDir, 'desktop.png'));
   } finally {
     await browser.close();
     local.server.close();
