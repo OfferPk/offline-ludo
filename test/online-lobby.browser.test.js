@@ -71,6 +71,7 @@ function startLocalServer() {
       const state = window.__mockBackend = {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
         removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
+        delayRpc: null, delayRpcMs: 0,
         delayNextRead: null,
         actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false, dropNextDrawResponseAfterCommit: false,
         tables: resumeFixture && resumeFixture.tables || {
@@ -385,6 +386,10 @@ function startLocalServer() {
                 state.activeRoomId = null;
                 data = { left: true };
               }
+              if (state.delayRpc === name) {
+                state.delayRpc = null;
+                return new Promise(resolve => setTimeout(() => resolve({ data, error: null }), state.delayRpcMs));
+              }
               return Promise.resolve({ data, error: null });
             },
             channel: makeChannel,
@@ -456,6 +461,24 @@ function startLocalServer() {
     assert.equal(await page.$eval('#online-wallet-diamonds', el => el.textContent), '7', 'cloud diamond balance loads from the wallet row');
     assert.match(await page.$eval('#online-profile-handle', el => el.textContent), /@alice123/, 'cloud profile handle loads');
     await page.waitForFunction(() => window.__mockBackend.channels.some(channel => channel.name.startsWith('crossfour-wallet-')) && window.__mockBackend.channels.some(channel => channel.name.startsWith('crossfour-profile-')) && window.__mockBackend.channels.some(channel => channel.name.startsWith('crossfour-history-')));
+
+    if (process.env.ONLINE_ROOM_REQUEST_LOCK_ONLY === '1') {
+      const roomRequestCount = await page.evaluate(() => window.__mockBackend.rpcCalls.length);
+      await page.evaluate(() => { window.__mockBackend.delayRpc = 'create_room'; window.__mockBackend.delayRpcMs = 350; });
+      await page.click('#online-create-room');
+      await page.waitForFunction(() => document.querySelector('#online-create-room').disabled && document.querySelector('#online-quick-match').disabled);
+      assert.equal(await page.$eval('#online-create-room', button => button.getAttribute('aria-busy')), 'true', 'room creation exposes its pending state accessibly');
+      await page.evaluate(() => {
+        ['online-create-room', 'online-quick-match'].forEach(id => document.getElementById(id).dispatchEvent(new MouseEvent('click', { bubbles: true })));
+      });
+      await new Promise(resolve => setTimeout(resolve, 60));
+      const overlappingRoomRequests = await page.evaluate(start => window.__mockBackend.rpcCalls.slice(start).map(call => call.name), roomRequestCount);
+      assert.deepEqual(overlappingRoomRequests, ['create_room'], 'rapid repeated create/quick-match events cannot start a second room request');
+      await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-create-room').getAttribute('aria-busy') === null);
+      assert.equal(await page.$eval('#online-create-room', button => button.disabled), false, 'room controls unlock after the server response and room refresh complete');
+      console.log('Online room request single-flight browser regression passed.');
+      return;
+    }
 
     await page.$eval('#online-profile-name', el => { el.value = 'Alice Online'; });
     await page.click('#online-profile-form button[type="submit"]');

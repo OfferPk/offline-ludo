@@ -29,6 +29,7 @@
   var roomChannelStatus = 'idle';
   var roomConnectionState = 'idle';
   var roomRefreshSequence = 0;
+  var createRoomInFlight = false;
   var roomRestoreSequence = 0;
   var roomRestorePromise = null;
   var roomRestoreUserId = '';
@@ -1103,19 +1104,34 @@
       var text = errorText(error);
       return /create_room|quick_match|schema cache|Could not find the function|PGRST202/i.test(text);
     }
+    function runCreateRoomRequest(request) {
+      if (!client || createRoomInFlight) return;
+      createRoomInFlight = true;
+      $('online-create-room').disabled = true;
+      $('online-create-room').setAttribute('aria-busy', 'true');
+      $('online-quick-match').disabled = true;
+      var promise;
+      try { promise = request(); } catch (error) { promise = Promise.reject(error); }
+      return Promise.resolve(promise).finally(function () {
+        createRoomInFlight = false;
+        $('online-create-room').disabled = false;
+        $('online-create-room').removeAttribute('aria-busy');
+        $('online-quick-match').disabled = false;
+      });
+    }
     $('online-create-room').addEventListener('click', function () {
       if (!client) return;
       var args = roomRpcArgs();
-      callRpc('create_room', args).then(attachRoom).catch(function (error) {
+      runCreateRoomRequest(function () { return callRpc('create_room', args).then(attachRoom).catch(function (error) {
         if (args.p_rules && missingRulesRpc(error)) {
           announce('This server has not applied the v1.4.0 rules migration, so house rules cannot be locked yet. Creating the room with the previous server rules.', true);
           return callRpc('create_room', { p_mode: args.p_mode, p_capacity: args.p_capacity }).then(attachRoom);
         }
         announce('Room could not be created: ' + errorText(error), true);
-      });
+      }); });
     });
     $('online-quick-match').addEventListener('click', function () {
-      if (!client) return;
+      if (!client || createRoomInFlight) return;
       var args = roomRpcArgs();
       callRpc('quick_match', args).then(attachRoom).catch(function (error) {
         if (args.p_rules && missingRulesRpc(error)) {
