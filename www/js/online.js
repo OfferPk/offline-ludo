@@ -38,6 +38,7 @@
   var historyChannel = null;
   var client = null;
   var sdkLoading = null;
+  var staleRoomCleanupPromise = null;
   var nativeCallbackConfigured = false;
   var pendingInvite = new URLSearchParams(window.location.search).get('room') || sessionStorage.getItem('crossfour.online.pending-invite') || '';
   var handlingPendingInvite = false;
@@ -131,12 +132,28 @@
     if (window.__cf && window.__cf.clearOnline) window.__cf.clearOnline();
     renderRoom();
   }
-  function callRpc(name, args) {
+  function invokeRpc(name, args) {
     if (!client) return Promise.reject(new Error('Online services are not configured yet.'));
     return client.rpc(name, args).then(function (result) {
       if (result.error) throw result.error;
       return rpcObject(result.data);
     });
+  }
+  function cleanupStaleWaitingRooms() {
+    if (!client || !currentUser) return Promise.resolve(0);
+    if (staleRoomCleanupPromise) return staleRoomCleanupPromise;
+    var request = Promise.resolve().then(function () {
+      return invokeRpc('expire_stale_waiting_rooms', {});
+    }).catch(function () { return 0; });
+    staleRoomCleanupPromise = request.finally(function () { staleRoomCleanupPromise = null; });
+    return staleRoomCleanupPromise;
+  }
+  function callRpc(name, args) {
+    if (!client) return Promise.reject(new Error('Online services are not configured yet.'));
+    if (name === 'quick_match') {
+      return cleanupStaleWaitingRooms().then(function () { return invokeRpc(name, args); });
+    }
+    return invokeRpc(name, args);
   }
   function openOnline() {
     home.classList.add('hidden');
@@ -1245,7 +1262,9 @@
       handlingPendingInvite = true;
       joinInvite(pendingInvite).finally(function () { handlingPendingInvite = false; });
     } else {
-      restoreActiveRoom();
+      cleanupStaleWaitingRooms().then(function () {
+        if (currentUser && currentUser.id === userId && !recoveryMode) restoreActiveRoom();
+      });
     }
     return userId;
   }

@@ -13,6 +13,8 @@ Four additive migrations are applied to this project only:
 
 Post-apply metadata checks confirmed Chess match state is readable only to authenticated room participants, clients have no direct write access, `anon` has no access, and Chess transitions are exposed through authenticated security-definer RPCs rather than direct state mutation. The new functions validate room membership, assigned seat/turn, expected version, legal move and promotion, and an action-ID/payload-bound retry. The migration does not change email/password Auth settings, Classic Ludo rules, local saves, wallet operations, or production frontend hosting.
 
+This branch also proposes `20261007011000_expire_stale_waiting_rooms.sql`; it is **not applied** to the live project. It adds an authenticated, batch-limited cleanup that cancels only waiting rooms at least 24 hours old, matching the existing invite lifetime. The client invokes it before room recovery and Quick Match; active matches, room memberships, history, and wallets are untouched. Cleanup is best-effort, so a temporary RPC failure does not block matchmaking or room recovery.
+
 ## Email/password authentication
 
 Supabase Auth email/password signup is enabled and email confirmation is disabled (`mailer_autoconfirm` is on). Signup immediately returns a signed-in session. Email/password is the only sign-in method supported by this portal.
