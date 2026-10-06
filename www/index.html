@@ -348,6 +348,12 @@
         <span class="online-grace-meter" aria-hidden="true"><i id="online-grace-fill"></i></span>
       </div>
       <button id="online-board-retry" class="btn plate hidden" type="button">Retry pending action</button>
+      <section id="online-classic-accessible-controls" class="online-classic-accessible-controls hidden" role="region" aria-labelledby="online-classic-accessible-title">
+        <h2 id="online-classic-accessible-title">Online Classic controls</h2>
+        <p id="online-classic-accessible-status" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
+        <p class="online-classic-accessible-help">Keyboard: Space or Enter rolls; keys 1–4 move the matching token when a move is available. You can also choose an action below.</p>
+        <div id="online-classic-accessible-actions" class="online-classic-accessible-actions" role="group" aria-label="Available Online Classic actions"></div>
+      </section>
       <div id="stage">
         <div class="pods top"><div class="pod" data-slot="0"></div><div class="pod right" data-slot="1"></div></div>
         <div id="board-wrap">
@@ -610,6 +616,7 @@
   <script src="js/community.js?v=1.7.2"></script>
   <script src="js/supabase-config.js?v=1.7.2"></script>
   <script src="js/chess.js?v=1.7.2"></script>
+  <script src="js/online-classic-controls.js?v=1.7.2"></script>
   <script src="js/online.js?v=1.7.2"></script>
   <script src="js/ludo-chess-discovery.js?v=1.7.2"></script>
 </body>

@@ -647,6 +647,40 @@
       if (!/expire_turn|schema cache|Could not find the function|PGRST202/i.test(errorText(error))) announce('Turn timer could not be applied: ' + errorText(error), true);
     });
   }
+  function renderOnlineClassicControls(state, turnName, isMyTurn, isSynchronized, hasPendingAction, legalMoves) {
+    var panel = $('online-classic-accessible-controls');
+    var status = $('online-classic-accessible-status');
+    var actions = $('online-classic-accessible-actions');
+    var model = window.OnlineClassicControls.build(state, turnName, isMyTurn, isSynchronized, hasPendingAction, legalMoves);
+    var hadFocus = actions.contains(document.activeElement);
+    var focusedKey = hadFocus ? document.activeElement.dataset.onlineActionKey : '';
+    panel.classList.toggle('hidden', !model.visible);
+    status.textContent = model.status;
+    actions.replaceChildren();
+    model.actions.forEach(function (action) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn plate';
+      button.textContent = action.label;
+      button.setAttribute('aria-label', action.label);
+      button.dataset.onlineActionKey = action.key;
+      button.addEventListener('click', function () {
+        if (action.type === 'roll') {
+          submitMatchAction('roll_match', {});
+          return;
+        }
+        var queue = Array.isArray(state.queue) ? state.queue : [];
+        var queueIndex = queue.indexOf(action.value);
+        if (queueIndex >= 0) submitMatchAction('move_match', { p_piece: action.piece, p_queue_index: queueIndex });
+      });
+      actions.appendChild(button);
+    });
+    if (hadFocus) {
+      var replacement = Array.prototype.find.call(actions.children, function (button) { return button.dataset.onlineActionKey === focusedKey; });
+      if (replacement) replacement.focus({ preventScroll: true });
+      else status.focus({ preventScroll: true });
+    }
+  }
   function renderMatch() {
     var room = currentRoom;
     var panel = $('online-match-panel');
@@ -654,6 +688,7 @@
     var show = !!(room && (room.status === 'active' || room.status === 'completed') && record && record.state);
     panel.classList.toggle('hidden', !show);
     if (!show) {
+      $('online-classic-accessible-controls').classList.add('hidden');
       $('online-chess-play').classList.add('hidden');
       $('online-chess-resume').classList.add('hidden');
       panel.classList.remove('is-chess-match');
@@ -686,6 +721,7 @@
     var myMember = room.roster.find(function (member) { return member.user_id === (currentUser && currentUser.id); });
     var turnMember = room.roster.find(function (member) { return Number(member.seat) === Number(state.turn); });
     var isMyTurn = !!(myMember && Number(myMember.seat) === Number(state.turn));
+    var turnName = turnMember ? turnMember.displayName || turnMember.handle || 'Player' : 'The current player';
     $('online-match-version').textContent = 'Version ' + record.version;
     $('online-match-eyebrow').textContent = isChess ? 'LUDO CHESS · LIVE STATE' : 'ONLINE CLASSIC · LIVE STATE';
     $('online-match-heading').textContent = isChess ? (state.phase === 'over' ? 'Game complete' : 'Move ' + (state.fullmove || 1)) : (state.phase === 'over' ? 'Match complete' : 'Turn ' + ((state.turn_count || 0) + 1));
@@ -703,6 +739,7 @@
     $('online-chess-resign').disabled = !isSynchronized;
     $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) { button.disabled = !isSynchronized; });
     if (isChess) {
+      $('online-classic-accessible-controls').classList.add('hidden');
       if (window.__cf && window.__cf.clearOnline) window.__cf.clearOnline();
       renderChessDrawControls(state, room, isSynchronized);
       renderChessMoveHistory(state, room, record.version);
@@ -715,10 +752,12 @@
     var queue = Array.isArray(state.queue) ? state.queue : [];
     $('online-match-dice').textContent = (lastRoll ? 'Last server die: seat ' + (Number(lastRoll.seat) + 1) + ' rolled ' + lastRoll.face + '. ' : '') +
       (queue.length ? 'Dice to use: ' + queue.join(' · ') : 'No pending dice.');
+    var legalOnlineMoves = [];
     if (isMyTurn && state.phase === 'move' && !pendingMatchAction && window.LudoLogic && typeof window.LudoLogic.queueMoves === 'function') {
       var localView = { mode: 'classic', players: state.players, pieces: state.pieces, rules: state.rules, turn: Number(state.turn), phase: 'move', queue: queue, ranking: state.ranking || [], effects: [], capd: state.capd || [false, false, false, false], lk: null };
-      window.LudoLogic.queueMoves(localView);
+      legalOnlineMoves = window.LudoLogic.queueMoves(localView) || [];
     }
+    renderOnlineClassicControls(state, turnName, isMyTurn, isSynchronized, !!(pendingMatchAction && pendingMatchAction.room_id === currentRoomId), legalOnlineMoves);
     var names = {};
     (room.roster || []).forEach(function (member) { names[Number(member.seat)] = member.displayName || member.handle || ('Seat ' + (Number(member.seat) + 1)); });
     if (window.__cf && window.__cf.presentOnline) {

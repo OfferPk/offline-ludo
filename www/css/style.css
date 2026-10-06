@@ -1227,6 +1227,12 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-match-moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 9px; color: var(--muted); font-size: 11px; }
 .online-match-moves button { min-height: 38px; padding: 6px; font-size: 10px; }
 .online-match-panel > .online-mode-note { margin-bottom: 0; }
+.online-classic-accessible-controls { width: min(calc(100% - 20px), 620px); margin: 8px auto 12px; padding: 11px 12px; border: 1px solid rgba(115,224,176,.26); border-radius: 12px; background: rgba(14,25,28,.94); }
+.online-classic-accessible-controls h2 { margin: 0 0 5px; color: var(--ink); font-size: 14px; }
+.online-classic-accessible-controls p { margin: 4px 0 8px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.online-classic-accessible-controls [role="status"] { color: var(--ink); }
+.online-classic-accessible-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.online-classic-accessible-actions button { min-height: 42px; padding: 8px 12px; font-size: 12px; }
 @media (max-width: 370px) {
   .online-screen { padding-inline: 10px; }
   .online-card { padding: 12px; }
