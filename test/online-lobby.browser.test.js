@@ -69,8 +69,8 @@ function startLocalServer() {
       let resumeFixture = null;
       try { resumeFixture = JSON.parse(sessionStorage.getItem('crossfour.online.test-fixture') || 'null'); } catch (_) {}
       const state = window.__mockBackend = {
-        clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
-        removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
+        clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [], profileUpdateAttempts: [],
+        removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, failProfileUpdate: false, session: resumeFixture && resumeFixture.session || null,
         delayNextRead: null,
         actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false, dropNextDrawResponseAfterCommit: false,
         tables: resumeFixture && resumeFixture.tables || {
@@ -139,6 +139,7 @@ function startLocalServer() {
           return Promise.resolve().then(() => {
             const matchedRows = (state.tables[table] || []).filter(matches);
             if (operation === 'update') {
+              if (table === 'profiles' && state.failProfileUpdate) return { data: null, error: { message: 'Profile service unavailable' } };
               matchedRows.forEach(row => Object.assign(row, patch));
               return { data: null, error: null };
             }
@@ -155,7 +156,12 @@ function startLocalServer() {
         }
         const builder = {
           select() { operation = 'select'; return builder; },
-          update(values) { operation = 'update'; patch = values; return builder; },
+          update(values) {
+            operation = 'update';
+            patch = values;
+            if (table === 'profiles') state.profileUpdateAttempts.push(Object.assign({}, values));
+            return builder;
+          },
           eq(field, value) { filters.push({ kind: 'eq', field, value }); return builder; },
           in(field, values) { filters.push({ kind: 'in', field, values }); return builder; },
           order() { return builder; },
@@ -456,6 +462,45 @@ function startLocalServer() {
     assert.equal(await page.$eval('#online-wallet-diamonds', el => el.textContent), '7', 'cloud diamond balance loads from the wallet row');
     assert.match(await page.$eval('#online-profile-handle', el => el.textContent), /@alice123/, 'cloud profile handle loads');
     await page.waitForFunction(() => window.__mockBackend.channels.some(channel => channel.name.startsWith('crossfour-wallet-')) && window.__mockBackend.channels.some(channel => channel.name.startsWith('crossfour-profile-')) && window.__mockBackend.channels.some(channel => channel.name.startsWith('crossfour-history-')));
+
+    if (process.env.ONLINE_PROFILE_SAVE_GUARD_ONLY === '1') {
+      if (process.env.PREVIEW_DIR) {
+        await fs.promises.mkdir(process.env.PREVIEW_DIR, { recursive: true });
+        await page.$eval('#online-profile-form', el => el.scrollIntoView({ block: 'center' }));
+        await page.screenshot({ path: path.join(process.env.PREVIEW_DIR, 'mobile.png'), fullPage: true });
+      }
+      await page.$eval('#online-profile-name', el => { el.value = 'Alice Online'; });
+      await page.evaluate(() => { window.__mockBackend.failProfileUpdate = true; });
+      const failedSave = await page.evaluate(() => {
+        const state = window.__mockBackend;
+        const form = document.querySelector('#online-profile-form');
+        const button = form.querySelector('button[type="submit"]');
+        const start = state.profileUpdateAttempts.length;
+        const submit = () => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        submit();
+        const pending = { busy: form.getAttribute('aria-busy'), inputDisabled: document.querySelector('#online-profile-name').disabled, buttonDisabled: button.disabled, label: button.textContent };
+        submit();
+        return { attempts: state.profileUpdateAttempts.length - start, pending };
+      });
+      assert.equal(failedSave.attempts, 1, 'repeated profile submissions start only one update');
+      assert.deepEqual(failedSave.pending, { busy: 'true', inputDisabled: true, buttonDisabled: true, label: 'Saving…' }, 'the profile form exposes an accessible pending state');
+      await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Profile update failed: Profile service unavailable') && !document.querySelector('#online-profile-form').hasAttribute('aria-busy'));
+      assert.equal(await page.$eval('#online-profile-name', el => el.value), 'Alice Online', 'a failed save keeps the typed display name for retry');
+      assert.equal(await page.$eval('#online-profile-form button[type="submit"]', el => el.disabled + ':' + el.textContent), 'false:Save', 'failed saves restore the form action');
+
+      await page.evaluate(() => { window.__mockBackend.failProfileUpdate = false; });
+      const retryAttempts = await page.evaluate(() => {
+        const state = window.__mockBackend;
+        const start = state.profileUpdateAttempts.length;
+        document.querySelector('#online-profile-form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        return state.profileUpdateAttempts.length - start;
+      });
+      assert.equal(retryAttempts, 1, 'the user can retry after the failed request');
+      await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Display name saved to your online profile.') && window.__mockBackend.tables.profiles.find(row => row.id === 'user-one').display_name === 'Alice Online');
+      assert.deepEqual(errors, [], 'the profile save retry flow has no uncaught JavaScript errors');
+      console.log('Online profile-save single-flight browser regression passed.');
+      return;
+    }
 
     await page.$eval('#online-profile-name', el => { el.value = 'Alice Online'; });
     await page.click('#online-profile-form button[type="submit"]');

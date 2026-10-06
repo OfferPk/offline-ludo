@@ -1073,17 +1073,40 @@
         clearRoomSelection(true);
       }).catch(function (error) { announce('Sign-out failed: ' + errorText(error), true); });
     });
-    $('online-profile-form').addEventListener('submit', function (event) {
+    var profileUpdateInFlight = false;
+    var profileForm = $('online-profile-form');
+    var profileNameField = $('online-profile-name');
+    var profileSaveButton = profileForm.querySelector('button[type="submit"]');
+    var profileSaveLabel = profileSaveButton.textContent;
+    profileForm.addEventListener('submit', function (event) {
       event.preventDefault();
-      if (!client || !currentUser) return;
-      var displayName = $('online-profile-name').value.trim();
+      if (!client || !currentUser || profileUpdateInFlight) return;
+      var profileUserId = currentUser.id;
+      var displayName = profileNameField.value.trim();
       if (!displayName || displayName.length > 32) return announce('Choose a display name from 1 to 32 characters.', true);
-      client.from('profiles').update({ display_name: displayName }).eq('id', currentUser.id)
-        .then(function (result) {
+      profileUpdateInFlight = true;
+      profileForm.setAttribute('aria-busy', 'true');
+      profileNameField.disabled = true;
+      profileSaveButton.disabled = true;
+      profileSaveButton.textContent = 'Saving…';
+      announce('Saving display name…');
+      var request;
+      try { request = client.from('profiles').update({ display_name: displayName }).eq('id', profileUserId); }
+      catch (error) { request = Promise.reject(error); }
+      return Promise.resolve(request).then(function (result) {
           if (result.error) throw result.error;
+          if (!currentUser || currentUser.id !== profileUserId) return;
           announce('Display name saved to your online profile.');
           return refreshAccount().then(function () { return refreshRoom(); });
-        }).catch(function (error) { announce('Profile update failed: ' + errorText(error), true); });
+        }).catch(function (error) {
+          if (currentUser && currentUser.id === profileUserId) announce('Profile update failed: ' + errorText(error), true);
+        }).finally(function () {
+          profileUpdateInFlight = false;
+          profileForm.removeAttribute('aria-busy');
+          profileNameField.disabled = false;
+          profileSaveButton.disabled = !client || !currentUser;
+          profileSaveButton.textContent = profileSaveLabel;
+        });
     });
     function classicRulesPayload() {
       var rules = window.__cf && window.__cf.save && window.__cf.save.rules;
