@@ -323,9 +323,54 @@
         announce('Match history could not be refreshed. Try again when your connection is stable.', true);
       });
   }
+  function renderRoomRules(room) {
+    var panel = $('online-room-rules');
+    var list = $('online-room-rules-list');
+    if (!panel || !list) return;
+    list.replaceChildren();
+    if (!room || room.mode !== 'classic') {
+      panel.classList.add('hidden');
+      return;
+    }
+    panel.classList.remove('hidden');
+    var rules = room.locked_rules;
+    var keys = ['safeSquares', 'captureToEnter', 'blocks', 'bonusOnCapture', 'bonusOnHome', 'arrows', 'noCapture'];
+    var valid = rules && typeof rules === 'object' && !Array.isArray(rules) &&
+      (rules.rollStyle === 'star' || rules.rollStyle === 'classic') &&
+      keys.every(function (key) { return typeof rules[key] === 'boolean'; });
+    if (!valid) {
+      $('online-room-rules-note').textContent = room.lockedRulesAvailable === false
+        ? 'Rule details are unavailable on this server version. The room can still be played using its server rules.'
+        : 'A complete rule summary is not available for this table; no settings have been assumed.';
+      return;
+    }
+    $('online-room-rules-note').textContent = room.status === 'waiting'
+      ? 'Review the host-locked rules before marking Ready. They stay fixed for this table.'
+      : 'These host-chosen rules stay fixed for this table.';
+    var rows = [
+      ['Roll style', rules.rollStyle === 'star' ? 'Star · 6s stack' : 'Classic · move each 6 first'],
+      ['Safe squares', rules.safeSquares ? 'On' : 'Off'],
+      ['Capture to enter home', rules.captureToEnter ? 'On' : 'Off'],
+      ['Blocks', rules.blocks ? 'On' : 'Off'],
+      ['Bonus on capture', rules.bonusOnCapture ? 'On' : 'Off'],
+      ['Bonus on reaching home', rules.bonusOnHome ? 'On' : 'Off'],
+      ['Arrow tiles', rules.arrows ? 'On' : 'Off'],
+      ['Captures', rules.noCapture ? 'Disabled' : 'Allowed']
+    ];
+    rows.forEach(function (row) {
+      var item = document.createElement('div');
+      var label = document.createElement('dt');
+      var value = document.createElement('dd');
+      label.textContent = row[0];
+      value.textContent = row[1];
+      item.append(label, value);
+      list.appendChild(item);
+    });
+  }
   function renderRoom() {
     var room = currentRoom;
     var card = $('online-room-card');
+    renderRoomRules(room);
     card.classList.toggle('hidden', !room);
     if (!room) { $('online-chess-resume').classList.add('hidden'); renderMatch(); return; }
     if (room.status === 'completed' || room.status === 'cancelled' || (room.matchState && room.matchState.state && room.matchState.state.phase === 'over')) setRoomConnectionState('ended');
@@ -795,13 +840,35 @@
       }
     });
   }
+  function missingLockedRulesColumn(error) {
+    var message = errorText(error);
+    return /locked_rules/i.test(message) &&
+      (/PGRST204|42703/i.test(String(error && error.code || '')) || /column|schema cache/i.test(message));
+  }
+  function readRoomRecord(roomId) {
+    var columns = 'id,created_by,mode,capacity,status,updated_at';
+    return client.from('rooms').select(columns + ',locked_rules').eq('id', roomId).maybeSingle()
+      .then(function (result) {
+        if (!result.error) {
+          return Object.assign({}, result, {
+            lockedRulesAvailable: !!(result.data && Object.prototype.hasOwnProperty.call(result.data, 'locked_rules'))
+          });
+        }
+        if (!missingLockedRulesColumn(result.error)) return result;
+        return client.from('rooms').select(columns).eq('id', roomId).maybeSingle()
+          .then(function (fallback) {
+            if (fallback.error) return fallback;
+            return Object.assign({}, fallback, { lockedRulesAvailable: false });
+          });
+      });
+  }
   function refreshRoom() {
     if (!client || !currentRoomId || !currentUser) return Promise.resolve(null);
     var requestedRoomId = currentRoomId;
     var userId = currentUser.id;
     var requestSequence = ++roomRefreshSequence;
     return Promise.all([
-      client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').eq('id', requestedRoomId).maybeSingle(),
+      readRoomRecord(requestedRoomId),
       client.from('room_members').select('user_id,seat,role,ready').eq('room_id', requestedRoomId),
       client.from('room_invites').select('invite_code').eq('room_id', requestedRoomId).limit(1).maybeSingle(),
       client.from('match_states').select('room_id,version,state,updated_at').eq('room_id', requestedRoomId).maybeSingle(),
@@ -831,6 +898,7 @@
         var roomStatus = results[0].data.status;
         if (existingRoom && (existingRoom.status === 'completed' || existingRoom.status === 'cancelled') && roomStatus === 'active') roomStatus = existingRoom.status;
         currentRoom = Object.assign({}, results[0].data, {
+          lockedRulesAvailable: results[0].lockedRulesAvailable !== false && Object.prototype.hasOwnProperty.call(results[0].data, 'locked_rules'),
           status: roomStatus,
           inviteCode: results[2].data ? results[2].data.invite_code : '',
           matchState: serverMatchState,

@@ -1210,6 +1210,13 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-room-connection[data-state="reconnecting"] { color: #ffd37a !important; background: rgba(244,183,64,.08); }
 .online-room-connection[data-state="ended"] { color: #b8e7ce !important; background: rgba(115,224,176,.08); }
 .online-room-connection[data-state="idle"] { display: none; }
+.online-room-rules { margin: 10px 0 12px; padding: 10px; border: 1px solid var(--surface-edge); border-radius: 11px; background: var(--surface); }
+.online-room-rules h4 { margin: 2px 0 4px !important; font-size: 13px !important; }
+.online-room-rules-note { margin: 0 0 8px; color: var(--muted); font-size: 10px !important; line-height: 1.45; }
+.online-room-rules-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 0; }
+.online-room-rules-list > div { display: flex; justify-content: space-between; align-items: baseline; gap: 7px; min-width: 0; padding: 5px 6px; border-radius: 7px; background: rgba(255,255,255,.035); }
+.online-room-rules-list dt { color: var(--muted); font-size: 10px; line-height: 1.3; }
+.online-room-rules-list dd { margin: 0; color: var(--ink); font-size: 10px; font-weight: 750; text-align: right; }
 .online-invite-row input { font-family: ui-monospace, monospace; letter-spacing: .12em; }
 .online-room-roster, .online-history-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .online-room-roster li, .online-history-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface); font-size: 12px; }
@@ -1230,6 +1237,7 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 @media (max-width: 370px) {
   .online-screen { padding-inline: 10px; }
   .online-card { padding: 12px; }
+  .online-room-rules-list { grid-template-columns: 1fr; }
   .online-provider-actions { gap: 6px; }
   .online-provider-actions > * { padding-inline: 6px; font-size: 11px; }
 }
