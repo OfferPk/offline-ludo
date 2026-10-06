@@ -248,6 +248,12 @@
             <p id="online-room-connection" class="online-room-connection" role="status" aria-live="polite" aria-atomic="true" data-state="idle"></p>
             <label class="online-invite-label" for="online-invite-code">Invite code</label><div class="online-invite-row"><input id="online-invite-code" readonly><button id="online-copy-invite" class="btn plate" type="button">Copy link</button></div>
             <h4>Players</h4><ul id="online-room-roster" class="online-room-roster"></ul>
+            <section id="online-room-rules" class="online-room-rules hidden" aria-labelledby="online-room-rules-heading">
+              <span class="online-eyebrow">LOCKED FOR THIS TABLE</span>
+              <h4 id="online-room-rules-heading">Classic house rules</h4>
+              <p id="online-room-rules-note" class="online-room-rules-note"></p>
+              <dl id="online-room-rules-list" class="online-room-rules-list" aria-label="Host-selected Classic Ludo rules"></dl>
+            </section>
             <div class="online-provider-actions"><button id="online-ready" class="btn plate" type="button" aria-pressed="false">Ready</button><button id="online-start-room" class="btn primary hidden" type="button">Start table</button></div>
             <section id="online-match-panel" class="online-match-panel hidden" aria-label="Server-authoritative online match">
               <div class="online-card-head"><div><span id="online-match-eyebrow" class="online-eyebrow">ONLINE CLASSIC · LIVE STATE</span><h4 id="online-match-heading">Match state</h4></div><span id="online-match-version" class="online-match-version"></span></div>
