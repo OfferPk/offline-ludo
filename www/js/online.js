@@ -13,6 +13,7 @@
   var currentRoomId = sessionStorage.getItem('crossfour.online.room') || '';
   var currentRoom = null;
   var currentUser = null;
+  var authRequestInFlight = false;
   var pendingMatchAction = null;
   var selectedChessSquare = -1;
   var selectedChessMoves = [];
@@ -163,6 +164,19 @@
     home.classList.remove('hidden');
     $('btn-online').focus({ preventScroll: true });
   }
+  function renderAuthActions() {
+    ['online-signin', 'online-signup', 'online-reset-request'].forEach(function (id) {
+      $(id).disabled = authRequestInFlight || !client || !emailPasswordEnabled();
+    });
+    $('online-email').disabled = authRequestInFlight;
+    $('online-password').disabled = authRequestInFlight;
+  }
+  function setAuthRequestBusy(busy) {
+    authRequestInFlight = !!busy;
+    if (authRequestInFlight) authPanel.setAttribute('aria-busy', 'true');
+    else authPanel.removeAttribute('aria-busy');
+    renderAuthActions();
+  }
   function renderAccount() {
     var signedIn = !!currentUser;
     var recovering = !!recoveryMode;
@@ -171,9 +185,7 @@
     accountPanel.classList.toggle('hidden', !signedIn || recovering);
     roomPanel.classList.toggle('hidden', !signedIn || recovering);
     $('online-signout').disabled = !signedIn;
-    ['online-signin', 'online-signup', 'online-reset-request'].forEach(function (id) {
-      $(id).disabled = !client || !emailPasswordEnabled();
-    });
+    renderAuthActions();
     $('online-recovery-submit').disabled = !client || !recovering;
     if (!isConfigured()) {
       $('online-config-note').textContent = 'Waiting for the Online Ludo Supabase URL and publishable key. Offline play remains available.';
@@ -213,10 +225,15 @@
   }
   function signInWithPassword() {
     if (!client || !emailPasswordEnabled()) return announce('Email/password sign-in is unavailable.', true);
+    if (authRequestInFlight) return;
     var credentials = readCredentials();
     if (!credentials) return;
+    setAuthRequestBusy(true);
     announce('Signing in…');
-    client.auth.signInWithPassword(credentials).then(function (result) {
+    var request;
+    try { request = client.auth.signInWithPassword(credentials); }
+    catch (error) { request = Promise.reject(error); }
+    return Promise.resolve(request).then(function (result) {
       if (result.error) throw result.error;
       var session = result.data && result.data.session;
       if (!session || !session.user) return announce('Sign-in could not start a session. Please try again.', true);
@@ -225,14 +242,20 @@
       renderAccount();
       announce('Signed in. Your online account is ready.');
       return refreshAccount();
-    }).catch(function (error) { announce('Sign-in failed: ' + errorText(error), true); });
+    }).catch(function (error) { announce('Sign-in failed: ' + errorText(error), true); })
+      .finally(function () { setAuthRequestBusy(false); });
   }
   function signUpWithPassword() {
     if (!client || !emailPasswordEnabled()) return announce('Email/password account creation is unavailable.', true);
+    if (authRequestInFlight) return;
     var credentials = readCredentials();
     if (!credentials) return;
+    setAuthRequestBusy(true);
     announce('Creating your account…');
-    client.auth.signUp({ email: credentials.email, password: credentials.password }).then(function (result) {
+    var request;
+    try { request = client.auth.signUp({ email: credentials.email, password: credentials.password }); }
+    catch (error) { request = Promise.reject(error); }
+    return Promise.resolve(request).then(function (result) {
       if (result.error) throw result.error;
       var session = result.data && result.data.session;
       if (session && session.user) {
@@ -242,17 +265,24 @@
         return refreshAccount();
       }
       announce('Account created, but automatic sign-in did not start. Sign in with the same email and password.', true);
-    }).catch(function (error) { announce('Account creation failed: ' + errorText(error), true); });
+    }).catch(function (error) { announce('Account creation failed: ' + errorText(error), true); })
+      .finally(function () { setAuthRequestBusy(false); });
   }
   function requestPasswordReset() {
     if (!client || !emailPasswordEnabled()) return announce('Password reset is unavailable.', true);
+    if (authRequestInFlight) return;
     var emailField = $('online-email');
     if (!emailField.checkValidity()) { emailField.reportValidity(); return; }
+    setAuthRequestBusy(true);
     announce('Requesting a password reset…');
-    client.auth.resetPasswordForEmail(emailField.value.trim(), { redirectTo: authRedirectUrl() }).then(function (result) {
+    var request;
+    try { request = client.auth.resetPasswordForEmail(emailField.value.trim(), { redirectTo: authRedirectUrl() }); }
+    catch (error) { request = Promise.reject(error); }
+    return Promise.resolve(request).then(function (result) {
       if (result.error) throw result.error;
       announce('If an account exists for that address, a reset link will be sent. Supabase default email only reaches project-team addresses; if this address is not on the team, the link will not arrive until custom SMTP is configured.');
-    }).catch(function (error) { announce('Password reset could not be requested: ' + errorText(error), true); });
+    }).catch(function (error) { announce('Password reset could not be requested: ' + errorText(error), true); })
+      .finally(function () { setAuthRequestBusy(false); });
   }
   function updateRecoveredPassword(event) {
     event.preventDefault();
