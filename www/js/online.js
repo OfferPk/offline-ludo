@@ -749,12 +749,15 @@
       });
     }).then(function (result) {
       if (!result || restoreToken !== roomRestoreSequence || !currentUser || currentUser.id !== userId) return null;
-      var active = result.rooms.filter(function (room) {
-        return room.status === 'active' && (room.mode === 'classic' || room.mode === 'ludo_chess');
-      }).sort(function (a, b) { return String(b.updated_at || '').localeCompare(String(a.updated_at || '')); })[0];
-      if (!active) return null;
-      currentRoomId = active.id;
-      roomRestoreRoomId = active.id;
+      function newestRoomWithStatus(status) {
+        return result.rooms.filter(function (room) {
+          return room.status === status && (room.mode === 'classic' || room.mode === 'ludo_chess');
+        }).sort(function (a, b) { return String(b.updated_at || '').localeCompare(String(a.updated_at || '')); })[0];
+      }
+      var restorableRoom = newestRoomWithStatus('active') || newestRoomWithStatus('waiting');
+      if (!restorableRoom) return null;
+      currentRoomId = restorableRoom.id;
+      roomRestoreRoomId = restorableRoom.id;
       currentRoom = null;
       sessionStorage.setItem('crossfour.online.room', currentRoomId);
       subscribeRoom();
@@ -762,8 +765,8 @@
       return refreshRoom();
     }).catch(function (error) {
       if (restoreToken === roomRestoreSequence && currentUser && currentUser.id === userId) {
-        setRoomConnectionState(currentRoom ? 'reconnecting' : 'idle', currentRoom ? undefined : 'Could not check for an active room. Try again when your connection is stable.');
-        announce('Active online room could not be restored: ' + errorText(error), true);
+        setRoomConnectionState(currentRoom ? 'reconnecting' : 'idle', currentRoom ? undefined : 'Could not check for a saved room. Try again when your connection is stable.');
+        announce('Saved online room could not be restored: ' + errorText(error), true);
       }
       return null;
     });

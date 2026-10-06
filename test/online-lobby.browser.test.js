@@ -29,6 +29,36 @@ function startLocalServer() {
     server.listen(0, '127.0.0.1', () => resolve({ server, url: 'http://127.0.0.1:' + server.address().port + '/' }));
   });
 }
+async function testWaitingRoomRestoration(page) {
+  await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await page.evaluate(() => {
+    const roomId = 'resume-waiting-classic';
+    const fixture = {
+      session: { user: { id: 'user-one', email: 'alice@example.test' } },
+      tables: {
+        profiles: [{ id: 'user-one', handle: 'alice123', display_name: 'Alice' }],
+        wallets: [{ user_id: 'user-one', coins: 1250, diamonds: 7 }],
+        rooms: [{ id: roomId, created_by: 'user-one', mode: 'classic', capacity: 2, status: 'waiting', updated_at: '2026-10-04T12:00:00.000Z' }],
+        room_members: [{ room_id: roomId, user_id: 'user-one', seat: 0, role: 'host', ready: true }],
+        room_invites: [{ room_id: roomId, invite_code: 'WAITINGROOM1234' }],
+        match_history: [], match_states: [], ludo_chess_matches: []
+      }
+    };
+    sessionStorage.setItem('crossfour.online.test-fixture', JSON.stringify(fixture));
+    sessionStorage.removeItem('crossfour.online.room');
+  });
+  await page.reload({ waitUntil: 'networkidle0', timeout: 30000 });
+  await page.click('#btn-online');
+  await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-mode').textContent === 'Classic · 2 seats', { timeout: 5000 });
+  assert.match(await page.$eval('#online-room-status', el => el.textContent), /Waiting for players/, 'a fresh session restores the existing waiting-room lobby');
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.room')), 'resume-waiting-classic', 'discovery persists the restored waiting-room ID for subsequent refreshes');
+  assert.equal(await page.$eval('#online-match-panel', el => el.classList.contains('hidden')), true, 'waiting-room recovery does not fabricate an active match state');
+  assert.equal(await page.evaluate(() => window.__mockBackend.channels.some(channel => channel.name === 'crossfour-room-resume-waiting-classic' && !channel.removed)), true, 'the restored waiting room subscribes to its live roster');
+  await page.$eval('#online-room-card', el => el.scrollIntoView({ block: 'start' }));
+  const previewPath = path.resolve(__dirname, '../../artifacts/online-waiting-room-restore/mobile.png');
+  fs.mkdirSync(path.dirname(previewPath), { recursive: true });
+  await page.screenshot({ path: previewPath });
+}
 (async () => {
   let localServer = null;
   let url = process.argv[2];
@@ -397,6 +427,12 @@ function startLocalServer() {
 
     await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
     await page.waitForSelector('#home:not(.hidden)');
+    if (process.env.ONLINE_WAITING_ROOM_RESTORE_ONLY === '1') {
+      await testWaitingRoomRestoration(page);
+      assert.deepEqual(errors, [], 'page has no uncaught JavaScript errors during waiting-room recovery');
+      console.log('Online waiting-room restoration browser regression passed.');
+      return;
+    }
     assert.deepEqual(sdkRequests, [], 'offline-first startup does not download the Supabase SDK');
     assert.equal(await page.$eval('#online', el => el.classList.contains('hidden')), true, 'online screen stays hidden at startup');
     for (const [width, height] of [[320, 568], [320, 844], [360, 844], [390, 844]]) {
@@ -1165,8 +1201,9 @@ function startLocalServer() {
       await page.waitForFunction(index => document.querySelector('#online-chess-board [data-square="' + index + '"]').getAttribute('aria-selected') === 'true', {}, squareIndex);
     }
     await page.screenshot({ path: path.join(discoveryPreviewDir, 'mobile-ludo-chess.png') });
+    await testWaitingRoomRestoration(page);
     assert.deepEqual(errors, [], 'page has no uncaught JavaScript errors');
-    console.log('Online Ludo deterministic browser test passed (mocked Auth, Classic/Chess refresh recovery and rejoin, active-room discovery, stale snapshots, auth changes, clean leave, mobile preview, and offline fallback).');
+    console.log('Online Ludo deterministic browser test passed (mocked Auth, active-match and waiting-room discovery, Classic/Chess refresh recovery and rejoin, stale snapshots, auth changes, clean leave, mobile preview, and offline fallback).');
   } finally {
     await browser.close();
     if (localServer) await new Promise(resolve => localServer.server.close(resolve));
