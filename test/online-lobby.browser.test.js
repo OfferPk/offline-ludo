@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
+const verifyReadyToggleGuard = require('./online-ready-toggle.helper');
 const webRoot = path.resolve(__dirname, '..', 'www');
 const mime = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
@@ -71,7 +72,7 @@ function startLocalServer() {
       const state = window.__mockBackend = {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
         removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
-        delayNextRead: null,
+        delayNextRead: null, deferNextReadyRpc: false, releaseReadyRpc: null,
         actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false, dropNextDrawResponseAfterCommit: false,
         tables: resumeFixture && resumeFixture.tables || {
           profiles: [
@@ -248,6 +249,15 @@ function startLocalServer() {
                 const member = state.tables.room_members.find(row => row.room_id === args.p_room_id && row.user_id === 'user-one');
                 if (member) member.ready = args.p_ready;
                 data = { ready: args.p_ready };
+                if (state.deferNextReadyRpc) {
+                  state.deferNextReadyRpc = false;
+                  return new Promise(resolve => {
+                    state.releaseReadyRpc = () => {
+                      state.releaseReadyRpc = null;
+                      resolve({ data, error: null });
+                    };
+                  });
+                }
               } else if (name === 'start_room') {
                 const room = state.tables.rooms.find(row => row.id === args.p_room_id);
                 if (room) room.status = 'active';
@@ -473,6 +483,11 @@ function startLocalServer() {
 
     await page.click('#online-quick-match');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-mode').textContent === 'Classic · 2 seats');
+    await verifyReadyToggleGuard(page);
+    if (process.env.ONLINE_READY_GUARD_ONLY === '1') {
+      console.log('Online Ludo Ready-toggle browser checks passed (duplicate submission blocked; success and failure both clear pending state).');
+      return;
+    }
     assert.match(await page.$eval('#online-room-roster', el => el.textContent), /Alice Online[\s\S]*Bob/, 'matchmaking loads a room roster with cloud names');
     await page.evaluate(() => {
       const state = window.__mockBackend;
@@ -481,8 +496,6 @@ function startLocalServer() {
       state.emit('profiles', { event: 'UPDATE', old: { id: 'user-two' }, new: bob });
     });
     await page.waitForFunction(() => document.querySelector('#online-room-roster').textContent.includes('Bobby Live'));
-    await page.click('#online-ready');
-    await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     assert.ok((await page.evaluate(() => window.__mockBackend.snapshot())).channels.some(channel => channel.tables.includes('room_members')), 'room roster/status changes subscribe through Realtime');
 
     await page.click('#online-leave-room');
