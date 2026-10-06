@@ -323,9 +323,15 @@
         announce('Match history could not be refreshed. Try again when your connection is stable.', true);
       });
   }
+  function renderRoomEntryControls() {
+    var hasCurrentRoom = !!currentRoomId;
+    $('online-room-entry').classList.toggle('hidden', hasCurrentRoom);
+    $('online-room-entry-note').classList.toggle('hidden', !hasCurrentRoom);
+  }
   function renderRoom() {
     var room = currentRoom;
     var card = $('online-room-card');
+    renderRoomEntryControls();
     card.classList.toggle('hidden', !room);
     if (!room) { $('online-chess-resume').classList.add('hidden'); renderMatch(); return; }
     if (room.status === 'completed' || room.status === 'cancelled' || (room.matchState && room.matchState.state && room.matchState.state.phase === 'over')) setRoomConnectionState('ended');
@@ -756,6 +762,7 @@
       currentRoomId = active.id;
       roomRestoreRoomId = active.id;
       currentRoom = null;
+      renderRoomEntryControls();
       sessionStorage.setItem('crossfour.online.room', currentRoomId);
       subscribeRoom();
       setRoomConnectionState('reconnecting');
@@ -770,6 +777,7 @@
   }
   function restoreActiveRoom() {
     if (!client || !currentUser || recoveryMode) return Promise.resolve(null);
+    renderRoomEntryControls();
     var userId = currentUser.id;
     var roomId = currentRoomId;
     if (roomRestorePromise && roomRestoreUserId === userId && roomRestoreRoomId === roomId) return roomRestorePromise;
@@ -999,6 +1007,7 @@
     }
     currentRoomId = result.room_id;
     currentRoom = null;
+    renderRoomEntryControls();
     sessionStorage.setItem('crossfour.online.room', currentRoomId);
     setRoomConnectionState('connecting');
     announce(result.status === 'waiting' ? 'Room ready. Share the code to invite another player.' : 'Joined the waiting room.');
