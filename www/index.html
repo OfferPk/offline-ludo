@@ -8,7 +8,7 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.7.2">
+  <link rel="stylesheet" href="css/style.css?v=1.7.2&rev=local-save-export-1">
   <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.7.2">
 </head>
 <body>
@@ -579,6 +579,12 @@
         <label class="row"><span>Bonus roll on reaching home</span><input type="checkbox" id="rule-bonusOnHome"><i class="sw"></i></label>
         <label class="row"><span>Arrow tiles <small>one extra step clockwise</small></span><input type="checkbox" id="rule-arrows"><i class="sw"></i></label>
         <label class="row"><span>No captures <small>friendly race</small></span><input type="checkbox" id="rule-noCapture"><i class="sw"></i></label>
+        <section class="local-backup" aria-labelledby="local-backup-title">
+          <b id="local-backup-title">Offline save</b>
+          <p>Download a JSON copy of your local progress, settings, cosmetics and saved match. Nothing is uploaded.</p>
+          <button id="btn-export-backup" class="btn plate" type="button">Export offline save</button>
+          <p id="local-backup-status" class="local-backup-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        </section>
         <div class="panel-actions col">
           <a class="btn plate" href="privacy.html">Privacy policy</a>
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
@@ -601,11 +607,11 @@
   <script src="js/token-evolution.js?v=1.7.2"></script>
   <script src="js/skin-shop.js?v=1.7.2"></script>
   <script src="js/art.js?v=1.7.2"></script>
-  <script src="js/save-store.js?v=1.7.2"></script>
+  <script src="js/save-store.js?v=1.7.2&rev=local-save-export-1"></script>
   <script src="js/dice-gesture.js?v=1.7.2"></script>
   <script src="js/path-animation.js?v=1.7.2"></script>
   <script src="js/celebration.js?v=1.7.2"></script>
-  <script src="js/game.js?v=1.7.2"></script>
+  <script src="js/game.js?v=1.7.2&rev=local-save-export-1"></script>
   <script src="js/community-fixtures.js?v=1.7.2"></script>
   <script src="js/community.js?v=1.7.2"></script>
   <script src="js/supabase-config.js?v=1.7.2"></script>

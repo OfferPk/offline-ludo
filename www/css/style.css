@@ -118,6 +118,11 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .row input:checked + .sw { background: var(--accent); }
 .row input:checked + .sw::after { transform: translateX(18px); }
 .note { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 10px 2px; }
+.local-backup { margin-top: 14px; padding: 12px; border: 1px solid var(--surface-edge); border-radius: 14px; background: var(--surface); }
+.local-backup > b { font-size: 14px; }
+.local-backup > p { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 6px 0 10px; }
+.local-backup > .btn { width: 100%; }
+.local-backup > .local-backup-status { min-height: 1.3em; margin: 8px 0 0; }
 
 /* ---------------- game ---------------- */
 .turn-label { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
