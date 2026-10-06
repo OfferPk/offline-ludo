@@ -297,6 +297,26 @@
       announce('Account data could not be loaded: ' + errorText(error), true);
     });
   }
+  function historyStatusLabel(status) {
+    var label = String(status || 'unknown').replace(/[_-]+/g, ' ');
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }
+  function historyOutcome(match, userId) {
+    var status = String(match.status || '').toLowerCase();
+    if (status === 'active') return { label: 'In progress', tone: 'live' };
+    if (status === 'completed') {
+      if (match.winner_id) return match.winner_id === userId
+        ? { label: 'You won', tone: 'win' }
+        : { label: 'Another player won', tone: 'loss' };
+      return { label: 'No winner recorded', tone: 'neutral' };
+    }
+    return { label: historyStatusLabel(status || 'unknown'), tone: 'neutral' };
+  }
+  function historyDate(value) {
+    if (!value) return '';
+    var date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+  }
   function refreshHistory() {
     if (!client || !currentUser) return Promise.resolve();
     var requestedUserId = currentUser.id;
@@ -312,12 +332,22 @@
         (result.data || []).forEach(function (match) {
           var item = document.createElement('li');
           var title = document.createElement('b');
-          title.textContent = modeLabel(match.mode) + ' · ' + match.status;
+          title.textContent = modeLabel(match.mode) + ' · ' + historyStatusLabel(match.status);
+          var outcome = historyOutcome(match, requestedUserId);
+          var outcomeLabel = document.createElement('span');
+          outcomeLabel.className = 'online-history-outcome';
+          outcomeLabel.dataset.outcome = outcome.tone;
+          outcomeLabel.textContent = outcome.label;
           var detail = document.createElement('small');
-          detail.textContent = new Date(match.started_at).toLocaleString();
-          item.append(title, detail);
-        list.appendChild(item);
-      });
+          var dates = [];
+          var startedAt = historyDate(match.started_at);
+          var finishedAt = historyDate(match.finished_at);
+          if (startedAt) dates.push('Started ' + startedAt);
+          if (finishedAt) dates.push('Finished ' + finishedAt);
+          detail.textContent = dates.join(' · ') || 'Date unavailable';
+          item.append(title, outcomeLabel, detail);
+          list.appendChild(item);
+        });
       $('online-history-empty').classList.toggle('hidden', !!(result.data && result.data.length));
       }).catch(function () {
         announce('Match history could not be refreshed. Try again when your connection is stable.', true);
