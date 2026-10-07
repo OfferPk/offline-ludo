@@ -16,6 +16,7 @@
     "test:community": "node test/community.test.js",
     "test:online-ui": "node test/online-lobby.browser.test.js",
     "test:skins:browser": "node test/skins.browser.test.js",
+    "test:storage-protection": "node test/storage-protection.browser.test.js",
     "test:yard-pads": "node test/v162-yard-pads.browser.test.js",
     "test:camel": "node test/v163-camel.browser.test.js",
     "test:light-contrast": "node test/v164-light-contrast.browser.test.js",
