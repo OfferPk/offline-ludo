@@ -467,6 +467,11 @@
     <div id="stats" class="overlay hidden">
       <div class="panel wide">
         <div class="panel-head"><h3>Statistics</h3><button class="icon-btn close" data-close="stats" aria-label="Close">✕</button></div>
+        <section class="recent-match-history" aria-labelledby="recent-match-history-title">
+          <h4 id="recent-match-history-title">Recent offline matches</h4>
+          <p class="recent-match-history-note">Up to 20 results, saved only with this device’s game data.</p>
+          <ol id="recent-match-list" class="recent-match-history-list" aria-label="Recent offline match results"></ol>
+        </section>
         <div id="stats-body" class="stats-grid"></div>
       </div>
     </div>
@@ -602,6 +607,7 @@
   <script src="js/skin-shop.js?v=1.7.2"></script>
   <script src="js/art.js?v=1.7.2"></script>
   <script src="js/save-store.js?v=1.7.2"></script>
+  <script src="js/offline-match-history.js?v=1.7.2"></script>
   <script src="js/dice-gesture.js?v=1.7.2"></script>
   <script src="js/path-animation.js?v=1.7.2"></script>
   <script src="js/celebration.js?v=1.7.2"></script>
