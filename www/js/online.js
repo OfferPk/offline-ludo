@@ -389,6 +389,9 @@
     return state.winner === 0 || state.winner === 1 ? text + ' · ' + chessSeatName(room, state.winner) + ' wins' : text;
   }
   function chessStateAnnouncement(state, room, previousState, previousOffer, currentOffer) {
+    if (window.SFX && typeof window.SFX.incomingChessMove === 'function') {
+      window.SFX.incomingChessMove(previousState, state, room, currentUser && currentUser.id);
+    }
     if (state.phase === 'over') return chessResultLabel(state, room);
     if (currentOffer && !previousOffer) return 'Draw offer from ' + chessSeatName(room, Number(currentOffer.offered_by)) + '. ' + chessSeatName(room, state.turn) + ' to move.';
     if (previousOffer && !currentOffer && previousState && JSON.stringify(previousState.last_move) === JSON.stringify(state.last_move)) {

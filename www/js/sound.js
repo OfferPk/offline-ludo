@@ -83,6 +83,26 @@
     },
     forfeit: function () { if (!enabled || !ac()) return; thud(ctx.currentTime, 0.45); },
     turn: function () { if (!enabled || !ac()) return; ting(ctx.currentTime, 1320, 0.09, 0.32); },
+    incomingChessMove: function (previous, next, room, userId) {
+      if (!previous || !next || !room || room.mode !== 'ludo_chess' || !Array.isArray(room.roster) ||
+          typeof previous.board !== 'string' || previous.board.length !== 64 || typeof next.board !== 'string' || next.board.length !== 64 ||
+          previous.phase !== 'active' || (next.phase !== 'active' && next.phase !== 'over') || previous.board === next.board) return false;
+      var move = next.last_move, nextTurn = Number(next.turn), previousTurn = Number(previous.turn);
+      if (!move || !Number.isInteger(move.from) || !Number.isInteger(move.to) || move.from < 0 || move.from > 63 || move.to < 0 || move.to > 63 ||
+          (nextTurn !== 0 && nextTurn !== 1) || (previousTurn !== 0 && previousTurn !== 1) || previousTurn === nextTurn) return false;
+      if (typeof userId !== 'string' || !userId) return false;
+      var member = room.roster.find(function (candidate) { return candidate.user_id === userId; });
+      if (!member || Number(member.seat) !== nextTurn) return false;
+      if (enabled && ac()) {
+        var t = ctx.currentTime;
+        if (move.capture || move.en_passant) {
+          softTap(t, 660, 0.055); softTap(t + 0.045, 880, 0.04);
+        } else {
+          softTap(t, 1175, 0.035); softTap(t + 0.035, 1568, 0.025);
+        }
+      }
+      return true;
+    },
     win: function () {
       if (!enabled || !ac()) return;
       var t = ctx.currentTime;
