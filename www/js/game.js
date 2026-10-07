@@ -2609,11 +2609,17 @@
     }
     var g = onlineHooks.grace;
     if (grace) {
-      if (g && Number(g.until) > Date.now() && G.st.phase !== 'over') {
+      var graceSeat = g ? Number(g.seat) : -1;
+      var validGraceSeat = Number.isInteger(graceSeat) && graceSeat >= 0 && graceSeat < 4;
+      var graceName = validGraceSeat && onlineHooks.names && onlineHooks.names[graceSeat];
+      var graceTarget = typeof graceName === 'string' && graceName.trim()
+        ? graceName.trim() + ' (seat ' + (graceSeat + 1) + ')'
+        : 'seat ' + (graceSeat + 1);
+      if (g && validGraceSeat && Number(g.until) > Date.now() && G.st.phase !== 'over') {
         var gLeft = Math.max(0, Number(g.until) - Date.now()), gTotal = 20000;
         grace.classList.remove('hidden');
-        if (graceText) graceText.textContent = 'Reconnect window: seat ' + (Number(g.seat) + 1) + ' can rejoin for ' + Math.ceil(gLeft / 1000) + 's. No computer takes the seat.';
-        else grace.textContent = 'Reconnect window: seat ' + (Number(g.seat) + 1) + ' can rejoin for ' + Math.ceil(gLeft / 1000) + 's. No computer takes the seat.';
+        if (graceText) graceText.textContent = 'Reconnect window: ' + graceTarget + ' can rejoin for ' + Math.ceil(gLeft / 1000) + 's. No computer takes the seat.';
+        else grace.textContent = 'Reconnect window: ' + graceTarget + ' can rejoin for ' + Math.ceil(gLeft / 1000) + 's. No computer takes the seat.';
         if (graceFill) graceFill.style.width = Math.max(0, Math.min(100, (gLeft / gTotal) * 100)) + '%';
       } else grace.classList.add('hidden');
     }
