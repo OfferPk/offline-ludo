@@ -33,6 +33,8 @@
     var clock = options.now || function () { return Date.now(); };
     var lastGood = null;
     var writeBlocked = null;
+    // Exact primary value observed at load or the last successful write; used to reject stale tabs.
+    var observedPrimaryRaw = null;
 
     function freshDefaults() {
       var value = typeof defaults === 'function' ? defaults() : defaults;
@@ -45,9 +47,9 @@
       var raw;
       try { raw = storage.getItem(key); }
       catch (e) { return { error: e }; }
-      if (raw == null) return { missing: true };
-      try { return { value: JSON.parse(raw) }; }
-      catch (e) { return { corrupt: true }; }
+      if (raw == null) return { missing: true, raw: null };
+      try { return { value: JSON.parse(raw), raw: String(raw) }; }
+      catch (e) { return { corrupt: true, raw: String(raw) }; }
     }
     function legacyV2(value) {
       if (!isRecord(value)) return null;
@@ -108,6 +110,7 @@
         return result(empty, 'unavailable', null, true, writeBlocked);
       }
 
+      observedPrimaryRaw = entries[primaryKey].raw == null ? null : String(entries[primaryKey].raw);
       var primary = entries[primaryKey].value;
       var checkpoint = entries[checkpointKey].value;
       var primaryFuture = isRecord(primary) && typeof primary.schemaVersion === 'number' && primary.schemaVersion > version;
@@ -151,16 +154,23 @@
       var storage;
       try { storage = typeof storageProvider === 'function' ? storageProvider() : storageProvider; }
       catch (e) { storage = null; }
-      if (!storage || typeof storage.setItem !== 'function') return { ok: false, reason: 'storage-unavailable', stage: 'access' };
+      if (!storage || typeof storage.setItem !== 'function' || typeof storage.getItem !== 'function') return { ok: false, reason: 'storage-unavailable', stage: 'access' };
+      var currentRaw;
+      try { currentRaw = storage.getItem(primaryKey); }
+      catch (e) { return { ok: false, reason: 'storage-unavailable', stage: 'verify', error: e }; }
+      currentRaw = currentRaw == null ? null : String(currentRaw);
+      if (currentRaw !== observedPrimaryRaw) return { ok: false, reason: 'stale-write', stage: 'conflict' };
       try {
         if (!validate(payload)) return { ok: false, reason: 'invalid-snapshot', stage: 'validate' };
         var next = makeSnapshot(payload);
         if (!validSnapshot(next, version, validate)) return { ok: false, reason: 'invalid-snapshot', stage: 'validate' };
+        var serializedNext = JSON.stringify(next);
         var previous = lastGood || next;
         var stage = 'checkpoint';
         storage.setItem(checkpointKey, JSON.stringify(previous));
         stage = 'primary';
-        storage.setItem(primaryKey, JSON.stringify(next));
+        storage.setItem(primaryKey, serializedNext);
+        observedPrimaryRaw = serializedNext;
         lastGood = clone(next);
         return { ok: true };
       } catch (e) {
@@ -173,7 +183,12 @@
       var storage;
       try { storage = typeof storageProvider === 'function' ? storageProvider() : storageProvider; }
       catch (e) { storage = null; }
-      if (!storage || typeof storage.setItem !== 'function' || typeof storage.removeItem !== 'function') return { ok: false, reason: 'storage-unavailable', stage: 'access' };
+      if (!storage || typeof storage.setItem !== 'function' || typeof storage.removeItem !== 'function' || typeof storage.getItem !== 'function') return { ok: false, reason: 'storage-unavailable', stage: 'access' };
+      var currentRaw;
+      try { currentRaw = storage.getItem(primaryKey); }
+      catch (e) { return { ok: false, reason: 'storage-unavailable', stage: 'verify', error: e }; }
+      currentRaw = currentRaw == null ? null : String(currentRaw);
+      if (currentRaw !== observedPrimaryRaw) return { ok: false, reason: 'stale-write', stage: 'conflict' };
       var stage = 'validate';
       try {
         if (!validate(payload)) return { ok: false, reason: 'invalid-snapshot', stage: 'validate' };
@@ -184,6 +199,7 @@
         storage.removeItem(legacyV1Key);
         stage = 'primary';
         storage.setItem(primaryKey, serialized);
+        observedPrimaryRaw = serialized;
         lastGood = clone(next);
       } catch (e) {
         return { ok: false, reason: 'write-failed', stage: stage, error: e };
