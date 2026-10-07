@@ -19,6 +19,8 @@
   var pendingChessPromotion = null;
   var chessPlayViewDismissed = false;
   var chessMoveHistoryCache = { roomId: '', version: null, rows: [], captures: [] };
+  var chessReviewCache = { roomId: '', version: null, timeline: null };
+  var chessReviewIndex = null;
   var chessAnnouncementRoomId = '';
   var chessAnnouncementVersion = null;
   var chessAnnouncementState = null;
@@ -121,6 +123,8 @@
     pendingChessPromotion = null;
     chessPlayViewDismissed = false;
     chessMoveHistoryCache = { roomId: '', version: null, rows: [], captures: [] };
+    chessReviewCache = { roomId: '', version: null, timeline: null };
+    chessReviewIndex = null;
     chessAnnouncementRoomId = ''; chessAnnouncementVersion = null;
     chessAnnouncementState = null; chessAnnouncementDrawOffer = null;
     if (clearStoredState) {
@@ -453,6 +457,54 @@
     empty.classList.toggle('hidden', count > 0);
     if (count > 0) list.scrollTop = list.scrollHeight;
   }
+  function chessReviewTimeline(state, room, version) {
+    var roomId = room && room.id || '';
+    if (chessReviewCache.roomId === roomId && chessReviewCache.version === version && chessReviewCache.timeline) return chessReviewCache.timeline;
+    var timeline = window.OnlineChessReview && window.OnlineChessReview.createTimeline
+      ? window.OnlineChessReview.createTimeline(state, window.LudoChess)
+      : { complete: false, positions: [], moves: [], reason: 'Position review is unavailable in this build.' };
+    chessReviewCache = { roomId: roomId, version: version, timeline: timeline };
+    return timeline;
+  }
+  function renderChessReview(state, room, version) {
+    var timeline = chessReviewTimeline(state, room, version);
+    var available = !!(timeline.complete && timeline.positions && timeline.positions.length > 1 && timeline.moves && timeline.moves.length === timeline.positions.length - 1);
+    var start = $('online-chess-review-start'), previous = $('online-chess-review-previous');
+    var next = $('online-chess-review-next'), live = $('online-chess-review-live');
+    var status = $('online-chess-review-status');
+    if (!available) {
+      chessReviewIndex = null;
+      start.disabled = true; previous.disabled = true; next.disabled = true; live.disabled = true;
+      status.textContent = timeline.complete ? 'Play a move before reviewing earlier positions.' : 'Position review unavailable. ' + (timeline.reason || 'A complete, verified server history is required.');
+      return { state: state, reviewing: false, timeline: timeline, index: 0 };
+    }
+    var lastIndex = timeline.positions.length - 1;
+    if (chessReviewIndex !== null) chessReviewIndex = Math.max(0, Math.min(lastIndex, Number(chessReviewIndex) || 0));
+    var reviewing = chessReviewIndex !== null;
+    var index = reviewing ? chessReviewIndex : lastIndex;
+    var move = index > 0 ? timeline.moves[index - 1] : null;
+    var moveLabel = move ? String(move.number) + (Number(move.color) === 1 ? '… ' : '. ') + (move.san || move.coordinate) : '';
+    if (!reviewing) status.textContent = moveLabel ? 'Live server position · after ' + moveLabel + '.' : 'Live server position.';
+    else if (index === 0) status.textContent = 'Reviewing the starting position · position 1 of ' + timeline.positions.length + '.';
+    else status.textContent = 'Reviewing after ' + moveLabel + ' · position ' + (index + 1) + ' of ' + timeline.positions.length + '.';
+    start.disabled = index === 0;
+    previous.disabled = index === 0;
+    next.disabled = !reviewing || index >= lastIndex;
+    live.disabled = !reviewing;
+    return { state: reviewing ? timeline.positions[index] : state, reviewing: reviewing, timeline: timeline, index: index };
+  }
+  function navigateChessReview(action) {
+    if (!currentRoom || currentRoom.mode !== 'ludo_chess' || !currentRoom.matchState || !currentRoom.matchState.state) return;
+    var timeline = chessReviewTimeline(currentRoom.matchState.state, currentRoom, currentRoom.matchState.version);
+    if (!timeline.complete || !timeline.positions || timeline.positions.length < 2) return;
+    var lastIndex = timeline.positions.length - 1;
+    var index = chessReviewIndex === null ? lastIndex : Number(chessReviewIndex);
+    if (action === 'live') chessReviewIndex = null;
+    else if (action === 'start') chessReviewIndex = 0;
+    else if (action === 'previous') chessReviewIndex = Math.max(0, index - 1);
+    else if (action === 'next') chessReviewIndex = Math.min(lastIndex, index + 1);
+    renderMatch();
+  }
   function downloadChessPgn(pgn) {
     if (typeof Blob !== 'function' || !window.URL || typeof window.URL.createObjectURL !== 'function') throw new Error('File export is unavailable in this browser.');
     var blob = new Blob([pgn], { type: 'application/vnd.chess-pgn; charset=utf-8' });
@@ -519,7 +571,7 @@
     }
   }
   function chooseChessSquare(index, state, isMyTurn) {
-    if (!isMyTurn || state.phase !== 'active' || pendingMatchAction || pendingChessPromotion || roomConnectionState !== 'connected' || !window.LudoChess) return;
+    if (!isMyTurn || chessReviewIndex !== null || state.phase !== 'active' || pendingMatchAction || pendingChessPromotion || roomConnectionState !== 'connected' || !window.LudoChess) return;
     var matching = selectedChessMoves.find(function (move) { return move.to === index; });
     if (selectedChessSquare >= 0 && matching) {
       if (matching.promotion) {
@@ -557,16 +609,18 @@
       } catch (error) { /* cosmetic only */ }
     }, 60);
   }
-  function renderChessBoard(state, room, isMyTurn) {
+  function renderChessBoard(state, room, isMyTurn, reviewMode) {
     var chess = window.LudoChess;
     if (!chess || !state || typeof state.board !== 'string' || state.board.length !== 64) return;
     var board = $('online-chess-board');
+    board.setAttribute('aria-readonly', String(!!reviewMode));
     var activeSquare = board.contains(document.activeElement) ? Number(document.activeElement.dataset.square) : -1;
     var restoreFocus = Number.isInteger(activeSquare) && activeSquare >= 0 && activeSquare < 64;
     var focusIndex = restoreFocus ? activeSquare : (selectedChessSquare >= 0 ? selectedChessSquare : (state.last_move && Number.isInteger(state.last_move.to) ? state.last_move.to : 0));
     var chars = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚', P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔' };
     if (!isMyTurn || state.phase !== 'active' || pendingMatchAction) {
-      selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
+      selectedChessSquare = -1; selectedChessMoves = [];
+      if (!reviewMode) pendingChessPromotion = null;
     }
     $('online-chess-red').classList.toggle('is-turn', state.phase === 'active' && Number(state.turn) === 0);
     $('online-chess-blue').classList.toggle('is-turn', state.phase === 'active' && Number(state.turn) === 1);
@@ -576,16 +630,18 @@
     $('online-chess-blue-name').textContent = blueName;
     $('online-chess-red-role').textContent = 'Red pieces · ' + (myMember && Number(myMember.seat) === 0 ? 'you' : 'opponent');
     $('online-chess-blue-role').textContent = 'Blue pieces · ' + (myMember && Number(myMember.seat) === 1 ? 'you' : 'opponent');
-    $('online-chess-status').textContent = state.phase === 'over'
-      ? chessResultLabel(state, room)
-      : chessSeatName(room, state.turn) + (isMyTurn ? ' · your move' : ' · waiting for their move') + (state.check ? ' · Check!' : '');
-    $('online-chess-result').textContent = state.phase === 'over'
-      ? chessResultLabel(state, room) + '. Match saved to online history.'
-      : 'Standard chess rules · Red pieces move first · Select a piece, then a highlighted square.';
+    if (!reviewMode) {
+      $('online-chess-status').textContent = state.phase === 'over'
+        ? chessResultLabel(state, room)
+        : chessSeatName(room, state.turn) + (isMyTurn ? ' · your move' : ' · waiting for their move') + (state.check ? ' · Check!' : '');
+      $('online-chess-result').textContent = state.phase === 'over'
+        ? chessResultLabel(state, room) + '. Match saved to online history.'
+        : 'Standard chess rules · Red moves first · Select a piece, then a highlighted square.';
+    }
     celebrateChessWin(state, room);
-    $('online-chess-claim-draw').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || pendingMatchAction || !chess.canClaimDraw(state));
-    $('online-chess-resign').classList.toggle('hidden', state.phase !== 'active' || !isMyTurn || !!pendingMatchAction);
-    $('online-chess-promotion').classList.toggle('hidden', !pendingChessPromotion || !!pendingMatchAction);
+    $('online-chess-claim-draw').classList.toggle('hidden', !!reviewMode || state.phase !== 'active' || !isMyTurn || pendingMatchAction || !chess.canClaimDraw(state));
+    $('online-chess-resign').classList.toggle('hidden', !!reviewMode || state.phase !== 'active' || !isMyTurn || !!pendingMatchAction);
+    $('online-chess-promotion').classList.toggle('hidden', !!reviewMode || !pendingChessPromotion || !!pendingMatchAction);
     board.replaceChildren();
     for (var row = 0; row < 8; row++) {
       var rowElement = document.createElement('div');
@@ -598,7 +654,7 @@
         cell.tabIndex = index === focusIndex ? 0 : -1;
         cell.setAttribute('aria-colindex', String(col + 1));
         cell.setAttribute('aria-selected', String(selectedChessSquare === index));
-        cell.setAttribute('aria-disabled', String(!isMyTurn || state.phase !== 'active' || !!pendingMatchAction || roomConnectionState !== 'connected'));
+        cell.setAttribute('aria-disabled', String(!!reviewMode || !isMyTurn || state.phase !== 'active' || !!pendingMatchAction || roomConnectionState !== 'connected'));
         cell.className = 'online-chess-square ' + ((row + col) % 2 ? 'dark' : 'light');
         var checkedKing = state.check ? state.board.indexOf(Number(state.turn) === 0 ? 'K' : 'k') : -1;
         if (index === checkedKing) cell.classList.add('is-check');
@@ -657,6 +713,7 @@
       $('online-chess-play').classList.add('hidden');
       $('online-chess-resume').classList.add('hidden');
       panel.classList.remove('is-chess-match');
+      chessReviewIndex = null;
       setChessPlayScreen(false);
       chessAnnouncementRoomId = ''; chessAnnouncementVersion = null; chessAnnouncementState = null; chessAnnouncementDrawOffer = null; $('online-chess-announcement').textContent = '';
       if (window.__cf && window.__cf.clearOnline) window.__cf.clearOnline();
@@ -678,6 +735,7 @@
     } else {
       chessAnnouncementRoomId = ''; chessAnnouncementVersion = null; $('online-chess-announcement').textContent = '';
       chessAnnouncementState = null; chessAnnouncementDrawOffer = null;
+      chessReviewIndex = null;
     }
     panel.classList.toggle('is-chess-match', isChess);
     $('online-chess-resume').classList.toggle('hidden', !isChess || !chessPlayViewDismissed);
@@ -704,11 +762,12 @@
     $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) { button.disabled = !isSynchronized; });
     if (isChess) {
       if (window.__cf && window.__cf.clearOnline) window.__cf.clearOnline();
-      renderChessDrawControls(state, room, isSynchronized);
+      var review = renderChessReview(state, room, record.version);
+      renderChessDrawControls(state, room, isSynchronized && !review.reviewing);
       renderChessMoveHistory(state, room, record.version);
       renderCapturedPieces(chessMoveHistoryCache.captures, 0, 'online-chess-red-captured');
       renderCapturedPieces(chessMoveHistoryCache.captures, 1, 'online-chess-blue-captured');
-      renderChessBoard(state, room, isMyTurn);
+      renderChessBoard(review.state, room, isMyTurn && !review.reviewing, review.reviewing);
       return;
     }
     var lastRoll = state.last_roll;
@@ -992,6 +1051,9 @@
       roomRestoreUserId = '';
       roomRestoreRoomId = '';
       selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
+      chessMoveHistoryCache = { roomId: '', version: null, rows: [], captures: [] };
+      chessReviewCache = { roomId: '', version: null, timeline: null };
+      chessReviewIndex = null;
     }
     if (pendingMatchAction && pendingMatchAction.room_id !== result.room_id) {
       pendingMatchAction = null;
@@ -1174,6 +1236,10 @@
     $('online-chess-withdraw-draw').addEventListener('click', function () { submitMatchAction('respond_ludo_chess_draw', { p_response: 'withdraw' }); });
     $('online-chess-resign').addEventListener('click', function () { submitMatchAction('resign_ludo_chess', {}); });
     $('online-chess-copy-pgn').addEventListener('click', copyChessPgn);
+    $('online-chess-review-start').addEventListener('click', function () { navigateChessReview('start'); });
+    $('online-chess-review-previous').addEventListener('click', function () { navigateChessReview('previous'); });
+    $('online-chess-review-next').addEventListener('click', function () { navigateChessReview('next'); });
+    $('online-chess-review-live').addEventListener('click', function () { navigateChessReview('live'); });
     $('online-chess-back').addEventListener('click', function () {
       chessPlayViewDismissed = true;
       renderMatch();
