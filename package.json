@@ -13,6 +13,7 @@
     "test:tutorial": "node test/tutorial.browser.test.js",
     "test:spotlight": "node test/spotlight.test.js",
     "test:turn-controls": "node test/turn-controls.browser.test.js",
+    "test:offline-turn-announcements": "node test/offline-turn-announcements.browser.test.js",
     "test:community": "node test/community.test.js",
     "test:online-ui": "node test/online-lobby.browser.test.js",
     "test:skins:browser": "node test/skins.browser.test.js",
