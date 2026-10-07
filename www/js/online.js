@@ -28,6 +28,9 @@
   var roomChannel = null;
   var roomChannelStatus = 'idle';
   var roomConnectionState = 'idle';
+  var roomChatPending = [];
+  var roomChatSeen = Object.create(null);
+  var roomChatSending = false;
   var roomRefreshSequence = 0;
   var roomRestoreSequence = 0;
   var roomRestorePromise = null;
@@ -41,6 +44,7 @@
   var nativeCallbackConfigured = false;
   var pendingInvite = new URLSearchParams(window.location.search).get('room') || sessionStorage.getItem('crossfour.online.pending-invite') || '';
   var handlingPendingInvite = false;
+  var onlineChatChoices = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!', ':smile', ':laugh', ':wow', ':sad', ':angry', ':cool', ':think', ':love'];
   if (pendingInvite) sessionStorage.setItem('crossfour.online.pending-invite', pendingInvite);
   try { pendingMatchAction = JSON.parse(sessionStorage.getItem('crossfour.online.pending-match-action') || 'null'); } catch (_) { pendingMatchAction = null; }
 
@@ -113,6 +117,8 @@
     roomRestoreRoomId = '';
     roomRefreshSequence++;
     clearRoomChannel();
+    roomChatPending = [];
+    roomChatSeen = Object.create(null);
     currentRoomId = '';
     currentRoom = null;
     pendingMatchAction = null;
@@ -138,6 +144,61 @@
       return rpcObject(result.data);
     });
   }
+  function showRoomChatRow(row) {
+    if (!row || row.room_id !== currentRoomId || !currentRoom || currentRoom.id !== currentRoomId || !currentUser) return false;
+    if (onlineChatChoices.indexOf(row.message) < 0) return false;
+    var messageId = row.id == null ? '' : String(row.id);
+    if (messageId && roomChatSeen[messageId]) return false;
+    var member = currentRoom.roster.find(function (candidate) { return candidate.user_id === row.user_id; });
+    if (!member || !window.__cf || typeof window.__cf.showOnlineChatMessage !== 'function') return false;
+    if (!window.__cf.showOnlineChatMessage(Number(member.seat), row.message)) return false;
+    if (messageId) roomChatSeen[messageId] = true;
+    return true;
+  }
+  function receiveRoomChat(change) {
+    var row = change && change.new;
+    if (!row || row.room_id !== currentRoomId) return;
+    if (!currentRoom || currentRoom.id !== row.room_id || !window.__cf || !window.__cf.game || !window.__cf.game.online) {
+      if (roomChatPending.length >= 32) roomChatPending.shift();
+      roomChatPending.push(row);
+      return;
+    }
+    showRoomChatRow(row);
+  }
+  function flushRoomChatPending() {
+    var pending = roomChatPending;
+    roomChatPending = [];
+    pending.forEach(showRoomChatRow);
+  }
+  function sendOnlineRoomChat(message) {
+    if (onlineChatChoices.indexOf(message) < 0) {
+      announce('Choose one of the available Quick Chat messages.', true);
+      return Promise.resolve(false);
+    }
+    if (!client || !currentUser || !currentRoom || currentRoom.mode !== 'classic' || currentRoom.status !== 'active' || roomConnectionState !== 'connected') {
+      announce('Quick Chat is available in a connected Online Classic match.', true);
+      return Promise.resolve(false);
+    }
+    if (roomChatSending) return Promise.resolve(false);
+    var roomId = currentRoomId;
+    var userId = currentUser.id;
+    roomChatSending = true;
+    return client.rpc('send_room_chat', { p_room_id: roomId, p_message: message }).then(function (result) {
+      if (result.error) throw result.error;
+      var row = rpcObject(result.data);
+      if (currentRoomId !== roomId || !currentUser || currentUser.id !== userId) return false;
+      if (row.room_id !== roomId || row.user_id !== userId || row.message !== message) throw new Error('The Quick Chat response was invalid.');
+      showRoomChatRow(row);
+      return true;
+    }).catch(function (error) {
+      if (currentRoomId === roomId && currentUser && currentUser.id === userId) {
+        if (/wait|cooldown/i.test(errorText(error))) announce('Please wait a moment before sending another Quick Chat message.', true);
+        else announce('Quick Chat could not be delivered. Check your room connection and try again.', true);
+      }
+      return false;
+    }).finally(function () { roomChatSending = false; });
+  }
+  if (window.__cf && typeof window.__cf.setOnlineChatSender === 'function') window.__cf.setOnlineChatSender(sendOnlineRoomChat);
   function openOnline() {
     home.classList.add('hidden');
     screen.classList.remove('hidden');
@@ -849,6 +910,7 @@
           if (wasReconnecting) announce('Room reconnected. Latest server state restored.');
         }
         renderRoom();
+        flushRoomChatPending();
         return refreshHistory().then(function () { return currentRoom; });
       });
     }).catch(function (error) {
@@ -881,7 +943,8 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId }, refreshRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'room_members', filter: 'room_id=eq.' + roomId }, refreshRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'match_states', filter: 'room_id=eq.' + roomId }, refreshRoom)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ludo_chess_matches', filter: 'room_id=eq.' + roomId }, refreshRoom);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ludo_chess_matches', filter: 'room_id=eq.' + roomId }, refreshRoom)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'room_chat_messages', filter: 'room_id=eq.' + roomId }, receiveRoomChat);
     channel.roomId = roomId;
     channel.userId = userId;
     roomChannel = channel;
