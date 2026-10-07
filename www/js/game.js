@@ -678,7 +678,7 @@
         (pl.type === 'ai' ? '<span class="lvtag">' + LEVEL_NAMES[pl.level].charAt(0) + '</span>' : '') + '<span class="lkb"></span></div>' +
         '<div class="pmeta"><b class="pname"></b><small class="plvl"></small><div class="chips"></div></div>' +
         '<button class="pdice" aria-label="Roll the die for ' + NAMES[s] + ' (tap or swipe)">' + cubeHTML() + '<i class="roll-countdown" aria-hidden="true"></i><em class="boost-tag hidden"></em></button>' +
-        '<div class="bubble hidden"></div>';
+        '<div class="bubble hidden" role="status" aria-live="polite" aria-atomic="true"></div>';
       var die = el.querySelector('.pdice');
       window.DiceGesture.bind(die, function (e) {
         SFX.unlock();
@@ -1911,7 +1911,7 @@
     else later(fin, 500);
   }
 
-  // ---------------- quick chat & emotes (cosmetic, offline) ----------------
+  // ---------------- quick chat & emotes (local offline; shared in Online Classic) ----------------
   var lastChat = [0, 0, 0, 0];
   function bubble(seat, html, isEmote) {
     var p = podEl(seat); if (!p) return;
@@ -1921,6 +1921,16 @@
     SFX.pop();
   }
   function say(seat, item) { if (!item) return; if (item.charAt(0) === ':') bubble(seat, ART.emote(item.slice(1), 38), true); else bubble(seat, item.replace(/</g, '&lt;')); }
+  function validOnlineChatItem(item) {
+    return typeof item === 'string' && (PHRASES.indexOf(item) >= 0 || (item.charAt(0) === ':' && Object.prototype.hasOwnProperty.call(ART.EMOTES, item.slice(1))));
+  }
+  function setOnlineChatSender(sender) { onlineChatSender = typeof sender === 'function' ? sender : null; }
+  function showOnlineChatMessage(seat, item) {
+    seat = Number(seat);
+    if (!G || !G.online || !Number.isInteger(seat) || seat < 0 || seat >= 4 || !G.st.seats[seat] || !validOnlineChatItem(item)) return false;
+    say(seat, item);
+    return true;
+  }
   function pickOne(a) { return a[Math.floor(Math.random() * a.length)]; }
   /** Computer players react now and then (rate-limited; can be switched off in Settings). */
   function aiReact(kind, s, caps) {
@@ -1948,7 +1958,18 @@
     $('chat-emotes').innerHTML = Object.keys(ART.EMOTES).map(function (k) { return '<button data-say=":' + k + '" aria-label="' + ART.EMOTES[k].label + '">' + ART.emote(k, 34) + '</button>'; }).join('');
     each(document.querySelectorAll('#chat [data-say]'), function (b) {
       b.addEventListener('click', function () {
-        if (!G) return; var s = chatSender(); if (s < 0) return;
+        if (!G) return;
+        if (G.online) {
+          hide('chat');
+          if (!validOnlineChatItem(b.dataset.say)) return;
+          if (!onlineChatSender) { toast('Online Quick Chat is not connected yet.', 1800); return; }
+          try {
+            var pending = onlineChatSender(b.dataset.say);
+            if (pending && typeof pending.catch === 'function') pending.catch(function () {});
+          } catch (_) { toast('Could not send that chat message. Please try again.', 1800); }
+          return;
+        }
+        var s = chatSender(); if (s < 0) return;
         hide('chat'); say(s, b.dataset.say);
         setTimeout(function () { aiReact('reply', s, b.dataset.say); }, 900);
       });
@@ -2543,6 +2564,7 @@
 
   // ---------------- online Classic on the local board ----------------
   var onlineHooks = null;
+  var onlineChatSender = null;
   var parkedLocal = null;
   var onlineClock = null;
   var onlineExpireKey = '';
@@ -2682,6 +2704,8 @@
     podOf: function (s) { var p = podEl(s); return p ? +p.dataset.slot : null; },
     layout: layout,
     presentOnline: presentOnline,
+    setOnlineChatSender: setOnlineChatSender,
+    showOnlineChatMessage: showOnlineChatMessage,
     clearOnline: clearOnline,
     showOnlineBoard: showOnlineBoard,
     celebrateWin: celebrateWin,
