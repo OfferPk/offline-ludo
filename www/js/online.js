@@ -1038,6 +1038,18 @@
       announce('Could not finish email authentication: ' + errorText(error), true);
     });
   }
+  function lobbyPreferenceStorage() {
+    try { return window.localStorage; } catch (_) { return null; }
+  }
+  function restoreLobbyPreferences() {
+    var preferences = window.OnlineRoomPreferences.load(lobbyPreferenceStorage());
+    $('online-mode').value = preferences.mode;
+    $('online-capacity').value = preferences.classicCapacity;
+    capacityBeforeChess = preferences.classicCapacity;
+  }
+  function saveLobbyPreferences() {
+    window.OnlineRoomPreferences.save(lobbyPreferenceStorage(), $('online-mode').value, capacityBeforeChess);
+  }
   function updateRoomModeOptions() {
     var chessMode = $('online-mode').value === 'ludo_chess';
     var capacity = $('online-capacity');
@@ -1051,6 +1063,7 @@
       if (capacityBeforeChess && Array.prototype.some.call(capacity.options, function (option) { return option.value === capacityBeforeChess; })) capacity.value = capacityBeforeChess;
       $('online-mode-note').textContent = 'Classic Ludo plays on the same board as offline. House rules lock when the room is created. Mystery and Lucky Chaos remain offline modes.';
     }
+    saveLobbyPreferences();
   }
   function bindEvents() {
     $('btn-online').addEventListener('click', openOnline);
@@ -1062,8 +1075,12 @@
     $('online-signup').addEventListener('click', signUpWithPassword);
     $('online-reset-request').addEventListener('click', requestPasswordReset);
     $('online-recovery-form').addEventListener('submit', updateRecoveredPassword);
+    restoreLobbyPreferences();
     $('online-mode').addEventListener('change', updateRoomModeOptions);
-    $('online-capacity').addEventListener('change', function () { if ($('online-mode').value !== 'ludo_chess') capacityBeforeChess = $('online-capacity').value; });
+    $('online-capacity').addEventListener('change', function () {
+      if ($('online-mode').value !== 'ludo_chess') capacityBeforeChess = $('online-capacity').value;
+      saveLobbyPreferences();
+    });
     updateRoomModeOptions();
     $('online-signout').addEventListener('click', function () {
       if (!client) return;
