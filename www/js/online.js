@@ -31,6 +31,11 @@
   var roomRefreshSequence = 0;
   var roomRestoreSequence = 0;
   var roomRestorePromise = null;
+  var multiGraceExpiryTimer = null;
+  var multiGraceExpiryKey = '';
+  var multiGraceExpiryInFlightKey = '';
+  var multiGraceRetryKey = '';
+  var multiGraceRetryAt = 0;
   var roomRestoreUserId = '';
   var roomRestoreRoomId = '';
   var walletChannel = null;
@@ -91,6 +96,94 @@
   function removeRealtimeChannel(channel) {
     if (client && channel) client.removeChannel(channel);
   }
+  function clearMultiGraceExpiry() {
+    if (multiGraceExpiryTimer) window.clearTimeout(multiGraceExpiryTimer);
+    multiGraceExpiryTimer = null;
+    multiGraceExpiryKey = '';
+    multiGraceRetryKey = '';
+    multiGraceRetryAt = 0;
+  }
+  function earliestDisconnectedRoomMember(room) {
+    var earliest = null;
+    (room && Array.isArray(room.roster) ? room.roster : []).forEach(function (member) {
+      if (!member || !member.disconnected_at) return;
+      var disconnectedAt = Date.parse(member.disconnected_at);
+      var seat = Number(member.seat);
+      if (!Number.isInteger(seat) || !Number.isFinite(disconnectedAt)) return;
+      var candidate = { seat: seat, disconnectedAt: disconnectedAt, until: disconnectedAt + 20000 };
+      if (!earliest || candidate.until < earliest.until) earliest = candidate;
+    });
+    return earliest;
+  }
+  function scheduleMultiSeatGraceExpiry(room) {
+    var state = room && room.matchState && room.matchState.state;
+    if (!room || room.id !== currentRoomId || room.mode !== 'classic' || room.status !== 'active' ||
+        !currentUser || !state || state.phase === 'over' || roomConnectionState === 'ended') {
+      clearMultiGraceExpiry();
+      return;
+    }
+    var disconnected = earliestDisconnectedRoomMember(room);
+    if (!disconnected) {
+      clearMultiGraceExpiry();
+      return;
+    }
+    var key = room.id + ':' + disconnected.seat + ':' + disconnected.disconnectedAt;
+    if (key === multiGraceExpiryKey && (multiGraceExpiryTimer || multiGraceExpiryInFlightKey === key)) return;
+    if (multiGraceExpiryTimer) window.clearTimeout(multiGraceExpiryTimer);
+    multiGraceExpiryTimer = null;
+    if (key !== multiGraceRetryKey) {
+      multiGraceRetryKey = '';
+      multiGraceRetryAt = 0;
+    }
+    multiGraceExpiryKey = key;
+
+    function later(delay) {
+      if (currentRoomId === room.id && multiGraceExpiryKey === key) {
+        multiGraceExpiryTimer = window.setTimeout(expire, delay);
+      }
+    }
+    function expire() {
+      multiGraceExpiryTimer = null;
+      if (currentRoomId !== room.id || multiGraceExpiryKey !== key) return;
+      if (multiGraceExpiryInFlightKey) { later(1000); return; }
+      if (!currentUser || roomConnectionState !== 'connected') { later(3000); return; }
+      var currentCandidate = earliestDisconnectedRoomMember(currentRoom);
+      if (!currentCandidate || currentCandidate.seat !== disconnected.seat || currentCandidate.disconnectedAt !== disconnected.disconnectedAt) {
+        scheduleMultiSeatGraceExpiry(currentRoom);
+        return;
+      }
+      var remaining = disconnected.until - Date.now();
+      if (remaining > 0) { later(remaining + 250); return; }
+      multiGraceExpiryInFlightKey = key;
+      callRpc('expire_grace', { p_room_id: room.id }).then(function () {
+        if (currentRoomId !== room.id || multiGraceExpiryKey !== key) return null;
+        // Realtime may already have refreshed the roster. A short retry also
+        // covers a server/client clock skew that made the authoritative call early.
+        multiGraceRetryKey = key;
+        multiGraceRetryAt = Date.now() + 3000;
+        multiGraceExpiryKey = '';
+        return refreshRoom().then(function (refreshed) {
+          if (!refreshed && currentRoomId === room.id && currentRoom && !multiGraceExpiryKey) {
+            multiGraceExpiryKey = key;
+            later(3000);
+          }
+        });
+      }).catch(function (error) {
+        if (currentRoomId !== room.id || multiGraceExpiryKey !== key) return;
+        if (/schema cache|Could not find the function|PGRST202/i.test(errorText(error))) {
+          clearMultiGraceExpiry();
+          return;
+        }
+        later(3000);
+      }).finally(function () {
+        if (multiGraceExpiryInFlightKey === key) multiGraceExpiryInFlightKey = '';
+      });
+    }
+
+    var delay = Math.max(0, disconnected.until - Date.now() + 1200);
+    if (multiGraceRetryKey === key) delay = Math.max(delay, multiGraceRetryAt - Date.now());
+    later(delay);
+  }
   function clearRoomChannel() {
     var channel = roomChannel;
     roomChannel = null;
@@ -112,6 +205,7 @@
     roomRestoreUserId = '';
     roomRestoreRoomId = '';
     roomRefreshSequence++;
+    clearMultiGraceExpiry();
     clearRoomChannel();
     currentRoomId = '';
     currentRoom = null;
@@ -325,6 +419,7 @@
   }
   function renderRoom() {
     var room = currentRoom;
+    scheduleMultiSeatGraceExpiry(room);
     var card = $('online-room-card');
     card.classList.toggle('hidden', !room);
     if (!room) { $('online-chess-resume').classList.add('hidden'); renderMatch(); return; }
@@ -802,7 +897,7 @@
     var requestSequence = ++roomRefreshSequence;
     return Promise.all([
       client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').eq('id', requestedRoomId).maybeSingle(),
-      client.from('room_members').select('user_id,seat,role,ready').eq('room_id', requestedRoomId),
+      client.from('room_members').select('user_id,seat,role,ready,disconnected_at').eq('room_id', requestedRoomId),
       client.from('room_invites').select('invite_code').eq('room_id', requestedRoomId).limit(1).maybeSingle(),
       client.from('match_states').select('room_id,version,state,updated_at').eq('room_id', requestedRoomId).maybeSingle(),
       client.from('ludo_chess_matches').select('room_id,version,state,draw_offer,updated_at').eq('room_id', requestedRoomId).maybeSingle()
