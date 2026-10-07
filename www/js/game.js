@@ -2456,7 +2456,10 @@
     var card = $('howto-card'); if (card) card.classList.toggle('is-open', open);
     if (open && card && card.scrollIntoView) {
       var r = card.getBoundingClientRect();
-      if (r.bottom > window.innerHeight) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      if (r.bottom > window.innerHeight) {
+        var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        card.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+      }
     }
   });
   each($('rules-tabs').children, function (b) { b.addEventListener('click', function () { SFX.click(); openRules(b.dataset.tab); }); });
