@@ -561,17 +561,19 @@
     var chess = window.LudoChess;
     if (!chess || !state || typeof state.board !== 'string' || state.board.length !== 64) return;
     var board = $('online-chess-board');
+    var myMember = room && Array.isArray(room.roster) ? room.roster.find(function (member) { return member.user_id === (currentUser && currentUser.id); }) : null;
+    var flipped = !!(myMember && Number(myMember.seat) === 1);
     var activeSquare = board.contains(document.activeElement) ? Number(document.activeElement.dataset.square) : -1;
     var restoreFocus = Number.isInteger(activeSquare) && activeSquare >= 0 && activeSquare < 64;
-    var focusIndex = restoreFocus ? activeSquare : (selectedChessSquare >= 0 ? selectedChessSquare : (state.last_move && Number.isInteger(state.last_move.to) ? state.last_move.to : 0));
+    var focusIndex = restoreFocus ? activeSquare : (selectedChessSquare >= 0 ? selectedChessSquare : (state.last_move && Number.isInteger(state.last_move.to) ? state.last_move.to : (flipped ? 63 : 0)));
     var chars = { p: '♟', n: '♞', b: '♝', r: '♜', q: '♛', k: '♚', P: '♙', N: '♘', B: '♗', R: '♖', Q: '♕', K: '♔' };
+    board.setAttribute('aria-label', 'Ludo Chess board, ' + (flipped ? 'Blue' : 'Red') + ' side at bottom');
     if (!isMyTurn || state.phase !== 'active' || pendingMatchAction) {
       selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
     }
     $('online-chess-red').classList.toggle('is-turn', state.phase === 'active' && Number(state.turn) === 0);
     $('online-chess-blue').classList.toggle('is-turn', state.phase === 'active' && Number(state.turn) === 1);
     var redName = chessPlayerName(room, 0), blueName = chessPlayerName(room, 1);
-    var myMember = room.roster.find(function (member) { return member.user_id === (currentUser && currentUser.id); });
     $('online-chess-red-name').textContent = redName;
     $('online-chess-blue-name').textContent = blueName;
     $('online-chess-red-role').textContent = 'Red pieces · ' + (myMember && Number(myMember.seat) === 0 ? 'you' : 'opponent');
@@ -592,7 +594,7 @@
       rowElement.className = 'online-chess-row';
       rowElement.setAttribute('role', 'row'); rowElement.setAttribute('aria-rowindex', String(row + 1));
       for (var col = 0; col < 8; col++) {
-        var index = row * 8 + col, piece = state.board[index];
+        var index = flipped ? (7 - row) * 8 + (7 - col) : row * 8 + col, piece = state.board[index];
         var cell = document.createElement('button');
         cell.type = 'button'; cell.setAttribute('role', 'gridcell'); cell.dataset.square = String(index);
         cell.tabIndex = index === focusIndex ? 0 : -1;
@@ -609,10 +611,10 @@
         var label = piece === '.' ? 'Empty square' : (window.LudoChess.colorOf(piece) === 0 ? 'Red ' : 'Blue ') + chess.pieceName(piece);
         cell.setAttribute('aria-label', label + ' on ' + chess.coord(index) + ((selectedChessSquare === index) ? ', selected' : '') + (legal ? ', legal destination' : '') + (index === checkedKing ? ', in check' : ''));
         if (col === 0) {
-          var rank = document.createElement('span'); rank.className = 'square-coord rank-coord'; rank.textContent = String(8 - row); cell.appendChild(rank);
+          var rank = document.createElement('span'); rank.className = 'square-coord rank-coord'; rank.textContent = chess.coord(index).charAt(1); cell.appendChild(rank);
         }
         if (row === 7) {
-          var file = document.createElement('span'); file.className = 'square-coord file-coord'; file.textContent = String.fromCharCode(97 + col); cell.appendChild(file);
+          var file = document.createElement('span'); file.className = 'square-coord file-coord'; file.textContent = chess.coord(index).charAt(0); cell.appendChild(file);
         }
         if (piece !== '.') {
           var glyph = document.createElement('span'); glyph.className = 'online-chess-piece ' + (window.LudoChess.colorOf(piece) === 0 ? 'red-piece' : 'blue-piece');
@@ -629,7 +631,8 @@
           event.preventDefault();
           var nextRow = squareRow + delta[0], nextCol = squareCol + delta[1];
           if (nextRow < 0 || nextRow > 7 || nextCol < 0 || nextCol > 7) return;
-          var nextCell = board.querySelector('[data-square="' + (nextRow * 8 + nextCol) + '"]');
+          var nextSquare = flipped ? (7 - nextRow) * 8 + (7 - nextCol) : nextRow * 8 + nextCol;
+          var nextCell = board.querySelector('[data-square="' + nextSquare + '"]');
           if (nextCell) nextCell.focus();
         }; }(row, col));
         rowElement.appendChild(cell);
