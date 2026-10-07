@@ -1206,6 +1206,7 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-room-card h3 { margin: 3px 0; font-size: 16px; }
 .online-room-card h4 { margin: 14px 0 6px; font-size: 12px; }
 .online-room-state { color: var(--muted); font-size: 12px !important; }
+.online-classic-turn-summary:not(.hidden) { margin: 0 0 9px; padding: 8px 10px; border: 1px solid rgba(130,201,187,.24); border-radius: 9px; color: #b9ece0 !important; background: rgba(73,158,139,.09); font-weight: 750; }
 .online-room-connection { margin: 7px 0; padding: 7px 9px; border-radius: 8px; color: #9ad9ff !important; background: rgba(105,205,255,.07); font-size: 11px !important; }
 .online-room-connection[data-state="reconnecting"] { color: #ffd37a !important; background: rgba(244,183,64,.08); }
 .online-room-connection[data-state="ended"] { color: #b8e7ce !important; background: rgba(115,224,176,.08); }
@@ -1751,6 +1752,7 @@ body.light .online-screen input::placeholder { color: var(--muted); }
 body.light .online-limit-note { border-color: rgba(176,112,16,.32); background: rgba(244,183,64,.12); }
 body.light .online-live-dot { background: #18a074; box-shadow: 0 0 8px rgba(24,160,116,.5); }
 body.light .online-room-card { border-color: rgba(31,96,160,.26); background: rgba(53,153,220,.07); }
+body.light .online-classic-turn-summary:not(.hidden) { color: #146852 !important; background: rgba(24,160,116,.09); border-color: rgba(24,160,116,.26); }
 body.light .online-room-connection { color: var(--lt-link) !important; background: rgba(31,96,160,.08); }
 body.light .online-room-connection[data-state="reconnecting"] { color: var(--lt-warn) !important; background: rgba(244,183,64,.14); }
 body.light .online-room-connection[data-state="ended"] { color: #11744f !important; background: rgba(24,160,116,.1); }

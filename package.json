@@ -16,6 +16,7 @@
     "test:community": "node test/community.test.js",
     "test:online-ui": "node test/online-lobby.browser.test.js",
     "test:online-classic-navigation": "node test/online-classic-navigation.browser.test.js",
+    "test:online-classic-room-summary": "node test/online-classic-room-summary.test.js",
     "test:skins:browser": "node test/skins.browser.test.js",
     "test:yard-pads": "node test/v162-yard-pads.browser.test.js",
     "test:camel": "node test/v163-camel.browser.test.js",
