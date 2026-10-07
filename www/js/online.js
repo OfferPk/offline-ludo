@@ -41,6 +41,7 @@
   var nativeCallbackConfigured = false;
   var pendingInvite = new URLSearchParams(window.location.search).get('room') || sessionStorage.getItem('crossfour.online.pending-invite') || '';
   var handlingPendingInvite = false;
+  var pendingInviteAttemptUserId = '';
   if (pendingInvite) sessionStorage.setItem('crossfour.online.pending-invite', pendingInvite);
   try { pendingMatchAction = JSON.parse(sessionStorage.getItem('crossfour.online.pending-match-action') || 'null'); } catch (_) { pendingMatchAction = null; }
 
@@ -150,13 +151,13 @@
       announce('Connecting to the online sign-in service…');
       ensureClient().then(function () {
         if (currentUser) refreshAccount();
-        if (pendingInvite && currentUser) joinInvite(pendingInvite);
+        if (pendingInvite && currentUser) attemptPendingInvite();
       }).catch(function (error) { announce('Online sign-in could not load: ' + errorText(error), true); });
     } else if (currentUser) {
       refreshAccount();
       if (!pendingInvite) restoreActiveRoom();
     }
-    if (pendingInvite && currentUser) joinInvite(pendingInvite);
+    if (pendingInvite && currentUser) attemptPendingInvite();
   }
   function closeOnline() {
     screen.classList.add('hidden');
@@ -1005,14 +1006,37 @@
     subscribeRoom();
     return refreshRoom();
   }
-  function joinInvite(code) {
-    if (!client || !currentUser || !code) return Promise.resolve();
+  function clearPendingInvite() {
     pendingInvite = '';
+    pendingInviteAttemptUserId = '';
     sessionStorage.removeItem('crossfour.online.pending-invite');
     window.history.replaceState({}, '', window.location.pathname + window.location.hash);
-    return callRpc('join_room', { p_invite_code: code.trim().toUpperCase() })
-      .then(attachRoom)
-      .catch(function (error) { announce('Could not join room: ' + errorText(error), true); });
+  }
+  function attemptPendingInvite() {
+    if (!pendingInvite || !currentUser || handlingPendingInvite || pendingInviteAttemptUserId === currentUser.id) return Promise.resolve();
+    var userId = currentUser.id;
+    var code = pendingInvite;
+    pendingInviteAttemptUserId = userId;
+    handlingPendingInvite = true;
+    return joinInvite(code, true).finally(function () { handlingPendingInvite = false; });
+  }
+  function joinInvite(code, isPendingAttempt) {
+    if (!client || !currentUser || !code || (handlingPendingInvite && !isPendingAttempt)) return Promise.resolve();
+    var normalizedCode = code.trim().toUpperCase();
+    var codeInput = $('online-join-code');
+    if (pendingInvite && codeInput) codeInput.value = normalizedCode;
+    return callRpc('join_room', { p_invite_code: normalizedCode })
+      .then(function (result) {
+        var attached = attachRoom(result);
+        return Promise.resolve(attached).then(function (room) {
+          clearPendingInvite();
+          return room;
+        });
+      })
+      .catch(function (error) {
+        if (pendingInvite && codeInput) codeInput.value = normalizedCode;
+        announce('Could not join room: ' + errorText(error), true);
+      });
   }
   function handleNativeCallback(url) {
     if (!url) return Promise.resolve();
@@ -1241,12 +1265,8 @@
     subscribeWallet();
     subscribeProfile();
     subscribeHistory();
-    if (pendingInvite && !handlingPendingInvite) {
-      handlingPendingInvite = true;
-      joinInvite(pendingInvite).finally(function () { handlingPendingInvite = false; });
-    } else {
-      restoreActiveRoom();
-    }
+    if (pendingInvite) attemptPendingInvite();
+    else restoreActiveRoom();
     return userId;
   }
   function applyAuthSession(event, session) {
