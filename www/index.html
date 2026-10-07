@@ -569,6 +569,13 @@
         <label class="row"><span>Turn timer <small>20 s per turn for human players</small></span><input type="checkbox" id="set-timer"><i class="sw"></i></label>
         <label class="row"><span>Computer chat &amp; emotes</span><input type="checkbox" id="set-chat"><i class="sw"></i></label>
         <label class="row"><span>Fast animations</span><input type="checkbox" id="set-fast"><i class="sw"></i></label>
+        <section id="storage-protection" class="storage-protection" aria-labelledby="storage-protection-title" aria-busy="true">
+          <div class="storage-protection-copy">
+            <h4 id="storage-protection-title">Protect saved progress</h4>
+            <p id="storage-protection-status" role="status" aria-live="polite" aria-atomic="true">Checking browser storage…</p>
+          </div>
+          <button id="btn-storage-protection" class="btn plate" type="button" disabled>Checking…</button>
+        </section>
         <div class="sect">House rules <small>(new matches)</small></div>
         <p id="rule-lock-note" class="note hidden">Locked for this online room. The host chose these when the table was created.</p>
         <div class="row nolabel"><span>Roll style</span><div class="seg mini" id="rule-style"><button data-v="star">Star</button><button data-v="classic">Classic</button></div></div>
@@ -612,5 +619,6 @@
   <script src="js/chess.js?v=1.7.2"></script>
   <script src="js/online.js?v=1.7.2"></script>
   <script src="js/ludo-chess-discovery.js?v=1.7.2"></script>
+  <script src="js/storage-protection.js?v=1.7.2"></script>
 </body>
 </html>
