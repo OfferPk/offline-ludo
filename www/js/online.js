@@ -906,6 +906,11 @@
   function submitMatchAction(rpc, values) {
     if (!currentRoomId || !currentRoom || !currentRoom.matchState || pendingMatchAction) return;
     if (roomConnectionState !== 'connected') return announce('Reconnect to the room before sending a match action.', true);
+    if (rpc === 'resign_ludo_chess') {
+      var chessState = currentRoom.matchState.state;
+      if (currentRoom.mode !== 'ludo_chess' || currentRoom.status !== 'active' || !chessState || chessState.phase !== 'active') return;
+      if (!window.confirm('Resign this Online Chess game? The game will end immediately, and your opponent will win.')) return;
+    }
     try {
       pendingMatchAction = {
         room_id: currentRoomId,
