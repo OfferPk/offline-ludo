@@ -1219,6 +1219,15 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-mode-note { margin: 6px 1px 10px; font-size: 11px !important; }
 .online-match-panel { margin-top: 14px; padding: 12px; border: 1px solid rgba(115,224,176,.24); border-radius: 12px; background: rgba(115,224,176,.045); }
 .online-match-panel h4 { margin: 3px 0 !important; font-size: 14px !important; }
+.online-classic-standings { margin: 10px 0; padding: 10px; border: 1px solid rgba(115,224,176,.18); border-radius: 10px; background: rgba(0,0,0,.13); }
+.online-classic-standings h5 { margin: 0 0 8px; color: var(--ink); font-size: 12px; letter-spacing: .02em; }
+.online-classic-standings-list { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.online-classic-standing { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 36px; padding: 6px 8px; border-radius: 8px; background: var(--surface); font-size: 12px; }
+.online-classic-standing-place { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 800; }
+.online-classic-standing.is-winner .online-classic-standing-place, .online-classic-standing.is-winner .online-classic-standing-note { color: #ffd27a; }
+.online-classic-standing-name { min-width: 0; overflow-wrap: anywhere; font-weight: 700; }
+.online-classic-standing-note { color: var(--muted); font-size: 10px; text-align: right; }
+.online-classic-standing.is-abandoned .online-classic-standing-name { color: var(--muted); font-weight: 500; }
 .online-match-version { color: var(--muted); font-size: 10px; }
 .online-match-dice { margin: 5px 0 10px; color: var(--ink) !important; font-size: 12px !important; }
 .online-match-pieces { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
