@@ -9,6 +9,7 @@
   var SAVE_KEY = 'crossfour.save.v3', CHECKPOINT_KEY = 'crossfour.save.checkpoint.v3';
   var V2_KEY = 'crossfour.save.v2', OLD_KEY = 'crossfour.save.v1';
   var TUTORIAL_KEY = 'crossfour.tutorial.v1';
+  var lastOfflineTurnAnnouncement = '';
   var tutorial = { active: false, intro: false, firstMove: false };
   var NAMES = SK.SEAT_NAMES;
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
@@ -1009,6 +1010,34 @@
     if (lk.forceSix && st.turn === s) h += '<span class="pw-on">6!</span>';
     return h;
   }
+  function announceOfflineTurn(st) {
+    var region = $('offline-turn-announcement');
+    if (!region) return;
+    if (G.online) {
+      lastOfflineTurnAnnouncement = '';
+      if (region.textContent) region.textContent = '';
+      return;
+    }
+    if (busy) return;
+    var name = nameOf(st.turn), message;
+    if (st.phase === 'over') {
+      message = st.ranking.length ? 'Match over. ' + nameOf(st.ranking[0]) + ' wins.' : 'Match over.';
+    } else if (!isHuman(st.turn)) {
+      message = name + (st.phase === 'choose' ? ' is choosing.' : ' is playing.');
+    } else {
+      var who = name === 'You' ? 'Your turn.' : name + "'s turn.";
+      var action;
+      if (st.phase === 'choose') action = 'Make your choice.';
+      else if (st.phase === 'move') action = st.queue.length > 1 ? 'Choose a die result, then a token to move.' : 'Choose a token to move.';
+      else if (L.mustChoose(st)) action = 'Choose a die result.';
+      else if (st.queue.length || st.bonus || st.sixes || st.rollAgain) action = 'Roll again.';
+      else action = 'Roll the die.';
+      message = who + ' ' + action;
+    }
+    if (message === lastOfflineTurnAnnouncement) return;
+    lastOfflineTurnAnnouncement = message;
+    region.textContent = message;
+  }
   function render() {
     if (!G) return;
     var st = G.st, over = st.phase === 'over';
@@ -1078,6 +1107,7 @@
       else if (st.phase === 'move') hint = st.queue.length > 1 ? 'Pick a chip, then a token' : 'Pick a token';
     } else if (!over && !isHuman(s)) hint = NAMES[s] + ' is thinking…';
     $('hint').textContent = hint;
+    announceOfflineTurn(st);
     var u = $('btn-undo'), showU = save.settings.undo && humans(st).length > 0 && !over;
     u.classList.toggle('hidden', !showU);
     var act = undoActive();
@@ -1958,6 +1988,7 @@
   // ---------------- match lifecycle ----------------
   function startMatch(seats, mode, offerTutorial) {
     cancelFlow(); stopCelebration();
+    lastOfflineTurnAnnouncement = '';
     tutorial.active = offerTutorial === true && mode === 'classic' && !tutorialSeen();
     tutorial.intro = tutorial.active; tutorial.firstMove = false;
     var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
@@ -2168,6 +2199,7 @@
   }
   function showGame() {
     ['result', 'menu', 'chat'].forEach(hide);
+    lastOfflineTurnAnnouncement = '';
     screen('game'); paused = false;
     if (G.view == null) G.view = viewOf(G.st);
     buildPods(); buildTiles(); buildPieces(); layout(); render();
@@ -2175,7 +2207,7 @@
     advance();
   }
   function openMenu() { if (!G) return; cancelFlow(); stopTimer(); paused = true; layoutPieces(true); render(); persist(); show('menu'); }
-  function resumeFromMenu() { hide('menu'); paused = false; layoutPieces(true); advance(); }
+  function resumeFromMenu() { hide('menu'); paused = false; lastOfflineTurnAnnouncement = ''; layoutPieces(true); advance(); }
   function askConfirm(title, text, yes, onYes, onNo) {
     $('confirm-title').textContent = title; $('confirm-text').textContent = text; $('confirm-yes').textContent = yes;
     $('confirm').classList.toggle('exit-confirm', title === 'Exit match?');
@@ -2519,7 +2551,7 @@
   });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState !== 'visible') { if (G) { cancelFlow(); stopTimer(); layoutPieces(true); persist(); } }
-    else if (G && !$('game').classList.contains('hidden') && !paused && !isOpen('result')) { layoutPieces(true); render(); advance(); }
+    else if (G && !$('game').classList.contains('hidden') && !paused && !isOpen('result')) { lastOfflineTurnAnnouncement = ''; layoutPieces(true); render(); advance(); }
   });
   window.addEventListener('resize', function () { layout(); });
   if (window.ResizeObserver) new ResizeObserver(function () { layout(); }).observe($('stage'));
