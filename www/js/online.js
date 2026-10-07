@@ -358,7 +358,35 @@
   function chessSeatName(room, seat) {
     return (Number(seat) === 0 ? 'Red' : 'Blue') + ' · ' + chessPlayerName(room, seat);
   }
+  function renderChessNewRoomAction(state, room) {
+    var completed = !!(room && room.mode === 'ludo_chess' && state && state.phase === 'over');
+    var button = $('online-chess-new-room');
+    button.classList.toggle('hidden', !completed);
+    button.disabled = !client || !currentUser || !!createNewChessRoom.pending;
+    button.textContent = createNewChessRoom.pending ? 'Creating Chess room…' : 'Create another Chess room';
+    button.setAttribute('aria-busy', String(!!createNewChessRoom.pending));
+    $('online-chess-next-game-note').classList.toggle('hidden', !completed);
+  }
+  function initializeChessNewRoomActions() {
+    var actions = $('online-chess-actions');
+    if (!actions || $('online-chess-new-room')) return;
+    var button = document.createElement('button');
+    button.id = 'online-chess-new-room';
+    button.className = 'btn primary hidden';
+    button.type = 'button';
+    button.textContent = 'Create another Chess room';
+    button.setAttribute('aria-busy', 'false');
+    button.setAttribute('aria-describedby', 'online-chess-next-game-note');
+    button.addEventListener('click', createNewChessRoom);
+    var note = document.createElement('p');
+    note.id = 'online-chess-next-game-note';
+    note.className = 'online-mode-note hidden';
+    note.textContent = "Creates a fresh two-player invite room. Share its link to play again; this game's result stays in your history.";
+    actions.appendChild(button);
+    actions.insertAdjacentElement('afterend', note);
+  }
   function renderChessDrawControls(state, room, isSynchronized) {
+    renderChessNewRoomAction(state, room);
     var offer = room.matchState && room.matchState.draw_offer || null;
     var member = room.roster.find(function (candidate) { return candidate.user_id === (currentUser && currentUser.id); });
     var isActive = room.status === 'active' && state.phase === 'active';
@@ -517,6 +545,25 @@
       playScreen.classList.add('hidden'); playScreen.setAttribute('aria-hidden', 'true');
       onlineBody.removeAttribute('aria-hidden'); onlineTopbar.removeAttribute('aria-hidden');
     }
+  }
+  function createNewChessRoom() {
+    var state = currentRoom && currentRoom.matchState && currentRoom.matchState.state;
+    if (!client || !currentUser || !currentRoom || currentRoom.mode !== 'ludo_chess' || !state || state.phase !== 'over' || createNewChessRoom.pending) return;
+    createNewChessRoom.pending = true;
+    renderMatch();
+    announce('Creating a fresh two-player Chess invite room…');
+    callRpc('create_room', { p_mode: 'ludo_chess', p_capacity: 2 })
+      .then(function (result) { return attachRoom(result); })
+      .then(function () {
+        if (currentRoom && currentRoom.mode === 'ludo_chess' && currentRoom.status === 'waiting') {
+          announce('New Chess room created. Copy the invite link to share it.');
+        }
+      })
+      .catch(function (error) { announce('Could not create a new Chess room: ' + errorText(error), true); })
+      .finally(function () {
+        createNewChessRoom.pending = false;
+        renderMatch();
+      });
   }
   function chooseChessSquare(index, state, isMyTurn) {
     if (!isMyTurn || state.phase !== 'active' || pendingMatchAction || pendingChessPromotion || roomConnectionState !== 'connected' || !window.LudoChess) return;
@@ -1315,6 +1362,7 @@
   }
   function initialize() {
     bindEvents();
+    initializeChessNewRoomActions();
     renderAccount();
     configureNativeCallback();
     if (!isConfigured()) {
