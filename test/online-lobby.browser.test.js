@@ -302,6 +302,29 @@ function startLocalServer() {
                 match.state = nextState;
                 data = { room_id: args.p_room_id, action_id: args.p_action_id, duplicate: false, version: match.version, state: nextState };
                 state.emit('match_states', { event: 'UPDATE', new: match });
+              } else if (name === 'expire_grace') {
+                const match = state.tables.match_states.find(row => row.room_id === args.p_room_id);
+                const room = state.tables.rooms.find(row => row.id === args.p_room_id);
+                const grace = match && match.state.grace;
+                if (!grace || Number(grace.until) > Date.now()) {
+                  return Promise.resolve({ data: null, error: { message: 'Reconnect grace has not expired', code: '55000' } });
+                }
+                const abandoned = (match.state.abandoned || []).concat(Number(grace.seat));
+                const nextState = Object.assign({}, match.state, { grace: null, abandoned: Array.from(new Set(abandoned)) });
+                const activeSeats = (nextState.players || []).filter(seat => !nextState.abandoned.includes(Number(seat)) && !(nextState.ranking || []).includes(Number(seat)));
+                if (activeSeats.length < 2) {
+                  nextState.phase = 'over';
+                  nextState.result = 'abandoned';
+                  nextState.turn_deadline = null;
+                  if (room) room.status = 'completed';
+                  const history = state.tables.match_history.find(row => row.room_id === args.p_room_id);
+                  if (history) Object.assign(history, { status: 'completed', result: { result: 'abandoned', state: nextState }, finished_at: new Date().toISOString() });
+                }
+                match.version++;
+                match.state = nextState;
+                data = { room_id: args.p_room_id, version: match.version, state: nextState };
+                state.emit('match_states', { event: 'UPDATE', new: match });
+                if (room) state.emit('rooms', { event: 'UPDATE', new: room });
               } else if (name === 'ludo_chess_move') {
                 const match = state.tables.ludo_chess_matches.find(row => row.room_id === args.p_room_id);
                 const request = { type: 'chess_move', expected_version: args.p_expected_version, from: args.p_from, to: args.p_to, promotion: args.p_promotion };
@@ -496,6 +519,55 @@ function startLocalServer() {
     await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · active'));
       await page.waitForFunction(() => !document.querySelector('#online-match-panel').classList.contains('hidden') && document.querySelector('#online-match-version').textContent === 'Version 0');
       await page.waitForFunction(() => !document.querySelector('#game').classList.contains('hidden') && document.querySelector('#board') && document.querySelector('#online-match-pieces').classList.contains('hidden'));
+      const matchBeforeGrace = await page.evaluate(() => {
+        const backend = window.__mockBackend;
+        const match = backend.tables.match_states.find(row => row.room_id === 'host-room');
+        const history = backend.tables.match_history.find(row => row.room_id === 'host-room');
+        return { version: match.version, state: JSON.parse(JSON.stringify(match.state)), historyStatus: history.status };
+      });
+      await page.evaluate(() => {
+        const backend = window.__mockBackend;
+        const match = backend.tables.match_states.find(row => row.room_id === 'host-room');
+        match.state = Object.assign({}, match.state, {
+          players: [0, 1, 2],
+          pieces: [match.state.pieces[0], match.state.pieces[1], [-1, -1, -1, -1], null],
+          grace: { seat: 1, until: Date.now() + 400 },
+          abandoned: []
+        });
+        backend.emit('match_states', { event: 'UPDATE', new: match });
+      });
+      await page.waitForFunction(() => {
+        const backend = window.__mockBackend;
+        const match = backend.tables.match_states.find(row => row.room_id === 'host-room');
+        return backend.rpcCalls.some(call => call.name === 'expire_grace') && match.state.phase === 'roll' && match.state.abandoned.includes(1);
+      });
+      const graceExpiryResult = await page.evaluate(() => {
+        const backend = window.__mockBackend;
+        const match = backend.tables.match_states.find(row => row.room_id === 'host-room');
+        return { calls: backend.rpcCalls.filter(call => call.name === 'expire_grace'), version: match.version, state: match.state, roomStatus: backend.tables.rooms.find(row => row.id === 'host-room').status };
+      });
+      assert.equal(graceExpiryResult.calls.length, 1, 'an expired reconnect window invokes the authoritative expiry RPC once');
+      assert.equal(graceExpiryResult.calls[0].args.p_room_id, 'host-room', 'grace expiry is scoped to the active room');
+      assert.equal(graceExpiryResult.state.abandoned.includes(1), true, 'the disconnected seat is marked abandoned after its grace period');
+      assert.equal(graceExpiryResult.state.phase, 'roll', 'the game continues while two of three seats remain active');
+      assert.equal(graceExpiryResult.roomStatus, 'active', 'one abandonment does not prematurely complete a room with two active players');
+      if (process.env.ONLINE_GRACE_ONLY === '1') {
+        assert.deepEqual(errors, [], 'the grace-expiry browser flow has no uncaught page errors');
+        console.log('Online reconnect-grace browser regression passed (room-scoped RPC, abandoned seat, remaining active players continue).');
+        return;
+      }
+      await page.evaluate(saved => {
+        const backend = window.__mockBackend;
+        const match = backend.tables.match_states.find(row => row.room_id === 'host-room');
+        const room = backend.tables.rooms.find(row => row.id === 'host-room');
+        const history = backend.tables.match_history.find(row => row.room_id === 'host-room');
+        match.version = saved.version; match.state = saved.state;
+        room.status = 'active'; history.status = saved.historyStatus;
+        backend.emit('match_states', { event: 'UPDATE', new: match });
+        backend.emit('rooms', { event: 'UPDATE', new: room });
+        backend.emit('match_history', { event: 'UPDATE', new: history });
+      }, matchBeforeGrace);
+      await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 0' && document.querySelector('#online-room-status').textContent.includes('match is active'));
       await page.evaluate(() => { window.__mockBackend.failRpc = 'roll_match'; });
       await page.evaluate(() => document.querySelector('#game .pod[data-seat="0"] .pdice').click());
       await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Retry uses the same action ID.'));

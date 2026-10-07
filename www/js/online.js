@@ -33,6 +33,8 @@
   var roomRestorePromise = null;
   var roomRestoreUserId = '';
   var roomRestoreRoomId = '';
+  var graceExpiryTimer = null;
+  var graceExpiryKey = '';
   var walletChannel = null;
   var profileChannel = null;
   var historyChannel = null;
@@ -91,6 +93,51 @@
   function removeRealtimeChannel(channel) {
     if (client && channel) client.removeChannel(channel);
   }
+  function clearGraceExpiryTimer() {
+    if (graceExpiryTimer) window.clearTimeout(graceExpiryTimer);
+    graceExpiryTimer = null;
+    graceExpiryKey = '';
+  }
+  function scheduleGraceExpiry(roomId, state) {
+    var grace = state && state.grace;
+    var seat = Number(grace && grace.seat);
+    var until = Number(grace && grace.until);
+    if (!roomId || !grace || !Number.isInteger(seat) || !Number.isFinite(until) || until <= 0 || state.phase === 'over') {
+      clearGraceExpiryTimer();
+      return;
+    }
+    var key = roomId + ':' + seat + ':' + until;
+    if (key === graceExpiryKey) return;
+    clearGraceExpiryTimer();
+    graceExpiryKey = key;
+    function later(delay) {
+      if (currentRoomId === roomId && graceExpiryKey === key) {
+        graceExpiryTimer = window.setTimeout(expire, delay);
+      }
+    }
+    function expire() {
+      graceExpiryTimer = null;
+      if (currentRoomId !== roomId || graceExpiryKey !== key) return;
+      if (!currentUser || roomConnectionState !== 'connected') {
+        later(3000);
+        return;
+      }
+      callRpc('expire_grace', { p_room_id: roomId }).then(function (result) {
+        if (currentRoomId !== roomId || graceExpiryKey !== key) return;
+        var remaining = result && result.state && result.state.grace;
+        if (remaining && Number(remaining.seat) === seat && Number(remaining.until) === until) {
+          later(3000);
+          return;
+        }
+        return refreshRoom();
+      }).catch(function (error) {
+        if (currentRoomId !== roomId || graceExpiryKey !== key) return;
+        if (/schema cache|Could not find the function|PGRST202/i.test(errorText(error))) return;
+        later(3000);
+      });
+    }
+    later(Math.max(0, until - Date.now()));
+  }
   function clearRoomChannel() {
     var channel = roomChannel;
     roomChannel = null;
@@ -112,6 +159,7 @@
     roomRestoreUserId = '';
     roomRestoreRoomId = '';
     roomRefreshSequence++;
+    clearGraceExpiryTimer();
     clearRoomChannel();
     currentRoomId = '';
     currentRoom = null;
@@ -654,6 +702,7 @@
     var show = !!(room && (room.status === 'active' || room.status === 'completed') && record && record.state);
     panel.classList.toggle('hidden', !show);
     if (!show) {
+      clearGraceExpiryTimer();
       $('online-chess-play').classList.add('hidden');
       $('online-chess-resume').classList.add('hidden');
       panel.classList.remove('is-chess-match');
@@ -664,6 +713,8 @@
     }
     var state = record.state;
     var isChess = room.mode === 'ludo_chess';
+    if (isChess || room.status !== 'active') clearGraceExpiryTimer();
+    else scheduleGraceExpiry(room.id, state);
     if (isChess) {
       var nextChessVersion = Number(record.version);
       var nextDrawOffer = record.draw_offer || null;
