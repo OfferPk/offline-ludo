@@ -1363,6 +1363,7 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 #online-chess-screen button:focus-visible { outline: 3px solid #fff5df; outline-offset: 3px; box-shadow: 0 0 0 1px #111820; }
 #online-chess-screen .online-chess-square:focus-visible { outline-offset: -3px; box-shadow: inset 0 0 0 3px #151d25; }
 #online-chess-screen-title:focus { outline: 2px solid #fff5df; outline-offset: 4px; border-radius: 3px; }
+.offline-move-sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 .online-chess-sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 .online-chess-screen .online-match-panel > .online-provider-actions { display: none; }
 @media (max-width: 900px) {

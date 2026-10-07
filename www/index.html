@@ -379,6 +379,7 @@
         <div class="toolbar">
           <button id="btn-undo" class="tool hidden" aria-label="Undo dice roll"><svg viewBox="0 0 24 24"><path d="M9 4 4 9l5 5M4.5 9H15a5 5 0 0 1 0 10h-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span id="undo-label">Undo</span><em class="ad-badge hidden" id="undo-ad">▶ AD</em><i class="undo-bar" id="undo-bar"></i></button>
           <div class="hint" id="hint" role="status" aria-live="polite" aria-atomic="true"></div>
+          <span id="offline-move-announcement" class="offline-move-sr-only" role="status" aria-live="polite" aria-atomic="true"></span>
           <button id="btn-chat" class="tool" aria-label="Quick chat"><svg viewBox="0 0 24 24"><path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="9" cy="10.5" r="1.2" fill="currentColor"/><circle cx="12" cy="10.5" r="1.2" fill="currentColor"/><circle cx="15" cy="10.5" r="1.2" fill="currentColor"/></svg><span>Chat</span></button>
         </div>
         <div id="chat" class="chat hidden">
@@ -602,6 +603,7 @@
   <script src="js/skin-shop.js?v=1.7.2"></script>
   <script src="js/art.js?v=1.7.2"></script>
   <script src="js/save-store.js?v=1.7.2"></script>
+  <script src="js/offline-move-announcements.js?v=1.7.2"></script>
   <script src="js/dice-gesture.js?v=1.7.2"></script>
   <script src="js/path-animation.js?v=1.7.2"></script>
   <script src="js/celebration.js?v=1.7.2"></script>
