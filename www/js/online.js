@@ -297,28 +297,78 @@
       announce('Account data could not be loaded: ' + errorText(error), true);
     });
   }
+  function historyProfileLabel(profile, seat) {
+    var displayName = String(profile && profile.display_name || '').trim();
+    var handle = String(profile && profile.handle || '').trim();
+    if (displayName && handle) return displayName + ' (@' + handle + ')';
+    if (displayName) return displayName;
+    if (handle) return '@' + handle;
+    return 'Player (seat ' + (Number(seat) + 1) + ')';
+  }
+  function historyOpponentLabel(match, userId, members, profiles) {
+    var matchMembers = (members || []).filter(function (member) {
+      return member.room_id === match.room_id && member.user_id !== userId;
+    }).sort(function (a, b) { return Number(a.seat) - Number(b.seat); });
+    if (!matchMembers.length) return 'Opponent details unavailable';
+    var profileById = Object.create(null);
+    (profiles || []).forEach(function (profile) { profileById[profile.id] = profile; });
+    var names = matchMembers.map(function (member) {
+      return historyProfileLabel(profileById[member.user_id], member.seat);
+    });
+    return names.length === 1 ? 'vs ' + names[0] : 'With ' + names.join(' · ');
+  }
+  function loadHistoryOpponents(matches, userId) {
+    var roomIds = [];
+    (matches || []).forEach(function (match) {
+      if (match.room_id && roomIds.indexOf(match.room_id) === -1) roomIds.push(match.room_id);
+    });
+    if (!roomIds.length) return Promise.resolve({ members: [], profiles: [] });
+    return client.from('room_members').select('room_id,user_id,seat').in('room_id', roomIds)
+      .then(function (result) {
+        if (result.error) throw result.error;
+        var members = result.data || [];
+        var profileIds = [];
+        members.forEach(function (member) {
+          if (member.user_id && member.user_id !== userId && profileIds.indexOf(member.user_id) === -1) profileIds.push(member.user_id);
+        });
+        if (!profileIds.length) return { members: members, profiles: [] };
+        return client.from('profiles').select('id,display_name,handle').in('id', profileIds)
+          .then(function (profileResult) {
+            return { members: members, profiles: profileResult.error ? [] : (profileResult.data || []) };
+          })
+          .catch(function () { return { members: members, profiles: [] }; });
+      })
+      .catch(function () { return { members: [], profiles: [] }; });
+  }
   function refreshHistory() {
     if (!client || !currentUser) return Promise.resolve();
     var requestedUserId = currentUser.id;
     return client.from('match_history')
-      .select('id,mode,status,winner_id,started_at,finished_at')
+      .select('id,room_id,mode,status,winner_id,started_at,finished_at')
       .order('started_at', { ascending: false })
       .limit(10)
       .then(function (result) {
         if (result.error) throw result.error;
         if (!currentUser || currentUser.id !== requestedUserId) return;
-        var list = $('online-history-list');
-        list.replaceChildren();
-        (result.data || []).forEach(function (match) {
-          var item = document.createElement('li');
-          var title = document.createElement('b');
-          title.textContent = modeLabel(match.mode) + ' · ' + match.status;
-          var detail = document.createElement('small');
-          detail.textContent = new Date(match.started_at).toLocaleString();
-          item.append(title, detail);
-        list.appendChild(item);
-      });
-      $('online-history-empty').classList.toggle('hidden', !!(result.data && result.data.length));
+        var matches = result.data || [];
+        return loadHistoryOpponents(matches, requestedUserId).then(function (players) {
+          if (!currentUser || currentUser.id !== requestedUserId) return;
+          var list = $('online-history-list');
+          list.replaceChildren();
+          matches.forEach(function (match) {
+            var item = document.createElement('li');
+            var title = document.createElement('b');
+            title.textContent = modeLabel(match.mode) + ' · ' + match.status;
+            var opponents = document.createElement('small');
+            opponents.className = 'online-history-players';
+            opponents.textContent = historyOpponentLabel(match, requestedUserId, players.members, players.profiles);
+            var detail = document.createElement('small');
+            detail.textContent = new Date(match.started_at).toLocaleString();
+            item.append(title, opponents, detail);
+            list.appendChild(item);
+          });
+          $('online-history-empty').classList.toggle('hidden', !!matches.length);
+        });
       }).catch(function () {
         announce('Match history could not be refreshed. Try again when your connection is stable.', true);
       });
