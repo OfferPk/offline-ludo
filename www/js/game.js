@@ -2058,12 +2058,18 @@
     if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
     render(); setCoins(); setLevel(); show('result');
     if (entering) { spotlightWinner(winner); celebrateWin(winner); }
+    if (entering) {
+      var announcement = $('result-announcement');
+      if (announcement) announcement.textContent = 'Match over. ' + $('r-title').textContent;
+    }
   }
   /** The ONLY place an interstitial may appear: leaving the result screen after a finished match. */
   function leaveResult(dest) {
     if (!G || G.st.phase !== 'over') return;
     stopCelebration();
     hide('result');
+    var announcement = $('result-announcement');
+    if (announcement) announcement.textContent = '';
     var seats = G.seats, mode = G.mode;
     G = null; save.game = null; persist();
     Ads.maybeInterstitial(gate).then(function () {
