@@ -2057,6 +2057,7 @@
     $('btn-r-double').classList.toggle('hidden', !G.coins || G.doubled);
     if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
     render(); setCoins(); setLevel(); show('result');
+    if (entering) $('r-title').focus({ preventScroll: true });
     if (entering) { spotlightWinner(winner); celebrateWin(winner); }
   }
   /** The ONLY place an interstitial may appear: leaving the result screen after a finished match. */
@@ -2068,7 +2069,12 @@
     G = null; save.game = null; persist();
     Ads.maybeInterstitial(gate).then(function () {
       persist();
-      if (dest === 'again') startMatch(seats, mode); else showHome();
+      if (dest === 'again') startMatch(seats, mode);
+      else {
+        showHome();
+        var homeAction = $('btn-vs-ai');
+        if (homeAction) homeAction.focus({ preventScroll: true });
+      }
     });
   }
   function doubleCoins() {
@@ -2505,6 +2511,29 @@
       var firstDialogButton = dialogButtons[0], lastDialogButton = dialogButtons[dialogButtons.length - 1];
       if (e.shiftKey && document.activeElement === firstDialogButton) { e.preventDefault(); lastDialogButton.focus(); }
       else if (!e.shiftKey && document.activeElement === lastDialogButton) { e.preventDefault(); firstDialogButton.focus(); }
+      return;
+    }
+    if (isOpen('result')) {
+      if (e.key === 'Tab') {
+        var resultDialog = $('result');
+        var resultButtons = resultDialog.querySelectorAll('button:not([disabled]):not(.hidden)');
+        if (!resultButtons.length) {
+          e.preventDefault();
+          $('r-title').focus({ preventScroll: true });
+        } else {
+          var firstResultButton = resultButtons[0];
+          var lastResultButton = resultButtons[resultButtons.length - 1];
+          var resultTitle = $('r-title');
+          if (!resultDialog.contains(document.activeElement)) {
+            e.preventDefault();
+            (e.shiftKey ? lastResultButton : firstResultButton).focus();
+          } else if (e.shiftKey && (document.activeElement === firstResultButton || document.activeElement === resultTitle)) {
+            e.preventDefault(); lastResultButton.focus();
+          } else if (!e.shiftKey && document.activeElement === lastResultButton) {
+            e.preventDefault(); firstResultButton.focus();
+          }
+        }
+      }
       return;
     }
     if (!G || $('game').classList.contains('hidden') || paused) return;

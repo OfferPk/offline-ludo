@@ -417,11 +417,11 @@
     </aside>
 
     <!-- RESULT -->
-    <div id="result" class="overlay hidden">
+    <div id="result" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="r-title" aria-describedby="r-meta">
       <div id="winner-confetti" aria-hidden="true"></div>
       <div class="panel">
         <div class="kicker" id="r-kicker">MATCH OVER</div>
-        <h2 id="r-title">You win!</h2>
+        <h2 id="r-title" tabindex="-1">You win!</h2>
         <p class="note" id="r-meta"></p>
         <ol id="r-rank" class="rank"></ol>
         <div class="r-rewards">
