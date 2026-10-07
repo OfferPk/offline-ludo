@@ -29,6 +29,7 @@
   var roomChannelStatus = 'idle';
   var roomConnectionState = 'idle';
   var roomRefreshSequence = 0;
+  var roomEntryInFlight = false;
   var roomRestoreSequence = 0;
   var roomRestorePromise = null;
   var roomRestoreUserId = '';
@@ -1103,28 +1104,41 @@
       var text = errorText(error);
       return /create_room|quick_match|schema cache|Could not find the function|PGRST202/i.test(text);
     }
-    $('online-create-room').addEventListener('click', function () {
-      if (!client) return;
-      var args = roomRpcArgs();
-      callRpc('create_room', args).then(attachRoom).catch(function (error) {
-        if (args.p_rules && missingRulesRpc(error)) {
-          announce('This server has not applied the v1.4.0 rules migration, so house rules cannot be locked yet. Creating the room with the previous server rules.', true);
-          return callRpc('create_room', { p_mode: args.p_mode, p_capacity: args.p_capacity }).then(attachRoom);
-        }
-        announce('Room could not be created: ' + errorText(error), true);
+    function setRoomEntryPending(pending, rpcName) {
+      roomEntryInFlight = !!pending;
+      [
+        { id: 'online-create-room', action: 'create_room', label: 'Create invite room', pendingLabel: 'Creating room…' },
+        { id: 'online-quick-match', action: 'quick_match', label: 'Find a table', pendingLabel: 'Searching…' }
+      ].forEach(function (entry) {
+        var button = $(entry.id);
+        if (!button) return;
+        button.disabled = roomEntryInFlight || !client || !currentUser;
+        button.textContent = roomEntryInFlight && entry.action === rpcName ? entry.pendingLabel : entry.label;
+        if (roomEntryInFlight) button.setAttribute('aria-busy', 'true');
+        else button.removeAttribute('aria-busy');
       });
-    });
-    $('online-quick-match').addEventListener('click', function () {
-      if (!client) return;
+    }
+    function requestRoomEntry(rpcName) {
+      if (!client || !currentUser || roomEntryInFlight) return Promise.resolve();
       var args = roomRpcArgs();
-      callRpc('quick_match', args).then(attachRoom).catch(function (error) {
-        if (args.p_rules && missingRulesRpc(error)) {
-          announce('This server has not applied the v1.4.0 rules migration, so quick match cannot lock house rules yet. Searching with the previous server rules.', true);
-          return callRpc('quick_match', { p_mode: args.p_mode, p_capacity: args.p_capacity }).then(attachRoom);
-        }
-        announce('Matchmaking failed: ' + errorText(error), true);
+      setRoomEntryPending(true, rpcName);
+      announce(rpcName === 'create_room' ? 'Creating an invite room…' : 'Searching for an open table…');
+      return callRpc(rpcName, args).catch(function (error) {
+        if (!args.p_rules || !missingRulesRpc(error)) throw error;
+        announce(rpcName === 'create_room'
+          ? 'This server has not applied the v1.4.0 rules migration, so house rules cannot be locked yet. Creating the room with the previous server rules.'
+          : 'This server has not applied the v1.4.0 rules migration, so quick match cannot lock house rules yet. Searching with the previous server rules.', true);
+        return callRpc(rpcName, { p_mode: args.p_mode, p_capacity: args.p_capacity });
+      }).then(attachRoom).then(function () {
+        announce('Room is ready.');
+      }).catch(function (error) {
+        announce((rpcName === 'create_room' ? 'Room could not be created: ' : 'Matchmaking failed: ') + errorText(error), true);
+      }).finally(function () {
+        setRoomEntryPending(false);
       });
-    });
+    }
+    $('online-create-room').addEventListener('click', function () { requestRoomEntry('create_room'); });
+    $('online-quick-match').addEventListener('click', function () { requestRoomEntry('quick_match'); });
     $('online-join-room').addEventListener('click', function () { joinInvite($('online-join-code').value); });
     $('online-join-code').addEventListener('keydown', function (event) {
       if (event.key === 'Enter') { event.preventDefault(); joinInvite($('online-join-code').value); }
