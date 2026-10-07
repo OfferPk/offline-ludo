@@ -652,6 +652,9 @@
     var panel = $('online-match-panel');
     var record = room && room.matchState;
     var show = !!(room && (room.status === 'active' || room.status === 'completed') && record && record.state);
+    if (window.OnlineClassicStandings) {
+      window.OnlineClassicStandings.render($('online-classic-standings'), show && room.mode !== 'ludo_chess' ? record.state : null, room ? room.roster : [], currentUser && currentUser.id);
+    }
     panel.classList.toggle('hidden', !show);
     if (!show) {
       $('online-chess-play').classList.add('hidden');
