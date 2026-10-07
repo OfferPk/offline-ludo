@@ -8,7 +8,7 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.7.2">
+  <link rel="stylesheet" href="css/style.css?v=1.7.2&rev=local-save-restore-1">
   <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.7.2">
 </head>
 <body>
@@ -584,6 +584,13 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
+        <section class="local-restore" aria-labelledby="local-restore-title">
+          <b id="local-restore-title">Restore offline save</b>
+          <p id="local-restore-help">Choose a Crossfour JSON backup saved on this device. Restoring replaces your offline progress and saved match; nothing is uploaded.</p>
+          <input id="local-restore-file" class="hidden" type="file" accept=".json,application/json" aria-label="Choose offline save backup">
+          <button id="btn-restore-backup" class="btn plate" type="button" aria-describedby="local-restore-help local-restore-status">Choose backup file</button>
+          <p id="local-restore-status" class="local-restore-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        </section>
         <p class="ver">Crossfour v1.7.2 · © OfferPk</p>
       </div>
     </div>
@@ -601,11 +608,11 @@
   <script src="js/token-evolution.js?v=1.7.2"></script>
   <script src="js/skin-shop.js?v=1.7.2"></script>
   <script src="js/art.js?v=1.7.2"></script>
-  <script src="js/save-store.js?v=1.7.2"></script>
+  <script src="js/save-store.js?v=1.7.2&rev=local-save-restore-1"></script>
   <script src="js/dice-gesture.js?v=1.7.2"></script>
   <script src="js/path-animation.js?v=1.7.2"></script>
   <script src="js/celebration.js?v=1.7.2"></script>
-  <script src="js/game.js?v=1.7.2"></script>
+  <script src="js/game.js?v=1.7.2&rev=local-save-restore-1"></script>
   <script src="js/community-fixtures.js?v=1.7.2"></script>
   <script src="js/community.js?v=1.7.2"></script>
   <script src="js/supabase-config.js?v=1.7.2"></script>

@@ -508,6 +508,7 @@ body.light .exit-match { color: #28536b; border-color: rgba(53,120,154,.3); back
 /* ---------------- overlays ---------------- */
 .overlay { position: absolute; inset: 0; background: var(--overlay); display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 50; animation: fade .18s; backdrop-filter: blur(2px); }
 .overlay.exit-confirm { background: rgba(4,8,14,.68); backdrop-filter: blur(8px) saturate(1.1); }
+.overlay#confirm { z-index: 60; }
 .overlay.exit-confirm .panel { border-color: rgba(144,211,247,.25); background: linear-gradient(140deg, rgba(67,117,151,.18), rgba(100,83,155,.14)), rgba(24,31,41,.94); box-shadow: inset 0 1px 0 rgba(255,255,255,.11), 0 22px 60px rgba(0,0,0,.5), 0 0 28px rgba(100,177,218,.08); backdrop-filter: blur(20px) saturate(1.15); }
 .overlay.exit-confirm .panel h3 { color: #ecf6ff; }
 .overlay.exit-confirm .panel p { line-height: 1.5; }
@@ -1459,6 +1460,12 @@ body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-
 #settings .row span { flex: 1; line-height: 1.3; }
 #settings .row small, #settings .row .note { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 500; }
 #settings .sect { margin: 14px 0 4px; padding-top: 4px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.local-restore { margin-top: 14px; padding: 12px; border: 1px solid var(--surface-edge); border-radius: 14px; background: var(--surface); }
+.local-restore > b { font-size: 14px; }
+.local-restore > p { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 6px 0 10px; }
+.local-restore > .btn { width: 100%; }
+.local-restore > .local-restore-status { min-height: 1.3em; margin: 8px 0 0; }
+.local-restore > .btn:focus-visible { outline: 3px solid #9ad9ff; outline-offset: 2px; }
 
 /* ---- v1.6.1 token die picker + 4s move countdown ---- */
 .pc.picking { z-index: 12; }

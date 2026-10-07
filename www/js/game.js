@@ -2351,6 +2351,48 @@
     each($('rule-style').children, function (b) { b.classList.toggle('on', b.dataset.v === save.rules.rollStyle); b.disabled = locked; });
     if ($('rule-lock-note')) $('rule-lock-note').classList.toggle('hidden', !locked);
     $('btn-privacy-options').classList.toggle('hidden', !(native && Ads.privacyOptionsRequired()));
+    $('btn-restore-backup').disabled = locked;
+    if (locked) $('local-restore-help').textContent = 'Backup restore is disabled during an online match so its connection is not interrupted.';
+    else $('local-restore-help').textContent = 'Choose a Crossfour JSON backup saved on this device. Restoring replaces your offline progress and saved match; nothing is uploaded.';
+  }
+  function setRestoreStatus(message) {
+    var status = $('local-restore-status');
+    if (status) status.textContent = message;
+  }
+  function bindLocalRestore() {
+    var button = $('btn-restore-backup'), input = $('local-restore-file');
+    button.addEventListener('click', function () {
+      if (G && G.online) { setRestoreStatus('Backup restore is unavailable during an online match.'); return; }
+      SFX.click(); input.click();
+    });
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      input.value = '';
+      if (!file) return;
+      if (G && G.online) { setRestoreStatus('Backup restore is unavailable during an online match.'); return; }
+      if (file.size > 1024 * 1024) { setRestoreStatus('That file is too large. Choose a backup no larger than 1 MB. Nothing was changed.'); return; }
+      if (typeof FileReader !== 'function') { setRestoreStatus('This browser cannot read a backup file. Your save was not changed.'); return; }
+      var reader = new FileReader();
+      reader.onerror = reader.onabort = function () { setRestoreStatus('The backup file could not be read. Your save was not changed.'); };
+      reader.onload = function () {
+        var snapshot;
+        try { snapshot = JSON.parse(String(reader.result)); }
+        catch (e) { setRestoreStatus('That file is not valid JSON. Your save was not changed.'); return; }
+        var inspected = saveStore.inspectSnapshot(snapshot);
+        if (!inspected.ok) { setRestoreStatus('That file is not a valid backup for this game version. Your save was not changed.'); return; }
+        var date = new Date(inspected.savedAt), dated = isFinite(date.getTime()) ? ' Backup date: ' + date.toLocaleString() + '.' : '';
+        askConfirm('Restore offline save?', 'This will replace the offline profile, settings, statistics and saved match on this device.' + dated + ' The current save is checkpointed before replacement. Online account data is not affected. Continue?', 'Restore', function () {
+          if (G && G.online) { setRestoreStatus('Restore cancelled because an online match is active.'); return; }
+          if (!persist()) { setRestoreStatus('Restore stopped: the current save could not be checkpointed. Check device storage and try again.'); return; }
+          var result = saveStore.importSnapshot(snapshot);
+          if (!result.ok) { setRestoreStatus('Restore failed. Your current saved progress was kept. Check device storage and try again.'); return; }
+          setRestoreStatus('Backup restored. Reloading the saved offline game…');
+          window.setTimeout(function () { window.location.reload(); }, 800);
+        }, function () { setRestoreStatus('Restore cancelled. Your current save was not changed.'); });
+      };
+      try { reader.readAsText(file); }
+      catch (e) { setRestoreStatus('The backup file could not be read. Your save was not changed.'); }
+    });
   }
   function buildRulesEvents() {
     ['boost', 'chaos'].forEach(function (k) {
@@ -2535,7 +2577,7 @@
 
   // ---------------- boot ----------------
   SFX.setEnabled(save.settings.sound);
-  applySkin(); setCoins(); setLevel(); updateHome(); buildChat(); buildRulesEvents();
+  applySkin(); setCoins(); setLevel(); updateHome(); buildChat(); buildRulesEvents(); bindLocalRestore();
   if (loadResult.status === 'recovered') toast('Recovered your last safe save. Some recent moves may be missing.', 5000);
   // consent + SDK init only: no interstitial is ever shown on launch; the banner sits on the menu / game screens
   if (Ads) Ads.init().then(function () { syncSettingsUI(); Ads.showBanner(); });
