@@ -37,6 +37,9 @@
   var profileChannel = null;
   var historyChannel = null;
   var client = null;
+  var classicTurnCue = window.OnlineClassicTurnCue ? window.OnlineClassicTurnCue.create(function () {
+    if (window.SFX && typeof window.SFX.turn === 'function') window.SFX.turn();
+  }) : null;
   var sdkLoading = null;
   var nativeCallbackConfigured = false;
   var pendingInvite = new URLSearchParams(window.location.search).get('room') || sessionStorage.getItem('crossfour.online.pending-invite') || '';
@@ -659,12 +662,14 @@
       panel.classList.remove('is-chess-match');
       setChessPlayScreen(false);
       chessAnnouncementRoomId = ''; chessAnnouncementVersion = null; chessAnnouncementState = null; chessAnnouncementDrawOffer = null; $('online-chess-announcement').textContent = '';
+      if (classicTurnCue) classicTurnCue.reset();
       if (window.__cf && window.__cf.clearOnline) window.__cf.clearOnline();
       return;
     }
     var state = record.state;
     var isChess = room.mode === 'ludo_chess';
     if (isChess) {
+      if (classicTurnCue) classicTurnCue.reset();
       var nextChessVersion = Number(record.version);
       var nextDrawOffer = record.draw_offer || null;
       if (chessAnnouncementRoomId !== room.id) {
@@ -686,6 +691,10 @@
     var myMember = room.roster.find(function (member) { return member.user_id === (currentUser && currentUser.id); });
     var turnMember = room.roster.find(function (member) { return Number(member.seat) === Number(state.turn); });
     var isMyTurn = !!(myMember && Number(myMember.seat) === Number(state.turn));
+    if (!isChess && classicTurnCue) {
+      if (room.status === 'active') classicTurnCue.update(room.id, record.version, state, myMember ? Number(myMember.seat) : null);
+      else classicTurnCue.reset();
+    }
     $('online-match-version').textContent = 'Version ' + record.version;
     $('online-match-eyebrow').textContent = isChess ? 'LUDO CHESS · LIVE STATE' : 'ONLINE CLASSIC · LIVE STATE';
     $('online-match-heading').textContent = isChess ? (state.phase === 'over' ? 'Game complete' : 'Move ' + (state.fullmove || 1)) : (state.phase === 'over' ? 'Match complete' : 'Turn ' + ((state.turn_count || 0) + 1));
