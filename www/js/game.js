@@ -2487,7 +2487,9 @@
         lastSaveError = { reason: resetResult.reason, stage: resetResult.stage };
         saveWriteFailed = true;
         var warning = $('save-warning');
-        warning.textContent = 'Reset failed. Your existing progress was not cleared. Check device storage and try again.';
+        warning.textContent = resetResult.recoveryRestored === false
+          ? 'Reset failed, and device storage could not restore every recovery copy. Check device storage before continuing.'
+          : 'Reset failed. Your existing progress was not cleared. Check device storage and try again.';
         warning.classList.remove('hidden');
         toast('Progress was not reset', 2400);
         return;
