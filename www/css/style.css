@@ -1630,6 +1630,18 @@ body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-
   .camel-cel .cc-halo, .camel-cel .cc-bouquet { transform: none; }
 }
 
+/* Respect reduced-motion preferences across the board, overlays and interface. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ---------------- v1.6.4 · Light theme contrast polish (original Crossfour look) ----------------
    Light skins only (body.light). Darker text, stronger icons, clearer borders/shadows.
    Dark skins are untouched; the board canvas keeps its own palette. --muted is deepened in JS (applySkin). */
