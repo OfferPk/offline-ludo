@@ -813,7 +813,9 @@
         unavailable.code = 'ROOM_UNAVAILABLE';
         throw unavailable;
       }
-      var roster = results[1].data || [];
+      var roster = (results[1].data || []).slice().sort(function (a, b) {
+        return Number(a.seat) - Number(b.seat);
+      });
       if (!roster.some(function (member) { return member.user_id === userId; })) {
         var notMember = new Error('Your room membership is no longer active.');
         notMember.code = 'ROOM_UNAVAILABLE';

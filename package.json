@@ -15,6 +15,7 @@
     "test:turn-controls": "node test/turn-controls.browser.test.js",
     "test:community": "node test/community.test.js",
     "test:online-ui": "node test/online-lobby.browser.test.js",
+    "test:online-room-seat-order": "node test/online-room-seat-order.browser.test.js",
     "test:skins:browser": "node test/skins.browser.test.js",
     "test:yard-pads": "node test/v162-yard-pads.browser.test.js",
     "test:camel": "node test/v163-camel.browser.test.js",
