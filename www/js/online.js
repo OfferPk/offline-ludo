@@ -830,6 +830,11 @@
         if (existingRoom && existingRoom.matchState && serverMatchState && Number(existingRoom.matchState.version) > Number(serverMatchState.version)) serverMatchState = existingRoom.matchState;
         var roomStatus = results[0].data.status;
         if (existingRoom && (existingRoom.status === 'completed' || existingRoom.status === 'cancelled') && roomStatus === 'active') roomStatus = existingRoom.status;
+        var previousMatchState = existingRoom && existingRoom.matchState && existingRoom.matchState.state;
+        var previousMatchEnded = !!(previousMatchState && previousMatchState.phase === 'over');
+        var currentMatchState = serverMatchState && serverMatchState.state;
+        var currentMatchEnded = !!(currentMatchState && currentMatchState.phase === 'over');
+        var shouldRefreshHistory = !existingRoom || existingRoom.status !== roomStatus || (currentMatchEnded && !previousMatchEnded);
         currentRoom = Object.assign({}, results[0].data, {
           status: roomStatus,
           inviteCode: results[2].data ? results[2].data.invite_code : '',
@@ -849,6 +854,7 @@
           if (wasReconnecting) announce('Room reconnected. Latest server state restored.');
         }
         renderRoom();
+        if (!shouldRefreshHistory) return Promise.resolve(currentRoom);
         return refreshHistory().then(function () { return currentRoom; });
       });
     }).catch(function (error) {
