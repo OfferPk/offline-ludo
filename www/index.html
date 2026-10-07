@@ -294,6 +294,10 @@
         </section>
         <section class="online-card" aria-labelledby="online-history-heading">
           <span class="online-eyebrow">RECENT TABLES</span><h2 id="online-history-heading">Match history</h2><p id="online-history-empty">Your started online tables will appear here.</p><ol id="online-history-list" class="online-history-list"></ol>
+          <div id="online-history-feedback" class="online-history-feedback hidden">
+            <p id="online-history-feedback-message" role="status" aria-live="polite" aria-atomic="true"></p>
+            <button id="online-history-retry" class="btn plate" type="button" aria-controls="online-history-list" aria-label="Retry loading match history">Retry</button>
+          </div>
         </section>
       </div>
       <section id="online-chess-screen" class="online-chess-screen hidden" role="region" aria-labelledby="online-chess-screen-title" aria-hidden="true" tabindex="-1">

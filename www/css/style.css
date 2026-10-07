@@ -1216,6 +1216,8 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-room-roster small, .online-history-list small { color: var(--muted); font-size: 10px; text-align: right; }
 .online-history-list li { align-items: flex-start; flex-direction: column; }
 .online-history-list small { text-align: left; }
+.online-history-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.online-history-feedback p { margin: 0; color: var(--muted); font-size: 12px; }
 .online-mode-note { margin: 6px 1px 10px; font-size: 11px !important; }
 .online-match-panel { margin-top: 14px; padding: 12px; border: 1px solid rgba(115,224,176,.24); border-radius: 12px; background: rgba(115,224,176,.045); }
 .online-match-panel h4 { margin: 3px 0 !important; font-size: 14px !important; }

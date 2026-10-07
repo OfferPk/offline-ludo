@@ -71,7 +71,7 @@ function startLocalServer() {
       const state = window.__mockBackend = {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
         removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
-        delayNextRead: null,
+        delayNextRead: null, failNextHistoryRead: false,
         actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false, dropNextDrawResponseAfterCommit: false,
         tables: resumeFixture && resumeFixture.tables || {
           profiles: [
@@ -141,6 +141,10 @@ function startLocalServer() {
             if (operation === 'update') {
               matchedRows.forEach(row => Object.assign(row, patch));
               return { data: null, error: null };
+            }
+            if (table === 'match_history' && state.failNextHistoryRead) {
+              state.failNextHistoryRead = false;
+              return { data: null, error: { message: 'Simulated history read failure' } };
             }
             const rows = matchedRows.map(row => JSON.parse(JSON.stringify(row)));
             const limited = maxRows === null ? rows : rows.slice(0, maxRows);
@@ -493,7 +497,56 @@ function startLocalServer() {
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     await page.click('#online-start-room');
       await page.waitForFunction(() => document.querySelector('#online-room-status').textContent.includes('validated by the server'));
+      await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · active'));
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.failNextHistoryRead = true;
+      state.emit('match_history', { event: 'UPDATE', new: state.tables.match_history[0] });
+    });
+    await page.waitForFunction(() => !document.querySelector('#online-history-feedback').classList.contains('hidden') && !document.querySelector('#online-history-retry').disabled);
+    assert.match(await page.$eval('#online-history-feedback-message', el => el.textContent), /could not be refreshed/i, 'history failures are explained beside the history list');
+    assert.equal(await page.$$eval('#online-history-list li', items => items.length), 1, 'a failed refresh preserves the last successful history rows');
+    const previousGameVisibility = await page.$eval('#game', el => el.style.visibility);
+    await page.$eval('#game', el => { el.style.visibility = 'hidden'; });
+    if (process.env.PREVIEW_DIR) {
+      fs.mkdirSync(process.env.PREVIEW_DIR, { recursive: true });
+      await page.setViewport({ width: 1440, height: 900, isMobile: true, hasTouch: true });
+      const desktopHistoryCard = await page.$('[aria-labelledby="online-history-heading"]');
+      await desktopHistoryCard.screenshot({ path: path.join(process.env.PREVIEW_DIR, 'online-history-retry-desktop.png') });
+      await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+      const mobileHistoryCard = await page.$('[aria-labelledby="online-history-heading"]');
+      await mobileHistoryCard.screenshot({ path: path.join(process.env.PREVIEW_DIR, 'online-history-retry-mobile.png') });
+    }
+    await page.evaluate(() => { window.__mockBackend.delayNextRead = { table: 'match_history', ms: 120 }; });
+    await page.click('#online-history-retry');
+    await page.waitForFunction(() => !document.querySelector('#online-history-feedback').classList.contains('hidden') && document.querySelector('#online-history-retry').disabled && document.querySelector('#online-history-feedback-message').textContent.includes('Refreshing'));
+    await page.waitForFunction(() => document.querySelector('#online-history-feedback').classList.contains('hidden') && document.querySelector('#online-history-list').textContent.includes('Classic · active'));
+    assert.equal(await page.$eval('#online-status', el => el.textContent), 'Match history refreshed.', 'manual retry clears the prior global error status');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.delayNextRead = { table: 'match_history', ms: 180 };
+      state.emit('match_history', { event: 'UPDATE', new: state.tables.match_history[0] });
+      setTimeout(() => {
+        const row = state.tables.match_history[0];
+        row.status = 'completed';
+        state.emit('match_history', { event: 'UPDATE', new: row });
+      }, 10);
+    });
+    await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · completed'));
+    await new Promise(resolve => setTimeout(resolve, 220));
+    assert.match(await page.$eval('#online-history-list', el => el.textContent), /Classic · completed/, 'a slower stale response cannot overwrite a newer history refresh');
+    await page.evaluate(() => {
+      const state = window.__mockBackend;
+      state.tables.match_history[0].status = 'active';
+      state.emit('match_history', { event: 'UPDATE', new: state.tables.match_history[0] });
+    });
     await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · active'));
+    await page.$eval('#game', (el, visibility) => { el.style.visibility = visibility; }, previousGameVisibility);
+    if (process.env.ONLINE_HISTORY_RETRY_ONLY === '1') {
+      assert.deepEqual(errors, [], 'history retry does not cause browser runtime errors');
+      console.log('Online history retry browser checks passed.');
+      return;
+    }
       await page.waitForFunction(() => !document.querySelector('#online-match-panel').classList.contains('hidden') && document.querySelector('#online-match-version').textContent === 'Version 0');
       await page.waitForFunction(() => !document.querySelector('#game').classList.contains('hidden') && document.querySelector('#board') && document.querySelector('#online-match-pieces').classList.contains('hidden'));
       await page.evaluate(() => { window.__mockBackend.failRpc = 'roll_match'; });
