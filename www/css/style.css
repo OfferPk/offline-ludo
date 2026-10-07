@@ -635,6 +635,11 @@ body.light .toast { background: rgba(35,38,44,.92); }
 .r-coins { margin: 0; }
 .r-xp { display: flex; align-items: center; gap: 6px; font-size: 18px; flex-wrap: wrap; max-width: 150px; }
 .r-xp small { font-size: 12px; color: var(--muted); }
+.offline-result-share { display: grid; gap: 5px; margin: 8px 0 0; }
+.offline-result-share > .btn { min-height: 44px; }
+.offline-result-share-status { min-height: 1.25em; margin: 0 2px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.offline-result-share-text { box-sizing: border-box; width: 100%; min-height: 72px; padding: 9px 10px; border: 1px solid var(--surface-edge); border-radius: 10px; color: var(--ink); background: rgba(0,0,0,.18); font: inherit; font-size: 12px; line-height: 1.5; resize: vertical; user-select: text; -webkit-user-select: text; }
+body.light .offline-result-share-text { border-color: rgba(28,32,44,.2); color: #1c202c; background: #fff; }
 .medal { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 900; color: #1b1e25; background: #8a93a3; flex: none; }
 .medal.m1 { background: radial-gradient(circle at 35% 30%, #fff3b0, #f2c14e 55%, #b8841c); }
 .medal.m2 { background: radial-gradient(circle at 35% 30%, #ffffff, #c9d1dc 55%, #8a96a8); }

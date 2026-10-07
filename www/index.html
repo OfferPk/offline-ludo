@@ -428,6 +428,11 @@
           <div class="r-coins"><span class="coin-ico"></span><b id="r-coins">+0</b><small>coins</small></div>
           <div class="r-xp"><b id="r-xp">+0</b><small>XP</small><span class="lvl-bar"><i id="r-lvl-fill"></i></span><small id="r-lvl">Level 1</small></div>
         </div>
+        <div id="offline-result-share" class="offline-result-share hidden">
+          <button id="btn-r-share" class="btn plate" type="button" aria-label="Share the completed offline match result">Share results</button>
+          <p id="offline-result-share-status" class="offline-result-share-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <textarea id="offline-result-share-text" class="offline-result-share-text hidden" rows="3" readonly aria-label="Result summary for manual copying"></textarea>
+        </div>
         <button id="btn-r-double" class="btn rewarded-btn">▶ Watch an ad for 2× coins</button>
         <p class="note tiny">Coins only unlock cosmetic skins. They can't be bought, bet or cashed out.</p>
         <div class="panel-actions">
@@ -604,6 +609,7 @@
   <script src="js/save-store.js?v=1.7.2"></script>
   <script src="js/dice-gesture.js?v=1.7.2"></script>
   <script src="js/path-animation.js?v=1.7.2"></script>
+  <script src="js/offline-result-share.js?v=1.7.2"></script>
   <script src="js/celebration.js?v=1.7.2"></script>
   <script src="js/game.js?v=1.7.2"></script>
   <script src="js/community-fixtures.js?v=1.7.2"></script>

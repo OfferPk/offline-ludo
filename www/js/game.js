@@ -2038,6 +2038,73 @@
     }
   }
   function stopCelebration() { if (window.CamelCelebration) window.CamelCelebration.stop(); }
+  var offlineResultSharePending = false;
+  function offlineResultSummary() {
+    if (!G || G.online || !G.st || G.st.phase !== 'over' || !window.OfflineResultShare) return '';
+    return window.OfflineResultShare.summarize(G.st, NAMES);
+  }
+  function isShowingOfflineResult() {
+    return !!(G && !G.online && G.st && G.st.phase === 'over' && isOpen('result'));
+  }
+  function updateOfflineResultShare(clearFeedback) {
+    var panel = $('offline-result-share');
+    if (!panel) return;
+    var summary = offlineResultSummary();
+    panel.classList.toggle('hidden', !summary || !isOpen('result'));
+    if (clearFeedback) {
+      $('offline-result-share-status').textContent = '';
+      $('offline-result-share-text').value = '';
+      $('offline-result-share-text').classList.add('hidden');
+    }
+  }
+  function showOfflineResultManualCopy(summary) {
+    if (!isShowingOfflineResult()) return;
+    var field = $('offline-result-share-text');
+    field.value = summary;
+    field.classList.remove('hidden');
+    field.focus({ preventScroll: true });
+    field.select();
+    $('offline-result-share-status').textContent = 'Sharing and copying are unavailable. Select and copy the result below.';
+  }
+  function copyOfflineResult(summary) {
+    var writing;
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') throw new Error('Clipboard access is unavailable.');
+      writing = navigator.clipboard.writeText(summary);
+    } catch (error) { writing = Promise.reject(error); }
+    return Promise.resolve(writing).then(function () {
+      if (isShowingOfflineResult()) $('offline-result-share-status').textContent = 'Result copied to clipboard.';
+    }).catch(function () { showOfflineResultManualCopy(summary); });
+  }
+  function shareOfflineResult() {
+    if (offlineResultSharePending || !isShowingOfflineResult()) return;
+    var summary = offlineResultSummary();
+    if (!summary) return;
+    var button = $('btn-r-share');
+    offlineResultSharePending = true;
+    button.disabled = true;
+    $('offline-result-share-status').textContent = '';
+    $('offline-result-share-text').value = '';
+    $('offline-result-share-text').classList.add('hidden');
+    var operation;
+    if (typeof navigator.share === 'function') {
+      try { operation = navigator.share({ title: 'Offline Ludo result', text: summary }); }
+      catch (error) { operation = Promise.reject(error); }
+      operation = Promise.resolve(operation).then(function () {
+        if (isShowingOfflineResult()) $('offline-result-share-status').textContent = 'Result shared.';
+      }).catch(function (error) {
+        if (error && error.name === 'AbortError') {
+          if (isShowingOfflineResult()) $('offline-result-share-status').textContent = 'Share cancelled.';
+          return;
+        }
+        if (isShowingOfflineResult()) return copyOfflineResult(summary);
+      });
+    } else operation = copyOfflineResult(summary);
+    Promise.resolve(operation).catch(function () { showOfflineResultManualCopy(summary); }).finally(function () {
+      offlineResultSharePending = false;
+      if (button) button.disabled = false;
+    });
+  }
   function showResult() {
     var st = G.st, hs = humans(st), single = hs.length === 1, winner = st.ranking[0];
     var entering = !isOpen('result');
@@ -2056,7 +2123,7 @@
     var lv = L.levelFromXp(save.xp); $('r-lvl').textContent = 'Level ' + lv.level; $('r-lvl-fill').style.width = Math.round(lv.into / lv.need * 100) + '%';
     $('btn-r-double').classList.toggle('hidden', !G.coins || G.doubled);
     if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
-    render(); setCoins(); setLevel(); show('result');
+    render(); setCoins(); setLevel(); show('result'); updateOfflineResultShare(entering);
     if (entering) { spotlightWinner(winner); celebrateWin(winner); }
   }
   /** The ONLY place an interstitial may appear: leaving the result screen after a finished match. */
@@ -2444,6 +2511,7 @@
   $('btn-r-again').addEventListener('click', function () { leaveResult('again'); });
   $('btn-r-home').addEventListener('click', function () { leaveResult('home'); });
   $('btn-r-double').addEventListener('click', doubleCoins);
+  $('btn-r-share').addEventListener('click', shareOfflineResult);
   $('btn-exit-match').addEventListener('click', function () { SFX.click(); openExitConfirmation(); });
   $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); show('stats'); });
   $('btn-skins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
