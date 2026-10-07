@@ -335,6 +335,10 @@
     $('online-room-status').textContent = room.status === 'active'
       ? (room.matchState ? (room.mode === 'ludo_chess' ? 'Ludo Chess is active. Legal moves and match state are validated by the server.' : 'Online Classic match is active. Dice and moves are validated by the server.') : 'This table predates the current online gameplay update. Create a new table to play online.')
       : room.status === 'completed' ? 'This table is complete.' : room.status === 'cancelled' ? 'This table was cancelled.' : 'Waiting for players to join and ready up.';
+    var turnSummary = window.OnlineClassicRoomSummary.describe(room, currentUser && currentUser.id);
+    var turnSummaryLine = $('online-classic-turn-summary');
+    turnSummaryLine.classList.toggle('hidden', !turnSummary);
+    if (turnSummaryLine.textContent !== turnSummary) turnSummaryLine.textContent = turnSummary;
     $('online-invite-code').value = room.inviteCode || '';
     $('online-start-room').classList.toggle('hidden', room.status !== 'waiting' || room.created_by !== (currentUser && currentUser.id));
     $('online-ready').classList.toggle('hidden', room.status !== 'waiting');

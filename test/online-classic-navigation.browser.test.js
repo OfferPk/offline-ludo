@@ -160,6 +160,8 @@ function startLocalServer() {
     await page.click('#btn-home');
     await page.waitForFunction(() => document.querySelector('#game').classList.contains('hidden') && !document.querySelector('#online-classic-resume-actions').classList.contains('hidden'));
     assert.equal(await page.$eval('#online', element => element.classList.contains('hidden')), false, 'room details become visible when the board is dismissed');
+    await page.waitForFunction(() => !document.querySelector('#online-classic-turn-summary').classList.contains('hidden') && document.querySelector('#online-classic-turn-summary').textContent === 'Your turn: roll the dice.');
+    assert.equal(await page.$eval('#online-classic-turn-summary', element => element.getAttribute('aria-live')), 'polite', 'the turn summary announces changes politely');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'online-classic-resume', 'focus moves to the return-to-board action when room details open');
 
     await page.evaluate(() => {
@@ -167,10 +169,11 @@ function startLocalServer() {
       const row = backend.tables.match_states[0];
       const old = JSON.parse(JSON.stringify(row));
       row.version = 1;
-      row.state = Object.assign({}, row.state, { turn: 1, phase: 'roll', turn_count: 1, turn_deadline: Date.now() + 45000 });
+      row.state = Object.assign({}, row.state, { turn: 1, phase: 'move', turn_count: 1, turn_deadline: Date.now() + 45000 });
       backend.emit('match_states', { event: 'UPDATE', old, new: row });
     });
     await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 1');
+    await page.waitForFunction(() => document.querySelector('#online-classic-turn-summary').textContent === "Bob's turn: choose a token.");
     assert.equal(await page.$eval('#game', element => element.classList.contains('hidden')), true, 'a realtime match update does not unexpectedly reopen the board');
     assert.equal(await page.$eval('#online', element => element.classList.contains('hidden')), false, 'realtime updates keep the visible room-details screen in front');
     assert.equal(await page.evaluate(() => window.__cf.game.st.turn), 1, 'hidden board state and countdown hooks follow the latest server snapshot');
@@ -180,11 +183,15 @@ function startLocalServer() {
       await page.evaluate(() => document.querySelector('#online-classic-resume').scrollIntoView({ block: 'center' }));
       const mobilePreview = path.join(process.env.PREVIEW_DIR, 'online-classic-room-mobile.png');
       await page.screenshot({ path: mobilePreview, fullPage: true });
+      const turnSummaryMobilePreview = path.join(process.env.PREVIEW_DIR, 'online-classic-room-turn-summary-mobile.png');
+      await page.screenshot({ path: turnSummaryMobilePreview, fullPage: true });
       await page.setViewport({ width: 1280, height: 900, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
       await page.evaluate(() => document.querySelector('#online-classic-resume').scrollIntoView({ block: 'center' }));
       const desktopPreview = path.join(process.env.PREVIEW_DIR, 'online-classic-room-desktop.png');
       await page.screenshot({ path: desktopPreview, fullPage: true });
-      assert.ok((await fs.promises.stat(mobilePreview)).size > 0 && (await fs.promises.stat(desktopPreview)).size > 0, 'mobile and desktop lobby previews are captured');
+      const turnSummaryDesktopPreview = path.join(process.env.PREVIEW_DIR, 'online-classic-room-turn-summary-desktop.png');
+      await page.screenshot({ path: turnSummaryDesktopPreview, fullPage: true });
+      assert.ok((await fs.promises.stat(mobilePreview)).size > 0 && (await fs.promises.stat(desktopPreview)).size > 0 && (await fs.promises.stat(turnSummaryMobilePreview)).size > 0 && (await fs.promises.stat(turnSummaryDesktopPreview)).size > 0, 'mobile and desktop room-detail previews are captured');
       await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
     }
 
