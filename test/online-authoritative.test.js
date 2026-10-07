@@ -40,6 +40,13 @@ ok(/state\.rules,[\s\S]*?window\.LudoLogic\.queueMoves\(localView\)/i.test(onlin
 ok(/table: 'match_states'/i.test(online) && /window\.addEventListener\('online'/i.test(online) && /document\.addEventListener\('visibilitychange'/i.test(online), 'state updates subscribe live and refresh after connection/visibility recovery');
 ok(/pending\.args/i.test(online) && /Retry uses the same action ID/i.test(online), 'the client can safely retry the identical action request after a lost response');
 ok(/p_action_id: makeActionId\(\)/i.test(online) && /p_die|p_value/.test(online) === false, 'the browser generates an idempotency key and never submits a dice face');
+const expiryStart = online.indexOf('function expireOnlineTurn()');
+const expiryEnd = online.indexOf('function renderMatch()', expiryStart);
+const expiryHandler = online.slice(expiryStart, expiryEnd);
+ok(/result\.expired === false/.test(expiryHandler) && /returnedState\.turn_deadline/.test(expiryHandler) && /scheduleOnlineTurnExpiryRetry/.test(expiryHandler), 'an early server no-op is retried only while the same active turn deadline remains current');
+ok(/isTransientTurnExpiryError\(error\)/.test(expiryHandler) && /scheduleOnlineTurnExpiryRetry/.test(expiryHandler), 'transient turn-expiry transport failures receive an automatic retry');
+ok(/roomConnectionState !== 'connected'\) \{\s*scheduleOnlineTurnExpiryRetry\(snapshot\);\s*return;/.test(expiryHandler), 'an expired turn waits for room reconnection instead of losing its one-shot timeout callback');
+ok(/room\.status !== 'active'/.test(online.slice(online.indexOf('function onlineTurnExpirySnapshot()'), expiryStart)), 'turn-expiry retries are scoped to a live Classic room and cannot affect a later turn');
 ok(/Online gameplay currently supports Classic rooms only/i.test(migration) && /Mystery and Lucky Chaos remain available in offline play only/i.test(html), 'online scope is explicitly Classic-only while local variants remain available');
 ok(/function roll\(st, value\)/i.test(logic) && /L\.roll\(st/i.test(game), 'offline gameplay continues to use the unchanged local rules engine');
 ok(!/match_states/.test(read('www/js/save-store.js')), 'authoritative cloud state is not added to local save storage');
