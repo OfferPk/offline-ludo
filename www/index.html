@@ -293,7 +293,14 @@
           </section>
         </section>
         <section class="online-card" aria-labelledby="online-history-heading">
-          <span class="online-eyebrow">RECENT TABLES</span><h2 id="online-history-heading">Match history</h2><p id="online-history-empty">Your started online tables will appear here.</p><ol id="online-history-list" class="online-history-list"></ol>
+          <span class="online-eyebrow">RECENT TABLES</span><h2 id="online-history-heading">Match history</h2>
+          <div id="online-history-filters" class="online-history-filters hidden" role="group" aria-label="Filter match history">
+            <button id="online-history-filter-all" class="btn plate" type="button" data-history-filter="all" aria-pressed="true">All</button>
+            <button id="online-history-filter-classic" class="btn plate" type="button" data-history-filter="classic" aria-pressed="false">Online Classic</button>
+            <button id="online-history-filter-chess" class="btn plate" type="button" data-history-filter="ludo_chess" aria-pressed="false">Ludo Chess</button>
+          </div>
+          <p id="online-history-filter-status" class="online-history-filter-status hidden" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p id="online-history-empty">Your started online tables will appear here.</p><ol id="online-history-list" class="online-history-list"></ol>
         </section>
       </div>
       <section id="online-chess-screen" class="online-chess-screen hidden" role="region" aria-labelledby="online-chess-screen-title" aria-hidden="true" tabindex="-1">
@@ -610,6 +617,7 @@
   <script src="js/community.js?v=1.7.2"></script>
   <script src="js/supabase-config.js?v=1.7.2"></script>
   <script src="js/chess.js?v=1.7.2"></script>
+  <script src="js/online-history-filter.js?v=1.7.2"></script>
   <script src="js/online.js?v=1.7.2"></script>
   <script src="js/ludo-chess-discovery.js?v=1.7.2"></script>
 </body>

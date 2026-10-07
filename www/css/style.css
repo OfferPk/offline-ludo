@@ -1216,6 +1216,11 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-room-roster small, .online-history-list small { color: var(--muted); font-size: 10px; text-align: right; }
 .online-history-list li { align-items: flex-start; flex-direction: column; }
 .online-history-list small { text-align: left; }
+.online-history-filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0 5px; }
+.online-history-filters .btn { flex: 1 1 auto; min-height: 40px; padding: 7px 10px; font-size: 11px; white-space: nowrap; }
+.online-history-filters .btn[aria-pressed="true"] { color: var(--accent); border-color: rgba(244,183,64,.5); background: rgba(244,183,64,.1); }
+.online-history-filter-status { min-height: 1em; margin: 0 0 8px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.online-history-list li[hidden] { display: none !important; }
 .online-mode-note { margin: 6px 1px 10px; font-size: 11px !important; }
 .online-match-panel { margin-top: 14px; padding: 12px; border: 1px solid rgba(115,224,176,.24); border-radius: 12px; background: rgba(115,224,176,.045); }
 .online-match-panel h4 { margin: 3px 0 !important; font-size: 14px !important; }
@@ -1754,6 +1759,7 @@ body.light .online-room-card { border-color: rgba(31,96,160,.26); background: rg
 body.light .online-room-connection { color: var(--lt-link) !important; background: rgba(31,96,160,.08); }
 body.light .online-room-connection[data-state="reconnecting"] { color: var(--lt-warn) !important; background: rgba(244,183,64,.14); }
 body.light .online-room-connection[data-state="ended"] { color: #11744f !important; background: rgba(24,160,116,.1); }
+body.light .online-history-filters .btn[aria-pressed="true"] { color: #7a5300; border-color: rgba(176,112,16,.35); background: rgba(244,183,64,.15); }
 /* The dedicated online Ludo Chess surface is always dark: give it dark tokens on light skins too. */
 body.light .online-chess-screen { --ink: #eef1f5; --muted: #9ba6b0; --surface: rgba(255,255,255,.05); --surface-edge: rgba(255,255,255,.1); }
 body.light .online-chess-screen .btn:not(.primary):not(.rewarded-btn) { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.14); box-shadow: none; }

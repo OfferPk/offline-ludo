@@ -311,6 +311,7 @@
         list.replaceChildren();
         (result.data || []).forEach(function (match) {
           var item = document.createElement('li');
+          item.dataset.historyMode = match.mode === 'ludo_chess' ? 'ludo_chess' : 'classic';
           var title = document.createElement('b');
           title.textContent = modeLabel(match.mode) + ' · ' + match.status;
           var detail = document.createElement('small');
