@@ -80,12 +80,13 @@
     var line = $('online-room-connection');
     if (!line) return;
     line.dataset.state = state;
-    line.textContent = message || ({
+    var text = message || ({
       connecting: 'Restoring the latest server match state…',
       connected: 'Connected · server match state is up to date.',
       reconnecting: 'Reconnecting · actions are paused until the latest server state is restored.',
       ended: 'Room ended · final authoritative match state is available.'
     }[state] || '');
+    if (line.textContent !== text) line.textContent = text;
     if (currentRoom) renderMatch();
   }
   function removeRealtimeChannel(channel) {
