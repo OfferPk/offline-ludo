@@ -450,10 +450,10 @@
     </div>
 
     <!-- MENU (in game) -->
-    <div id="menu" class="overlay hidden">
+    <div id="menu" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="menu-title" aria-describedby="menu-note">
       <div class="panel">
-        <h3>Match paused</h3>
-        <p class="note">Your match is saved automatically. You can continue it later from the home screen.</p>
+        <h3 id="menu-title" tabindex="-1">Match paused</h3>
+        <p id="menu-note" class="note">Your match is saved automatically. You can continue it later from the home screen.</p>
         <div class="panel-actions col">
           <button id="btn-m-resume" class="btn primary">Resume</button>
           <button id="btn-m-rules" class="btn plate">Rules</button>
@@ -482,9 +482,9 @@
     </div>
 
     <!-- RULES -->
-    <div id="rules" class="overlay hidden">
+    <div id="rules" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="rules-title">
       <div class="panel wide">
-        <div class="panel-head"><h3>Rules</h3><button class="icon-btn close" data-close="rules" aria-label="Close">✕</button></div>
+        <div class="panel-head"><h3 id="rules-title" tabindex="-1">Rules</h3><button class="icon-btn close" data-close="rules" aria-label="Close">✕</button></div>
         <div class="tabs" id="rules-tabs"><button data-tab="basics" class="on">Basics</button><button data-tab="rolls">Rolls</button><button data-tab="mystery">Mystery</button><button data-tab="lucky">Lucky</button><button data-tab="modes">Modes</button><button data-tab="house">House</button></div>
         <div class="rules-page" data-page="basics">
           <ul class="rules-list">
