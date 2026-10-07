@@ -145,11 +145,21 @@ function startLocalServer() {
     await page.click('#btn-online');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-connection').dataset.state === 'connected');
     await page.waitForFunction(() => !document.querySelector('#game').classList.contains('hidden') && window.__cf && window.__cf.game && window.__cf.game.online);
+    assert.equal(await page.$eval('#online', element => element.classList.contains('hidden')), true, 'the lobby is hidden while the restored Classic board is active');
     assert.equal(await page.$eval('#btn-home', element => element.getAttribute('aria-label')), 'Room details', 'the Classic board navigation control is named for its destination');
     assert.equal(await page.$eval('#online-classic-resume-actions', element => element.classList.contains('hidden')), true, 'the resume action is not shown while the board is already open');
 
+    if (process.env.PREVIEW_DIR) {
+      await fs.promises.mkdir(process.env.PREVIEW_DIR, { recursive: true });
+      await page.screenshot({ path: path.join(process.env.PREVIEW_DIR, 'online-active-room-board-mobile.png'), fullPage: true });
+      await page.setViewport({ width: 1280, height: 900, isMobile: true, hasTouch: true, deviceScaleFactor: 1 });
+      await page.screenshot({ path: path.join(process.env.PREVIEW_DIR, 'online-active-room-board-desktop.png'), fullPage: true });
+      await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    }
+
     await page.click('#btn-home');
     await page.waitForFunction(() => document.querySelector('#game').classList.contains('hidden') && !document.querySelector('#online-classic-resume-actions').classList.contains('hidden'));
+    assert.equal(await page.$eval('#online', element => element.classList.contains('hidden')), false, 'room details become visible when the board is dismissed');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'online-classic-resume', 'focus moves to the return-to-board action when room details open');
 
     await page.evaluate(() => {
@@ -162,6 +172,7 @@ function startLocalServer() {
     });
     await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 1');
     assert.equal(await page.$eval('#game', element => element.classList.contains('hidden')), true, 'a realtime match update does not unexpectedly reopen the board');
+    assert.equal(await page.$eval('#online', element => element.classList.contains('hidden')), false, 'realtime updates keep the visible room-details screen in front');
     assert.equal(await page.evaluate(() => window.__cf.game.st.turn), 1, 'hidden board state and countdown hooks follow the latest server snapshot');
 
     if (process.env.PREVIEW_DIR) {
@@ -180,6 +191,7 @@ function startLocalServer() {
     await page.evaluate(() => document.querySelector('#online-classic-resume').scrollIntoView({ block: 'center' }));
     await page.click('#online-classic-resume');
     await page.waitForFunction(() => !document.querySelector('#game').classList.contains('hidden') && window.__cf.game && window.__cf.game.online && window.__cf.game.st.turn === 1);
+    assert.equal(await page.$eval('#online', element => element.classList.contains('hidden')), true, 'resuming hides room details behind the active board again');
     assert.equal(await page.evaluate(() => window.__cf.game.st.turn), 1, 'returning opens the latest server turn, not the stale snapshot');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'btn-home', 'focus returns to the board navigation control after resume');
     assert.deepEqual(errors, [], 'the mocked Online room flow has no uncaught JavaScript errors');

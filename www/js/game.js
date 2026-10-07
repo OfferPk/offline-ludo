@@ -2637,9 +2637,14 @@
     G = { st: st, seats: st.seats, mode: 'classic', view: mySeat, online: true, undoLeft: 0, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: true, started: Date.now() };
     setOnlineNavigationLabel(true);
   }
+  function setOnlineLobbyVisible(visible) {
+    var lobby = $('online');
+    if (lobby) lobby.classList.toggle('hidden', !visible);
+  }
   function updateOnline(opts) {
     setOnlineState(opts);
     document.body.classList.add('online-classic-board');
+    setOnlineLobbyVisible(true);
     $('game').classList.add('hidden');
     paintOnlineChrome();
   }
@@ -2647,6 +2652,7 @@
     setOnlineState(opts);
     hideClassicTextPanel();
     document.body.classList.add('online-classic-board');
+    setOnlineLobbyVisible(false);
     screen('game'); paused = false;
     var st = G.st;
     buildPods(); buildTiles(); buildPieces(); layout(); render(); highlight(); paintOnlineChrome();
@@ -2660,12 +2666,14 @@
   }
   function showOnlineBoard() {
     if (!G || !G.online) return;
+    setOnlineLobbyVisible(false);
     $('game').classList.remove('hidden');
     layout(); render(); highlight();
   }
   function hideOnlineBoard() {
     if (!G || !G.online) return;
     $('game').classList.add('hidden');
+    setOnlineLobbyVisible(true);
   }
   function clearOnline() {
     stopOnlineClock();
@@ -2682,6 +2690,7 @@
     G = parkedLocal;
     parkedLocal = null;
     $('game').classList.add('hidden');
+    setOnlineLobbyVisible(true);
     if (G) { G.undo = null; G.sel = null; }
   }
 
