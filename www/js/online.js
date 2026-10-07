@@ -326,6 +326,21 @@
   function renderRoom() {
     var room = currentRoom;
     var card = $('online-room-card');
+    var inviteAvailable = !!(room && room.status === 'waiting' && room.inviteCode);
+    ['online-copy-invite', 'online-share-invite'].forEach(function (id) {
+      var action = $(id);
+      if (!action) return;
+      action.disabled = !inviteAvailable;
+      if (inviteAvailable) action.removeAttribute('aria-describedby');
+      else action.setAttribute('aria-describedby', 'online-invite-closed');
+    });
+    var inviteNotice = $('online-invite-closed');
+    inviteNotice.classList.toggle('hidden', !room || inviteAvailable);
+    inviteNotice.textContent = !room || inviteAvailable ? '' : room.status === 'waiting'
+      ? 'An invite link is not available for this table.'
+      : room.status === 'active'
+        ? 'This table has started. New players cannot join, so invite links are disabled.'
+        : 'This table is closed. New players cannot join, so invite links are disabled.';
     card.classList.toggle('hidden', !room);
     if (!room) { $('online-chess-resume').classList.add('hidden'); renderMatch(); return; }
     if (room.status === 'completed' || room.status === 'cancelled' || (room.matchState && room.matchState.state && room.matchState.state.phase === 'over')) setRoomConnectionState('ended');
