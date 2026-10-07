@@ -95,6 +95,7 @@
     var channel = roomChannel;
     roomChannel = null;
     roomChannelStatus = 'idle';
+    if (window.OnlineRoomRosterAnnouncements) window.OnlineRoomRosterAnnouncements.reset();
     removeRealtimeChannel(channel);
   }
   function clearAccountChannels() {
@@ -841,6 +842,7 @@
         });
         var mine = roster.filter(function (member) { return member.user_id === userId; })[0];
         currentRoom.myReady = !!mine.ready;
+        if (window.OnlineRoomRosterAnnouncements) window.OnlineRoomRosterAnnouncements.update(requestedRoomId, currentRoom.roster, userId);
         if (roomStatus === 'completed' || roomStatus === 'cancelled' || (serverMatchState && serverMatchState.state && serverMatchState.state.phase === 'over')) {
           setRoomConnectionState('ended');
         } else if (roomChannelStatus === 'SUBSCRIBED') {
