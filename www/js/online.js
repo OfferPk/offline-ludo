@@ -433,7 +433,9 @@
     $('online-chess-history-notation').textContent = history.complete ? 'Standard algebraic notation (SAN)' : 'Coordinate notation · incomplete server history';
     list.setAttribute('aria-label', history.complete ? 'Move list in standard algebraic chess notation' : 'Verified coordinate moves; the full move history is unavailable');
     $('online-chess-copy-pgn').disabled = !history.complete;
-    $('online-chess-copy-pgn').title = history.complete ? 'Copy the verified complete game as PGN; download it if clipboard access is unavailable.' : 'PGN export requires a complete, verifiable server move history.';
+    $('online-chess-download-pgn').disabled = !history.complete;
+    $('online-chess-copy-pgn').title = history.complete ? 'Copy the verified complete game as PGN.' : 'PGN export requires a complete, verifiable server move history.';
+    $('online-chess-download-pgn').title = history.complete ? 'Download the verified complete game as a PGN file.' : 'PGN export requires a complete, verifiable server move history.';
     $('online-chess-pgn-status').textContent = history.complete
       ? (count ? 'PGN ready · full server history verified.' : 'PGN ready · Red moves first.')
       : (history.reason || 'PGN unavailable because the server did not provide a complete move history.');
@@ -453,7 +455,7 @@
     empty.classList.toggle('hidden', count > 0);
     if (count > 0) list.scrollTop = list.scrollHeight;
   }
-  function downloadChessPgn(pgn) {
+  function downloadChessPgn(pgn, clipboardFallback) {
     if (typeof Blob !== 'function' || !window.URL || typeof window.URL.createObjectURL !== 'function') throw new Error('File export is unavailable in this browser.');
     var blob = new Blob([pgn], { type: 'application/vnd.chess-pgn; charset=utf-8' });
     var url = window.URL.createObjectURL(blob), link = document.createElement('a');
@@ -461,17 +463,35 @@
     link.href = url; link.download = 'ludo-chess-' + roomName + '.pgn'; link.hidden = true;
     document.body.appendChild(link); link.click(); link.remove();
     window.setTimeout(function () { window.URL.revokeObjectURL(url); }, 1000);
-    $('online-chess-pgn-status').textContent = 'Clipboard access was unavailable; the PGN file was downloaded.';
+    $('online-chess-pgn-status').textContent = clipboardFallback ? 'Clipboard access was unavailable; the PGN file was downloaded.' : 'PGN file downloaded.';
+  }
+  function currentVerifiedChessPgn() {
+    if (!currentRoom || !currentRoom.matchState || !currentRoom.matchState.state || !window.LudoChess) return null;
+    var state = currentRoom.matchState.state;
+    var history = chessMoveHistory(state, currentRoom, currentRoom.matchState.version);
+    if (!history.complete) {
+      $('online-chess-pgn-status').textContent = history.reason || 'PGN export requires a complete, verifiable server move history.';
+      return null;
+    }
+    return window.LudoChess.exportPgn(state, { red: chessPlayerName(currentRoom, 0), blue: chessPlayerName(currentRoom, 1) });
+  }
+  function downloadCurrentChessPgn() {
+    try {
+      var pgn = currentVerifiedChessPgn();
+      if (!pgn) return;
+      downloadChessPgn(pgn, false);
+    } catch (error) {
+      $('online-chess-pgn-status').textContent = 'PGN download unavailable: ' + errorText(error);
+    }
   }
   function copyChessPgn() {
-    if (!currentRoom || !currentRoom.matchState || !currentRoom.matchState.state || !window.LudoChess) return;
     try {
-      var state = currentRoom.matchState.state;
-      var pgn = window.LudoChess.exportPgn(state, { red: chessPlayerName(currentRoom, 0), blue: chessPlayerName(currentRoom, 1) });
-      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return downloadChessPgn(pgn);
+      var pgn = currentVerifiedChessPgn();
+      if (!pgn) return;
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return downloadChessPgn(pgn, true);
       navigator.clipboard.writeText(pgn).then(function () {
         $('online-chess-pgn-status').textContent = 'PGN copied to clipboard.';
-      }).catch(function () { try { downloadChessPgn(pgn); } catch (error) { $('online-chess-pgn-status').textContent = 'PGN could not be copied or downloaded: ' + errorText(error); } });
+      }).catch(function () { try { downloadChessPgn(pgn, true); } catch (error) { $('online-chess-pgn-status').textContent = 'PGN could not be copied or downloaded: ' + errorText(error); } });
     } catch (error) {
       $('online-chess-pgn-status').textContent = 'PGN export unavailable: ' + errorText(error);
     }
@@ -1174,6 +1194,7 @@
     $('online-chess-withdraw-draw').addEventListener('click', function () { submitMatchAction('respond_ludo_chess_draw', { p_response: 'withdraw' }); });
     $('online-chess-resign').addEventListener('click', function () { submitMatchAction('resign_ludo_chess', {}); });
     $('online-chess-copy-pgn').addEventListener('click', copyChessPgn);
+    $('online-chess-download-pgn').addEventListener('click', downloadCurrentChessPgn);
     $('online-chess-back').addEventListener('click', function () {
       chessPlayViewDismissed = true;
       renderMatch();
