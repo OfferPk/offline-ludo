@@ -13,6 +13,7 @@
   var currentRoomId = sessionStorage.getItem('crossfour.online.room') || '';
   var currentRoom = null;
   var currentUser = null;
+  var creatingClassicNextRoom = false;
   var pendingMatchAction = null;
   var selectedChessSquare = -1;
   var selectedChessMoves = [];
@@ -650,6 +651,9 @@
   function renderMatch() {
     var room = currentRoom;
     var panel = $('online-match-panel');
+    var nextClassicRoomButton = $('online-classic-next-room');
+    nextClassicRoomButton.classList.add('hidden');
+    nextClassicRoomButton.disabled = true;
     var record = room && room.matchState;
     var show = !!(room && (room.status === 'active' || room.status === 'completed') && record && record.state);
     panel.classList.toggle('hidden', !show);
@@ -699,6 +703,10 @@
     $('online-roll').disabled = !isSynchronized;
     $('online-match-retry').classList.toggle('hidden', !pendingMatchAction || pendingMatchAction.room_id !== currentRoomId);
     $('online-match-retry').disabled = !isSynchronized;
+    var showNextClassicRoom = !isChess && state.phase === 'over' && room.status !== 'cancelled';
+    nextClassicRoomButton.classList.toggle('hidden', !showNextClassicRoom);
+    nextClassicRoomButton.disabled = creatingClassicNextRoom || !client || !currentUser;
+    nextClassicRoomButton.textContent = creatingClassicNextRoom ? 'Creating invite room…' : 'Create another Classic room';
     $('online-chess-claim-draw').disabled = !isSynchronized;
     $('online-chess-resign').disabled = !isSynchronized;
     $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) { button.disabled = !isSynchronized; });
@@ -1103,6 +1111,53 @@
       var text = errorText(error);
       return /create_room|quick_match|schema cache|Could not find the function|PGRST202/i.test(text);
     }
+    function classicRulesForFinishedMatch(state) {
+      var rules = state && state.rules;
+      if (!rules || typeof rules !== 'object' || Array.isArray(rules)) return classicRulesPayload();
+      return {
+        rollStyle: rules.rollStyle === 'classic' ? 'classic' : 'star',
+        safeSquares: typeof rules.safeSquares === 'boolean' ? rules.safeSquares : true,
+        captureToEnter: !!rules.captureToEnter,
+        blocks: !!rules.blocks,
+        bonusOnCapture: typeof rules.bonusOnCapture === 'boolean' ? rules.bonusOnCapture : true,
+        bonusOnHome: typeof rules.bonusOnHome === 'boolean' ? rules.bonusOnHome : true,
+        arrows: !!rules.arrows,
+        noCapture: !!rules.noCapture
+      };
+    }
+    function createClassicNextRoom() {
+      var sourceRoom = currentRoom;
+      var match = sourceRoom && sourceRoom.matchState;
+      var state = match && match.state;
+      if (!client || !currentUser || !sourceRoom || sourceRoom.mode !== 'classic' || !state || state.phase !== 'over' || creatingClassicNextRoom) return;
+      var capacity = Number(sourceRoom.capacity);
+      if ([2, 3, 4].indexOf(capacity) < 0) return announce('Could not reuse this Classic table’s seat count. Choose a new room from the lobby.', true);
+      var args = { p_mode: 'classic', p_capacity: capacity, p_rules: classicRulesForFinishedMatch(state) };
+      creatingClassicNextRoom = true;
+      renderMatch();
+      announce('Creating a new Classic invite room with the completed match settings…');
+      var request;
+      try { request = callRpc('create_room', args); }
+      catch (error) { request = Promise.reject(error); }
+      return Promise.resolve(request).catch(function (error) {
+        if (!args.p_rules || !missingRulesRpc(error)) throw error;
+        announce('This server has not applied the Classic rules update; creating the new room with server defaults.', true);
+        return callRpc('create_room', { p_mode: 'classic', p_capacity: capacity });
+      }).then(function (result) {
+        return attachRoom(result).then(function () {
+          if (currentRoom && currentRoom.id === result.room_id) {
+            announce('New Classic invite room is ready. Share its code to invite players; the completed result remains in match history.');
+          } else {
+            announce('New Classic invite room was created. Reconnecting to load its invite code.', true);
+          }
+        });
+      }).catch(function (error) {
+        announce('New Classic room could not be created: ' + errorText(error), true);
+      }).finally(function () {
+        creatingClassicNextRoom = false;
+        renderMatch();
+      });
+    }
     $('online-create-room').addEventListener('click', function () {
       if (!client) return;
       var args = roomRpcArgs();
@@ -1156,6 +1211,7 @@
         })
         .catch(function (error) { announce('Table could not be started: ' + errorText(error), true); });
     });
+    $('online-classic-next-room').addEventListener('click', createClassicNextRoom);
     $('online-roll').addEventListener('click', function () { submitMatchAction('roll_match', {}); });
     $('online-match-retry').addEventListener('click', runPendingMatchAction);
     if ($('online-board-retry')) $('online-board-retry').addEventListener('click', runPendingMatchAction);
