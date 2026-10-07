@@ -647,6 +647,81 @@
       if (!/expire_turn|schema cache|Could not find the function|PGRST202/i.test(errorText(error))) announce('Turn timer could not be applied: ' + errorText(error), true);
     });
   }
+  var sharingClassicResult = false;
+  function classicResultSummary(room) {
+    var state = room && room.matchState && room.matchState.state;
+    if (!room || room.mode !== 'classic' || !state || state.phase !== 'over' || !window.OnlineClassicResultShare) return '';
+    return window.OnlineClassicResultShare.summarize(state, room.roster);
+  }
+  function updateClassicResultShare(room) {
+    var actions = $('online-classic-result-share-actions');
+    var button = $('online-classic-result-share-button');
+    var status = $('online-classic-result-share-status');
+    var manualCopy = $('online-classic-result-share-text');
+    var summary = classicResultSummary(room);
+    actions.classList.toggle('hidden', !summary);
+    button.disabled = sharingClassicResult || !summary;
+    if (!summary && !sharingClassicResult) {
+      status.textContent = '';
+      manualCopy.value = '';
+      manualCopy.classList.add('hidden');
+    }
+  }
+  function showManualResultCopy(summary, roomId) {
+    if (!currentRoom || currentRoom.id !== roomId) return;
+    var field = $('online-classic-result-share-text');
+    field.value = summary;
+    field.classList.remove('hidden');
+    field.focus({ preventScroll: true });
+    field.select();
+    $('online-classic-result-share-status').textContent = 'Sharing and copying are unavailable. Select and copy the result below.';
+  }
+  function copyClassicResult(summary, roomId) {
+    return Promise.resolve().then(function () {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') throw new Error('Clipboard access is unavailable.');
+      return navigator.clipboard.writeText(summary);
+    }).then(function () {
+      if (currentRoom && currentRoom.id === roomId) $('online-classic-result-share-status').textContent = 'Result copied to clipboard.';
+    }).catch(function () { showManualResultCopy(summary, roomId); });
+  }
+  function shareClassicResult() {
+    if (sharingClassicResult || !currentRoom) return;
+    var summary = classicResultSummary(currentRoom);
+    if (!summary) return;
+    var roomId = currentRoom.id;
+    var status = $('online-classic-result-share-status');
+    var manualCopy = $('online-classic-result-share-text');
+    sharingClassicResult = true;
+    status.textContent = '';
+    manualCopy.value = '';
+    manualCopy.classList.add('hidden');
+    updateClassicResultShare(currentRoom);
+    var operation;
+    if (typeof navigator.share === 'function') {
+      try {
+        operation = navigator.share({ title: 'Online Classic Ludo result', text: summary });
+      } catch (error) {
+        operation = Promise.reject(error);
+      }
+      operation = Promise.resolve(operation).then(function () {
+        if (currentRoom && currentRoom.id === roomId) status.textContent = 'Result shared.';
+      }).catch(function (error) {
+        if (error && error.name === 'AbortError') {
+          if (currentRoom && currentRoom.id === roomId) status.textContent = 'Share cancelled.';
+          return;
+        }
+        return copyClassicResult(summary, roomId);
+      });
+    } else {
+      operation = copyClassicResult(summary, roomId);
+    }
+    Promise.resolve(operation).catch(function () {
+      showManualResultCopy(summary, roomId);
+    }).finally(function () {
+      sharingClassicResult = false;
+      updateClassicResultShare(currentRoom);
+    });
+  }
   function renderMatch() {
     var room = currentRoom;
     var panel = $('online-match-panel');
@@ -654,6 +729,7 @@
     var show = !!(room && (room.status === 'active' || room.status === 'completed') && record && record.state);
     panel.classList.toggle('hidden', !show);
     if (!show) {
+      updateClassicResultShare(null);
       $('online-chess-play').classList.add('hidden');
       $('online-chess-resume').classList.add('hidden');
       panel.classList.remove('is-chess-match');
@@ -664,6 +740,7 @@
     }
     var state = record.state;
     var isChess = room.mode === 'ludo_chess';
+    updateClassicResultShare(isChess ? null : room);
     if (isChess) {
       var nextChessVersion = Number(record.version);
       var nextDrawOffer = record.draw_offer || null;
@@ -1158,6 +1235,7 @@
     });
     $('online-roll').addEventListener('click', function () { submitMatchAction('roll_match', {}); });
     $('online-match-retry').addEventListener('click', runPendingMatchAction);
+    $('online-classic-result-share-button').addEventListener('click', shareClassicResult);
     if ($('online-board-retry')) $('online-board-retry').addEventListener('click', runPendingMatchAction);
     $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) {
       button.addEventListener('click', function () {

@@ -1219,6 +1219,10 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-mode-note { margin: 6px 1px 10px; font-size: 11px !important; }
 .online-match-panel { margin-top: 14px; padding: 12px; border: 1px solid rgba(115,224,176,.24); border-radius: 12px; background: rgba(115,224,176,.045); }
 .online-match-panel h4 { margin: 3px 0 !important; font-size: 14px !important; }
+.online-classic-result-share-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0 10px; }
+.online-classic-result-share-actions > button { min-height: 44px; }
+.online-classic-result-share-status { flex: 1 1 160px; margin: 0; color: var(--muted); font-size: 11px; }
+.online-classic-result-share-text { flex: 1 0 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--surface-edge); border-radius: 9px; color: var(--ink); background: rgba(0,0,0,.2); font: inherit; font-size: 12px; line-height: 1.5; user-select: text; -webkit-user-select: text; }
 .online-match-version { color: var(--muted); font-size: 10px; }
 .online-match-dice { margin: 5px 0 10px; color: var(--ink) !important; font-size: 12px !important; }
 .online-match-pieces { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
@@ -1751,6 +1755,7 @@ body.light .online-screen input::placeholder { color: var(--muted); }
 body.light .online-limit-note { border-color: rgba(176,112,16,.32); background: rgba(244,183,64,.12); }
 body.light .online-live-dot { background: #18a074; box-shadow: 0 0 8px rgba(24,160,116,.5); }
 body.light .online-room-card { border-color: rgba(31,96,160,.26); background: rgba(53,153,220,.07); }
+body.light .online-classic-result-share-text { border-color: rgba(28,32,44,.2); color: #1c202c; background: #fff; }
 body.light .online-room-connection { color: var(--lt-link) !important; background: rgba(31,96,160,.08); }
 body.light .online-room-connection[data-state="reconnecting"] { color: var(--lt-warn) !important; background: rgba(244,183,64,.14); }
 body.light .online-room-connection[data-state="ended"] { color: #11744f !important; background: rgba(24,160,116,.1); }
