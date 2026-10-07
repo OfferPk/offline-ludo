@@ -1213,6 +1213,8 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-invite-row input { font-family: ui-monospace, monospace; letter-spacing: .12em; }
 .online-room-roster, .online-history-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .online-room-roster li, .online-history-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--surface); font-size: 12px; }
+.online-room-roster li.is-open { border: 1px dashed rgba(145,202,239,.24); color: var(--muted); background: rgba(255,255,255,.02); }
+.online-room-roster li.is-open b { color: var(--muted); font-weight: 650; }
 .online-room-roster small, .online-history-list small { color: var(--muted); font-size: 10px; text-align: right; }
 .online-history-list li { align-items: flex-start; flex-direction: column; }
 .online-history-list small { text-align: left; }
