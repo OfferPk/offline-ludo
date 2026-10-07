@@ -21,6 +21,7 @@
     "test:light-contrast": "node test/v164-light-contrast.browser.test.js",
     "test:howto": "node test/v165-howto.browser.test.js",
     "test:anim": "node test/v166-anim.browser.test.js",
+    "test:settings-accessibility": "node test/settings-accessibility.browser.test.js",
     "test:hero": "node test/v170-tokens.browser.test.js",
     "sync": "npx cap sync android",
     "test:evo": "node test/v171-evo.browser.test.js",

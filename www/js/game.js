@@ -2344,6 +2344,25 @@
   }
   var SETTINGS = ['sound', 'haptics', 'auto', 'undo', 'timer', 'chat', 'fast'];
   var RULE_KEYS = ['safeSquares', 'captureToEnter', 'blocks', 'bonusOnCapture', 'bonusOnHome', 'arrows', 'noCapture'];
+  var settingsOpener = null;
+  var SETTINGS_FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function settingsFocusableControls() {
+    return Array.prototype.slice.call($('settings').querySelectorAll(SETTINGS_FOCUSABLE)).filter(function (el) {
+      return !el.closest('.hidden') && el.getClientRects().length > 0;
+    });
+  }
+  function openSettings(opener) {
+    settingsOpener = opener || document.activeElement;
+    syncSettingsUI();
+    show('settings');
+    $('settings-title').focus();
+  }
+  function closeSettings(restoreFocus) {
+    var opener = settingsOpener;
+    settingsOpener = null;
+    hide('settings');
+    if (restoreFocus !== false && opener && document.documentElement.contains(opener) && !opener.disabled) opener.focus();
+  }
   function syncSettingsUI() {
     var locked = !!(G && G.online);
     SETTINGS.forEach(function (k) { $('set-' + k).checked = !!save.settings[k]; });
@@ -2393,7 +2412,7 @@
   $('btn-setup-back').addEventListener('click', function () { SFX.click(); showHome(); });
   each($('mode-seg').children, function (b) { b.addEventListener('click', function () { SFX.click(); setupMode = b.dataset.mode; save.setup.mode[setupKind] = setupMode; persist(); renderSetup(); }); });
   each($('presets').children, function (b) { b.addEventListener('click', function () { SFX.click(); applyPreset(b.dataset.p); }); });
-  $('btn-edit-rules').addEventListener('click', function () { SFX.click(); syncSettingsUI(); show('settings'); });
+  $('btn-edit-rules').addEventListener('click', function () { SFX.click(); openSettings(this); });
   $('btn-start').addEventListener('click', function () {
     SFX.unlock(); SFX.click();
     var seats = save.setup[setupKind].map(function (x) { return x ? { type: x.type, level: x.level } : null; }), mode = setupMode;
@@ -2460,10 +2479,10 @@
     }
   });
   each($('rules-tabs').children, function (b) { b.addEventListener('click', function () { SFX.click(); openRules(b.dataset.tab); }); });
-  $('btn-settings').addEventListener('click', function () { SFX.unlock(); SFX.click(); syncSettingsUI(); show('settings'); });
-  $('btn-game-settings').addEventListener('click', function () { SFX.click(); syncSettingsUI(); show('settings'); });
+  $('btn-settings').addEventListener('click', function () { SFX.unlock(); SFX.click(); openSettings(this); });
+  $('btn-game-settings').addEventListener('click', function () { SFX.click(); openSettings(this); });
   each($('skin-tabs').children, function (b) { b.addEventListener('click', function () { skinTab = b.dataset.tab; SFX.click(); renderSkins(); }); });
-  each(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', function () { SFX.click(); hide(b.dataset.close); if (setupVisible()) renderSetup(); }); });
+  each(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', function () { SFX.click(); if (b.dataset.close === 'settings') closeSettings(true); else hide(b.dataset.close); if (setupVisible()) renderSetup(); }); });
   SETTINGS.forEach(function (k) {
     $('set-' + k).addEventListener('change', function () {
       save.settings[k] = $('set-' + k).checked; persist();
@@ -2479,7 +2498,7 @@
   each($('rule-style').children, function (b) { b.addEventListener('click', function () { if (G && G.online) return; save.rules.rollStyle = b.dataset.v; persist(); SFX.click(); syncSettingsUI(); if (setupVisible()) renderSetup(); }); });
   $('btn-privacy-options').addEventListener('click', function () { Ads.showPrivacyOptions(); });
   $('btn-reset').addEventListener('click', function () {
-    hide('settings');
+    closeSettings(false);
     askConfirm('Reset progress?', 'Coins, XP, skins, statistics and the saved match will be deleted.', 'Reset', function () {
       var resetData = defaults(); resetData.ad = save.ad;
       var resetResult = saveStore.reset(resetData);
@@ -2505,6 +2524,18 @@
       var firstDialogButton = dialogButtons[0], lastDialogButton = dialogButtons[dialogButtons.length - 1];
       if (e.shiftKey && document.activeElement === firstDialogButton) { e.preventDefault(); lastDialogButton.focus(); }
       else if (!e.shiftKey && document.activeElement === lastDialogButton) { e.preventDefault(); firstDialogButton.focus(); }
+      return;
+    }
+    if (isOpen('settings')) {
+      if (e.key === 'Escape') { e.preventDefault(); closeSettings(true); return; }
+      if (e.key === 'Tab') {
+        var controls = settingsFocusableControls();
+        if (!controls.length) { e.preventDefault(); $('settings-title').focus(); return; }
+        var first = controls[0], last = controls[controls.length - 1], active = document.activeElement;
+        if (e.shiftKey && (active === first || active === $('settings-title') || !$('settings').contains(active))) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && (active === last || !$('settings').contains(active))) { e.preventDefault(); first.focus(); }
+        return;
+      }
       return;
     }
     if (!G || $('game').classList.contains('hidden') || paused) return;

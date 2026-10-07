@@ -559,9 +559,9 @@
     </div>
 
     <!-- SETTINGS -->
-    <div id="settings" class="overlay hidden">
+    <div id="settings" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="panel">
-        <div class="panel-head"><h3>Settings</h3><button class="icon-btn close" data-close="settings" aria-label="Close">✕</button></div>
+        <div class="panel-head"><h3 id="settings-title" tabindex="-1">Settings</h3><button id="btn-settings-close" class="icon-btn close" data-close="settings" aria-label="Close">✕</button></div>
         <label class="row"><span>Sound effects</span><input type="checkbox" id="set-sound"><i class="sw"></i></label>
         <label class="row"><span>Haptics <small>dice roll and captures</small></span><input type="checkbox" id="set-haptics"><i class="sw"></i></label>
         <label class="row"><span>Auto-move when only one move</span><input type="checkbox" id="set-auto"><i class="sw"></i></label>
