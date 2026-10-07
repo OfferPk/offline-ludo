@@ -339,13 +339,27 @@
     $('online-ready').textContent = room.myReady ? 'Mark not ready' : 'Ready';
     $('online-ready').setAttribute('aria-pressed', String(!!room.myReady));
     $('online-room-roster').replaceChildren();
-    room.roster.forEach(function (member) {
+    var roster = Array.isArray(room.roster) ? room.roster : [];
+    var seatRows = window.OnlineRoomSeats && typeof window.OnlineRoomSeats.listSeats === 'function'
+      ? window.OnlineRoomSeats.listSeats(room.capacity, roster, room.status === 'waiting')
+      : roster.slice().sort(function (a, b) { return Number(a.seat) - Number(b.seat); }).map(function (member) { return { seat: Number(member.seat), member: member }; });
+    seatRows.forEach(function (seatRow) {
       var item = document.createElement('li');
-      var playerName = document.createElement('b');
-      playerName.textContent = member.displayName || member.handle || 'Player';
-      var playerState = document.createElement('small');
-      playerState.textContent = 'Seat ' + (member.seat + 1) + ' · ' + (member.ready ? 'Ready' : 'Not ready') + (member.role === 'host' ? ' · Host' : '');
-      item.append(playerName, playerState);
+      if (seatRow.member) {
+        var playerName = document.createElement('b');
+        playerName.textContent = seatRow.member.displayName || seatRow.member.handle || 'Player';
+        var playerState = document.createElement('small');
+        playerState.textContent = 'Seat ' + (seatRow.seat + 1) + ' · ' + (seatRow.member.ready ? 'Ready' : 'Not ready') + (seatRow.member.role === 'host' ? ' · Host' : '');
+        item.append(playerName, playerState);
+      } else {
+        item.classList.add('is-open');
+        item.setAttribute('aria-label', 'Seat ' + (seatRow.seat + 1) + ' is open. Invite another player.');
+        var openSeatName = document.createElement('b');
+        openSeatName.textContent = 'Open seat';
+        var openSeatStatus = document.createElement('small');
+        openSeatStatus.textContent = 'Seat ' + (seatRow.seat + 1) + ' · invite a player';
+        item.append(openSeatName, openSeatStatus);
+      }
       $('online-room-roster').appendChild(item);
     });
     $('online-chess-resume').classList.toggle('hidden', !(room.mode === 'ludo_chess' && room.matchState && room.matchState.state && chessPlayViewDismissed));
