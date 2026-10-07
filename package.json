@@ -6,7 +6,7 @@
   "license": "MIT",
   "scripts": {
     "serve": "npx --yes http-server www -p 8080 -c-1",
-    "test": "node test/logic.test.js && node test/lucky.test.js && node test/modes13.test.js && node test/chess.test.js && node test/save-store.test.js && node test/adgate.test.js && node test/dice-gesture.test.js && node test/path-animation.test.js && node test/sound.test.js && node test/skins.test.js && node test/online-backend.test.js && node test/online-authoritative.test.js && node test/ludo-chess-migration.test.js && node test/online-classic-14.test.js && node test/banner-die.test.js && node test/corner-die.test.js && node test/arrow-danger.test.js && node test/best-auto-move.test.js && node test/token-die-pick.test.js && node test/yard-pads.test.js && node test/camel-celebration.test.js && node test/light-contrast.test.js && node test/howto-placement.test.js && node test/feel-animations.test.js && node test/hero-tokens.test.js && node test/token-evolution.test.js && node test/tall-pawns.test.js",
+    "test": "node test/logic.test.js && node test/lucky.test.js && node test/modes13.test.js && node test/chess.test.js && node test/save-store.test.js && node test/adgate.test.js && node test/dice-gesture.test.js && node test/path-animation.test.js && node test/sound.test.js && node test/skins.test.js && node test/online-backend.test.js && node test/online-authoritative.test.js && node test/ludo-chess-migration.test.js && node test/online-classic-14.test.js && node test/banner-die.test.js && node test/corner-die.test.js && node test/arrow-danger.test.js && node test/best-auto-move.test.js && node test/token-die-pick.test.js && node test/yard-pads.test.js && node test/camel-celebration.test.js && node test/light-contrast.test.js && node test/howto-placement.test.js && node test/feel-animations.test.js && node test/hero-tokens.test.js && node test/token-evolution.test.js && node test/tall-pawns.test.js && node test/online-profile-name-feedback.test.js",
     "test:arrow-danger": "node test/arrow-danger.browser.test.js",
     "test:home-cards": "node test/home-mode-cards.browser.test.js",
     "test:setup-layout": "node test/setup-layout.browser.test.js",
@@ -15,6 +15,8 @@
     "test:turn-controls": "node test/turn-controls.browser.test.js",
     "test:community": "node test/community.test.js",
     "test:online-ui": "node test/online-lobby.browser.test.js",
+    "test:online-profile-name-feedback": "node test/online-profile-name-feedback.test.js",
+    "test:online-profile-name-feedback:browser": "node test/online-profile-name-feedback.browser.test.js",
     "test:skins:browser": "node test/skins.browser.test.js",
     "test:yard-pads": "node test/v162-yard-pads.browser.test.js",
     "test:camel": "node test/v163-camel.browser.test.js",
