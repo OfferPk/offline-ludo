@@ -36,6 +36,7 @@
   var walletChannel = null;
   var profileChannel = null;
   var historyChannel = null;
+  var accountRefreshSequence = 0;
   var client = null;
   var sdkLoading = null;
   var nativeCallbackConfigured = false;
@@ -99,6 +100,7 @@
   }
   function clearAccountChannels() {
     clearRoomChannel();
+    accountRefreshSequence++;
     removeRealtimeChannel(walletChannel);
     removeRealtimeChannel(profileChannel);
     removeRealtimeChannel(historyChannel);
@@ -275,13 +277,14 @@
   function refreshAccount() {
     if (!client || !currentUser) return Promise.resolve();
     var requestedUserId = currentUser.id;
+    var requestedSequence = ++accountRefreshSequence;
     return Promise.all([
       client.from('profiles').select('handle,display_name').eq('id', currentUser.id).maybeSingle(),
       client.from('wallets').select('coins,diamonds').eq('user_id', currentUser.id).maybeSingle()
     ]).then(function (results) {
+      if (requestedSequence !== accountRefreshSequence || !currentUser || currentUser.id !== requestedUserId) return;
       if (results[0].error) throw results[0].error;
       if (results[1].error) throw results[1].error;
-      if (!currentUser || currentUser.id !== requestedUserId) return;
       var profile = results[0].data;
       var wallet = results[1].data;
       if (profile) {
@@ -294,6 +297,7 @@
       $('online-wallet-diamonds').textContent = wallet ? Number(wallet.diamonds).toLocaleString() : '0';
       return refreshHistory();
     }).catch(function (error) {
+      if (requestedSequence !== accountRefreshSequence || !currentUser || currentUser.id !== requestedUserId) return;
       announce('Account data could not be loaded: ' + errorText(error), true);
     });
   }
