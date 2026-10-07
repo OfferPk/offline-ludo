@@ -487,6 +487,7 @@ function startLocalServer() {
 
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+    if (process.env.ONLINE_CHESS_REVIEW_ONLY !== '1') {
     await page.click('#online-create-room');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'HOSTROOM12345678');
     await page.click('#online-ready');
@@ -519,6 +520,7 @@ function startLocalServer() {
     await page.evaluate(() => document.querySelector('#btn-home').click());
     await page.click('#online-leave-room');
     await page.waitForFunction(() => document.querySelector('#online-room-card').classList.contains('hidden'));
+    }
     await page.$eval('#online-capacity', el => { el.value = '3'; el.dispatchEvent(new Event('change', { bubbles: true })); });
     await page.select('#online-mode', 'ludo_chess');
     assert.equal(await page.$eval('#online-capacity', el => el.value + ':' + el.disabled), '2:true', 'Chess mode forces and locks a two-player table');
@@ -613,6 +615,40 @@ function startLocalServer() {
     assert.match(await page.$eval('#online-chess-move-list', el => el.textContent), /1\.\s*e4/, 'the move list shows SAN reconstructed from server position history');
     assert.match(await page.$eval('#online-chess-history-notation', el => el.textContent), /standard algebraic notation/i, 'the move-list format is explicitly identified as SAN');
     assert.equal(await page.$eval('#online-chess-copy-pgn', el => el.disabled), false, 'PGN export is enabled only after the complete initial-to-current history verifies');
+    const reviewBaseline = await page.evaluate(() => {
+      const state = window.__mockBackend, match = state.tables.ludo_chess_matches.find(row => row.room_id === state.activeRoomId);
+      return { version: match.version, matchState: JSON.stringify(match.state), rpcCount: state.rpcCalls.length };
+    });
+    await page.click('#online-chess-review-start');
+    await page.waitForFunction(() => document.querySelector('#online-chess-review-status').textContent.includes('Reviewing the starting position'));
+    assert.match(await page.$eval('#online-chess-board [data-square="52"]', el => el.getAttribute('aria-label')), /Red pawn on e2/, 'Start displays the verified initial board position');
+    assert.match(await page.$eval('#online-chess-board [data-square="36"]', el => el.getAttribute('aria-label')), /Empty square on e4/, 'the historical position shows the pawn before its live move');
+    assert.equal(await page.$$eval('#online-chess-board [data-square][aria-disabled="true"]', cells => cells.length), 64, 'every square is read-only during position review');
+    assert.equal(await page.$eval('#online-chess-board', el => el.getAttribute('aria-readonly')), 'true', 'the Chess grid exposes its read-only review state');
+    assert.equal(await page.$eval('#online-chess-review-previous', el => el.disabled), true, 'Previous is disabled at the starting position');
+    await page.click('#online-chess-review-next');
+    await page.waitForFunction(() => document.querySelector('#online-chess-review-status').textContent.includes('after 1. e4'));
+    assert.match(await page.$eval('#online-chess-board [data-square="36"]', el => el.getAttribute('aria-label')), /Red pawn on e4/, 'Next displays the verified position after e4');
+    assert.match(await page.$eval('#online-chess-status', el => el.textContent), /Blue.*waiting for their move/, 'reviewing history does not rewrite the live turn announcement');
+    if (process.env.SAVE_PREVIEW === '1') {
+      const previewDir = path.resolve(__dirname, '..', 'docs', 'previews', 'online-chess-position-review');
+      fs.mkdirSync(previewDir, { recursive: true });
+      await page.setViewport({ width: 390, height: 1200, isMobile: true, hasTouch: true });
+      await page.evaluate(() => { document.querySelector('#online-chess-screen').scrollTop = 0; });
+      await page.screenshot({ path: path.join(previewDir, 'mobile.png'), fullPage: true });
+      await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+    }
+    await page.click('#online-chess-review-live');
+    await page.waitForFunction(() => document.querySelector('#online-chess-review-status').textContent.startsWith('Live server position'));
+    const reviewAfter = await page.evaluate(() => {
+      const state = window.__mockBackend, match = state.tables.ludo_chess_matches.find(row => row.room_id === state.activeRoomId);
+      return { version: match.version, matchState: JSON.stringify(match.state), rpcCount: state.rpcCalls.length };
+    });
+    assert.deepEqual(reviewAfter, reviewBaseline, 'review navigation is read-only and sends no match RPCs');
+    if (process.env.ONLINE_CHESS_REVIEW_ONLY === '1') {
+      console.log('Online Chess position review browser checks passed.');
+      return;
+    }
     await page.click('#online-chess-copy-pgn');
     await page.waitForFunction(() => document.querySelector('#online-chess-pgn-status').textContent === 'PGN copied to clipboard.');
     const firstPgn = await page.evaluate(() => window.__mockClipboardText);

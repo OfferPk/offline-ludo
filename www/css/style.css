@@ -1327,6 +1327,10 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-chess-square.dark .online-chess-piece { -webkit-text-stroke: 1.2px #fff5df; }
 .online-chess-square.is-check .online-chess-piece { filter: drop-shadow(0 0 5px rgba(255,46,46,.72)); }
 .online-chess-square:focus-visible { z-index: 2; outline: 3px solid #f6d66b; outline-offset: -3px; }
+.chess-review-controls { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 9px 0 3px; }
+.chess-review-controls .btn { min-width: 0; min-height: 44px; padding: 6px 4px; font-size: 10px; }
+.chess-review-controls .btn:disabled { cursor: not-allowed; opacity: .46; }
+.chess-review-status { min-height: 1.4em; margin: 4px 1px 8px; color: #aab5be; font-size: 10px; line-height: 1.4; }
 .online-chess-promotion { width: 100%; }
 .online-chess-info { min-width: 0; display: grid; gap: 11px; }
 .chess-live-status, .chess-move-section { min-width: 0; padding: 13px 14px; border: 1px solid rgba(255,255,255,.085); border-radius: 13px; background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.018)); }
