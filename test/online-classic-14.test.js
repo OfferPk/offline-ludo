@@ -33,6 +33,8 @@ ok(/interval '20 seconds'/.test(migration) && /function public\.rejoin_match/.te
 ok(/function public\.expire_grace/.test(migration) && /abandoned/.test(migration) && !/type',\s*'ai'/.test(migration), 'after the grace window the seat is dropped, not replaced by a computer');
 ok(/function public\.expire_turn/.test(migration) && /turn_deadline/.test(migration) && /\+ 45000/.test(migration), 'turn timer is 45 seconds and expiry is checked on the server');
 ok(/Turn timer expired/.test(migration), 'a late roll or move is rejected once the timer has expired');
+const serverClockExtracts = migration.match(/\bextract\s*\(\s*epoch\s+from\s+pg_catalog\.clock_timestamp\(\)\)/gi) || [];
+ok(!/pg_catalog\.extract\s*\(/i.test(migration) && serverClockExtracts.length === 5, 'server-clock expressions use valid PostgreSQL EXTRACT syntax with the empty search_path');
 
 ok(/ARROW_SQUARES = \[4, 17, 30, 43\]/.test(logic), 'arrows sit on board number 4, not the old squares');
 ok(!/\[2, 7, 15, 20, 28, 33, 41, 46\]/.test(logic), 'the old arrow squares are gone from the rules engine');

@@ -221,7 +221,7 @@ begin
      and coalesce((p_state->>'turn_deadline')::bigint, 0) > 0 then
     return p_state;
   end if;
-  v_deadline := (pg_catalog.extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint + 45000;
+  v_deadline := (extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint + 45000;
   p_state := pg_catalog.jsonb_set(p_state, '{turn_deadline}', pg_catalog.to_jsonb(v_deadline), true);
   p_state := pg_catalog.jsonb_set(p_state, '{armed_turn}', pg_catalog.to_jsonb(v_turn), true);
   p_state := pg_catalog.jsonb_set(p_state, '{armed_count}', pg_catalog.to_jsonb(v_count), true);
@@ -390,7 +390,7 @@ begin
   if (v_state->>'turn')::integer <> v_member_seat then raise exception 'It is not your turn' using errcode = '42501'; end if;
   if coalesce(v_state->'abandoned', '[]'::jsonb) @> pg_catalog.jsonb_build_array(v_member_seat) then raise exception 'This seat left the match' using errcode = '42501'; end if;
   if coalesce((v_state->>'turn_deadline')::bigint, 0) > 0
-     and (pg_catalog.extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint > (v_state->>'turn_deadline')::bigint then
+     and (extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint > (v_state->>'turn_deadline')::bigint then
     raise exception 'Turn timer expired' using errcode = '55000';
   end if;
 
@@ -482,7 +482,7 @@ begin
   if (v_state->>'turn')::integer <> v_member_seat then raise exception 'It is not your turn' using errcode = '42501'; end if;
   if coalesce(v_state->'abandoned', '[]'::jsonb) @> pg_catalog.jsonb_build_array(v_member_seat) then raise exception 'This seat left the match' using errcode = '42501'; end if;
   if coalesce((v_state->>'turn_deadline')::bigint, 0) > 0
-     and (pg_catalog.extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint > (v_state->>'turn_deadline')::bigint then
+     and (extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint > (v_state->>'turn_deadline')::bigint then
     raise exception 'Turn timer expired' using errcode = '55000';
   end if;
 
@@ -586,7 +586,7 @@ begin
   select ms.version, ms.state into v_version, v_state from public.match_states as ms where ms.room_id = p_room_id for update;
   if not found then raise exception 'Authoritative match state is unavailable' using errcode = 'P0002'; end if;
   update public.room_members set disconnected_at = now() where room_id = p_room_id and user_id = v_user;
-  v_until := (pg_catalog.extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint + 20000;
+  v_until := (extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint + 20000;
   v_state := pg_catalog.jsonb_set(v_state, '{grace}', pg_catalog.jsonb_build_object('seat', v_seat, 'until', v_until), true);
   update public.match_states set version = v_version + 1, state = v_state, updated_at = now() where room_id = p_room_id;
   return pg_catalog.jsonb_build_object('room_id', p_room_id, 'seat', v_seat, 'grace_ms', 20000, 'version', v_version + 1, 'state', v_state);
@@ -688,7 +688,7 @@ begin
     return pg_catalog.jsonb_build_object('room_id', p_room_id, 'expired', false, 'version', v_version, 'state', v_state);
   end if;
   v_deadline := coalesce((v_state->>'turn_deadline')::bigint, 0);
-  if v_deadline <= 0 or (pg_catalog.extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint <= v_deadline then
+  if v_deadline <= 0 or (extract(epoch from pg_catalog.clock_timestamp()) * 1000)::bigint <= v_deadline then
     return pg_catalog.jsonb_build_object('room_id', p_room_id, 'expired', false, 'version', v_version, 'state', v_state);
   end if;
   v_state := private.online_ludo_next_turn(pg_catalog.jsonb_set(v_state, '{queue}', '[]'::jsonb, true));
