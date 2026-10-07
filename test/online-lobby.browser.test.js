@@ -222,6 +222,14 @@ function startLocalServer() {
             from: queryBuilder,
             rpc(name, args) {
               state.rpcCalls.push({ name, args });
+              if (name === 'join_room' && state.delayJoinRoom) {
+                const roomId = 'stale-invite-room';
+                ensureRoom(roomId, 'user-three', 'classic', 2);
+                ensureMember(roomId, 'user-three', 0, 'host', true);
+                ensureMember(roomId, 'user-one', 1, 'member', false);
+                state.delayJoinRoom = false;
+                return new Promise(resolve => { state.completeJoinRoom = () => resolve({ data: { room_id: roomId, status: 'waiting' }, error: null }); });
+              }
               if (state.failRpc === name) return Promise.resolve({ data: null, error: { message: 'The matching service is unavailable.' } });
               let data = {};
               if (name === 'quick_match') {
@@ -470,6 +478,31 @@ function startLocalServer() {
       state.emit('wallets', { event: 'UPDATE', old: { user_id: 'user-one' }, new: wallet });
     });
     await page.waitForFunction(() => document.querySelector('#online-wallet-coins').textContent === '2,500' && document.querySelector('#online-wallet-diamonds').textContent === '12');
+    if (process.env.ONLINE_ROOM_JOIN_AUTH_GUARD_ONLY === '1') {
+      await page.evaluate(() => { window.__mockBackend.delayJoinRoom = true; });
+      await page.$eval('#online-join-code', el => { el.value = 'CROSSROOM12345678'; });
+      await page.click('#online-join-room');
+      await page.waitForFunction(() => typeof window.__mockBackend.completeJoinRoom === 'function');
+      await page.evaluate(() => {
+        const state = window.__mockBackend;
+        state.session = { user: { id: 'user-two', email: 'bob@example.test' } };
+        state.authListeners.forEach(listener => listener('SIGNED_IN', state.session));
+      });
+      await page.waitForFunction(() => window.__mockBackend.channels.some(channel => channel.name === 'crossfour-profile-user-two'));
+      await page.evaluate(() => window.__mockBackend.completeJoinRoom());
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const staleJoinOutcome = await page.evaluate(() => ({
+        userId: window.__mockBackend.session.user.id,
+        storedRoom: sessionStorage.getItem('crossfour.online.room'),
+        staleRoomChannelCreated: window.__mockBackend.channels.some(channel => channel.name === 'crossfour-room-stale-invite-room')
+      }));
+      assert.equal(staleJoinOutcome.userId, 'user-two', 'the newer signed-in identity remains active');
+      assert.equal(staleJoinOutcome.storedRoom, null, 'a delayed join from the previous account cannot persist a room in the new session');
+      assert.equal(staleJoinOutcome.staleRoomChannelCreated, false, 'a delayed join cannot subscribe the new account to the previous request room');
+      assert.deepEqual(errors, [], 'the auth-switch regression has no uncaught JavaScript errors');
+      console.log('Online room join auth-generation regression passed.');
+      return;
+    }
 
     await page.click('#online-quick-match');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-mode').textContent === 'Classic · 2 seats');
