@@ -2662,6 +2662,46 @@
     if (G) { G.undo = null; G.sel = null; }
   }
 
+  function handleNativeBack(event) {
+    var claimModal = $('community-claim-modal');
+    if (claimModal && !claimModal.classList.contains('hidden')) { $('community-claim-close').click(); return; }
+    if (isOpen('confirm')) { $('confirm-no').click(); return; }
+    if (isOpen('tutorial-intro')) { $('tutorial-intro-skip').click(); return; }
+    if (isOpen('tutorial-coach')) { $('tutorial-skip').click(); return; }
+
+    var closeButtons = document.querySelectorAll('.overlay:not(.hidden) [data-close]');
+    if (closeButtons.length) { closeButtons[closeButtons.length - 1].click(); return; }
+    if (isOpen('menu')) { $('btn-m-resume').click(); return; }
+    if (isOpen('result')) { $('btn-r-home').click(); return; }
+    if (isOpen('chat')) { $('btn-chat').click(); return; }
+
+    var howto = $('btn-howto-home');
+    if (howto && howto.getAttribute('aria-expanded') === 'true') { howto.click(); return; }
+    if (!$('game').classList.contains('hidden')) { $('btn-home').click(); return; }
+    if (!$('setup').classList.contains('hidden')) { $('btn-setup-back').click(); return; }
+    if (!$('online').classList.contains('hidden')) { $('online-back').click(); return; }
+    if (!$('community').classList.contains('hidden')) { $('community-back').click(); return; }
+
+    if (event && event.canGoBack) { window.history.back(); return; }
+    var app = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (app && typeof app.exitApp === 'function') {
+      try {
+        var exiting = app.exitApp();
+        if (exiting && typeof exiting.catch === 'function') exiting.catch(function () {});
+      } catch (e) {}
+    }
+  }
+
+  function installNativeBackButton() {
+    var app = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (!app || typeof app.addListener !== 'function') return;
+    try {
+      var listener = app.addListener('backButton', handleNativeBack);
+      if (listener && typeof listener.catch === 'function') listener.catch(function () {});
+    } catch (e) {}
+  }
+  installNativeBackButton();
+
   window.__cf = {
     get game() { return G; }, get save() { return save; }, get loadStatus() { return loadResult.status; }, logic: L, gate: gate,
     native: native, haptic: haptic,
