@@ -1363,6 +1363,21 @@
     show('picker');
   }
 
+  function announceOfflineRoll(seat, result) {
+    var region = $('offline-roll-announcement'), formatter = window.OfflineRollAnnouncements;
+    if (!region || !formatter || !G || G.online || !isHuman(seat)) return;
+    var legalTokens = [];
+    (G.st.moves || []).forEach(function (move) {
+      if (move.seat === seat && legalTokens.indexOf(move.piece) < 0) legalTokens.push(move.piece);
+    });
+    var message = formatter.format({
+      actor: nameOf(seat), raw: result.raw, value: result.value, chosen: result.chosen,
+      doubled: result.doubled, forfeit: result.forfeit, next: result.next,
+      queue: G.st.turn === seat ? G.st.queue : [], legalTokenCount: legalTokens.length
+    });
+    if (message) region.textContent = message;
+  }
+
   function doRoll(chosen) {
     if (!G || busy || G.st.phase !== 'roll' || paused) return;
     if (G.online) {
@@ -1384,6 +1399,7 @@
     animateDice(s, r.raw, function () {
       busy = false;
       if (snap) { G.undo = { snap: snap, until: Date.now() + UNDO_MS, seat: s }; startUndoBar(); later(expireUndo, UNDO_MS + 30); }
+      announceOfflineRoll(s, r);
       if (r.doubled) { var pc = podEl(s), pr = pc.getBoundingClientRect(), br = $('board-wrap').getBoundingClientRect(); floatAt(pr.left + pr.width / 2 - br.left, slotOf(s) < 2 ? 8 : BS - 8, '×2 → ' + r.value); }
       if (r.forfeit) {
         SFX.forfeit(); haptic('warn');
