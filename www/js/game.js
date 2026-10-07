@@ -1138,7 +1138,7 @@
     $('hint').textContent = 'Pick ' + moves.map(function (m) { return m.v; }).join(' or ') + ' for this token';
   }
   function handleTokenTap(seat, piece, keyboard) {
-    if (!G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn) || G.online) return false;
+    if (!G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn)) return false;
     var opts = tokenDieMoves(seat, piece);
     if (!opts.length) return false;
     // Multi-die for this token: open the premium picker (overrides chip selection).
