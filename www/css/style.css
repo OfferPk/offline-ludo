@@ -1180,6 +1180,9 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-provider-actions > * { flex: 1; min-width: 0; min-height: 42px; padding: 9px; font-size: 13px; }
 .online-auth-form { display: grid; gap: 10px; margin-top: 12px; }
 .online-auth-form label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+.online-password-control { display: flex; align-items: stretch; gap: 8px; }
+.online-password-control input { flex: 1; }
+.online-password-toggle { flex: none; min-width: 62px; min-height: 40px; padding: 8px 10px; font-size: 12px; }
 .online-auth-actions { display: flex; gap: 8px; margin-top: 2px; }
 .online-auth-actions > * { flex: 1; min-width: 0; min-height: 42px; padding: 9px; font-size: 13px; }
 .online-auth-link { justify-self: end; border: 0; padding: 4px 0; color: #9ad9ff; background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
