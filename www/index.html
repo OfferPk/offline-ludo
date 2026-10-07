@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="icon.png">
   <link rel="stylesheet" href="css/style.css?v=1.7.2">
   <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.7.2">
+  <script defer src="js/online-password-visibility.js?v=1.7.2"></script>
 </head>
 <body>
   <div id="app">
@@ -218,7 +219,8 @@
           <p class="online-mode-note">New email/password accounts sign in immediately; no confirmation link is required. Gmail SMTP remains configured for password resets, but reset-email delivery has not yet been tested.</p>
           <form id="online-auth-form" class="online-auth-form">
             <label for="online-email">Email address<input id="online-email" type="email" autocomplete="email" maxlength="254" required></label>
-            <label for="online-password">Password<input id="online-password" type="password" autocomplete="current-password" required></label>
+            <label for="online-password">Password</label>
+            <div class="online-password-control"><input id="online-password" type="password" autocomplete="current-password" required><button id="online-password-toggle" class="btn plate online-password-toggle" type="button" aria-label="Password visibility for password" aria-pressed="false" aria-controls="online-password">Show</button></div>
             <div class="online-auth-actions"><button id="online-signin" class="btn primary" type="submit">Sign in</button><button id="online-signup" class="btn plate" type="button">Create account</button></div>
             <button id="online-reset-request" class="online-auth-link" type="button">Forgot password?</button>
           </form>
@@ -226,7 +228,8 @@
         <section id="online-recovery-panel" class="online-card hidden" aria-labelledby="online-recovery-title">
           <span class="online-eyebrow">PASSWORD RECOVERY</span><h2 id="online-recovery-title">Choose a new password</h2>
           <form id="online-recovery-form" class="online-auth-form">
-            <label for="online-new-password">New password<input id="online-new-password" type="password" autocomplete="new-password" required></label>
+            <label for="online-new-password">New password</label>
+            <div class="online-password-control"><input id="online-new-password" type="password" autocomplete="new-password" required><button id="online-new-password-toggle" class="btn plate online-password-toggle" type="button" aria-label="Password visibility for new password" aria-pressed="false" aria-controls="online-new-password">Show</button></div>
             <button id="online-recovery-submit" class="btn primary" type="submit">Update password</button>
           </form>
         </section>
