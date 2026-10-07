@@ -36,6 +36,7 @@
   var walletChannel = null;
   var profileChannel = null;
   var historyChannel = null;
+  var historyRefreshSequence = 0;
   var client = null;
   var sdkLoading = null;
   var nativeCallbackConfigured = false;
@@ -98,6 +99,10 @@
     removeRealtimeChannel(channel);
   }
   function clearAccountChannels() {
+    historyRefreshSequence++;
+    $('online-history-feedback').classList.add('hidden');
+    $('online-history-feedback-message').textContent = '';
+    $('online-history-retry').disabled = false;
     clearRoomChannel();
     removeRealtimeChannel(walletChannel);
     removeRealtimeChannel(profileChannel);
@@ -297,16 +302,26 @@
       announce('Account data could not be loaded: ' + errorText(error), true);
     });
   }
-  function refreshHistory() {
+  function refreshHistory(isManualRetry) {
     if (!client || !currentUser) return Promise.resolve();
     var requestedUserId = currentUser.id;
+    var requestSequence = ++historyRefreshSequence;
+    var feedback = $('online-history-feedback');
+    var feedbackMessage = $('online-history-feedback-message');
+    var retryButton = $('online-history-retry');
+    var showProgress = isManualRetry === true || !feedback.classList.contains('hidden');
+    if (showProgress) {
+      feedback.classList.remove('hidden');
+      feedbackMessage.textContent = 'Refreshing match history…';
+      retryButton.disabled = true;
+    }
     return client.from('match_history')
       .select('id,mode,status,winner_id,started_at,finished_at')
       .order('started_at', { ascending: false })
       .limit(10)
       .then(function (result) {
+        if (requestSequence !== historyRefreshSequence || !currentUser || currentUser.id !== requestedUserId) return;
         if (result.error) throw result.error;
-        if (!currentUser || currentUser.id !== requestedUserId) return;
         var list = $('online-history-list');
         list.replaceChildren();
         (result.data || []).forEach(function (match) {
@@ -316,11 +331,20 @@
           var detail = document.createElement('small');
           detail.textContent = new Date(match.started_at).toLocaleString();
           item.append(title, detail);
-        list.appendChild(item);
-      });
-      $('online-history-empty').classList.toggle('hidden', !!(result.data && result.data.length));
+          list.appendChild(item);
+        });
+        $('online-history-empty').classList.toggle('hidden', !!(result.data && result.data.length));
+        feedbackMessage.textContent = '';
+        feedback.classList.add('hidden');
+        if (isManualRetry === true) announce('Match history refreshed.');
       }).catch(function () {
+        if (requestSequence !== historyRefreshSequence || !currentUser || currentUser.id !== requestedUserId) return;
+        feedback.classList.remove('hidden');
+        feedbackMessage.textContent = 'Match history could not be refreshed.';
+        retryButton.disabled = false;
         announce('Match history could not be refreshed. Try again when your connection is stable.', true);
+      }).finally(function () {
+        if (requestSequence === historyRefreshSequence) retryButton.disabled = false;
       });
   }
   function renderRoom() {
@@ -1158,6 +1182,7 @@
     });
     $('online-roll').addEventListener('click', function () { submitMatchAction('roll_match', {}); });
     $('online-match-retry').addEventListener('click', runPendingMatchAction);
+    $('online-history-retry').addEventListener('click', function () { refreshHistory(true); });
     if ($('online-board-retry')) $('online-board-retry').addEventListener('click', runPendingMatchAction);
     $('online-chess-promotion').querySelectorAll('[data-promotion]').forEach(function (button) {
       button.addEventListener('click', function () {
