@@ -1061,9 +1061,10 @@
       banner.style.setProperty('--turn-color', seatColor(s));
       banner.classList.toggle('is-live', !over);
       banner.classList.toggle('is-mine', !over && isHuman(s));
+      banner.classList.toggle('hidden', G.online && onlineHooks && onlineHooks.state && onlineHooks.state.result === 'abandoned');
     }
     if (!over && !busy) turnChangeFx(s);
-    if (over) lbl.innerHTML = 'Match over';
+    if (over) lbl.textContent = G.online && onlineHooks && onlineHooks.state && onlineHooks.state.result === 'abandoned' ? '' : 'Match over';
     else {
       var faceV = Math.min(6, Math.max(1, +(st.faces && st.faces[s]) || 1));
       var modeTag = st.mode === 'mystery' ? '<span class="mode-tag">Mystery</span>' : st.mode === 'lucky' ? '<span class="mode-tag lucky">Lucky Chaos</span>' : st.mode === 'quick' ? '<span class="mode-tag">Quick</span>' : st.mode === 'team' ? '<span class="mode-tag">Team</span>' : st.mode === 'arrow' ? '<span class="mode-tag">Arrows</span>' : st.mode === 'friendly' ? '<span class="mode-tag">Friendly</span>' : '';
@@ -2578,7 +2579,7 @@
   }
   function paintOnlineChrome() {
     var timer = $('online-turn-timer'), meter = $('online-turn-meter'), fill = $('online-turn-fill');
-    var grace = $('online-grace'), graceText = $('online-grace-text'), graceFill = $('online-grace-fill');
+    var grace = $('online-grace'), graceText = $('online-grace-text'), graceFill = $('online-grace-fill'), graceMeter = grace && grace.querySelector('.online-grace-meter');
     if (!G || !G.online || !onlineHooks) {
       if (timer) timer.classList.add('hidden');
       if (meter) meter.classList.add('hidden');
@@ -2612,9 +2613,14 @@
       if (g && Number(g.until) > Date.now() && G.st.phase !== 'over') {
         var gLeft = Math.max(0, Number(g.until) - Date.now()), gTotal = 20000;
         grace.classList.remove('hidden');
+        if (graceMeter) graceMeter.classList.remove('hidden');
         if (graceText) graceText.textContent = 'Reconnect window: seat ' + (Number(g.seat) + 1) + ' can rejoin for ' + Math.ceil(gLeft / 1000) + 's. No computer takes the seat.';
         else grace.textContent = 'Reconnect window: seat ' + (Number(g.seat) + 1) + ' can rejoin for ' + Math.ceil(gLeft / 1000) + 's. No computer takes the seat.';
         if (graceFill) graceFill.style.width = Math.max(0, Math.min(100, (gLeft / gTotal) * 100)) + '%';
+      } else if (G.st.phase === 'over' && onlineHooks.state && onlineHooks.state.result === 'abandoned') {
+        grace.classList.remove('hidden');
+        if (graceText) graceText.textContent = 'Match abandoned after reconnect grace expired. No winner was recorded.';
+        if (graceMeter) graceMeter.classList.add('hidden');
       } else grace.classList.add('hidden');
     }
     var retry = $('online-board-retry');
