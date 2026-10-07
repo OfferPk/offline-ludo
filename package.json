@@ -24,7 +24,8 @@
     "test:hero": "node test/v170-tokens.browser.test.js",
     "sync": "npx cap sync android",
     "test:evo": "node test/v171-evo.browser.test.js",
-    "test:tall": "node test/v172-tall.browser.test.js"
+    "test:tall": "node test/v172-tall.browser.test.js",
+    "test:local-backup": "node test/local-backup.browser.test.js"
   },
   "dependencies": {
     "@capacitor-community/admob": "8.1.0",

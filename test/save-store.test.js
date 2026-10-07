@@ -160,5 +160,17 @@ test('JSON snapshot round-trip preserves match state and deterministic RNG conti
   const rollA = L.roll(expected), rollB = L.roll(continued);
   assert.deepStrictEqual(rollA, rollB); assert.deepStrictEqual(continued, expected);
 });
+test('exports a detached validated snapshot without writing or mutating the save', () => {
+  const storage = new MemoryStorage(), store = make(storage), source = defaults();
+  source.coins = 74; source.settings.sound = false;
+  const snapshot = store.exportSnapshot(source);
+  assert.strictEqual(snapshot.schemaVersion, 3);
+  assert.strictEqual(snapshot.payload.coins, 74);
+  assert.strictEqual(snapshot.payload.settings.sound, false);
+  snapshot.payload.coins = 999;
+  assert.strictEqual(source.coins, 74, 'changing the export does not alter live data');
+  assert.strictEqual(storage.getItem('crossfour.save.v3'), null, 'export does not write storage');
+  assert.strictEqual(store.exportSnapshot({ invalid: true }), null, 'invalid payloads are not exported');
+});
 
 console.log(`\n${pass} save-store checks passed`);

@@ -41,6 +41,13 @@
     function makeSnapshot(payload) {
       return { schemaVersion: version, savedAt: clock(), payload: clone(payload) };
     }
+    function exportSnapshot(payload) {
+      try {
+        if (!validate(payload)) return null;
+        var snapshot = makeSnapshot(payload);
+        return validSnapshot(snapshot, version, validate) ? clone(snapshot) : null;
+      } catch (e) { return null; }
+    }
     function parse(storage, key) {
       var raw;
       try { raw = storage.getItem(key); }
@@ -200,6 +207,7 @@
     return {
       load: load,
       save: save,
+      exportSnapshot: exportSnapshot,
       reset: reset,
       get lastKnownGood() { return lastGood ? clone(lastGood) : null; },
       keys: { primary: primaryKey, checkpoint: checkpointKey, legacyV2: legacyV2Key, legacyV1: legacyV1Key },

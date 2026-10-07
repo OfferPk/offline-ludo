@@ -210,6 +210,29 @@
     }
     return true;
   }
+  function exportLocalBackup() {
+    var status = $('local-backup-status');
+    function report(message) { if (status) status.textContent = message; }
+    if (!persist()) { report('Backup not created: the current save could not be written. Check the save warning and device storage.'); return; }
+    var snapshot = saveStore.exportSnapshot(save);
+    if (!snapshot) { report('Backup not created: the current offline save did not pass validation.'); return; }
+    if (typeof Blob !== 'function' || !window.URL || typeof window.URL.createObjectURL !== 'function') {
+      report('This browser cannot download a save file. Your local save was not changed.'); return;
+    }
+    var filename = 'crossfour-offline-save-' + new Date().toISOString().slice(0, 10) + '.json';
+    var url = null, link = null;
+    try {
+      url = window.URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2) + '\n'], { type: 'application/json' }));
+      link = document.createElement('a'); link.href = url; link.download = filename; link.style.display = 'none';
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(function () { window.URL.revokeObjectURL(url); }, 1000);
+      SFX.click(); report('Offline save exported as ' + filename + '. The file is not uploaded.');
+    } catch (e) {
+      if (link && link.parentNode) link.parentNode.removeChild(link);
+      if (url) window.URL.revokeObjectURL(url);
+      report('Could not export the offline save. Your saved progress was not changed.');
+    }
+  }
   var gate = window.AdGate.create(CFG, save.ad); save.ad = gate.state;
   gate.sessionStarted();
   persist();
@@ -2462,6 +2485,7 @@
   each($('rules-tabs').children, function (b) { b.addEventListener('click', function () { SFX.click(); openRules(b.dataset.tab); }); });
   $('btn-settings').addEventListener('click', function () { SFX.unlock(); SFX.click(); syncSettingsUI(); show('settings'); });
   $('btn-game-settings').addEventListener('click', function () { SFX.click(); syncSettingsUI(); show('settings'); });
+  $('btn-export-backup').addEventListener('click', exportLocalBackup);
   each($('skin-tabs').children, function (b) { b.addEventListener('click', function () { skinTab = b.dataset.tab; SFX.click(); renderSkins(); }); });
   each(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', function () { SFX.click(); hide(b.dataset.close); if (setupVisible()) renderSetup(); }); });
   SETTINGS.forEach(function (k) {
