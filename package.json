@@ -10,6 +10,7 @@
     "test:arrow-danger": "node test/arrow-danger.browser.test.js",
     "test:home-cards": "node test/home-mode-cards.browser.test.js",
     "test:setup-layout": "node test/setup-layout.browser.test.js",
+    "test:offline-history": "node test/offline-match-history.test.js && node test/offline-match-history.browser.test.js",
     "test:tutorial": "node test/tutorial.browser.test.js",
     "test:spotlight": "node test/spotlight.test.js",
     "test:turn-controls": "node test/turn-controls.browser.test.js",

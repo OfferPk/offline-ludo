@@ -34,3 +34,8 @@ Legacy values are normalized against current defaults, while invalid current-for
 ## Verification
 
 `node test/save-store.test.js` checks migration, validation, corruption, failed writes, checkpoint recovery, future-version safety, and deterministic RNG continuation. `test/browser.test.js` additionally exercises v1/v2 migration, a simulated storage quota failure and warning, and a real phone-size browser reload/resume flow.
+
+
+## Recent offline results
+
+Version-3 payloads may contain `recentMatches`, a newest-first list capped at 20 completed offline match summaries. Each entry contains only a completion timestamp, game mode, and ordered seat indexes; it is not a move log and contains no account identifiers. Older v3 snapshots without this optional field remain valid and normalize to an empty list. Results stay in the device-local save, are never sent to Online services, and are removed by the confirmed Reset progress action.

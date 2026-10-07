@@ -3,6 +3,7 @@
   'use strict';
   var L = window.LudoLogic, SK = window.SKINS, CFG = window.ADS_CONFIG || {}, ART = window.ART;
   var SFX = window.SFX, Ads = window.Ads;
+  var MATCH_HISTORY = window.OfflineMatchHistory;
   var $ = function (id) { return document.getElementById(id); };
   var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
   var native = !!(Ads && Ads.isNative());
@@ -45,6 +46,7 @@
         mode: { ai: 'classic', pass: 'classic' }
       },
       stats: { played: 0, won: 0, streak: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], quick: [0, 0], team: [0, 0], arrow: [0, 0], friendly: [0, 0], duel: [0, 0], four: [0, 0] },
+      recentMatches: [],
       flags: { diamondCollection: true }, game: null, ad: {}
 
     };
@@ -113,6 +115,7 @@
   function normalizeSave(raw) {
     if (!isRecord(raw)) return null;
     var d = defaults(), s = d;
+    s.recentMatches = MATCH_HISTORY ? MATCH_HISTORY.normalize(raw.recentMatches) : [];
     s.coins = safeCounter(raw.coins, d.coins); s.xp = safeCounter(raw.xp, d.xp);
     if (isRecord(raw.owned)) {
       ['boards', 'dice'].forEach(function (kind) { s.owned[kind] = window.SkinShop.normalizeOwned(raw.owned[kind], d.owned[kind]); });
@@ -166,6 +169,7 @@
     if (s.flags !== undefined && (!isRecord(s.flags) || !Object.keys(s.flags).every(function (k) { return typeof s.flags[k] === 'boolean'; }))) return false;
     if (!Object.keys(defaults().rules).every(function (k) { return k === 'rollStyle' ? ['star', 'classic'].indexOf(s.rules[k]) >= 0 : typeof s.rules[k] === 'boolean'; })) return false;
     if (!validSeatList(s.setup.ai) || !validSeatList(s.setup.pass) || !isRecord(s.setup.mode) || !['ai', 'pass'].every(function (k) { return ['classic', 'mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'].indexOf(s.setup.mode[k]) >= 0; })) return false;
+    if (s.recentMatches !== undefined && (!MATCH_HISTORY || !MATCH_HISTORY.isValid(s.recentMatches))) return false;
     var ds = defaults().stats;
     if (!Object.keys(ds).every(function (k) {
       if (k === 'streak') return s.stats.streak === undefined || isCount(s.stats.streak);
@@ -1972,6 +1976,7 @@
     var st = G.st;
     if (!G.counted) {
       G.counted = true;
+      if (MATCH_HISTORY) save.recentMatches = MATCH_HISTORY.recordCompletedMatch(save.recentMatches, st, !!G.online, Date.now());
       var hs = humans(st), best = 99;
       if (st.mode === 'team') {
         var winT = L.teamOf(st.ranking[0]);
@@ -2208,6 +2213,34 @@
     $('stats-body').innerHTML = cells.map(function (c) { return '<div><b>' + c[1] + '</b><span>' + c[0] + '</span></div>'; }).join('');
   }
   var skinTab = 'boards';
+  function renderRecentMatches() {
+    var list = $('recent-match-list');
+    if (!list) return;
+    list.textContent = '';
+    var entries = MATCH_HISTORY ? MATCH_HISTORY.normalize(save.recentMatches) : [];
+    if (!entries.length) {
+      var empty = document.createElement('li');
+      empty.className = 'recent-match-empty';
+      empty.textContent = 'No completed offline matches yet.';
+      list.appendChild(empty);
+      return;
+    }
+    var places = ['1st', '2nd', '3rd', '4th'];
+    entries.forEach(function (entry) {
+      var row = document.createElement('li');
+      row.dataset.matchHistoryEntry = 'true';
+      var head = document.createElement('div'); head.className = 'recent-match-row-head';
+      var mode = document.createElement('span'); mode.textContent = MATCH_HISTORY.modeLabel(entry.mode);
+      var time = document.createElement('time');
+      var date = new Date(entry.completedAt);
+      time.dateTime = date.toISOString();
+      time.textContent = date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      head.appendChild(mode); head.appendChild(time);
+      var order = document.createElement('p'); order.className = 'recent-match-order';
+      order.textContent = 'Finish order: ' + entry.ranking.map(function (seat, index) { return (places[index] || (index + 1) + 'th') + ' ' + NAMES[seat]; }).join(' · ');
+      row.appendChild(head); row.appendChild(order); list.appendChild(row);
+    });
+  }
   function skinRequirement(it) {
     if (it.unlock === 'wins') return 'Unlock at ' + it.threshold + ' lifetime wins';
     if (it.unlock === 'streak') return 'Unlock with ' + it.threshold + ' consecutive wins';
@@ -2445,7 +2478,7 @@
   $('btn-r-home').addEventListener('click', function () { leaveResult('home'); });
   $('btn-r-double').addEventListener('click', doubleCoins);
   $('btn-exit-match').addEventListener('click', function () { SFX.click(); openExitConfirmation(); });
-  $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); show('stats'); });
+  $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); renderRecentMatches(); show('stats'); });
   $('btn-skins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   $('btn-rules').addEventListener('click', function () { SFX.unlock(); SFX.click(); openRules('basics'); });
   if ($('btn-howto-home')) $('btn-howto-home').addEventListener('click', function () {
@@ -2480,7 +2513,7 @@
   $('btn-privacy-options').addEventListener('click', function () { Ads.showPrivacyOptions(); });
   $('btn-reset').addEventListener('click', function () {
     hide('settings');
-    askConfirm('Reset progress?', 'Coins, XP, skins, statistics and the saved match will be deleted.', 'Reset', function () {
+    askConfirm('Reset progress?', 'Coins, XP, skins, statistics, recent offline match history and the saved match will be deleted.', 'Reset', function () {
       var resetData = defaults(); resetData.ad = save.ad;
       var resetResult = saveStore.reset(resetData);
       if (!resetResult.ok) {
