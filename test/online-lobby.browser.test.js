@@ -31,7 +31,8 @@ function startLocalServer() {
 }
 (async () => {
   let localServer = null;
-  let url = process.argv[2];
+  const recoveryOnly = process.argv.includes('--realtime-recovery-only');
+  let url = process.argv.slice(2).find(arg => !arg.startsWith('--'));
   if (!url) { localServer = await startLocalServer(); url = localServer.url; }
   const origin = new URL(url).origin;
   const browser = await puppeteer.launch({
@@ -495,6 +496,27 @@ function startLocalServer() {
       await page.waitForFunction(() => document.querySelector('#online-room-status').textContent.includes('validated by the server'));
     await page.waitForFunction(() => document.querySelector('#online-history-list').textContent.includes('Classic · active'));
       await page.waitForFunction(() => !document.querySelector('#online-match-panel').classList.contains('hidden') && document.querySelector('#online-match-version').textContent === 'Version 0');
+    const recoveryRpcStart = await page.evaluate(() => window.__mockBackend.rpcCalls.length);
+    await page.evaluate(() => {
+      const channel = window.__mockBackend.channels.find(item => item.name === 'crossfour-room-host-room' && !item.removed);
+      if (!channel) throw new Error('Active Classic room Realtime channel was not found.');
+      channel.statusCallback('CHANNEL_ERROR');
+      window.dispatchEvent(new Event('offline'));
+      channel.statusCallback('TIMED_OUT');
+    });
+    await page.waitForFunction(() => document.querySelector('#online-room-connection').dataset.state === 'reconnecting');
+    assert.equal(await page.$eval('#online-roll', el => el.disabled), true, 'Classic actions pause while the Realtime channel is reconnecting');
+    await page.waitForFunction(start => window.__mockBackend.rpcCalls.slice(start).some(call => call.name === 'note_disconnect'), {}, recoveryRpcStart);
+    await page.evaluate(() => {
+      const channel = window.__mockBackend.channels.find(item => item.name === 'crossfour-room-host-room' && !item.removed);
+      channel.statusCallback('SUBSCRIBED');
+    });
+    await page.waitForFunction(() => document.querySelector('#online-room-connection').dataset.state === 'connected' && /Room reconnected\. Latest server state restored\./.test(document.querySelector('#online-status').textContent));
+    assert.deepEqual(await page.evaluate(start => window.__mockBackend.rpcCalls.slice(start).map(call => call.name).filter(name => name === 'note_disconnect' || name === 'rejoin_match'), recoveryRpcStart), ['note_disconnect', 'rejoin_match'], 'a transient Realtime outage records one Classic disconnect and performs one same-seat rejoin in order');
+    if (recoveryOnly) {
+      console.log('Online Realtime recovery browser regression passed.');
+      return;
+    }
       await page.waitForFunction(() => !document.querySelector('#game').classList.contains('hidden') && document.querySelector('#board') && document.querySelector('#online-match-pieces').classList.contains('hidden'));
       await page.evaluate(() => { window.__mockBackend.failRpc = 'roll_match'; });
       await page.evaluate(() => document.querySelector('#game .pod[data-seat="0"] .pdice').click());
