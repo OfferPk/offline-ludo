@@ -112,7 +112,7 @@ body.light .seg { background: rgba(0,0,0,.06); }
 .setup-foot .btn { width: 100%; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--surface-edge); cursor: pointer; font-size: 15px; }
 .row small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
-.row input { display: none; }
+.row input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); clip-path: inset(50%); white-space: nowrap; }
 .sw { width: 44px; height: 26px; border-radius: 999px; background: rgba(128,128,128,.35); position: relative; flex: none; transition: background .15s; }
 .sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
 .row input:checked + .sw { background: var(--accent); }
@@ -1458,6 +1458,8 @@ body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-
 #settings .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 4px; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 14px; font-weight: 600; }
 #settings .row span { flex: 1; line-height: 1.3; }
 #settings .row small, #settings .row .note { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 500; }
+#settings button:focus-visible, #settings a:focus-visible, #settings .row input:focus-visible + .sw { outline: 3px solid #9ad9ff; outline-offset: 3px; }
+body.light #settings button:focus-visible, body.light #settings a:focus-visible, body.light #settings .row input:focus-visible + .sw { outline-color: #1d5f96; }
 #settings .sect { margin: 14px 0 4px; padding-top: 4px; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 
 /* ---- v1.6.1 token die picker + 4s move countdown ---- */
