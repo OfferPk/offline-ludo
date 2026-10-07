@@ -1447,7 +1447,7 @@ html[dir="rtl"] .howto-open[aria-expanded="true"] .howto-open-chevron { transfor
 body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-index: 40; left: 12px; bottom: 16px; }
 @media (max-height: 720px) {
   #home .home-actions { --card-h: 96px; --card-gap: 8px; }
-  #home .howto-open { min-height: 49px; padding-top: 7px; padding-bottom: 7px; }
+  #home .howto-open { min-height: 49px; padding: 6px 13px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .howto-card, .howto-open-chevron { transition: none; }
