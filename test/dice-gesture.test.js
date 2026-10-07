@@ -52,6 +52,23 @@ test('a short quick flick is accepted, but a stationary tap remains a tap', () =
   unbind();
 });
 
+test('lost pointer capture cancels only the matching in-flight gesture', () => {
+  const button = new FakeButton(); let rolls = 0, taps = 0;
+  const unbind = DiceGesture.bind(button, () => taps++, () => rolls++);
+  button.emit('pointerdown', { clientX: 20, clientY: 20, pointerId: 7, timeStamp: 100 });
+  button.emit('lostpointercapture', { pointerId: 8 });
+  button.emit('pointerup', { clientX: 60, clientY: 20, pointerId: 7, timeStamp: 180 });
+  assert.strictEqual(rolls, 1, 'a different pointer losing capture does not cancel the active swipe');
+
+  button.emit('pointerdown', { clientX: 20, clientY: 20, pointerId: 9, timeStamp: 300 });
+  button.emit('lostpointercapture', { pointerId: 9 });
+  button.emit('pointerup', { clientX: 60, clientY: 20, pointerId: 9, timeStamp: 380 });
+  button.emit('click', { clientX: 60, clientY: 20, pointerId: 9, timeStamp: 381, detail: 1 });
+  assert.strictEqual(rolls, 1, 'the interrupted pointer cannot trigger a stale swipe');
+  assert.strictEqual(taps, 1, 'the ordinary click fallback remains available after interruption');
+  unbind();
+});
+
 test('cancelled, secondary, and disabled gestures never roll', () => {
   const button = new FakeButton(); let rolls = 0, taps = 0;
   const unbind = DiceGesture.bind(button, () => taps++, () => rolls++);
