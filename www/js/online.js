@@ -195,7 +195,8 @@
       else if (client) announce('Online Ludo email/password authentication is not enabled.', true);
       return;
     }
-    $('online-profile-name').value = '';
+    if (window.OnlineProfileNameFeedback) window.OnlineProfileNameFeedback.setValue('');
+    else $('online-profile-name').value = '';
     $('online-profile-handle').textContent = 'Loading profile…';
   }
   function readCredentials() {
@@ -285,7 +286,8 @@
       var profile = results[0].data;
       var wallet = results[1].data;
       if (profile) {
-        $('online-profile-name').value = profile.display_name || '';
+        if (window.OnlineProfileNameFeedback) window.OnlineProfileNameFeedback.setValue(profile.display_name || '');
+        else $('online-profile-name').value = profile.display_name || '';
         $('online-profile-handle').textContent = '@' + (profile.handle || 'player');
       } else {
         $('online-profile-handle').textContent = 'Profile is being created…';

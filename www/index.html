@@ -232,7 +232,12 @@
         </section>
         <section id="online-account-panel" class="online-card hidden" aria-labelledby="online-account-title">
           <div class="online-card-head"><div><span class="online-eyebrow">CLOUD PROFILE</span><h2 id="online-account-title">Your account</h2><small id="online-profile-handle">Loading profile…</small></div><button id="online-signout" class="btn plate online-signout" type="button">Sign out</button></div>
-          <form id="online-profile-form" class="online-profile-form"><label for="online-profile-name">Display name</label><div><input id="online-profile-name" maxlength="32" autocomplete="nickname" required><button class="btn primary" type="submit">Save</button></div></form>
+          <form id="online-profile-form" class="online-profile-form">
+            <label for="online-profile-name">Display name</label>
+            <div><input id="online-profile-name" type="text" maxlength="32" autocomplete="nickname" aria-describedby="online-profile-name-guidance online-profile-name-feedback" required><button class="btn primary" type="submit">Save</button></div>
+            <small id="online-profile-name-guidance" class="online-profile-name-guidance">Use 1–32 characters. Leading and trailing whitespace is ignored.</small>
+            <p id="online-profile-name-feedback" class="online-profile-name-feedback" role="status" aria-live="polite" aria-atomic="true">0 of 32 characters. Enter a name after trimming.</p>
+          </form>
           <div class="online-wallet" aria-label="Cloud-synced balance"><span><b id="online-wallet-coins">—</b><small>Coins</small></span><span><b id="online-wallet-diamonds">—</b><small>Diamonds</small></span></div>
           <p class="online-wallet-note">These balances are server-owned. Offline coins are not uploaded, and the app cannot mint or spend cloud currency directly.</p>
         </section>
@@ -610,6 +615,7 @@
   <script src="js/community.js?v=1.7.2"></script>
   <script src="js/supabase-config.js?v=1.7.2"></script>
   <script src="js/chess.js?v=1.7.2"></script>
+  <script src="js/online-profile-name-feedback.js?v=1.7.2"></script>
   <script src="js/online.js?v=1.7.2"></script>
   <script src="js/ludo-chess-discovery.js?v=1.7.2"></script>
 </body>
