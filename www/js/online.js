@@ -13,6 +13,8 @@
   var currentRoomId = sessionStorage.getItem('crossfour.online.room') || '';
   var currentRoom = null;
   var currentUser = null;
+  var profileNameDraftUserId = '';
+  var profileNameDraftValue = '';
   var pendingMatchAction = null;
   var selectedChessSquare = -1;
   var selectedChessMoves = [];
@@ -189,13 +191,14 @@
       return;
     }
     if (!signedIn) {
+      if (window.OnlineProfileNameFeedback) window.OnlineProfileNameFeedback.setValue('');
+      else $('online-profile-name').value = '';
       $('online-wallet-coins').textContent = '—';
       $('online-wallet-diamonds').textContent = '—';
       if (client && emailPasswordEnabled()) announce('Sign in to create or join online rooms.');
       else if (client) announce('Online Ludo email/password authentication is not enabled.', true);
       return;
     }
-    $('online-profile-name').value = '';
     $('online-profile-handle').textContent = 'Loading profile…';
   }
   function readCredentials() {
@@ -285,7 +288,15 @@
       var profile = results[0].data;
       var wallet = results[1].data;
       if (profile) {
-        $('online-profile-name').value = profile.display_name || '';
+        var profileNameField = $('online-profile-name');
+        var savedDisplayName = profile.display_name || '';
+        var hasCurrentDraft = profileNameDraftUserId === requestedUserId && profileNameDraftValue === profileNameField.value;
+        if (!hasCurrentDraft || profileNameDraftValue === savedDisplayName) {
+          profileNameDraftUserId = '';
+          profileNameDraftValue = '';
+          if (window.OnlineProfileNameFeedback) window.OnlineProfileNameFeedback.setValue(savedDisplayName);
+          else profileNameField.value = savedDisplayName;
+        }
         $('online-profile-handle').textContent = '@' + (profile.handle || 'player');
       } else {
         $('online-profile-handle').textContent = 'Profile is being created…';
@@ -1073,14 +1084,29 @@
         clearRoomSelection(true);
       }).catch(function (error) { announce('Sign-out failed: ' + errorText(error), true); });
     });
+    $('online-profile-name').addEventListener('input', function () {
+      if (!currentUser) return;
+      profileNameDraftUserId = currentUser.id;
+      profileNameDraftValue = this.value;
+    });
     $('online-profile-form').addEventListener('submit', function (event) {
       event.preventDefault();
       if (!client || !currentUser) return;
-      var displayName = $('online-profile-name').value.trim();
+      var requestedUserId = currentUser.id;
+      var profileNameField = $('online-profile-name');
+      var submittedValue = profileNameField.value;
+      var displayName = submittedValue.trim();
       if (!displayName || displayName.length > 32) return announce('Choose a display name from 1 to 32 characters.', true);
-      client.from('profiles').update({ display_name: displayName }).eq('id', currentUser.id)
+      client.from('profiles').update({ display_name: displayName }).eq('id', requestedUserId)
         .then(function (result) {
           if (result.error) throw result.error;
+          if (currentUser && currentUser.id === requestedUserId && profileNameDraftUserId === requestedUserId &&
+            profileNameDraftValue === submittedValue && profileNameField.value === submittedValue) {
+            if (window.OnlineProfileNameFeedback) window.OnlineProfileNameFeedback.setValue(displayName);
+            else profileNameField.value = displayName;
+            profileNameDraftUserId = '';
+            profileNameDraftValue = '';
+          }
           announce('Display name saved to your online profile.');
           return refreshAccount().then(function () { return refreshRoom(); });
         }).catch(function (error) { announce('Profile update failed: ' + errorText(error), true); });
@@ -1254,6 +1280,12 @@
     var oldUserId = currentUser && currentUser.id;
     var nextUserId = nextUser && nextUser.id;
     var identityChanged = oldUserId !== nextUserId;
+    if (identityChanged) {
+      profileNameDraftUserId = '';
+      profileNameDraftValue = '';
+      if (window.OnlineProfileNameFeedback) window.OnlineProfileNameFeedback.setValue('');
+      else $('online-profile-name').value = '';
+    }
     if (event === 'PASSWORD_RECOVERY') recoveryMode = true;
     else if (event === 'SIGNED_OUT') recoveryMode = false;
     if (oldUserId && oldUserId !== nextUserId) {
