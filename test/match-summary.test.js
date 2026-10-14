@@ -1,0 +1,17 @@
+'use strict';
+const assert = require('node:assert');
+const MS = require('../www/js/match-summary.js');
+const TS = require('../www/js/token-skins.js');
+const t = MS.blank(); MS.add(t, 'capture', 2); MS.add(t, 'six'); MS.add(t, 'win', 5); MS.add(t, 'arrow', -3);
+assert.deepStrictEqual(t, { capture: 2, six: 1, arrow: 1, home: 0 });
+assert.strictEqual(MS.chips(t).length, 4);
+const save = { coins: 0, stats: { won: 2, captures: 9 }, tokenSkinsOwned: ['classic'] };
+const g = MS.nextGoal(save, TS);
+assert.ok(g && g.id === 'emerald', 'closest goal emerald (9/10), got ' + (g && g.id));
+assert.ok(g.pct > 0.8 && g.pct < 1);
+save.tokenSkinsOwned = TS.IDS.slice();
+assert.strictEqual(MS.nextGoal(save, TS), null);
+const css = require('node:fs').readFileSync(__dirname + '/../www/css/v180.css', 'utf8');
+for (const sel of ['body.light .dcell', 'body.light .vault-row', 'body.light .daily-chal', 'prefers-reduced-motion']) assert.ok(css.includes(sel), sel);
+assert.ok(!/r-(chip|daily|goal)[^{]*\{[^}]*filter/.test(css), 'no filter on summary');
+console.log('match-summary ok');
