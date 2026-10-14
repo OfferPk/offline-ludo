@@ -36,7 +36,7 @@ function startLocalServer() {
   const errors = [];
   try {
     let page;
-    const shot = async name => { const out = path.join(shotDir, 'v182-' + name + '.png'); await page.screenshot({ path: out }); ok(fs.statSync(out).size > 8000, 'screenshot ' + path.basename(out)); };
+    const shot = async name => { const out = path.join(shotDir, (process.env.SHOT_PREFIX || 'v182-') + name + '.png'); await page.screenshot({ path: out }); ok(fs.statSync(out).size > 8000, 'screenshot ' + path.basename(out)); };
     const setup = async board => {
       if (page) await page.close();
       const ctx = await browser.createBrowserContext(); page = await ctx.newPage();
@@ -72,6 +72,7 @@ function startLocalServer() {
         ok(await page.evaluate(() => getComputedStyle(document.querySelector('.dcell')).color) !== 'rgb(255, 255, 255)', 'light daily cells use dark text');
         await page.evaluate(() => document.querySelector('[data-close="daily"]').click()); await sleep(250);
         await page.evaluate(() => { document.getElementById('result').classList.add('hidden'); window.__cf.openVault(); }); await sleep(400); await shot('vault-light');
+        ok(await page.evaluate(() => document.querySelectorAll('.vault-mastery .m-stars').length === 2 && document.querySelectorAll('.vault-row')[0].querySelectorAll('.m-stars i.on').length === 1), 'vault shows mastery stars; Classic Bronze after a win');
       }
     }
     ok(errors.length === 0, 'no page errors ' + errors.join(' | '));

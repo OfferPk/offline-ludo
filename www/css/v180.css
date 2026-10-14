@@ -141,3 +141,11 @@ body.light .vault-own { color: #11804a; }
 body.light .vault-prev { background: radial-gradient(circle at 50% 35%, #ffffff, #dfe3ea); }
 body.light .r-unlock { color: #3a2a06; border-color: rgba(176,120,10,.55); } body.light .r-unlock span { color: #b07a0a; }
 body.light .r-chip.on { border-color: rgba(176,120,10,.55); }
+
+/* ---- v1.8.4 Skin Mastery + light Daily track ---- */
+.vault-mastery { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.m-stars { display: inline-flex; gap: 1px; letter-spacing: 0; }
+.m-stars i { font-style: normal; font-size: 13px; color: rgba(255,255,255,.22); }
+.m-stars i.on { color: #f4b740; }
+body.light .m-stars i { color: rgba(0,0,0,.18); } body.light .m-stars i.on { color: #b07a0a; }
+body.light .chal-bar { background: rgba(0,0,0,.12); }
