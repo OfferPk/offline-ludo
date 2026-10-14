@@ -3,7 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
-let URL = process.argv[2] ? process.argv[2].replace(/\/?$/, '/') : null; // v1.8.6: self-serves www/ when no URL is given
+let URL = process.argv[2] ? process.argv[2].replace(/\/?$/, '/') : null; // v1.8.7: self-serves www/ when no URL is given
 const OUT = process.argv[3] || '/tmp/crossfour-skin-screenshots';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let checks = 0;
@@ -49,7 +49,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await seedSave('crossfour.save.v1', v1);
     let migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
     ok(migrated.status === 'migrated-v1' && migrated.save.coins >= 77 /* +level reward from #122 */ && migrated.save.board === 'linen' && migrated.save.dice === 'brass', 'v1 save migration retains coins and selected legacy skins');
-    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === false && migrated.save.owned.boards.includes('linen') && migrated.save.owned.dice.includes('brass'), 'v1 gains safe streak/event defaults without losing owned skins');
+    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true /* Diamond event ON for everyone (John, v1.8.7) */ && migrated.save.owned.boards.includes('linen') && migrated.save.owned.dice.includes('brass'), 'v1 gains safe streak/event defaults without losing owned skins');
 
     const legacyV2 = await page.evaluate(() => {
       const s = JSON.parse(JSON.stringify(window.__cf.save));
@@ -59,7 +59,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await seedSave('crossfour.save.v2', legacyV2);
     migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
     ok(migrated.status === 'migrated-v2' && migrated.save.coins === 321 && migrated.save.board === 'walnut' && migrated.save.dice === 'frost', 'v2 save migration retains progression and selected legacy skins');
-    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === false, 'v2 receives backward-compatible achievement and event defaults');
+    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true /* Diamond event ON for everyone (John, v1.8.7) */, 'v2 receives backward-compatible achievement and event defaults');
 
     const legacyV3 = await page.evaluate(() => {
       const s = JSON.parse(JSON.stringify(window.__cf.save));
@@ -74,12 +74,12 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await reload();
     migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
     ok(migrated.status === 'loaded' && migrated.save.coins === 432 && migrated.save.board === 'aurora' && migrated.save.dice === 'ember', 'old v3 primary snapshot is accepted and keeps its selected IDs');
-    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === false, 'old v3 primary/checkpoint are normalized without schema loss');
+    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true /* Diamond event ON for everyone (John, v1.8.7) */, 'old v3 primary/checkpoint are normalized without schema loss');
 
     // Start shop tests from a clean local-only profile.
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await reload();
     await page.click('#btn-skins'); await page.waitForSelector('#skins:not(.hidden) #skin-grid [data-id="graphite"]');
-    ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === 20, 'real Boards tab renders all 20 boards');
+    ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === await page.evaluate(() => window.SKINS.BOARDS.length), 'real Boards tab renders every board');
     ok(await page.evaluate(() => {
       const box = document.getElementById('skins').querySelector('.panel');
       const grid = document.getElementById('skin-grid');
@@ -91,7 +91,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     const galaxyCard = await page.$('[data-id="galaxy"]');
     await galaxyCard.screenshot({ path: path.join(OUT, 'skin-preview-galaxy.png') });
     ok(await page.$eval('[data-id="galaxy"] canvas', canvas => canvas.width > 0 && canvas.getAttribute('aria-label') === 'Galaxy board preview'), 'Galaxy board preview draws the actual board renderer');
-    ok(await page.$eval('[data-id="diamond"] button', button => button.disabled && /future event/i.test(button.textContent)), 'Diamond board remains locked without an event flag');
+    ok(await page.$eval('[data-id="diamond"] button', button => !/future event/i.test(button.textContent)), 'Diamond board is available (Diamond event ON for everyone)');
     ok(await page.$eval('[data-id="champion"] small', note => /50 lifetime wins/i.test(note.textContent)), 'Champion card shows its real 50-win requirement');
     ok(await page.$eval('[data-id="streak-master"] small', note => /10 consecutive wins/i.test(note.textContent)), 'Streak Master card shows its real streak requirement');
 
@@ -107,23 +107,24 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     ok(failedPurchase.coins === beforeFail.coins && failedPurchase.board === beforeFail.board && !failedPurchase.owned.includes('ocean') && failedPurchase.warning, 'storage failure rolls back coins, ownership and selection without a false success');
     await page.evaluate(() => { Storage.prototype.setItem = window.__skinOriginalSetItem; window.__cf.persist(); document.querySelector('#skin-tabs [data-tab="boards"]').click(); });
 
+    const c0 = await page.evaluate(() => (window.__c0 = window.__cf.save.coins)); // v1.8.7: balance-relative (level rewards from #122 change the start balance)
     await page.$eval('[data-id="galaxy"] button', button => button.click());
     let purchased = await page.evaluate(() => {
       const c = window.__cf, snapshot = JSON.parse(localStorage.getItem('crossfour.save.v3'));
       return { coins: c.save.coins, board: c.save.board, owned: c.save.owned.boards.filter(id => id === 'galaxy').length,
         diskCoins: snapshot.payload.coins, diskBoard: snapshot.payload.board, diskOwned: snapshot.payload.owned.boards.includes('galaxy'), bg: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() };
     });
-    ok(purchased.coins === 1900 && purchased.board === 'galaxy' && purchased.owned === 1, 'Galaxy purchase deducts exactly 600 coins, owns once and equips');
-    ok(purchased.diskCoins === 1900 && purchased.diskBoard === 'galaxy' && purchased.diskOwned && purchased.bg === '#0b0b1d', 'Galaxy ownership, selection and palette persist locally and apply to UI');
+    ok(purchased.coins === c0 - 600 && purchased.board === 'galaxy' && purchased.owned === 1, 'Galaxy purchase deducts exactly 600 coins, owns once and equips');
+    ok(purchased.diskCoins === c0 - 600 && purchased.diskBoard === 'galaxy' && purchased.diskOwned && purchased.bg === '#0b0b1d', 'Galaxy ownership, selection and palette persist locally and apply to UI');
     await page.$eval('[data-id="linen"] button', button => button.click());
     await page.$eval('[data-id="galaxy"] button', button => button.click());
-    ok(await page.evaluate(() => window.__cf.save.coins === 1900 && window.__cf.save.owned.boards.filter(id => id === 'galaxy').length === 1), 're-equipping an owned Board skin never charges a second time');
+    ok(await page.evaluate(c0 => window.__cf.save.coins === c0 - 600 && window.__cf.save.owned.boards.filter(id => id === 'galaxy').length === 1, c0), 're-equipping an owned Board skin never charges a second time');
     await reload();
-    ok(await page.evaluate(() => window.__cf.save.board === 'galaxy' && window.__cf.save.coins === 1900 && window.__cf.save.owned.boards.includes('galaxy')), 'equipped Board skin and coin balance survive reload');
+    ok(await page.evaluate(c0 => window.__cf.save.board === 'galaxy' && window.__cf.save.coins === c0 - 600 && window.__cf.save.owned.boards.includes('galaxy'), c0), 'equipped Board skin and coin balance survive reload');
     await page.click('#btn-skins'); await page.waitForSelector('[data-id="galaxy"]');
 
     await page.click('#skin-tabs button[data-tab="dice"]');
-    ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === 17, 'real Dice tab renders all 17 dice styles');
+    ok(await page.$$eval('#skin-grid [data-id]', nodes => nodes.length) === await page.evaluate(() => window.SKINS.DICE.length), 'real Dice tab renders every dice style');
     ok(await page.evaluate(() => {
       const box = document.getElementById('skins').querySelector('.panel'), grid = document.getElementById('skin-grid');
       return document.documentElement.scrollWidth <= innerWidth && box.scrollWidth <= box.clientWidth + 1 && grid.scrollWidth <= grid.clientWidth + 1;
@@ -134,14 +135,14 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     const rainbowDice = await page.$('[data-id="rainbow-dice"] .dprev');
     await rainbowDice.screenshot({ path: path.join(OUT, 'skin-preview-rainbow-dice.png') });
     ok(await page.$eval('[data-id="ivory"] button', button => /In use/i.test(button.textContent)), 'original Ivory dice remain the unchanged starter selection');
-    ok(await page.$eval('[data-id="diamond-dice"] button', button => button.disabled && /future event/i.test(button.textContent)), 'Diamond Dice remain event-locked without a real flag');
+    ok(await page.$eval('[data-id="diamond-dice"] button', button => !/future event/i.test(button.textContent)), 'Diamond Dice are available (Diamond event ON for everyone)');
     ok(await page.$eval('[data-id="rainbow-dice"] .dprev', preview => preview.style.backgroundImage.includes('linear-gradient')), 'Rainbow Dice preview renders its distinct multi-colour finish');
     await page.$eval('[data-id="classic-white"] button', button => button.click());
-    ok(await page.evaluate(() => window.__cf.save.dice === 'classic-white' && window.__cf.save.coins === 1900 && window.__cf.save.owned.dice.includes('classic-white')), 'Classic White is a free unlock while Ivory and coin balance remain unchanged');
+    ok(await page.evaluate(c0 => window.__cf.save.dice === 'classic-white' && window.__cf.save.coins === c0 - 600 && window.__cf.save.owned.dice.includes('classic-white'), c0), 'Classic White is a free unlock while Ivory and coin balance remain unchanged');
     await page.$eval('[data-id="graphite-dice"] button', button => button.click());
-    ok(await page.evaluate(() => window.__cf.save.dice === 'graphite-dice' && window.__cf.save.coins === 1750), 'Graphite Dice costs exactly 150 coins and equips');
+    ok(await page.evaluate(c0 => window.__cf.save.dice === 'graphite-dice' && window.__cf.save.coins === c0 - 750, c0), 'Graphite Dice costs exactly 150 coins and equips');
     await page.reload({ waitUntil: 'networkidle0' }); await sleep(120);
-    ok(await page.evaluate(() => window.__cf.save.dice === 'graphite-dice' && window.__cf.save.coins === 1750), 'equipped Dice style and balance survive reload');
+    ok(await page.evaluate(c0 => window.__cf.save.dice === 'graphite-dice' && window.__cf.save.coins === c0 - 750, c0), 'equipped Dice style and balance survive reload');
 
     // One synthetic, local match settlement checks the actual game-to-achievement integration.
     await page.evaluate(() => {

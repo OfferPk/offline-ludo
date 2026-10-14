@@ -17,7 +17,7 @@ function ok(condition, message) {
   console.log('  ok -', message);
 }
 (async () => {
-  const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/chromium', headless: 'new', args: ['--no-sandbox'] });
+  const browser = await puppeteer.launch({ executablePath: process.env.CHROME || ['/usr/bin/chromium', '/usr/bin/google-chrome', '/usr/bin/chromium-browser'].find(p => require('fs').existsSync(p)), headless: 'new', args: ['--no-sandbox'] });
   try {
     const errors = [];
     let homeCheckDone = false;

@@ -200,6 +200,22 @@
   loadResult.data = save;
   var saveWriteFailed = false;
   var lastSaveError = null;
+  function updateSaveWarning(reason) {
+    var warning = $('save-warning');
+    warning.textContent = reason === 'stale-write'
+      ? 'Another tab saved newer progress. Reload this tab before continuing; changes here can no longer be saved.'
+      : 'Save failed. Your latest progress may not be saved on this device. Keep the app open and check device storage.';
+    warning.classList.remove('hidden');
+  }
+  function markStaleSave() {
+    lastSaveError = { reason: 'stale-write', stage: 'conflict' };
+    saveWriteFailed = true;
+    updateSaveWarning('stale-write');
+  }
+  window.addEventListener('storage', function (event) {
+    if ((event.key !== SAVE_KEY && event.key !== null) || event.oldValue === event.newValue) return;
+    markStaleSave();
+  });
   function persist() {
     var result;
     try {
@@ -210,9 +226,7 @@
     if (!result.ok) {
       lastSaveError = { reason: result.reason, stage: result.stage };
       if (!saveWriteFailed) {
-        var warning = $('save-warning');
-        warning.textContent = 'Save failed. Your latest progress may not be saved on this device. Keep the app open and check device storage.';
-        warning.classList.remove('hidden');
+        updateSaveWarning(result.reason);
       }
       saveWriteFailed = true;
       return false;
@@ -2265,6 +2279,7 @@
     renderSummary();
     if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
     render(); setCoins(); setLevel(); show('result');
+    if (entering) $('r-title').focus({ preventScroll: true }); // v1.8.7 (#111)
     if (entering) { spotlightWinner(winner); celebrateWin(winner); }
   }
   /** v1.8.2 match summary: this match's highlights, new unlocks, closest skin goal, today's challenge. */
@@ -2294,7 +2309,7 @@
       persist();
       if (dest === 'again' && championshipNext) startChampionshipRound();
       else if (dest === 'again' && championshipStage == null) startMatch(seats, mode, false, entryFee);
-      else showHome();
+      else { showHome(); var homeAction = $('btn-vs-ai'); if (homeAction) setTimeout(function () { if (!$('home').classList.contains('hidden')) homeAction.focus({ preventScroll: true }); }, 0); } // v1.8.7 (#111)
     });
   }
   function doubleCoins() {
@@ -3009,7 +3024,9 @@
         lastSaveError = { reason: resetResult.reason, stage: resetResult.stage };
         saveWriteFailed = true;
         var warning = $('save-warning');
-        warning.textContent = resetResult.recoveryRestored === false
+        warning.textContent = resetResult.reason === 'stale-write'
+          ? 'Reset cancelled. Another tab saved newer progress; reload this tab before trying again.'
+          : resetResult.recoveryRestored === false
           ? 'Reset failed, and device storage could not restore every recovery copy. Check device storage before continuing.'
           : 'Reset failed. Your existing progress was not cleared. Check device storage and try again.';
         warning.classList.remove('hidden');
@@ -3029,6 +3046,19 @@
       var firstDialogButton = dialogButtons[0], lastDialogButton = dialogButtons[dialogButtons.length - 1];
       if (e.shiftKey && document.activeElement === firstDialogButton) { e.preventDefault(); lastDialogButton.focus(); }
       else if (!e.shiftKey && document.activeElement === lastDialogButton) { e.preventDefault(); firstDialogButton.focus(); }
+      return;
+    }
+    if (isOpen('result') && !document.querySelector('.overlay:not(.hidden):not(#result)')) { // v1.8.7 (#111) focus trap
+      if (e.key === 'Tab') {
+        var resultDialog = $('result'), resultButtons = resultDialog.querySelectorAll('button:not([disabled]):not(.hidden)'), resultTitle = $('r-title');
+        if (!resultButtons.length) { e.preventDefault(); resultTitle.focus({ preventScroll: true }); }
+        else {
+          var firstResultButton = resultButtons[0], lastResultButton = resultButtons[resultButtons.length - 1];
+          if (!resultDialog.contains(document.activeElement)) { e.preventDefault(); (e.shiftKey ? lastResultButton : firstResultButton).focus(); }
+          else if (e.shiftKey && (document.activeElement === firstResultButton || document.activeElement === resultTitle)) { e.preventDefault(); lastResultButton.focus(); }
+          else if (!e.shiftKey && document.activeElement === lastResultButton) { e.preventDefault(); firstResultButton.focus(); }
+        }
+      }
       return;
     }
     if (!G || $('game').classList.contains('hidden') || paused) return;
@@ -3229,6 +3259,47 @@
     $('chal-2x').addEventListener('click', function () { dailyAd('challenge'); });
     updateDailyDot();
   }
+  // v1.8.7: rebuilt from PR #106 (Android system Back)
+  function handleNativeBack(event) {
+    var claimModal = $('community-claim-modal');
+    if (claimModal && !claimModal.classList.contains('hidden')) { $('community-claim-close').click(); return; }
+    if (isOpen('confirm')) { $('confirm-no').click(); return; }
+    if (isOpen('tutorial-intro')) { $('tutorial-intro-skip').click(); return; }
+    if (isOpen('tutorial-coach')) { $('tutorial-skip').click(); return; }
+
+    var closeButtons = document.querySelectorAll('.overlay:not(.hidden) [data-close]');
+    if (closeButtons.length) { closeButtons[closeButtons.length - 1].click(); return; }
+    if (isOpen('menu')) { $('btn-m-resume').click(); return; }
+    if (isOpen('result')) { $('btn-r-home').click(); return; }
+    if (isOpen('chat')) { $('btn-chat').click(); return; }
+
+    var howto = $('btn-howto-home');
+    if (howto && howto.getAttribute('aria-expanded') === 'true') { howto.click(); return; }
+    if (!$('game').classList.contains('hidden')) { $('btn-home').click(); return; }
+    if (!$('setup').classList.contains('hidden')) { $('btn-setup-back').click(); return; }
+    if (!$('online').classList.contains('hidden')) { $('online-back').click(); return; }
+    if (!$('community').classList.contains('hidden')) { $('community-back').click(); return; }
+
+    if (event && event.canGoBack) { window.history.back(); return; }
+    var app = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (app && typeof app.exitApp === 'function') {
+      try {
+        var exiting = app.exitApp();
+        if (exiting && typeof exiting.catch === 'function') exiting.catch(function () {});
+      } catch (e) {}
+    }
+  }
+
+  function installNativeBackButton() {
+    var app = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    if (!app || typeof app.addListener !== 'function') return;
+    try {
+      var listener = app.addListener('backButton', handleNativeBack);
+      if (listener && typeof listener.catch === 'function') listener.catch(function () {});
+    } catch (e) {}
+  }
+  installNativeBackButton();
+
   window.__cf = {
     get game() { return G; }, get save() { return save; }, get loadStatus() { return loadResult.status; }, logic: L, gate: gate,
     native: native, haptic: haptic,

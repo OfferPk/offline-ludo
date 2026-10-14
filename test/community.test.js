@@ -3,7 +3,7 @@
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
 const URL = (process.argv[2] || 'http://localhost:8781/').replace(/\/?$/, '/');
 const URLCtor = require('node:url').URL;
-const CHROME = process.env.CHROME || '/usr/bin/chromium';
+const CHROME = process.env.CHROME || ['/usr/bin/chromium', '/usr/bin/google-chrome', '/usr/bin/chromium-browser'].find(p => require('fs').existsSync(p));
 let checks = 0;
 function ok(condition, message) {
   if (!condition) throw new Error('FAILED: ' + message);
