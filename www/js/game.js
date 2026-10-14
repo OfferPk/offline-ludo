@@ -200,6 +200,22 @@
   loadResult.data = save;
   var saveWriteFailed = false;
   var lastSaveError = null;
+  function updateSaveWarning(reason) {
+    var warning = $('save-warning');
+    warning.textContent = reason === 'stale-write'
+      ? 'Another tab saved newer progress. Reload this tab before continuing; changes here can no longer be saved.'
+      : 'Save failed. Your latest progress may not be saved on this device. Keep the app open and check device storage.';
+    warning.classList.remove('hidden');
+  }
+  function markStaleSave() {
+    lastSaveError = { reason: 'stale-write', stage: 'conflict' };
+    saveWriteFailed = true;
+    updateSaveWarning('stale-write');
+  }
+  window.addEventListener('storage', function (event) {
+    if ((event.key !== SAVE_KEY && event.key !== null) || event.oldValue === event.newValue) return;
+    markStaleSave();
+  });
   function persist() {
     var result;
     try {
@@ -210,9 +226,7 @@
     if (!result.ok) {
       lastSaveError = { reason: result.reason, stage: result.stage };
       if (!saveWriteFailed) {
-        var warning = $('save-warning');
-        warning.textContent = 'Save failed. Your latest progress may not be saved on this device. Keep the app open and check device storage.';
-        warning.classList.remove('hidden');
+        updateSaveWarning(result.reason);
       }
       saveWriteFailed = true;
       return false;
@@ -3009,7 +3023,9 @@
         lastSaveError = { reason: resetResult.reason, stage: resetResult.stage };
         saveWriteFailed = true;
         var warning = $('save-warning');
-        warning.textContent = resetResult.recoveryRestored === false
+        warning.textContent = resetResult.reason === 'stale-write'
+          ? 'Reset cancelled. Another tab saved newer progress; reload this tab before trying again.'
+          : resetResult.recoveryRestored === false
           ? 'Reset failed, and device storage could not restore every recovery copy. Check device storage before continuing.'
           : 'Reset failed. Your existing progress was not cleared. Check device storage and try again.';
         warning.classList.remove('hidden');

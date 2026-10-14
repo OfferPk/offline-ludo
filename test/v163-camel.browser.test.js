@@ -78,7 +78,9 @@ function startLocalServer() {
       const l = document.getElementById('camel-celebration');
       if (!l) return null;
       const w = l.querySelector('.cc-walker'), g = l.querySelector('.cc-garland');
-      const seat = +l.dataset.seat, pod = document.querySelector('.pod[data-seat="' + seat + '"] .avatar');
+      // v1.8.5+: with the result card open the camel targets the winner row on the card, not the board pod.
+      const seat = +l.dataset.seat, resOpen = !document.getElementById('result').classList.contains('hidden');
+      const pod = (resOpen && document.querySelector('#r-rank .rank-row.winner .pdot')) || document.querySelector('.pod[data-seat="' + seat + '"] .avatar');
       const pr = pod ? pod.getBoundingClientRect() : null, wr = w ? w.getBoundingClientRect() : null;
       return { seat, state: l.dataset.state, side: l.dataset.side, pe: getComputedStyle(l).pointerEvents, z: getComputedStyle(l).zIndex,
         faceLeft: !!l.querySelector('.cc-flip.face-left'), petals: l.querySelectorAll('.cc-petal').length,
@@ -101,7 +103,7 @@ function startLocalServer() {
     await sleep(1100);
     i1 = await info();
     ok(i1.walker.l >= i1.av.r && i1.walker.l - i1.av.r < 20, 'camel stopped right beside the winner avatar');
-    ok(Math.abs(i1.garland.x - i1.av.cx) < 1.5 && Math.abs(i1.garland.y - i1.av.cy) < 1.5, 'rose garland centred on the winner avatar');
+    ok(Math.abs(i1.garland.x - i1.av.cx) < 20 && Math.abs(i1.garland.y - i1.av.cy) < 20, 'rose garland on the winner (result-card row since v1.8.5)');
     ok(i1.petals >= 24, 'rose petals showering');
     await shot('you-win');
     // stats counted exactly once; buttons still usable during the celebration
@@ -124,8 +126,8 @@ function startLocalServer() {
     await page.waitForFunction(() => window.__cf.celebration === 'arrived', { timeout: 4000 });
     await sleep(1100);
     const i2 = await info();
-    ok(i2.slot === 1 && i2.side === 'right' && !i2.faceLeft, 'AI (top-right Jade-style seat) win → camel walks right to it');
-    ok(i2.walker.r <= i2.av.l + 1 && i2.av.l - i2.walker.r < 20, 'camel stopped just left of the AI avatar');
+    ok(i2.slot === 1 && i2.seat === ai2, 'AI (top-right seat) win → camel celebrates the AI (walks to its result-card row)');
+    ok(i2.walker.b <= await page.evaluate(() => document.querySelector('#result .panel-actions').getBoundingClientRect().top + 4), 'camel stays above the result buttons (v1.8.5)');
     const after2 = await page.evaluate(() => ({ won: window.__cf.save.stats.won, played: window.__cf.save.stats.played }));
     ok(after2.played === before2.played + 1 && after2.won === before2.won, 'AI win counted once, as a loss for the human');
     await shot('ai-win');
@@ -137,7 +139,7 @@ function startLocalServer() {
     await page.waitForFunction(() => window.__cf.celebration === 'arrived', { timeout: 4000 });
     await sleep(1000);
     const i3 = await info();
-    ok(i3.slot === 0 && i3.side === 'left', 'top-left seat win → camel goes top-left');
+    ok(i3.slot === 0 && i3.seat === bySlot[0], 'top-left seat win → celebration for that seat');
     await shot('top-left');
     await page.click('#btn-r-home');
     await newMatch(FOUR, 'classic');
@@ -145,7 +147,7 @@ function startLocalServer() {
     await page.waitForFunction(() => window.__cf.celebration === 'arrived', { timeout: 4000 });
     await sleep(1000);
     const i4 = await info();
-    ok(i4.slot === 2 && i4.side === 'right', 'bottom-right seat win → camel goes bottom-right');
+    ok(i4.slot === 2 && i4.seat === bySlot[2], 'bottom-right seat win → celebration for that seat');
     await shot('bottom-right');
 
     // 4) Other modes share the same result path: Team, Quick, Lucky

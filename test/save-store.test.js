@@ -125,6 +125,51 @@ test('reports primary write failure, keeps the previous checkpoint, and retries 
   assert.strictEqual(store.save(second).ok, true);
   assert.strictEqual(make(storage).load().data.coins, 55);
 });
+test('a stale tab cannot overwrite a newer local snapshot and can save after reloading it', () => {
+  const storage = new MemoryStorage(), firstTab = make(storage), secondTab = make(storage);
+  firstTab.load(); secondTab.load();
+  const newer = defaults(); newer.coins = 41; newer.xp = 310;
+  assert.strictEqual(firstTab.save(newer).ok, true);
+  const winner = storage.getItem('crossfour.save.v3');
+  const checkpoint = storage.getItem('crossfour.save.checkpoint.v3');
+  const stale = defaults(); stale.coins = 99; stale.xp = 999;
+  assert.deepStrictEqual(secondTab.save(stale), { ok: false, reason: 'stale-write', stage: 'conflict' });
+  assert.strictEqual(storage.getItem('crossfour.save.v3'), winner, 'the newer primary snapshot is preserved');
+  assert.strictEqual(storage.getItem('crossfour.save.checkpoint.v3'), checkpoint, 'a blocked stale save does not replace the recovery checkpoint');
+  const refreshed = secondTab.load();
+  assert.strictEqual(refreshed.data.coins, 41);
+  refreshed.data.xp = 311;
+  assert.strictEqual(secondTab.save(refreshed.data).ok, true, 'reloading the current save re-enables local writes');
+  assert.strictEqual(make(storage).load().data.xp, 311);
+});
+test('a stale tab cannot reset or remove recovery data written by another tab', () => {
+  const storage = new MemoryStorage(), firstTab = make(storage), staleTab = make(storage);
+  firstTab.load(); staleTab.load();
+  const current = defaults(); current.coins = 77; current.xp = 120;
+  assert.strictEqual(firstTab.save(current).ok, true);
+  storage.setItem('crossfour.save.v2', JSON.stringify(current));
+  const winner = storage.getItem('crossfour.save.v3');
+  const checkpoint = storage.getItem('crossfour.save.checkpoint.v3');
+  const reset = staleTab.reset(defaults());
+  assert.deepStrictEqual(reset, { ok: false, reason: 'stale-write', stage: 'conflict' });
+  assert.strictEqual(storage.getItem('crossfour.save.v3'), winner, 'reset leaves the newer primary untouched');
+  assert.strictEqual(storage.getItem('crossfour.save.checkpoint.v3'), checkpoint, 'reset leaves the recovery checkpoint untouched');
+  assert.ok(storage.getItem('crossfour.save.v2'), 'reset leaves legacy recovery data untouched on conflict');
+});
+test('a tab can repair an unchanged corrupt primary using its recovered checkpoint', () => {
+  const storage = new MemoryStorage(), original = make(storage); original.load();
+  const first = defaults(); first.coins = 18; original.save(first);
+  const second = defaults(); second.coins = 26; original.save(second);
+  storage.setItem('crossfour.save.v3', '{corrupt but unchanged}');
+  const repair = make(storage), recovered = repair.load();
+  assert.strictEqual(recovered.status, 'recovered');
+  assert.strictEqual(recovered.data.coins, 18);
+  recovered.data.xp = 90;
+  assert.strictEqual(repair.save(recovered.data).ok, true, 'unchanged corruption is repairable from the validated checkpoint');
+  const repaired = make(storage).load();
+  assert.strictEqual(repaired.data.coins, 18);
+  assert.strictEqual(repaired.data.xp, 90);
+});
 test('does not overwrite a snapshot written by a newer schema', () => {
   const storage = new MemoryStorage();
   storage.setItem('crossfour.save.v3', JSON.stringify({ schemaVersion: 4, savedAt: 1, payload: { marker: 'future' } }));

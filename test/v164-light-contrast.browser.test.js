@@ -39,8 +39,10 @@ function serve(root) {
 
 async function openHome(page, url, theme) {
   await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
+  // v1.8.7: clear + reload first; the stale-tab guard (#109) rightly refuses to write over storage changed underneath the page.
+  await page.evaluate(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); });
+  await page.reload({ waitUntil: 'networkidle0' });
   await page.evaluate(t => {
-    localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1');
     const s = window.__cf.save; s.board = t; s.xp = 340; s.coins = 1250;
     if (s.owned.boards.indexOf(t) < 0) s.owned.boards.push(t);
     window.__cf.persist();
