@@ -233,6 +233,7 @@
   var G = validGame(save.game) ? save.game : null;
   if (!G) save.game = null;
   if (G) {
+    if (window.MatchSummary) G.tally = window.MatchSummary.normalize(G.tally); // v1.8.5: per-match stats survive resume
     G.undo = null; G.sel = null; delete G.timerTk; delete G.actor;
     G.st.moves = G.st.phase === 'move' ? L.queueMoves(G.st) : [];
   }
@@ -2180,9 +2181,12 @@
     var C = window.CamelCelebration;
     if (!C || !G || seat == null || !G.st.seats[seat]) return;
     var pod = podEl(seat);
+    // v1.8.5: with the result card open, walk to the winner's row on the card (top) so the camel never covers the buttons.
+    var row = isOpen('result') ? document.querySelector('#r-rank .rank-row.winner') : null;
+    if (row) pod = row;
     if (!pod) return;
     try {
-      C.play({ target: pod, anchor: pod.querySelector('.avatar') || pod, color: seatColor(seat), seat: seat, reduced: prefersReducedMotion() });
+      C.play({ target: pod, anchor: pod.querySelector('.avatar') || pod.querySelector('.pdot') || pod, color: seatColor(seat), seat: seat, reduced: prefersReducedMotion() });
     } catch (error) {
       if (window.console && console.warn) console.warn('Win celebration skipped.', error);
     }

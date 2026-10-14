@@ -8,6 +8,7 @@
   var KINDS = ['capture', 'six', 'arrow', 'home'];
   var LABELS = { capture: 'Captures', six: 'Sixes', arrow: 'Arrows', home: 'Home' };
   function blank() { return { capture: 0, six: 0, arrow: 0, home: 0 }; }
+  function normalize(t) { var o = blank(); if (t && typeof t === 'object') KINDS.forEach(function (k) { var v = t[k]; if (typeof v === 'number' && v >= 0 && v < 10000 && Math.floor(v) === v) o[k] = v; }); return o; }
   function add(t, kind, n) { if (!t || KINDS.indexOf(kind) < 0) return t; t[kind] += (typeof n === 'number' && n > 0 && n < 100) ? Math.floor(n) : 1; return t; }
   function chips(t) { t = t || blank(); return KINDS.map(function (k) { return { kind: k, label: LABELS[k], value: t[k] || 0 }; }); }
   /** Closest not-owned skin by free milestone progress (0..1). Returns null when every milestone skin is owned. */
@@ -25,5 +26,5 @@
     });
     return best;
   }
-  return { KINDS: KINDS, blank: blank, add: add, chips: chips, nextGoal: nextGoal };
+  return { KINDS: KINDS, blank: blank, normalize: normalize, add: add, chips: chips, nextGoal: nextGoal };
 });

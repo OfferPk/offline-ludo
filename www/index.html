@@ -8,9 +8,9 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.8.4">
-  <link rel="stylesheet" href="css/v180.css?v=1.8.4">
-  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.8.4">
+  <link rel="stylesheet" href="css/style.css?v=1.8.5">
+  <link rel="stylesheet" href="css/v180.css?v=1.8.5">
+  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.8.5">
 </head>
 <body>
   <div id="app">
@@ -364,7 +364,7 @@
         <div class="sect">Players</div>
         <div class="presets" id="presets" role="group" aria-label="Choose player count"><button type="button" data-p="1v1" aria-pressed="false">1 v 1</button><button type="button" data-p="3" aria-pressed="false">3 players</button><button type="button" data-p="4" aria-pressed="false">4 players</button></div>
         <div id="seat-list" class="seat-list"></div>
-        <div class="stake-picker"><label for="entry-fee">Entry fee · virtual coins<select id="entry-fee"><option value="0">Free · no entry fee</option><option value="50">50 coins</option><option value="100">100 coins</option><option value="500">500 coins</option></select></label><p id="stake-note">Offline only. One local entry fee is reserved; winner receives a 2×/3×/4× virtual pool. No cash value.</p></div>
+        <div class="stake-picker"><label for="entry-fee">Entry fee · virtual coins<select id="entry-fee"><option value="0">Free · no entry fee</option><option value="50">50 coins</option><option value="100">100 coins</option><option value="500">500 coins</option></select></label><p id="stake-note">Offline only. One local entry fee is reserved; winner receives a 2×/3×/4× virtual pool. No cash value.</p><details class="fee-explainer"><summary>How entry fees work</summary><ul><li>Entry fees use this device's virtual coins only. Coins can't be bought, sold or cashed out.</li><li>The fee is taken from each human seat when the match starts. Every seat, computer seats included, adds one fee to the pool, and the winner gets the whole pool. Other places get nothing back.</li><li>If you exit or restart before the match ends, your unfinished fee is returned.</li><li>Free matches (no entry fee) still pay normal match coins and XP.</li></ul></details></div>
         <p id="setup-msg" class="setup-msg" role="status" aria-live="polite"></p>
         <div class="sect">House rules</div>
         <div class="rules-sum" id="rules-sum" role="group" aria-label="Current house rules"></div>
@@ -493,7 +493,7 @@
         <p id="championship-description" class="note">Three rounds to the crown: Quarter-final → Semi-final → Final. Seven bracket matches total; you play your three-match path against offline opponents.</p>
         <div class="championship-bracket" aria-label="Three-round single-elimination bracket"><div><b>QUARTER-FINAL</b><span>You vs Ruby</span><span>Jade vs Saffron</span><span>Cobalt vs Pearl</span><span>Onyx vs Amber</span></div><i aria-hidden="true">›</i><div><b>SEMI-FINAL</b><span>QF winner vs QF winner</span><span>QF winner vs QF winner</span></div><i aria-hidden="true">›</i><div><b>FINAL</b><span>SF winner vs SF winner</span><span class="champ-crown">♛ Crown + coin jackpot</span></div></div>
         <label class="championship-entry" for="championship-entry-fee">Championship entry<select id="championship-entry-fee"><option value="50">50 coins · 400-coin jackpot</option><option value="100">100 coins · 800-coin jackpot</option><option value="500">500 coins · 4,000-coin jackpot</option></select></label>
-        <p id="championship-notice" class="note" role="status" aria-live="polite">Bots' bracket results are simulated locally. The full coin jackpot and Champion Crown are awarded only for a final win.</p>
+        <p id="championship-notice" class="note" role="status" aria-live="polite">Bots' bracket results are simulated locally. The full coin jackpot and Champion Crown are awarded only for a final win.</p><details class="fee-explainer"><summary>How the Championship entry works</summary><ul><li>One entry fee covers all three rounds. It is virtual coins only, never real money.</li><li>Win the Quarter-final and Semi-final to reach the Final. A loss at any round ends your run, and the fee is not refunded. Exiting a round keeps your paid entry, so you can resume it from the Championship card.</li><li>Only a Final win pays the full jackpot and the Champion Crown.</li></ul></details>
         <div class="panel-actions"><button id="championship-cancel" class="btn plate" type="button">Close</button><button id="championship-start" class="btn primary" type="button">Enter Championship</button><button id="championship-resume" class="btn primary hidden" type="button">Resume Championship</button></div>
       </div>
     </div>
@@ -699,7 +699,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.8.4 · © OfferPk</p>
+        <p class="ver">Crossfour v1.8.5 · © OfferPk</p>
       </div>
     </div>
 
@@ -707,34 +707,34 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
-  <script src="js/ads-config.js?v=1.8.4"></script>
-  <script src="js/adgate.js?v=1.8.4"></script>
-  <script src="js/ads.js?v=1.8.4"></script>
-  <script src="js/logic.js?v=1.8.4"></script>
-  <script src="js/sound.js?v=1.8.4"></script>
-  <script src="js/themes.js?v=1.8.4"></script>
-  <script src="js/daily-spin.js?v=1.8.4"></script>
-  <script src="js/progression-rewards.js?v=1.8.4"></script>
-  <script src="js/championship.js?v=1.8.4"></script>
-  <script src="js/token-evolution.js?v=1.8.4"></script>
-  <script src="js/token-skins.js?v=1.8.4"></script>
-  <script src="js/daily.js?v=1.8.4"></script>
-  <script src="js/match-summary.js?v=1.8.4"></script>
-  <script src="js/skin-shop.js?v=1.8.4"></script>
-  <script src="js/art.js?v=1.8.4"></script>
-  <script src="js/save-store.js?v=1.8.4"></script>
-  <script src="js/dice-gesture.js?v=1.8.4"></script>
-  <script src="js/path-animation.js?v=1.8.4"></script>
-  <script src="js/celebration.js?v=1.8.4"></script>
-  <script src="js/game.js?v=1.8.4"></script>
-  <script src="js/local-peer.js?v=1.8.4"></script>
-  <script src="js/vendor/qrcode-generator.js?v=1.8.4"></script>
-  <script src="js/local-room.js?v=1.8.4"></script>
-  <script src="js/community-fixtures.js?v=1.8.4"></script>
-  <script src="js/community.js?v=1.8.4"></script>
-  <script src="js/supabase-config.js?v=1.8.4"></script>
-  <script src="js/chess.js?v=1.8.4"></script>
-  <script src="js/online.js?v=1.8.4"></script>
-  <script src="js/ludo-chess-discovery.js?v=1.8.4"></script>
+  <script src="js/ads-config.js?v=1.8.5"></script>
+  <script src="js/adgate.js?v=1.8.5"></script>
+  <script src="js/ads.js?v=1.8.5"></script>
+  <script src="js/logic.js?v=1.8.5"></script>
+  <script src="js/sound.js?v=1.8.5"></script>
+  <script src="js/themes.js?v=1.8.5"></script>
+  <script src="js/daily-spin.js?v=1.8.5"></script>
+  <script src="js/progression-rewards.js?v=1.8.5"></script>
+  <script src="js/championship.js?v=1.8.5"></script>
+  <script src="js/token-evolution.js?v=1.8.5"></script>
+  <script src="js/token-skins.js?v=1.8.5"></script>
+  <script src="js/daily.js?v=1.8.5"></script>
+  <script src="js/match-summary.js?v=1.8.5"></script>
+  <script src="js/skin-shop.js?v=1.8.5"></script>
+  <script src="js/art.js?v=1.8.5"></script>
+  <script src="js/save-store.js?v=1.8.5"></script>
+  <script src="js/dice-gesture.js?v=1.8.5"></script>
+  <script src="js/path-animation.js?v=1.8.5"></script>
+  <script src="js/celebration.js?v=1.8.5"></script>
+  <script src="js/game.js?v=1.8.5"></script>
+  <script src="js/local-peer.js?v=1.8.5"></script>
+  <script src="js/vendor/qrcode-generator.js?v=1.8.5"></script>
+  <script src="js/local-room.js?v=1.8.5"></script>
+  <script src="js/community-fixtures.js?v=1.8.5"></script>
+  <script src="js/community.js?v=1.8.5"></script>
+  <script src="js/supabase-config.js?v=1.8.5"></script>
+  <script src="js/chess.js?v=1.8.5"></script>
+  <script src="js/online.js?v=1.8.5"></script>
+  <script src="js/ludo-chess-discovery.js?v=1.8.5"></script>
 </body>
 </html>

@@ -149,3 +149,9 @@ body.light .r-chip.on { border-color: rgba(176,120,10,.55); }
 .m-stars i.on { color: #f4b740; }
 body.light .m-stars i { color: rgba(0,0,0,.18); } body.light .m-stars i.on { color: #b07a0a; }
 body.light .chal-bar { background: rgba(0,0,0,.12); }
+
+/* ---- v1.8.5 entry-fee explainer ---- */
+.fee-explainer { margin: 6px 0 2px; font-size: 12.5px; border-radius: 12px; background: var(--surface); border: 1px solid var(--surface-edge); padding: 6px 10px; }
+.fee-explainer summary { cursor: pointer; font-weight: 700; color: var(--accent); min-height: 32px; display: flex; align-items: center; }
+.fee-explainer ul { margin: 4px 0 4px 16px; padding: 0; color: var(--muted); line-height: 1.45; }
+body.light .fee-explainer summary { color: #7a5408; }
