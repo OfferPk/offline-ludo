@@ -33,13 +33,15 @@
   var DailySpin = window.DailySpin;
   var ProgressionRewards = window.ProgressionRewards;
   var Championship = window.Championship;
+  var TOKEN_SKINS = window.TokenSkins;
+  var DAILY = window.Daily;
   var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, MOVE_DECIDE_MS = 4000, FREE_UNDOS = 3;
   var PHRASES = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!'];
 
   // ---------------- save ----------------
   function defaults() {
     return {
-      coins: 0, xp: 0, tokenEvo: 1, tokenEvoUnlocked: 1, owned: { boards: ['graphite', 'linen', 'midnight', 'timber'], dice: ['ivory'] }, board: 'graphite', dice: 'ivory',
+      coins: 0, xp: 0, tokenEvo: 1, tokenEvoUnlocked: 1, tokenSkin: 'classic', tokenSkinsOwned: ['classic'], tokenSkinStats: TOKEN_SKINS ? TOKEN_SKINS.normalize({}).stats : {}, owned: { boards: ['graphite', 'linen', 'midnight', 'timber'], dice: ['ivory'] }, board: 'graphite', dice: 'ivory',
       settings: { sound: true, haptics: true, auto: true, fast: false, undo: true, timer: false, chat: true },
       rules: L.normRules({}),
       setup: {
@@ -49,8 +51,7 @@
       },
       stats: { played: 0, won: 0, streak: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], quick: [0, 0], team: [0, 0], arrow: [0, 0], friendly: [0, 0], duel: [0, 0], four: [0, 0] },
       flags: { diamondCollection: true, crownFrame: false, championshipCrown: false },
-      dailySpinAt: 0, rewardClaims: [], championship: null, game: null, ad: {}
-
+      dailySpinAt: 0, rewardClaims: [], championship: null, game: null, ad: {}, daily: DAILY ? DAILY.normalize({}) : {}
     };
   }
   function isRecord(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
@@ -131,6 +132,8 @@
       s.tokenEvo = TOKEN_EVOLUTION.clampLevel(safeCounter(raw.tokenEvo, d.tokenEvo) || 1);
       if (s.tokenEvo > s.tokenEvoUnlocked) s.tokenEvo = s.tokenEvoUnlocked;
     } else { s.tokenEvo = 1; s.tokenEvoUnlocked = 1; }
+    if (TOKEN_SKINS) { var nsk = TOKEN_SKINS.normalize(raw); s.tokenSkinsOwned = nsk.owned; s.tokenSkin = nsk.equipped; s.tokenSkinStats = nsk.stats; }
+    if (DAILY) s.daily = DAILY.normalize(raw.daily);
     s.board = SK.BOARDS.some(function (x) { return x.id === raw.board; }) ? raw.board : d.board;
     s.dice = SK.DICE.some(function (x) { return x.id === raw.dice; }) ? raw.dice : d.dice;
     if (isRecord(raw.settings)) Object.keys(d.settings).forEach(function (k) { s.settings[k] = typeof raw.settings[k] === 'boolean' ? raw.settings[k] : d.settings[k]; });
@@ -171,7 +174,7 @@
   function validSave(s) {
     if (!isRecord(s) || !Object.prototype.hasOwnProperty.call(s, 'game') || !isCount(s.coins) || !isCount(s.xp) || !isCount(s.dailySpinAt) || !Array.isArray(s.rewardClaims) || !s.rewardClaims.every(function (level, i, claims) { return [2, 5, 10].indexOf(level) >= 0 && claims.indexOf(level) === i; }) || !isRecord(s.owned) || !Array.isArray(s.owned.boards) || !Array.isArray(s.owned.dice) ||
         !s.owned.boards.every(function (id) { return typeof id === 'string' && id.length <= 32; }) || !s.owned.dice.every(function (id) { return typeof id === 'string' && id.length <= 32; }) ||
-        !isInt(s.tokenEvo, 1, 5) || !isInt(s.tokenEvoUnlocked, 1, 5) || s.tokenEvo > s.tokenEvoUnlocked ||
+        !isInt(s.tokenEvo, 1, 5) || !isInt(s.tokenEvoUnlocked, 1, 5) || s.tokenEvo > s.tokenEvoUnlocked || (TOKEN_SKINS && !TOKEN_SKINS.isValid(s)) ||
         !SK.BOARDS.some(function (x) { return x.id === s.board; }) || !SK.DICE.some(function (x) { return x.id === s.dice; }) || !isRecord(s.settings) ||
         !isRecord(s.rules) || !isRecord(s.setup) || !isRecord(s.stats) || !isRecord(s.ad) || !(s.championship === null || (Championship && Championship.valid(s.championship))) || !(s.game === null || validGame(s.game))) return false;
     if (!Object.keys(defaults().settings).every(function (k) { return typeof s.settings[k] === 'boolean'; })) return false;
@@ -246,7 +249,7 @@
   function haptic(kind) {
     if (!save.settings.haptics) return;
     if (!native) {
-      if (navigator.vibrate) { try { navigator.vibrate(kind === 'heavy' || kind === 'warn' ? 36 : kind === 'success' ? [16, 30, 16] : 12); } catch (e) {} }
+      if (navigator.vibrate) { try { navigator.vibrate(kind === 'impact' ? 34 : kind === 'heavy' || kind === 'warn' ? 36 : kind === 'success' ? [16, 30, 16] : 12); } catch (e) {} }
       return;
     }
     var Hp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
@@ -255,7 +258,7 @@
       var task;
       if (kind === 'success') task = Hp.notification({ type: 'SUCCESS' });
       else if (kind === 'warn') task = Hp.notification({ type: 'WARNING' });
-      else task = Hp.impact({ style: kind === 'heavy' ? 'HEAVY' : kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
+      else task = Hp.impact({ style: kind === 'heavy' || kind === 'impact' ? 'HEAVY' : kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
       if (task && typeof task.catch === 'function') task.catch(function () {});
     } catch (e) {}
   }
@@ -731,20 +734,66 @@
       var cd = e.querySelector('.cd'); if (cd) cd.textContent = rest ? Math.ceil((t.until - st.turnCount) / n) : ''; // rounds left
     });
   }
-  function buildPieces() {
-    var box = $('pieces'); box.innerHTML = ''; pieceEls = [[], [], [], []];
-    if (!G) return;
-    for (var s = 0; s < 4; s++) {
-      if (!G.st.pieces[s]) continue;
-      var col = seatColor(s);
-      for (var i = 0; i < G.st.pieces[s].length; i++) {
-        var el = document.createElement('button'); el.type = 'button'; el.className = 'pc';
-        var tokNum = i + 1;
+  /* v1.8.0 Token skin layers (original Crossfour art). Drawn inside the pawn SVG (viewBox 0 0 24 36), clipped to the crystal body.
+   * Every skin gets a seat-colour base band so the seat stays readable whatever the material. Animations are transform/opacity only. */
+  function skinLayers(id, gid, body) {
+    var clip = '<clipPath id="gem-clip-' + gid + '"><path d="' + body + '"/></clipPath>';
+    var band = '<path class="sk-band" d="M3.9 27.2c1.6 1.1 4.3 1.75 8.1 1.75s6.5-.65 8.1-1.75c.75.7 1.05 1.4 1 2.15-.15 1.6-2.85 2.55-9.1 2.55s-8.95-.95-9.1-2.55c-.05-.75.25-1.45 1-2.15Z"/>' +
+      '<path class="sk-band-hi" d="M5 28.2c1.7.75 4 1.15 7 1.15s5.3-.4 7-1.15"/>';
+    var inner = '';
+    switch (id) {
+      case 'royal':
+        inner = '<path class="sk-crown" d="M8.6 9.4 9 5.9l1.55 1.55L12 4.9l1.45 2.55L15 5.9l.4 3.5Z"/><circle class="sk-crown-gem" cx="12" cy="7.9" r=".62"/>' +
+          '<path class="sk-filigree" d="M7.2 23.6c1.4.7 3 1 4.8 1s3.4-.3 4.8-1M8.4 21.6c1.1.45 2.3.65 3.6.65s2.5-.2 3.6-.65"/>'; break;
+      case 'diamond':
+        inner = '<path class="sk-facet" d="M12 2.6 8.4 5.6 12 8.6l3.6-3M6.6 7.4 8.4 5.6M17.4 7.4l-1.8-1.8M8.4 5.6v3.6L12 12.4l3.6-3.2V5.6M12 8.6v3.8M7.8 16l4.2 3 4.2-3M12 19v8.6M7.1 24.6 12 22l4.9 2.6"/>' +
+          '<path class="sk-prism" d="M9.2 4.6 10.6 3.8 10.1 5.4Z"/><path class="sk-prism sk-prism-b" d="M14.3 17.2l1.2-.6-.4 1.4Z"/>'; break;
+      case 'galaxy':
+        inner = '<ellipse class="sk-nebula" cx="10.4" cy="9" rx="4.8" ry="3.4"/><ellipse class="sk-nebula sk-nebula-b" cx="13.6" cy="22.6" rx="6.4" ry="3.6"/>' +
+          '<g class="sk-stars"><circle cx="9.4" cy="6.4" r=".45"/><circle cx="14.2" cy="8.8" r=".35"/><circle cx="11.2" cy="16.4" r=".4"/><circle cx="8.6" cy="24.2" r=".38"/><circle cx="15.6" cy="25.4" r=".45"/><circle cx="13" cy="11.2" r=".3"/></g>' +
+          '<g class="sk-stars sk-stars-b"><circle cx="15" cy="5.8" r=".3"/><circle cx="10" cy="20.8" r=".32"/><circle cx="12.6" cy="27.2" r=".36"/></g>'; break;
+      case 'inferno':
+        inner = '<path class="sk-flame" d="M12 27.6c-3.4 0-5.2-2.2-5-4.9.2-2.4 2.1-3.6 2.6-6 1.3 1.2 1.5 2.6 1.3 3.8 1.2-1.9 1.5-4.8.6-7.6 3.1 1.9 5.6 5.4 5.6 9.4 0 3.1-1.9 5.3-5.1 5.3Z"/>' +
+          '<path class="sk-flame-core" d="M12 27.2c-1.7 0-2.7-1.1-2.6-2.6.1-1.3 1-2 1.3-3.2.8.7 1 1.5.9 2.2.7-1 .9-2.5.5-4 1.6 1 2.8 2.8 2.8 4.8 0 1.7-1.1 2.8-2.9 2.8Z"/>'; break;
+      case 'cyber':
+        inner = '<path class="sk-circuit" d="M12 3.4v3.2l-2.2 1.6M12 6.6l2.4 1.4v2.2M8.2 15.6h2.4l1.4 1.6h3.6M12 17.2v6.4l-2.6 1.8H7.4M12 21.2l2.6 1.6v2.6h2"/>' +
+          '<g class="sk-nodes"><circle cx="9.8" cy="8.2" r=".55"/><circle cx="14.4" cy="10.2" r=".55"/><circle cx="15.6" cy="17.2" r=".55"/><circle cx="7.4" cy="25.4" r=".55"/><circle cx="16.6" cy="25.4" r=".55"/></g>'; break;
+      case 'mythic':
+        inner = '<rect class="sk-sweep" x="-6" y="-2" width="6" height="40" transform="rotate(18 12 18)"/>' +
+          '<path class="sk-crest" d="m12 4.4.9 1.9 2 .3-1.45 1.4.35 2-1.8-.95-1.8.95.35-2L9.1 6.6l2-.3Z"/><path class="sk-iris" d="M6.4 20.4c2.6-1.4 8.6-1.4 11.2 0M6 24.4c2.8-1.5 9.2-1.5 12 0"/>'; break;
+      case 'ruby':
+        inner = '<path class="sk-facet sk-facet-gem" d="M12 3.2 9 5.8l3 2.8 3-2.8ZM9 5.8 7.2 8M15 5.8 16.8 8M12 8.6v2.6"/><ellipse class="sk-inlay" cx="12" cy="24.4" rx="2.6" ry="1.2"/>'; break;
+      case 'emerald':
+        inner = '<rect class="sk-facet sk-facet-gem" x="9.2" y="4" width="5.6" height="6.4" rx=".6"/><rect class="sk-facet sk-facet-gem" x="10.4" y="5.2" width="3.2" height="4" rx=".3"/><ellipse class="sk-inlay" cx="12" cy="24.4" rx="2.6" ry="1.2"/>'; break;
+      case 'sapphire':
+        inner = '<path class="sk-asterism" d="M12 4.4v6.6M9.15 6.05l5.7 3.3M14.85 6.05l-5.7 3.3"/><ellipse class="sk-inlay" cx="12" cy="24.4" rx="2.6" ry="1.2"/>'; break;
+      default: inner = '';
+    }
+    return '<defs>' + clip + '</defs><g class="sk sk-' + id + '" clip-path="url(#gem-clip-' + gid + ')">' + inner + '</g>' + band;
+  }
+  var TRAIL_N = { fire: 3, frost: 3, electric: 2, stars: 3, gold: 3, mythic: 3, 'default': 1 };
+  /** Short, light per-skin move trail at each hop landing (transform/opacity only; skipped under reduced motion). */
+  function trailFx(x, y, skinId, col, k) {
+    if (!fxOk() || !TOKEN_SKINS) return;
+    var sk = TOKEN_SKINS.byId(skinId) || TOKEN_SKINS.SKINS[0], type = sk.trail || 'default', n = TRAIL_N[type] || 1;
+    if (k === 1) SFX.swoosh();
+    for (var j = 0; j < n; j++) {
+      var e = fxEl('trail trail-' + type, x + (j - (n - 1) / 2) * CELL * 0.16, y + CELL * 0.18);
+      e.style.setProperty('--rc', col);
+      e.style.setProperty('--dy', (-CELL * (0.22 + j * 0.08)).toFixed(1) + 'px');
+      e.style.setProperty('--dx', ((j - (n - 1) / 2) * CELL * 0.08).toFixed(1) + 'px');
+      e.style.animationDelay = (j * 40) + 'ms';
+      setTimeout(function (el) { el.remove(); }.bind(null, e), 560);
+    }
+  }
+  /** Paint one tall pawn (board token or Vault preview): skin material + seat band + Token Evolution level. */
+  function tokenFace(el, s, i, col, skinId, evoLv) {
+        var tokNum = (i % 100) + 1;
         /* Tall classic Ludo pawn (vertical body + rounded head + wider base).
          * Original Crossfour crystal materials. Token Evolution kept. No third-party game artwork. */
-        var mat = TOKEN_MAT[s] || TOKEN_MAT[0];
-        var evoLv = evoLevelForSeat(s);
-        var evoMeta = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.levelOf(evoLv) : { gloss: 1, glow: 1, particles: 0, badge: false, name: 'Basic' };
+                var mat = TOKEN_MAT[s] || TOKEN_MAT[0];
+        var smat = TOKEN_SKINS ? TOKEN_SKINS.material(skinId, col, mat, CORE_LIGHTS[s]) : null;
+                var evoMeta = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.levelOf(evoLv) : { gloss: 1, glow: 1, particles: 0, badge: false, name: 'Basic' };
         var gid = s + '-' + i;
         var badgeHtml = evoMeta.badge
           ? '<span class="evo-badge" data-evo-badge="' + evoLv + '" title="' + evoMeta.name + '" aria-hidden="true">' + (evoLv >= 5 ? '★' : '✦') + '</span>'
@@ -774,12 +823,14 @@
           '</defs>' +
           '<ellipse class="gem-jugnu-glow" style="fill:url(#gem-jugnu-' + gid + ')" cx="12" cy="16" rx="11.4" ry="16.2"/>' +
           '<ellipse class="gem-pad" cx="12" cy="33.35" rx="10.2" ry="2.35"/>' +
-          '<ellipse class="gem-shadow" cx="12" cy="33.85" rx="8.6" ry="1.45"/>' +
+          '<radialGradient id="gem-cshadow-' + gid + '" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#000" stop-opacity=".62"/><stop offset=".6" stop-color="#000" stop-opacity=".28"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>' +
+          '<ellipse class="gem-shadow" style="fill:url(#gem-cshadow-' + gid + ')" cx="12" cy="34" rx="10.4" ry="2.2"/>' +
           '<path class="gem-rim-outer" style="fill:url(#gem-metal-' + gid + ')" d="' + pawnOuter + '"/>' +
           '<path class="gem-rim" style="stroke:url(#gem-rim-lit-' + gid + ')" fill="none" d="' + pawnOuter + '"/>' +
           '<path class="gem-bevel" style="stroke:url(#gem-metal-' + gid + ')" fill="none" d="' + pawnBody + '"/>' +
           '<path class="gem-body" style="fill:url(#gem-body-' + gid + ')" d="' + pawnBody + '"/>' +
           '<path class="gem-sheen" style="fill:url(#gem-sheen-' + gid + ')" d="' + pawnBody + '"/>' +
+          skinLayers(skinId, gid, pawnBody) +
           '<ellipse class="gem-collar" style="fill:url(#gem-collar-' + gid + ')" cx="12" cy="13.35" rx="5.35" ry="1.55"/>' +
           '<ellipse class="gem-collar-lit" cx="12" cy="12.95" rx="4.55" ry=".85"/>' +
           '<ellipse class="gem-core" style="fill:url(#gem-core-' + gid + ')" cx="12" cy="7.35" rx="3.55" ry="3.7"/>' +
@@ -796,12 +847,25 @@
           '<path class="gem-frost-wash" d="' + pawnBody + '"/>' +
           '<path class="gem-frost-crack" d="m13.9 4.6-1.5 2.4 1.15 1.15-1.7 1.85.95 2-1.65 1.65"/>' +
           '</svg><i class="crown">' + ART.icon('crown', 16) + '</i>';
-        el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45)); el.style.setProperty('--pccore', CORE_LIGHTS[s]);
-        el.style.setProperty('--pcrim0', mat.rim0); el.style.setProperty('--pcrim1', mat.rim1); el.style.setProperty('--pcrim2', mat.rim2);
-        el.style.setProperty('--pcglassHi', mat.glassHi); el.style.setProperty('--pcglassMid', mat.glassMid); el.style.setProperty('--pcglassLo', mat.glassLo);
+        el.style.setProperty('--pc', col); el.style.setProperty('--pcl', mix(col, 'w', 0.55)); el.style.setProperty('--pcd', mix(col, 'b', 0.3)); el.style.setProperty('--pcdd', mix(col, 'b', 0.45)); el.style.setProperty('--pccore', smat ? smat.core : CORE_LIGHTS[s]);
+        var mm = smat || mat;
+        el.style.setProperty('--pcrim0', mm.rim0); el.style.setProperty('--pcrim1', mm.rim1); el.style.setProperty('--pcrim2', mm.rim2);
+        el.style.setProperty('--pcglassHi', mm.glassHi); el.style.setProperty('--pcglassMid', mm.glassMid); el.style.setProperty('--pcglassLo', mm.glassLo);
+        if (smat) { el.style.setProperty('--pcband', smat.band); el.style.setProperty('--pcbandhi', smat.bandHi); el.style.setProperty('--pcbandlo', smat.bandLo); el.style.setProperty('--pcneon', smat.neon); el.style.setProperty('--pcgem', smat.gem); }
+        el.dataset.skin = skinId;
         el.style.setProperty('--evo-gloss', String(evoMeta.gloss));
         el.style.setProperty('--evo-glow', String(evoMeta.glow));
         el.dataset.mat = mat.id; el.dataset.evo = String(evoLv);
+  }
+  function buildPieces() {
+    var box = $('pieces'); box.innerHTML = ''; pieceEls = [[], [], [], []];
+    if (!G) return;
+    for (var s = 0; s < 4; s++) {
+      if (!G.st.pieces[s]) continue;
+      var col = seatColor(s);
+      for (var i = 0; i < G.st.pieces[s].length; i++) {
+        var el = document.createElement('button'); el.type = 'button'; el.className = 'pc';
+        tokenFace(el, s, i, col, skinForSeat(s), evoLevelForSeat(s)); var tokNum = i + 1;
         el.style.setProperty('--jugnu-delay', ((s * 0.37 + i * 0.55) % 2.8).toFixed(2) + 's');
         el.dataset.seat = s; el.dataset.piece = i; el.dataset.num = String(tokNum);
         el.setAttribute('aria-label', NAMES[s] + ' token ' + tokNum);
@@ -842,7 +906,7 @@
           c.x += off[0] * CELL; c.y += off[1] * CELL;
           /* front-most in a stack sits slightly above and higher z so clusters read clearly */
           c.y -= idx * CELL * 0.018;
-          sc *= 1 - idx * 0.012;
+          sc *= (n >= 3 ? 0.84 : 0.9) - idx * 0.012; /* v1.8.0: bigger tokens shrink a little when stacked so paths stay clear */
           el.style.zIndex = String((selected ? 12 : canMove ? 8 : 3) + idx);
         } else {
           el.style.zIndex = '';
@@ -913,6 +977,12 @@
     if (!TOKEN_EVOLUTION || !isHuman(s)) return 1;
     if (G && G.online && G.view != null && s !== G.view) return 1;
     return TOKEN_EVOLUTION.clampLevel(save.tokenEvo || 1);
+  }
+  /** Token skin: local human seats only (online: own view only). AI / remote seats stay Classic so colours read the same for everyone. */
+  function skinForSeat(s) {
+    if (!TOKEN_SKINS || !isHuman(s)) return 'classic';
+    if (G && G.online && G.view != null && s !== G.view) return 'classic';
+    return TOKEN_SKINS.byId(save.tokenSkin) ? save.tokenSkin : 'classic';
   }
   function nameOf(s) { var st = G.st; var named = st.seats[s] && st.seats[s].name; if (named) return named; if (st.seats[s].type === 'human' && humans(st).length === 1) return 'You'; return NAMES[s]; }
   function levelOf(s) { var pl = G.st.seats[s]; if (pl.type === 'remote') return 'Online'; return pl.type === 'human' ? (humans(G.st).length === 1 ? 'Lv ' + L.levelFromXp(save.xp).level : 'P' + (humans(G.st).indexOf(s) + 1)) : LEVEL_NAMES[pl.level]; }
@@ -1396,7 +1466,7 @@
     var snap = human && save.settings.undo ? L.clone(st) : null;
     G.undo = null;
     var r = L.roll(st, chosen != null ? chosen : forced.length ? forced.shift() : undefined);
-    if (human && r.raw === 6) save.stats.sixes++;
+    if (human && r.raw === 6) { save.stats.sixes++; dailyEvent('six', 1); }
     render(); persist();
     animateDice(s, r.raw, function () {
       busy = false;
@@ -1657,12 +1727,13 @@
           piecePos[id] = points[k];
           if (!prefersReducedMotion()) {
             el.classList.remove('land'); void el.offsetWidth; el.classList.add('land');
+            trailFx(points[k].x, points[k].y, skinForSeat(s), seatColor(s), k);
             hopStepFx(points[k].x, points[k].y, seatColor(s), evoLevelForSeat(s) > 1 && TOKEN_EVOLUTION ? TOKEN_EVOLUTION.levelOf(evoLevelForSeat(s)).particles : 0);
             if (from < 0 && k === 0) yardExitFx(s, points[k]);
             var stepPos = path[k];
             if (stepPos >= L.COL0 && stepPos < L.HOME) homeLaneFx(points[k].x, points[k].y, seatColor(s), false);
           }
-          if (from < 0 && k === 0) SFX.leave(); else SFX.step(k);
+          if (from < 0 && k === 0) SFX.leave(); else { SFX.step(k); SFX.stepClick(k); }
           if (SFX.crystal) SFX.crystal(k);
         },
         onComplete: complete,
@@ -1681,11 +1752,37 @@
     el.style.transition = 'transform .5s cubic-bezier(.3,.7,.3,1), opacity .25s'; placeToken(seat, piece, -1);
     setTimeout(function () { el.style.transition = ''; }, 600);
   }
+  /** v1.8.0 capture: impact + shockwave + victim pop/vanish + attacker bounce + reward sparkle. Purely visual (<=0.75s), game logic never waits on it. */
+  function captureImpactFx(s, caps, at) {
+    if (!fxOk() || !at) return;
+    var col = seatColor(s);
+    var hit = fxEl('cap-impact', at.x, at.y); hit.style.setProperty('--rc', col); setTimeout(function () { hit.remove(); }, 520);
+    var wave = fxEl('cap-wave', at.x, at.y); wave.style.setProperty('--rc', col); setTimeout(function () { wave.remove(); }, 640);
+    captureImpactFeedback();
+    caps.forEach(function (cp, n) {
+      var ghost = fxEl('cap-pop', at.x + (n - (caps.length - 1) / 2) * CELL * 0.22, at.y); ghost.style.setProperty('--rc', seatColor(cp.seat)); setTimeout(function () { ghost.remove(); }, 520);
+    });
+    var me = G && G.lastMove ? pieceEls[G.lastMove.seat] && pieceEls[G.lastMove.seat][G.lastMove.piece] : null;
+    if (me && G.lastMove.seat === s) { me.classList.remove('cap-bounce'); void me.offsetWidth; me.classList.add('cap-bounce'); setTimeout(function () { me.classList.remove('cap-bounce'); }, 620); }
+    for (var k = 0; k < 6; k++) {
+      var sp = fxEl('cap-spark', at.x, at.y - CELL * 0.35), a = -Math.PI / 2 + (k - 2.5) * 0.42;
+      sp.style.setProperty('--dx', (Math.cos(a) * CELL * 0.62).toFixed(1) + 'px'); sp.style.setProperty('--dy', (Math.sin(a) * CELL * 0.62).toFixed(1) + 'px');
+      sp.style.animationDelay = (220 + k * 25) + 'ms';
+      setTimeout(function (el) { el.remove(); }.bind(null, sp), 760);
+    }
+  }
+  /** v1.8.1: one short (~34ms) vibration + thud exactly when the shockwave spawns. Fires once per capture. */
+  var impactFedAt = 0;
+  function captureImpactFeedback() {
+    var now = Date.now(); if (now - impactFedAt < 120) return; impactFedAt = now;
+    haptic('impact'); SFX.captureThud();
+  }
   function captureFx(s, caps, at) {
+    captureImpactFx(s, caps, at);
     caps.forEach(function (cp) { killBurst(at.x, at.y, seatColor(s), seatColor(cp.seat)); sendToBase(cp.seat, cp.piece); });
     floatAt(at.x, at.y - CELL * 0.6, caps.length > 1 ? 'Captures!' : 'Captured!', 'float-kill');
     shake();
-    SFX.capture(); haptic('heavy');
+    SFX.capture(); if (!fxOk()) captureImpactFeedback();
   }
 
   function doMove(piece, v, keyboard) {
@@ -1701,6 +1798,8 @@
     if (!st.moves.some(function (m) { return m.piece === piece && (v == null || m.v === v); })) return;
     busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); stopAutoRollTimer(false); stopMoveDecide(false); hideDiePick(); hide('chat');
     var res = L.move(st, piece, v, forcedEvents.length ? forcedEvents.shift() : undefined);
+    if (human && TOKEN_SKINS && res.captures.length) TOKEN_SKINS.recordKills(save, res.captures.length);
+    if (human) { if (res.captures.length) dailyEvent('capture', res.captures.length); if (res.arrowJump) dailyEvent('arrow', 1); if (res.finish) dailyEvent('home', 1); }
     if (human) { save.stats.captures += res.captures.length; if (res.finish) save.stats.home++; if (res.event) save.stats.events++; }
     G.sel = null;
     G.lastMove = { seat: s, piece: piece, cells: res.path.map(function (pp) { return L.cellOf(s, pp, piece); }) };
@@ -2030,18 +2129,24 @@
       if (st.players.length === 2) { S.duel[0]++; if (best === 1) S.duel[1]++; } else if (st.players.length === 4) { S.four[0]++; if (best === 1) S.four[1]++; }
       var previousBoards = save.owned.boards.slice(), previousDice = save.owned.dice.slice();
       var previousEvoU = save.tokenEvoUnlocked, previousEvo = save.tokenEvo;
+      var previousSkinsOwned = (save.tokenSkinsOwned || []).slice(), previousSkinStats = JSON.parse(JSON.stringify(save.tokenSkinStats || {}));
       var newlyUnlocked = window.SkinShop.collectEligible(save, SK);
       var evoGranted = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.collectEligible(save) : [];
+      if (TOKEN_SKINS) TOKEN_SKINS.recordMatch(save, best === 1);
+      var skinGranted = TOKEN_SKINS ? TOKEN_SKINS.collectEligible(save) : [];
+      if (hs.length) { dailyEvent('play', 1); if (best === 1) dailyEvent('win', 1); }
       if (ProgressionRewards) ProgressionRewards.collect(save, previousLevel, L.levelFromXp(save.xp).level, function () { return true; });
       gate.matchCompleted();
       if (!persist()) {
         save.owned.boards = previousBoards; save.owned.dice = previousDice;
         save.tokenEvoUnlocked = previousEvoU; save.tokenEvo = previousEvo;
+        save.tokenSkinsOwned = previousSkinsOwned; save.tokenSkinStats = previousSkinStats;
       } else {
         var notes = [];
         if (newlyUnlocked.length) notes.push('Achievement unlocked: ' + newlyUnlocked.map(function (x) { return x.name; }).join(', '));
         if (evoGranted.length) notes.push('Token Evolution: ' + evoGranted.map(function (x) { return 'Lv' + x.level + ' ' + x.name; }).join(', '));
-        if (notes.length) toast(notes.join(' · '), 3200);
+        if (skinGranted.length) notes.push('Token Vault: ' + skinGranted.map(function (x) { return x.name; }).join(', ') + ' unlocked');
+        if (notes.length) { toast(notes.join(' · '), 3200); SFX.unlockChime(); }
       }
       if (!isHuman(st.ranking[0])) aiReact('win', st.ranking[0]);
       if (gate.canShow(Date.now())) Ads.prepareInterstitial();
@@ -2251,7 +2356,7 @@
     cancelFlow(); stopTimer(); paused = false; stopCelebration();
     ['result', 'menu', 'chat'].forEach(hide);
     $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
-    screen('home'); updateHome(); setCoins(); setLevel();
+    screen('home'); updateHome(); setCoins(); setLevel(); updateDailyDot();
   }
   function updateHome() {
     var cont = G && G.st.phase !== 'over';
@@ -2485,11 +2590,86 @@
       el.appendChild(b); grid.appendChild(el);
     });
   }
+  /* ---------------- v1.8.0 Token Skins grid + Token Vault ---------------- */
+  function skinPreview(id, idx) {
+    var wrap = document.createElement('div'); wrap.className = 'vault-prev';
+    var el = document.createElement('span'); el.className = 'pc pc-prev'; el.setAttribute('aria-hidden', 'true');
+    var seat = 0; tokenFace(el, seat, 100 * (idx + 1), seatColor(seat), id, TOKEN_EVOLUTION ? TOKEN_EVOLUTION.clampLevel(save.tokenEvo || 1) : 1);
+    wrap.appendChild(el); return wrap;
+  }
+  function skinAction(id) {
+    var st = TOKEN_SKINS.state(id, save), result;
+    if (st.owned) result = TOKEN_SKINS.equip(save, id, persist);
+    else if (st.canUnlock) result = TOKEN_SKINS.unlock(save, id, persist);
+    else { toast('Locked: ' + TOKEN_SKINS.unlockText(st.skin), 2400); return; }
+    if (!result.ok) { if (result.reason === 'save-failed') toast('Could not save. Check device storage.', 2600); return; }
+    if (result.spent > 0) SFX.coin(); else if (SFX.unlock) SFX.unlock(); else SFX.click();
+    if (!st.owned) toast(result.name + ' unlocked' + (result.free ? ' (free milestone)' : ' · ' + result.spent + ' coins') + ' and equipped', 2400);
+    setCoins(); if (!$('skins').classList.contains('hidden')) renderSkins(); if (!$('vault').classList.contains('hidden')) renderVault();
+    if (G && !$('game').classList.contains('hidden')) { buildPieces(); layout(); render(); }
+  }
+  function skinButton(id) {
+    var st = TOKEN_SKINS.state(id, save), b = document.createElement('button');
+    b.type = 'button'; b.className = 'btn ' + (st.equipped ? 'plate' : st.owned || st.canUnlock ? 'primary' : 'plate');
+    if (st.equipped) { b.textContent = 'Equipped'; b.disabled = true; }
+    else if (st.owned) b.textContent = 'Equip';
+    else if (st.canUnlock && st.milestone) b.textContent = 'Unlock free';
+    else if (st.canUnlock) b.textContent = 'Unlock · ' + st.skin.coins.toLocaleString('en-US');
+    else { b.textContent = 'Locked'; b.disabled = true; }
+    b.dataset.skinBtn = id;
+    b.setAttribute('aria-label', st.skin.name + ': ' + b.textContent);
+    b.addEventListener('click', function () { skinAction(id); });
+    return b;
+  }
+  function renderTokenSkins() {
+    if (!TOKEN_SKINS) return;
+    if (TOKEN_SKINS.collectEligible(save).length) persist();
+    var grid = $('skin-grid');
+    var top = document.createElement('div'); top.className = 'vault-link-row';
+    top.innerHTML = '<p class="note">Token skins change the material only. Your seat colour stays on the base band.</p>';
+    var vb = document.createElement('button'); vb.type = 'button'; vb.className = 'btn plate'; vb.id = 'btn-vault-skins'; vb.textContent = 'Open Token Vault';
+    vb.addEventListener('click', function () { SFX.click(); hide('skins'); openVault(); });
+    top.appendChild(vb); grid.appendChild(top);
+    TOKEN_SKINS.SKINS.forEach(function (sk, idx) {
+      var st = TOKEN_SKINS.state(sk.id, save), r = st.rarity;
+      var el = document.createElement('div'); el.className = 'skin tskin r-' + r.id + (st.equipped ? ' on' : '') + (!st.owned && !st.canUnlock ? ' is-locked' : '');
+      el.dataset.skin = sk.id;
+      el.appendChild(skinPreview(sk.id, idx));
+      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = sk.name; el.appendChild(nm);
+      var rc = document.createElement('small'); rc.className = 'rarity-chip'; rc.style.setProperty('--rar', r.color); rc.textContent = r.name; el.appendChild(rc);
+      el.appendChild(skinButton(sk.id)); grid.appendChild(el);
+    });
+  }
+  function renderVault() {
+    if (!TOKEN_SKINS) return;
+    if (TOKEN_SKINS.collectEligible(save).length) persist();
+    var list = $('vault-list'); list.innerHTML = '';
+    var evo = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.clampLevel(save.tokenEvo || 1) : 1;
+    var owned = TOKEN_SKINS.normalize(save).owned.length;
+    $('vault-count').textContent = owned + '/' + TOKEN_SKINS.SKINS.length + ' owned';
+    TOKEN_SKINS.SKINS.forEach(function (sk, idx) {
+      var st = TOKEN_SKINS.state(sk.id, save), r = st.rarity;
+      var row = document.createElement('div'); row.className = 'vault-row r-' + r.id + (st.equipped ? ' on' : '') + (st.owned ? ' owned' : ' locked');
+      row.dataset.skin = sk.id;
+      row.appendChild(skinPreview(sk.id, 20 + idx));
+      var info = document.createElement('div'); info.className = 'vault-info';
+      var stateHtml = st.owned ? '<span class="vault-own">✓ Owned</span>' : '<span class="vault-lock" aria-label="Locked">🔒 ' + TOKEN_SKINS.unlockText(sk) + '</span>';
+      var prog = st.owned || sk.starter ? '' : '<small class="vault-prog">Progress: ' + (sk.wins ? st.progressWins + '/' + sk.wins + ' wins ' : '') + (sk.kills ? st.progressKills + '/' + sk.kills + ' captures ' : '') + '· ' + Math.min(save.coins, sk.coins).toLocaleString('en-US') + '/' + sk.coins.toLocaleString('en-US') + ' coins</small>';
+      info.innerHTML = '<div class="vault-name"><b>' + sk.name + '</b><span class="rarity-chip" style="--rar:' + r.color + '">' + r.name + '</span></div>' +
+        '<div class="vault-state">' + stateHtml + '</div>' + prog +
+        '<div class="vault-stats"><span>Level ' + evo + '/5</span><span>Kills ' + st.stats.kills + '</span><span>Wins ' + st.stats.wins + '</span></div>';
+      row.appendChild(info);
+      row.appendChild(skinButton(sk.id));
+      list.appendChild(row);
+    });
+  }
+  function openVault() { renderVault(); setCoins(); show('vault'); }
   function renderSkins() {
     setCoins();
     each($('skin-tabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === skinTab); });
     var grid = $('skin-grid'); grid.innerHTML = '';
     if (skinTab === 'tokens') { renderTokenEvolution(); return; }
+    if (skinTab === 'tokenskins') { renderTokenSkins(); return; }
     var list = skinTab === 'boards' ? SK.BOARDS : SK.DICE;
     list.forEach(function (it) {
       var state = window.SkinShop.state(it, save, skinTab);
@@ -2535,7 +2715,7 @@
           else if (result.reason === 'event-locked') toast('Diamond skins are reserved for a future event.', 2400);
           return;
         }
-        if (result.newlyOwned && result.price > 0) SFX.coin(); else SFX.click();
+        if (result.newlyOwned) { if (result.price > 0) SFX.coin(); SFX.unlockChime(); } else SFX.click();
         applySkin(); renderSkins(); setCoins();
         if (!$('game').classList.contains('hidden')) { buildPods(); buildTiles(); buildPieces(); layout(); render(); }
       });
@@ -2669,6 +2849,7 @@
   $('btn-exit-match').addEventListener('click', function () { SFX.click(); openExitConfirmation(); });
   $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); show('stats'); });
   $('btn-coins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
+  if ($('btn-vault')) $('btn-vault').addEventListener('click', function () { SFX.click(); openVault(); });
   $('btn-skins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   $('btn-rules').addEventListener('click', function () { SFX.unlock(); SFX.click(); openRules('basics'); });
   if ($('btn-howto-home')) $('btn-howto-home').addEventListener('click', function () {
@@ -2885,6 +3066,48 @@
     if (G) { G.undo = null; G.sel = null; }
   }
 
+
+  // ---------------- v1.8.1 Daily reward + challenge (cosmetic coins only) ----------------
+  function today() { return DAILY.localDate(new Date()); }
+  function dailyEvent(kind, n) {
+    if (!DAILY || !save.daily) return;
+    if (DAILY.record(save.daily, today(), kind, n)) setTimeout(function () { toast('Daily challenge complete! Claim it from Daily Reward.', 2600); }, 900);
+  }
+  function syncDailyCard() { var a = $('btn-daily'), b = $('btn-vs-ai'); if (!a || !b || !b.offsetHeight) return; a.style.minHeight = ''; a.style.minHeight = b.offsetHeight + 'px'; }
+  window.addEventListener('resize', function () { syncDailyCard(); });
+  function updateDailyDot() { syncDailyCard(); if (DAILY && $('daily-dot')) $('daily-dot').classList.toggle('hidden', !DAILY.hasPending(save.daily, today())); }
+  function renderDaily() {
+    var t = today(), st = DAILY.status(save.daily, t), cs = DAILY.challengeStatus(save.daily, t), html = '';
+    DAILY.REWARDS.forEach(function (c, i) {
+      var day = i + 1, cls = day < st.day || (st.claimedToday && day === st.day) ? 'got' : day === st.day ? 'now' : '';
+      html += '<div role="listitem" class="dcell ' + cls + (day === 7 ? ' big' : '') + '"><small>Day ' + day + '</small><span class="coin-ico"></span><b>' + c + '</b>' + (cls === 'got' ? '<i aria-label="claimed">✓</i>' : '') + '</div>';
+    });
+    $('daily-cal').innerHTML = html;
+    $('daily-msg').textContent = st.claimedToday ? 'Claimed Day ' + st.day + '. Come back tomorrow for Day ' + (st.day % 7 + 1) + '.' : (st.broken ? 'Streak reset — a day was missed. ' : '') + 'Day ' + st.day + ' reward: ' + st.reward + ' coins.';
+    $('daily-claim').disabled = !st.canClaim; $('daily-claim').textContent = st.canClaim ? 'Claim ' + st.reward : 'Claimed ✓';
+    $('daily-2x').classList.toggle('hidden', !DAILY.canDouble(save.daily, t, 'streak'));
+    $('chal-title').textContent = cs.title + ' · ' + cs.coins + ' coins';
+    $('chal-fill').style.width = Math.round(cs.progress / cs.goal * 100) + '%';
+    $('chal-prog').textContent = cs.progress + ' / ' + cs.goal + (cs.claimed ? ' · claimed ✓' : '');
+    $('chal-claim').disabled = !cs.done || cs.claimed; $('chal-claim').textContent = cs.claimed ? 'Claimed ✓' : cs.done ? 'Claim ' + cs.coins : 'In progress';
+    $('chal-2x').classList.toggle('hidden', !DAILY.canDouble(save.daily, t, 'challenge'));
+    setCoins(); updateDailyDot();
+  }
+  function openDaily() { if (!DAILY) return; renderDaily(); show('daily'); }
+  function dailyPay(coins, msg) { if (coins > 0) { save.coins += coins; persist(); SFX.dailyClaim(); toast(msg.replace('%', coins)); } renderDaily(); }
+  function dailyAd(which) {
+    SFX.click();
+    Ads.showRewarded(function () { dailyPay(DAILY.double(save.daily, today(), which), '+% bonus coins'); },
+      function () { toast('No ad available right now. Try again later.'); });
+  }
+  if ($('btn-daily')) {
+    $('btn-daily').addEventListener('click', function () { SFX.click(); openDaily(); });
+    $('daily-claim').addEventListener('click', function () { dailyPay(DAILY.claim(save.daily, today()).coins, '+% coins · streak saved'); });
+    $('chal-claim').addEventListener('click', function () { dailyPay(DAILY.claimChallenge(save.daily, today()).coins, '+% coins · challenge done'); });
+    $('daily-2x').addEventListener('click', function () { dailyAd('streak'); });
+    $('chal-2x').addEventListener('click', function () { dailyAd('challenge'); });
+    updateDailyDot();
+  }
   window.__cf = {
     get game() { return G; }, get save() { return save; }, get loadStatus() { return loadResult.status; }, logic: L, gate: gate,
     native: native, haptic: haptic,
