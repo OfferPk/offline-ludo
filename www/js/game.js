@@ -2973,6 +2973,13 @@
   var onlineExpireKey = '';
   var onlineCelebrated = '';
   function onlineNames(names, seat) { return names && names[seat] ? names[seat] : NAMES[seat]; }
+  function setOnlineNavigationLabel(isOnline) {
+    var button = $('btn-home');
+    if (!button) return;
+    var label = isOnline ? 'Room details' : 'Menu';
+    button.setAttribute('aria-label', label);
+    button.title = label;
+  }
   function serverToLocal(state, mySeat, names) {
     var players = (state.players || []).map(function (n) { return Number(n); });
     var seats = [null, null, null, null];
@@ -3046,16 +3053,27 @@
     if (retry) retry.classList.toggle('hidden', !onlineHooks.pending);
   }
   function stopOnlineClock() { if (onlineClock) { clearInterval(onlineClock); onlineClock = null; } }
-  function presentOnline(opts) {
+  function setOnlineState(opts) {
     opts = opts || {};
     if (!G || !G.online) parkedLocal = G;
     onlineHooks = opts;
-    hideClassicTextPanel();
-    document.body.classList.add('online-classic-board');
     var mySeat = Number(opts.mySeat);
     var st = serverToLocal(opts.state || {}, mySeat, opts.names || null);
     G = { st: st, seats: st.seats, mode: 'classic', view: mySeat, online: true, undoLeft: 0, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: true, started: Date.now() };
+    setOnlineNavigationLabel(true);
+  }
+  function updateOnline(opts) {
+    setOnlineState(opts);
+    document.body.classList.add('online-classic-board');
+    $('game').classList.add('hidden');
+    paintOnlineChrome();
+  }
+  function presentOnline(opts) {
+    setOnlineState(opts);
+    hideClassicTextPanel();
+    document.body.classList.add('online-classic-board');
     screen('game'); paused = false;
+    var st = G.st;
     buildPods(); buildTiles(); buildPieces(); layout(); render(); highlight(); paintOnlineChrome();
     if (st.phase === 'over' && st.ranking.length) {
       // Online win: same Gulaab Camel celebration, once per finished match.
@@ -3070,6 +3088,10 @@
     $('game').classList.remove('hidden');
     layout(); render(); highlight();
   }
+  function hideOnlineBoard() {
+    if (!G || !G.online) return;
+    $('game').classList.add('hidden');
+  }
   function clearOnline() {
     stopOnlineClock();
     if (G && G.online) stopCelebration();
@@ -3080,6 +3102,7 @@
     if ($('online-grace')) $('online-grace').classList.add('hidden');
     if ($('online-board-retry')) $('online-board-retry').classList.add('hidden');
     document.body.classList.remove('online-classic-board');
+    setOnlineNavigationLabel(false);
     if (!G || !G.online) return;
     G = parkedLocal;
     parkedLocal = null;
@@ -3150,8 +3173,10 @@
     podOf: function (s) { var p = podEl(s); return p ? +p.dataset.slot : null; },
     layout: layout,
     presentOnline: presentOnline,
+    updateOnline: updateOnline,
     clearOnline: clearOnline,
     showOnlineBoard: showOnlineBoard,
+    hideOnlineBoard: hideOnlineBoard,
     celebrateWin: celebrateWin,
     openVault: openVault,
     get celebration() { return window.CamelCelebration ? window.CamelCelebration.state : 'idle'; }

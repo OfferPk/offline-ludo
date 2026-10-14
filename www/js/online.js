@@ -18,6 +18,7 @@
   var selectedChessMoves = [];
   var pendingChessPromotion = null;
   var chessPlayViewDismissed = false;
+  var classicPlayViewDismissed = false;
   var chessMoveHistoryCache = { roomId: '', version: null, rows: [], captures: [] };
   var chessAnnouncementRoomId = '';
   var chessAnnouncementVersion = null;
@@ -242,6 +243,7 @@
     selectedChessMoves = [];
     pendingChessPromotion = null;
     chessPlayViewDismissed = false;
+    classicPlayViewDismissed = false;
     chessMoveHistoryCache = { roomId: '', version: null, rows: [], captures: [] };
     chessAnnouncementRoomId = ''; chessAnnouncementVersion = null;
     chessAnnouncementState = null; chessAnnouncementDrawOffer = null;
@@ -787,6 +789,7 @@
     var record = room && room.matchState;
     var show = !!(room && (room.status === 'active' || room.status === 'completed') && record && record.state);
     panel.classList.toggle('hidden', !show);
+    $('online-classic-resume-actions').classList.add('hidden');
     if (!show) {
       $('online-chess-play').classList.add('hidden');
       $('online-chess-resume').classList.add('hidden');
@@ -798,6 +801,8 @@
     }
     var state = record.state;
     var isChess = room.mode === 'ludo_chess';
+    var canResumeClassic = classicPlayViewDismissed && !isChess && !!state;
+    $('online-classic-resume-actions').classList.toggle('hidden', !canResumeClassic);
     if (isChess) {
       var nextChessVersion = Number(record.version);
       var nextDrawOffer = record.draw_offer || null;
@@ -855,8 +860,8 @@
     }
     var names = {};
     (room.roster || []).forEach(function (member) { names[Number(member.seat)] = member.displayName || member.handle || ('Seat ' + (Number(member.seat) + 1)); });
-    if (window.__cf && window.__cf.presentOnline) {
-      window.__cf.presentOnline({
+    if (window.__cf) {
+      var classicView = {
         state: state,
         mySeat: myMember ? Number(myMember.seat) : Number(state.turn),
         names: names,
@@ -867,7 +872,9 @@
         onMove: function (piece, queueIndex) { submitMatchAction('move_match', { p_piece: piece, p_queue_index: queueIndex }); },
         onExpire: function () { expireOnlineTurn(); },
         onRetry: runPendingMatchAction
-      });
+      };
+      if (classicPlayViewDismissed && window.__cf.updateOnline) window.__cf.updateOnline(classicView);
+      else if (window.__cf.presentOnline) window.__cf.presentOnline(classicView);
     }
   }
   function discoverActiveRoom(userId, restoreToken) {
@@ -1126,6 +1133,7 @@
       roomRestoreUserId = '';
       roomRestoreRoomId = '';
       selectedChessSquare = -1; selectedChessMoves = []; pendingChessPromotion = null;
+      classicPlayViewDismissed = false;
     }
     if (pendingMatchAction && pendingMatchAction.room_id !== result.room_id) {
       pendingMatchAction = null;
@@ -1187,8 +1195,31 @@
     }
     updateOnlineStakeControls();
   }
+  function dismissClassicBoard() {
+    if (!currentRoom || currentRoom.mode !== 'classic' || !currentRoom.matchState || !currentRoom.matchState.state) {
+      if (window.__cf && window.__cf.hideOnlineBoard) window.__cf.hideOnlineBoard();
+      return false;
+    }
+    classicPlayViewDismissed = true;
+    if (window.__cf && window.__cf.hideOnlineBoard) window.__cf.hideOnlineBoard();
+    renderRoom();
+    announce('Room details are open. Your Classic match is still active.');
+    var resume = $('online-classic-resume');
+    if (resume && !resume.classList.contains('hidden')) resume.focus({ preventScroll: true });
+    return true;
+  }
+  function resumeClassicBoard() {
+    if (!currentRoom || currentRoom.mode !== 'classic' || !currentRoom.matchState || !currentRoom.matchState.state) return;
+    classicPlayViewDismissed = false;
+    renderMatch();
+    announce('Online Classic board restored with the latest server state.');
+    $('btn-home').focus({ preventScroll: true });
+  }
   function bindEvents() {
     $('btn-online').addEventListener('click', openOnline);
+    $('btn-home').addEventListener('click', function () {
+      if (window.__cf && window.__cf.game && window.__cf.game.online) dismissClassicBoard();
+    }, true);
     $('online-back').addEventListener('click', closeOnline);
     $('online-auth-form').addEventListener('submit', function (event) {
       event.preventDefault();
@@ -1350,6 +1381,7 @@
       renderMatch();
       $('online-chess-screen-title').focus({ preventScroll: true });
     });
+    $('online-classic-resume').addEventListener('click', resumeClassicBoard);
     $('online-leave-room').addEventListener('click', function () {
       if (!currentRoomId) return;
       callRpc('leave_room', { p_room_id: currentRoomId })
@@ -1501,6 +1533,7 @@
   window.__crossfourOnline = {
     isConfigured: isConfigured,
     open: openOnline,
-    close: closeOnline
+    close: closeOnline,
+    dismissClassicBoard: dismissClassicBoard
   };
 })();
