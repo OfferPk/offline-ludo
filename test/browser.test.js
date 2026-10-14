@@ -405,7 +405,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
     animator.animate = function (opts) {
       probe.paths.push(opts.points.map(p => ({ x: p.x, y: p.y })));
       const step = opts.onStep, complete = opts.onComplete;
-      opts.onStep = function (i) { probe.steps.push(i); if (step) step(i); if (opts.el.classList.contains('land') && getComputedStyle(opts.el, '::after').animationName === 'gem-ripple') probe.landingRipple = true; };
+      opts.onStep = function (i) { probe.steps.push(i); if (step) step(i); if (opts.el.classList.contains('land') && /^gem-ripple(-b)?$/.test(getComputedStyle(opts.el, '::after').animationName)) probe.landingRipple = true; };
       opts.onComplete = function () { probe.completes++; if (complete) complete(); };
       return animate(opts);
     };
@@ -439,7 +439,7 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(movementProbe.pathLengths.join() === '2,3' && movementProbe.steps.join() === '0,1,0,1,2' && movementProbe.completes === 2,
     'the legal two-step arrival and three-step tile effect animate in sequence with exact endpoints');
   legacy(movementProbe.gemDuringHop, 'crystal token stays visible and elevated during the locked move', 'tall-pawns/token-skins/v18x suites');
-  legacy(movementProbe.landingRipple && movementProbe.crystalCalls === 5, 'normal-motion steps add one quiet crystal-clink call and soft landing ripples', 'tall-pawns/token-skins/v18x suites');
+  ok(movementProbe.landingRipple && movementProbe.crystalCalls === 5, 'normal-motion steps add one quiet crystal-clink call and soft landing ripples (same frame, v1.9.2)');
   ok(movementProbe.tileEvents === 1 && movementProbe.tileCooling, 'the tile arrival resolves exactly once and keeps its existing cooldown');
 
   // chaos tile "!" -> Freeze on yourself (frozen)

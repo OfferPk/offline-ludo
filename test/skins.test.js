@@ -23,7 +23,7 @@ test('keeps all original stable board IDs, names, prices and palettes', () => {
     walnut: ['Walnut', 250, '#1b1410', '#5a3b26'],
     aurora: ['Aurora', 400, '#0a0f1f', '#121a33']
   };
-  assert.strictEqual(SK.BOARDS.length, 22);
+  assert.strictEqual(SK.BOARDS.length, 24); // v1.9.2: + Monsoon, Kite Festival
   for (const [id, expected] of Object.entries(originals)) {
     const item = SK.BOARDS.find(x => x.id === id);
     assert.ok(item, id); assert.deepStrictEqual([item.name, item.price, item.bg, item.board], expected);

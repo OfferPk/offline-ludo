@@ -64,6 +64,14 @@
       bg: '#090918', page: '#111127', board: '#191a38', cell: '#232649', cellEdge: '#383d70', ink: '#f4f1ff', muted: '#a3a5c9', center: '#1c2043', glow: true,
       seats: ['#ff5f64', '#27d59b', '#ffd05a', '#5e8fff'] },
 
+    // v1.9.2 original themes
+    { id: 'monsoon', name: 'Monsoon', price: 550, dark: true,
+      bg: '#0b1a1f', page: '#10242b', board: '#173540', cell: '#22495a', cellEdge: '#3f7488', ink: '#e9fbff', muted: '#9cc3cf', center: '#1b3f4d', glow: true,
+      seats: ['#ff6a5c', '#2fd6a7', '#ffcf4f', '#58a6ff'] },
+    { id: 'kite-festival', name: 'Kite Festival', price: 600, dark: false,
+      bg: '#cfe7f7', page: '#e3f2fb', board: '#fffaf0', cell: '#ffffff', cellEdge: '#f0cf9c', ink: '#24303d', muted: '#6f7f8f', center: '#fde9c4',
+      seats: ['#e24a5a', '#14946b', '#e09312', '#2f63d6'] },
+
     { id: 'champion', name: 'Champion', price: 0, unlock: 'wins', threshold: 50, dark: true,
       bg: '#21170a', page: '#2d2110', board: '#46361d', cell: '#5f4a26', cellEdge: '#927641', ink: '#fff5d9', muted: '#d1b779', center: '#56411f', glow: true,
       seats: ['#ff655a', '#39d398', '#ffcf58', '#6095ff'] },
