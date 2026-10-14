@@ -44,6 +44,8 @@
   var onlineChampionshipSequence = 0;
   var sdkLoading = null;
   var nativeCallbackConfigured = false;
+  var authSessionGeneration = 0;
+  var staleRoomJoinResult = Object.freeze({});
   var pendingInvite = new URLSearchParams(window.location.search).get('room') || sessionStorage.getItem('crossfour.online.pending-invite') || '';
   var handlingPendingInvite = false;
   if (pendingInvite) sessionStorage.setItem('crossfour.online.pending-invite', pendingInvite);
@@ -1119,6 +1121,7 @@
     historyChannel.userId = userId;
   }
   function attachRoom(result) {
+    if (result === staleRoomJoinResult) return null;
     if (!result.room_id) throw new Error('The server did not return a room ID.');
     if (currentRoomId !== result.room_id) {
       roomRestoreSequence++;
@@ -1420,6 +1423,7 @@
     var oldUserId = currentUser && currentUser.id;
     var nextUserId = nextUser && nextUser.id;
     var identityChanged = oldUserId !== nextUserId;
+    if (identityChanged) authSessionGeneration++;
     if (event === 'PASSWORD_RECOVERY') recoveryMode = true;
     else if (event === 'SIGNED_OUT') recoveryMode = false;
     if (oldUserId && oldUserId !== nextUserId) {
@@ -1454,6 +1458,23 @@
     client = window.supabase.createClient(config.url, config.publishableKey, {
       auth: { flowType: 'pkce', autoRefreshToken: true, persistSession: true, detectSessionInUrl: !isNative() }
     });
+    var originalRpc = client.rpc.bind(client);
+    client.rpc = function (name, args) {
+      if (name !== 'join_room') return originalRpc(name, args);
+      var requestUserId = currentUser && currentUser.id;
+      var requestGeneration = authSessionGeneration;
+      var request;
+      try { request = originalRpc(name, args); } catch (error) { return Promise.reject(error); }
+      function isStale() {
+        return !currentUser || currentUser.id !== requestUserId || authSessionGeneration !== requestGeneration;
+      }
+      return Promise.resolve(request).then(function (result) {
+        return isStale() ? { data: staleRoomJoinResult, error: null } : result;
+      }, function (error) {
+        if (isStale()) return { data: staleRoomJoinResult, error: null };
+        throw error;
+      });
+    };
     renderAccount();
     client.auth.onAuthStateChange(applyAuthSession);
     client.auth.getSession().then(function (result) {
