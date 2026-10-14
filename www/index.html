@@ -8,9 +8,9 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.8.8">
-  <link rel="stylesheet" href="css/v180.css?v=1.8.8">
-  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.8.8">
+  <link rel="stylesheet" href="css/style.css?v=1.8.9">
+  <link rel="stylesheet" href="css/v180.css?v=1.8.9">
+  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.8.9">
 </head>
 <body>
   <div id="app">
@@ -481,6 +481,7 @@
         <div id="r-summary" class="r-summary" aria-label="Match summary"></div>
         <div id="r-progress" class="r-progress"></div>
         <button id="btn-r-double" class="btn rewarded-btn">▶ Watch an ad for 2× coins</button>
+        <p id="r-practice" class="note r-practice hidden">Friendly Pass &amp; Play: no coins, small XP, doesn't count toward skin unlocks.</p>
         <p class="note tiny">Coins are virtual in-game rewards only. They cannot be bought or cashed out; offline entry fees use this device's local balance.</p>
         <div class="panel-actions">
           <button id="btn-r-home" class="btn plate">Home</button>
@@ -723,7 +724,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.8.8 · © OfferPk</p>
+        <p class="ver">Crossfour v1.8.9 · © OfferPk</p>
       </div>
     </div>
 
@@ -731,37 +732,38 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
-  <script src="js/ads-config.js?v=1.8.8"></script>
-  <script src="js/adgate.js?v=1.8.8"></script>
-  <script src="js/ads.js?v=1.8.8"></script>
-  <script src="js/logic.js?v=1.8.8"></script>
-  <script src="js/sound.js?v=1.8.8"></script>
-  <script src="js/themes.js?v=1.8.8"></script>
-  <script src="js/daily-spin.js?v=1.8.8"></script>
-  <script src="js/progression-rewards.js?v=1.8.8"></script>
-  <script src="js/championship.js?v=1.8.8"></script>
-  <script src="js/token-evolution.js?v=1.8.8"></script>
-  <script src="js/token-skins.js?v=1.8.8"></script>
-  <script src="js/daily.js?v=1.8.8"></script>
-  <script src="js/match-summary.js?v=1.8.8"></script>
-  <script src="js/skin-shop.js?v=1.8.8"></script>
-  <script src="js/art.js?v=1.8.8"></script>
-  <script src="js/save-store.js?v=1.8.8"></script>
-  <script src="js/offline-move-announcements.js?v=1.8.8"></script>
-  <script src="js/dice-gesture.js?v=1.8.8"></script>
-  <script src="js/path-animation.js?v=1.8.8"></script>
-  <script src="js/offline-roll-announcements.js?v=1.8.8"></script>
-  <script src="js/celebration.js?v=1.8.8"></script>
-  <script src="js/game.js?v=1.8.8"></script>
-  <script src="js/local-peer.js?v=1.8.8"></script>
-  <script src="js/vendor/qrcode-generator.js?v=1.8.8"></script>
-  <script src="js/local-room.js?v=1.8.8"></script>
-  <script src="js/community-fixtures.js?v=1.8.8"></script>
-  <script src="js/community.js?v=1.8.8"></script>
-  <script src="js/supabase-config.js?v=1.8.8"></script>
-  <script src="js/chess.js?v=1.8.8"></script>
-  <script src="js/online.js?v=1.8.8"></script>
-  <script src="js/ludo-chess-discovery.js?v=1.8.8"></script>
-  <script src="js/storage-protection.js?v=1.8.8"></script>
+  <div id="tip-card" class="tip-card hidden" role="status" aria-live="polite"><b id="tip-title"></b><p id="tip-text"></p><button id="tip-ok" class="btn primary" type="button">Got it</button></div>
+  <script src="js/ads-config.js?v=1.8.9"></script>
+  <script src="js/adgate.js?v=1.8.9"></script>
+  <script src="js/ads.js?v=1.8.9"></script>
+  <script src="js/logic.js?v=1.8.9"></script>
+  <script src="js/sound.js?v=1.8.9"></script>
+  <script src="js/themes.js?v=1.8.9"></script>
+  <script src="js/daily-spin.js?v=1.8.9"></script>
+  <script src="js/progression-rewards.js?v=1.8.9"></script>
+  <script src="js/championship.js?v=1.8.9"></script>
+  <script src="js/token-evolution.js?v=1.8.9"></script>
+  <script src="js/token-skins.js?v=1.8.9"></script>
+  <script src="js/daily.js?v=1.8.9"></script>
+  <script src="js/match-summary.js?v=1.8.9"></script>
+  <script src="js/skin-shop.js?v=1.8.9"></script>
+  <script src="js/art.js?v=1.8.9"></script>
+  <script src="js/save-store.js?v=1.8.9"></script>
+  <script src="js/offline-move-announcements.js?v=1.8.9"></script>
+  <script src="js/dice-gesture.js?v=1.8.9"></script>
+  <script src="js/path-animation.js?v=1.8.9"></script>
+  <script src="js/offline-roll-announcements.js?v=1.8.9"></script>
+  <script src="js/celebration.js?v=1.8.9"></script>
+  <script src="js/game.js?v=1.8.9"></script>
+  <script src="js/local-peer.js?v=1.8.9"></script>
+  <script src="js/vendor/qrcode-generator.js?v=1.8.9"></script>
+  <script src="js/local-room.js?v=1.8.9"></script>
+  <script src="js/community-fixtures.js?v=1.8.9"></script>
+  <script src="js/community.js?v=1.8.9"></script>
+  <script src="js/supabase-config.js?v=1.8.9"></script>
+  <script src="js/chess.js?v=1.8.9"></script>
+  <script src="js/online.js?v=1.8.9"></script>
+  <script src="js/ludo-chess-discovery.js?v=1.8.9"></script>
+  <script src="js/storage-protection.js?v=1.8.9"></script>
 </body>
 </html>

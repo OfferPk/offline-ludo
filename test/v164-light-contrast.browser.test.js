@@ -39,7 +39,7 @@ function serve(root) {
 
 async function openHome(page, url, theme) {
   await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 });
-  // v1.8.8: clear + reload first; the stale-tab guard (#109) rightly refuses to write over storage changed underneath the page.
+  // v1.8.9: clear + reload first; the stale-tab guard (#109) rightly refuses to write over storage changed underneath the page.
   await page.evaluate(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); });
   await page.reload({ waitUntil: 'networkidle0' });
   await page.evaluate(t => {
@@ -133,7 +133,7 @@ let local;
       `Classic Wood tagline ${measured.timber.b.tag.toFixed(2)} -> ${measured.timber.a.tag.toFixed(2)} (cream on walnut)`);
 
     // ---- dark skins untouched: graphite home renders identically before/after (before any match is saved)
-    // v1.8.8: the home screen has changed a lot since v1.6.3 (Daily, Championship, wallet), so a pixel match is no longer meaningful.
+    // v1.8.9: the home screen has changed a lot since v1.6.3 (Daily, Championship, wallet), so a pixel match is no longer meaningful.
     // Check instead that dark Graphite still renders dark chrome with readable text.
     await openHome(page, local.url, 'graphite'); const gd = await page.evaluate(contrastFn);
     ok(!gd.light && gd.tag >= 4.5 && gd.subtitle >= 4.5, `Graphite (dark) home keeps dark chrome with readable text (tag ${gd.tag.toFixed(2)}, subtitle ${gd.subtitle.toFixed(2)})`);

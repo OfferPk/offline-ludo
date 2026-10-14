@@ -306,6 +306,29 @@
     var t = $('toast'); t.textContent = msg; t.classList.remove('hidden');
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.add('hidden'); }, ms || 1600);
   }
+  /* v1.8.9 contextual first-time tips (separate local key, not the save). One at a time, dismissible, never blocks play. */
+  var TIPS_KEY = 'crossfour.tips.v1', tipQueue = [], tipShowing = null;
+  var TIPS = {
+    arrow: { title: 'Arrow tiles', text: 'Land exactly on an arrow to jump 4 squares ahead. Opponent tokens you jump over are captured. Passing over an arrow is a normal move.' },
+    danger: { title: 'Red danger cells', text: 'The 3 red cells after each arrow are risky: a token landing on that arrow jumps over them and captures tokens there.' },
+    championship: { title: 'Championship', text: 'One entry covers Quarter-final, Semi-final and Final. Lose any round and the run ends. Only a Final win pays the jackpot and the Crown.' },
+    fee: { title: 'Entry fees', text: 'Fees use virtual coins only. Each seat adds one fee to the pool and the winner takes it. Exit or restart before the end and your fee comes back.' },
+    practice: { title: 'Friendly Pass & Play', text: 'Matches with no computer players are just for fun: small XP, no coins, and they don\u2019t count toward skin unlocks or the Daily challenge.' }
+  };
+  function tipsSeen() { try { var v = JSON.parse(window.localStorage.getItem(TIPS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
+  function markTip(id) { var v = tipsSeen(); v[id] = 1; try { window.localStorage.setItem(TIPS_KEY, JSON.stringify(v)); } catch (e) {} }
+  function tip(id) {
+    if (!TIPS[id] || tipsSeen()[id] || tipShowing === id || tipQueue.indexOf(id) >= 0) return;
+    tipQueue.push(id); if (!tipShowing) nextTip();
+  }
+  function nextTip() {
+    var card = $('tip-card'); if (!card) return;
+    tipShowing = tipQueue.shift() || null;
+    if (!tipShowing) { card.classList.add('hidden'); return; }
+    $('tip-title').textContent = TIPS[tipShowing].title; $('tip-text').textContent = TIPS[tipShowing].text;
+    card.classList.remove('hidden');
+  }
+  function dismissTip() { if (tipShowing) markTip(tipShowing); nextTip(); }
   function show(id) { $(id).classList.remove('hidden'); }
   function hide(id) { $(id).classList.add('hidden'); }
   function isOpen(id) { return !$(id).classList.contains('hidden'); }
@@ -814,7 +837,7 @@
   /** Short, light per-skin move trail at each hop landing (transform/opacity only; skipped under reduced motion). */
   function trailFx(x, y, skinId, col, k) {
     if (!fxOk() || !TOKEN_SKINS) return;
-    var sk = TOKEN_SKINS.byId(skinId) || TOKEN_SKINS.SKINS[0], type = sk.trail || 'default', n = TRAIL_N[type] || 1;
+    var sk = TOKEN_SKINS.byId(skinId) || TOKEN_SKINS.SKINS[0], type = sk.trail || 'default', n = lowFx() ? 1 : (TRAIL_N[type] || 1);
     if (k === 1) SFX.swoosh();
     for (var j = 0; j < n; j++) {
       var e = fxEl('trail trail-' + type, x + (j - (n - 1) / 2) * CELL * 0.16, y + CELL * 0.18);
@@ -1549,7 +1572,7 @@
     var snap = human && save.settings.undo ? L.clone(st) : null;
     G.undo = null;
     var r = L.roll(st, chosen != null ? chosen : forced.length ? forced.shift() : undefined);
-    if (human && r.raw === 6) { save.stats.sixes++; dailyEvent('six', 1); }
+    if (human && hasAI(st) && r.raw === 6) { save.stats.sixes++; dailyEvent('six', 1); }
     render(); persist();
     animateDice(s, r.raw, function () {
       busy = false;
@@ -1604,6 +1627,10 @@
 
   // ---------------- effects (WebView-safe: transform/opacity; respects reduced motion) ----------------
   function fxOk() { return !prefersReducedMotion(); }
+  /* v1.8.9 low-end devices: fewer particles + no backdrop blur (cheap on WebView). Auto from CPU/RAM hints, or Settings › Fast animations. */
+  var LOW_END = (function () { try { var n = navigator; return (n.hardwareConcurrency && n.hardwareConcurrency <= 4) || (n.deviceMemory && n.deviceMemory <= 2); } catch (e) { return false; } })();
+  function lowFx() { return LOW_END || !!(save && save.settings && save.settings.fast); }
+  document.body.classList.toggle('lowfx', LOW_END);
   function fxEl(cls, x, y) { var e = document.createElement('i'); e.className = cls; e.style.left = x + 'px'; e.style.top = y + 'px'; $('fx').appendChild(e); return e; }
   function burst(x, y, col, n) {
     if (!fxOk()) return;
@@ -1719,8 +1746,8 @@
   /** Tiny hop sparkles at each step landing. Extra particles scale with Token Evolution. */
   function hopStepFx(x, y, col, evoParticles) {
     if (!fxOk()) return;
-    var extra = Math.max(0, Math.min(5, evoParticles | 0));
-    var n = 3 + extra;
+    var extra = lowFx() ? 0 : Math.max(0, Math.min(5, evoParticles | 0));
+    var n = (lowFx() ? 2 : 3) + extra;
     for (var k = 0; k < n; k++) {
       var sp = fxEl('hop-spark' + (extra ? ' evo-spark' : ''), x, y);
       var a = -Math.PI / 2 + (k - (n - 1) / 2) * (0.55 + extra * 0.04);
@@ -1910,9 +1937,10 @@
     if (!st.moves.some(function (m) { return m.piece === piece && (v == null || m.v === v); })) return;
     busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); stopAutoRollTimer(false); stopMoveDecide(false); hideDiePick(); hide('chat');
     var res = L.move(st, piece, v, forcedEvents.length ? forcedEvents.shift() : undefined);
-    if (human && TOKEN_SKINS && res.captures.length) TOKEN_SKINS.recordKills(save, res.captures.length);
-    if (human) { if (res.captures.length) dailyEvent('capture', res.captures.length); if (res.arrowJump) dailyEvent('arrow', 1); if (res.finish) dailyEvent('home', 1); }
-    if (human) { save.stats.captures += res.captures.length; if (res.finish) save.stats.home++; if (res.event) save.stats.events++; }
+    var ranked = human && hasAI(st); // v1.8.9: all-human tables don't feed milestones
+    if (ranked && TOKEN_SKINS && res.captures.length) TOKEN_SKINS.recordKills(save, res.captures.length);
+    if (ranked) { if (res.captures.length) dailyEvent('capture', res.captures.length); if (res.arrowJump) dailyEvent('arrow', 1); if (res.finish) dailyEvent('home', 1); }
+    if (ranked) { save.stats.captures += res.captures.length; if (res.finish) save.stats.home++; if (res.event) save.stats.events++; }
     G.sel = null;
     G.lastMove = { seat: s, piece: piece, cells: res.path.map(function (pp) { return L.cellOf(s, pp, piece); }) };
     render(); persist();
@@ -2217,7 +2245,11 @@
       } else hs.forEach(function (s) { best = Math.min(best, st.ranking.indexOf(s) + 1); });
       G.moves = st.moveCount || 0; G.elapsed = Math.max(0, Date.now() - (G.started || Date.now()));
       var ai = st.players.filter(function (s) { return st.seats[s].type === 'ai'; }).map(function (s) { return st.seats[s].level; });
-      G.place = best; G.coins = L.coinsFor(best, st.players.length, ai, st.mode); G.xp = L.xpFor(best, st.players.length);
+      G.place = best;
+      // v1.8.9 fair Pass & Play: an all-human table (one phone, no computer seats) is a friendly game. It pays a small flat XP only,
+      // no coins, and doesn't count toward wins, skin milestones, mastery or the Daily challenge, so one player can't farm by playing every seat.
+      G.practice = !ai.length;
+      G.coins = G.practice ? 0 : L.coinsFor(best, st.players.length, ai, st.mode); G.xp = G.practice ? 10 : L.xpFor(best, st.players.length);
       save.coins += G.coins; save.xp += G.xp;
       G.stakePayout = 0;
       if (G.entryFee > 0 && !G.stakeSettled) {
@@ -2236,7 +2268,7 @@
         }
       }
       var S = save.stats; S.played++;
-      if (best === 1) { S.won++; S.streak = safeCounter(S.streak, 0) + 1; } else S.streak = 0;
+      if (G.practice) { /* friendly table: wins/streak untouched */ } else if (best === 1) { S.won++; S.streak = safeCounter(S.streak, 0) + 1; } else S.streak = 0;
       if (ai.length) { var top = ai.indexOf('hard') >= 0 ? 'hard' : ai.indexOf('medium') >= 0 ? 'medium' : 'easy'; S.vs[top][0]++; if (best === 1) S.vs[top][1]++; } else S.pass++;
       if (st.mode === 'mystery') { S.mystery[0]++; if (best === 1) S.mystery[1]++; }
       if (st.mode === 'lucky') { S.lucky[0]++; if (best === 1) S.lucky[1]++; }
@@ -2248,9 +2280,9 @@
       var newlyUnlocked = window.SkinShop.collectEligible(save, SK);
       var evoGranted = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.collectEligible(save) : [];
       var masteryBefore = TOKEN_SKINS ? TOKEN_SKINS.mastery(TOKEN_SKINS.state(save.tokenSkin, save).stats).stars : 0;
-      if (TOKEN_SKINS) TOKEN_SKINS.recordMatch(save, best === 1);
+      if (TOKEN_SKINS && !G.practice) TOKEN_SKINS.recordMatch(save, best === 1);
       var skinGranted = TOKEN_SKINS ? TOKEN_SKINS.collectEligible(save) : [];
-      if (hs.length) { dailyEvent('play', 1); if (best === 1) dailyEvent('win', 1); }
+      if (hs.length && !G.practice) { dailyEvent('play', 1); if (best === 1) dailyEvent('win', 1); }
       if (ProgressionRewards) ProgressionRewards.collect(save, previousLevel, L.levelFromXp(save.xp).level, function () { return true; });
       gate.matchCompleted();
       G.unlocks = [].concat(newlyUnlocked.map(function (x) { return /dice/i.test(x.name) ? x.name : x.name + ' board'; }), evoGranted.map(function (x) { return 'Lv' + x.level + ' ' + x.name; }), skinGranted.map(function (x) { return x.name + ' skin'; }));
@@ -2338,6 +2370,7 @@
     var lv = L.levelFromXp(save.xp); $('r-lvl').textContent = 'Level ' + lv.level; $('r-lvl-fill').style.width = Math.round(lv.into / lv.need * 100) + '%';
     $('btn-r-double').classList.toggle('hidden', !G.coins || G.doubled);
     renderSummary();
+    var pn = $('r-practice'); if (pn) pn.classList.toggle('hidden', !G.practice);
     if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
     render(); setCoins(); setLevel(); show('result');
     if (entering) $('r-title').focus({ preventScroll: true }); // v1.8.7 (#111)
@@ -2474,7 +2507,7 @@
     }
     $('championship-start').disabled = active || save.coins < Number($('championship-entry-fee').value || 50);
   }
-  function openChampionshipDialog() { updateChampionshipDialog(); show('championship'); }
+  function openChampionshipDialog() { updateChampionshipDialog(); show('championship'); tip('championship'); }
   function startChampionship() {
     if (!Championship || save.championship && save.championship.status === 'active') return;
     var fee = Number($('championship-entry-fee').value || 50);
@@ -2593,6 +2626,7 @@
     ['result', 'menu', 'chat'].forEach(hide);
     lastOfflineTurnAnnouncement = '';
     screen('game'); paused = false;
+    if (G && !G.online && G.st) { if (G.st.rules && G.st.rules.arrows || G.st.mode === 'arrow') { tip('arrow'); tip('danger'); } if (!hasAI(G.st)) tip('practice'); }
     if (G.view == null) G.view = viewOf(G.st);
     buildPods(); buildTiles(); buildPieces(); layout(); render();
     if (G.st.phase === 'over') { finishMatch(); return; }
@@ -3043,7 +3077,8 @@
   });
   $('btn-pass').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('pass'); });
   $('btn-setup-back').addEventListener('click', function () { SFX.click(); showHome(); });
-  $('entry-fee').addEventListener('change', function () { selectedEntryFee = Number(this.value) || 0; renderSetup(); });
+  $('entry-fee').addEventListener('change', function () { selectedEntryFee = Number(this.value) || 0; renderSetup(); if (selectedEntryFee) tip('fee'); });
+  if ($('tip-ok')) $('tip-ok').addEventListener('click', function () { SFX.click(); dismissTip(); });
   each($('mode-seg').children, function (b) { b.addEventListener('click', function () { SFX.click(); setupMode = b.dataset.mode; save.setup.mode[setupKind] = setupMode; persist(); renderSetup(); }); });
   each($('presets').children, function (b) { b.addEventListener('click', function () { SFX.click(); applyPreset(b.dataset.p); }); });
   $('btn-edit-rules').addEventListener('click', function () { SFX.click(); openSettings(this); });
@@ -3465,6 +3500,7 @@
     showOnlineBoard: showOnlineBoard,
     celebrateWin: celebrateWin,
     openVault: openVault,
+    tip: tip, get tipShowing() { return tipShowing; }, dismissTip: dismissTip, get lowFx() { return lowFx(); },
     get celebration() { return window.CamelCelebration ? window.CamelCelebration.state : 'idle'; }
   };
 })();
