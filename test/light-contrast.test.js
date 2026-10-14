@@ -79,7 +79,9 @@ for (const b of SK.BOARDS.filter(x => x.dark)) assert.ok(!UI_CHROME[b.id], b.id 
 // Every rule in the v1.6.4 block is scoped to light skins (dark themes untouched).
 const start = css.indexOf('v1.6.4 · Light theme contrast');
 assert.ok(start > 0, 'v1.6.4 CSS block present');
-const block = css.slice(css.indexOf('*/', start) + 2);
+const end = css.indexOf('/* END v1.6.4 light theme contrast block */', start);
+assert.ok(end > start, 'v1.6.4 CSS block has an explicit end marker');
+const block = css.slice(css.indexOf('*/', start) + 2, end);
 const selectors = [];
 block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]*\{/g, '').split('}').forEach(chunk => {
   const sel = chunk.split('{')[0].trim();

@@ -89,7 +89,7 @@ assert.match(game, /if \(entering\) \{ spotlightWinner\(winner\); celebrateWin\(
 assert.match(game, /function celebrateWin\(seat\)[\s\S]*?var pod = podEl\(seat\)[\s\S]*?C\.play\(\{ target: pod, anchor: pod\.querySelector\('\.avatar'\) \|\| pod/);
 assert.match(game, /st\.phase === 'over' && st\.ranking\.length\)[\s\S]*?celebrateWin\(st\.ranking\[0\]\)/);
 assert.match(game, /function leaveResult\(dest\) \{\s*if \(!G \|\| G\.st\.phase !== 'over'\) return;\s*stopCelebration\(\);/);
-assert.match(game, /function startMatch\(seats, mode, offerTutorial\) \{\s*cancelFlow\(\); stopCelebration\(\);/);
+assert.match(game, /function startMatch\(seats, mode, offerTutorial, entryFee, championshipStage\) \{\s*cancelFlow\(\); stopCelebration\(\);/);
 assert.match(online, /function celebrateChessWin\(state, room\)/);
 assert.match(online, /celebrateChessWin\(state, room\);/);
 console.log('  ok - wired into showResult (all modes), online classic over-state and online chess decisive results');

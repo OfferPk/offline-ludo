@@ -4,12 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#12151b">
-  <meta name="description" content="Online Ludo with cloud profiles and room matchmaking in development, alongside local game modes and offline saves. Online sign-in is not yet enabled; board and turn sync are not available.">
+  <meta name="description" content="Play Crossfour Ludo offline, pass and play, over a local Wi-Fi or hotspot peer room, or in online rooms with cloud profiles and server-validated matches.">
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.7.2">
-  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.7.2">
+  <link rel="stylesheet" href="css/style.css?v=1.7.3">
+  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.7.3">
 </head>
 <body>
   <div id="app">
@@ -26,7 +26,10 @@
           <p class="tag">online rooms · offline modes stay local</p>
         </div>
         <div class="home-actions" role="group" aria-label="Choose a game mode">
-          <button id="btn-continue" class="btn primary big hidden"><span>Continue match</span><small id="continue-sub">vs Computer</small></button>
+          <button id="btn-continue" class="btn primary big active-match-banner hidden" type="button" aria-label="Resume saved match">
+            <span class="resume-banner-copy"><b>Continue saved match</b><small id="continue-sub">vs Computer</small></span>
+            <span class="resume-banner-arrow" aria-hidden="true">›</span>
+          </button>
           <button id="btn-vs-ai" class="mode-card mode-computer" type="button" aria-labelledby="mode-computer-title" aria-describedby="mode-computer-subtitle">
             <span class="mode-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="3.5" y="4.5" width="17" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8 20h8M12 16.5V20M8 9h3m2.5 0H16M8 12h2m5.5 0H16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
             <span class="mode-card-copy"><span class="mode-card-title" id="mode-computer-title">Play vs Computer</span><span class="mode-card-subtitle" id="mode-computer-subtitle">Easy · Normal · Hard</span></span>
@@ -49,6 +52,10 @@
             <button id="btn-arrow" class="btn plate"><span>Arrow Ludo</span><small>Jump +4 · 1 token out</small></button>
             <button id="btn-friendly" class="btn plate"><span>Friendly</span><small>No captures · race home</small></button>
           </div>
+          <button id="home-scroll-hint" class="home-scroll-hint hidden" type="button" aria-label="Scroll down for more modes and options"><span>More modes &amp; tools</span><span aria-hidden="true">↓</span></button>
+          <button id="btn-championship" class="championship-launch" type="button" aria-label="Open the eight-player Championship bracket">
+            <span class="championship-mark" aria-hidden="true">♛</span><span class="championship-copy"><b>Championship</b><small id="championship-home-status">8-player bracket · Quarter-final → Semi-final → Final</small></span><span class="championship-arrow" aria-hidden="true">›</span>
+          </button>
           <section id="howto-card" class="howto-card" aria-labelledby="howto-title">
             <button id="btn-howto-home" class="howto-open" type="button" aria-expanded="false" aria-controls="howto-panel">
               <span class="howto-open-mark" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 5.5c2.6-1 5.3-1 8 .6v13.4c-2.7-1.6-5.4-1.6-8-.6V5.5ZM20 5.5c-2.6-1-5.3-1-8 .6v13.4c2.7-1.6 5.4-1.6 8-.6V5.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M6.6 9.2c1.2-.3 2.4-.2 3.4.3M6.6 12.2c1.2-.3 2.4-.2 3.4.3M14 9.5c1-.5 2.2-.6 3.4-.3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>
@@ -78,6 +85,11 @@
             </div>
           </section>
         </div>
+        <button id="btn-daily-spin" class="daily-spin-launch" type="button" aria-label="Claim your free daily coin spin">
+          <span class="daily-spin-coin" aria-hidden="true">✦</span>
+          <span class="daily-spin-copy"><b>Lucky Chaos · Daily free spin</b><small id="daily-spin-status">Free coin reward · refreshes every 24 hours</small></span>
+          <span class="daily-spin-action" aria-hidden="true">SPIN ›</span>
+        </button>
         <div class="home-row">
           <button id="btn-skins" class="btn plate">Skins</button>
           <button id="btn-rules" class="btn plate">Rules</button>
@@ -87,6 +99,9 @@
           <span class="community-launch-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 3 28 12 23 28H9L4 12 16 3Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="m4 12 12 4 12-4M16 16v12M10 9l6 7 6-7" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></span>
           <span class="community-launch-copy"><b>Leaderboard &amp; referrals</b><small>Weekly crystal rewards · invite friends</small></span>
           <span class="community-launch-arrow" aria-hidden="true">›</span>
+        </button>
+        <button id="btn-local-room" class="online-launch local-room-launch" type="button" aria-label="Set up a two-player local room on the same Wi-Fi or hotspot">
+          <span><b>Local Room · same Wi-Fi / hotspot</b><small>Two-phone Classic Ludo · no internet required</small></span><span aria-hidden="true">›</span>
         </button>
         <button id="btn-online" class="online-launch" type="button">
           <span><b>Online rooms</b><small>Cloud profiles · matchmaking · invites</small></span><span aria-hidden="true">›</span>
@@ -248,12 +263,20 @@
           <div class="online-card-head"><div><span class="online-eyebrow">CLOUD PROFILE</span><h2 id="online-account-title">Your account</h2><small id="online-profile-handle">Loading profile…</small></div><button id="online-signout" class="btn plate online-signout" type="button">Sign out</button></div>
           <form id="online-profile-form" class="online-profile-form"><label for="online-profile-name">Display name</label><div><input id="online-profile-name" maxlength="32" autocomplete="nickname" required><button class="btn primary" type="submit">Save</button></div></form>
           <div class="online-wallet" aria-label="Cloud-synced balance"><span><b id="online-wallet-coins">—</b><small>Coins</small></span><span><b id="online-wallet-diamonds">—</b><small>Diamonds</small></span></div>
-          <p class="online-wallet-note">These balances are server-owned. Offline coins are not uploaded, and the app cannot mint or spend cloud currency directly.</p>
+          <p class="online-wallet-note">These balances are server-owned. Offline coins are separate; optional online Classic room fees use cloud coins only, have no cash value, and are settled by the server.</p>
         </section>
         <section id="online-room-panel" class="online-card hidden" aria-labelledby="online-lobby-title">
           <span class="online-eyebrow">MATCHMAKING · INVITES</span><h2 id="online-lobby-title">Find or host a table</h2>
-          <div class="online-room-options"><label>Online mode<select id="online-mode"><option value="classic">Classic · server-authoritative</option><option value="ludo_chess">Ludo Chess · standard rules</option></select></label><label>Seats<select id="online-capacity"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label></div>
+          <div class="online-room-options"><label>Online mode<select id="online-mode"><option value="classic">Classic · server-authoritative</option><option value="ludo_chess">Ludo Chess · standard rules</option></select></label><label>Seats<select id="online-capacity"><option value="2">2 players</option><option value="3">3 players</option><option value="4">4 players</option></select></label><label>Entry fee<select id="online-entry-fee" disabled><option value="0">Free · no entry fee</option><option value="50">50 cloud coins</option><option value="100">100 cloud coins</option><option value="500">500 cloud coins</option></select></label></div>
           <p id="online-mode-note" class="online-mode-note">Classic and Ludo Chess are playable online. Mystery and Lucky Chaos remain offline modes.</p>
+          <p id="online-stake-note" class="online-stake-note" role="status">Online room fees are not enabled yet. Free online rooms remain available.</p>
+          <section class="online-championship-card" aria-labelledby="online-championship-title">
+            <span class="online-eyebrow">SERVER-RUN BRACKET · VIRTUAL COINS</span><h3 id="online-championship-title">Online Championship</h3>
+            <p>Eight signed-in players · Quarter-final → Semi-final → Final. The 50/100/500-coin entry is held by the server; the undefeated champion receives the full 8× pool and an exclusive Crown badge. No cash value.</p>
+            <div class="online-championship-controls"><label for="online-championship-fee">Entry fee<select id="online-championship-fee" disabled><option value="50">50 cloud coins · 400-coin pool</option><option value="100">100 cloud coins · 800-coin pool</option><option value="500">500 cloud coins · 4,000-coin pool</option></select></label><button id="online-championship-enter" class="btn primary" type="button" disabled>Enter Championship</button></div>
+            <p id="online-championship-status" class="online-championship-status" role="status" aria-live="polite">Available after the prepared Supabase Championship migration is reviewed and installed.</p>
+            <div class="online-championship-actions"><button id="online-championship-leave" class="btn plate hidden" type="button">Leave waiting bracket · refund</button><button id="online-championship-open" class="btn plate hidden" type="button">Open my current match</button></div>
+          </section>
           <div class="online-provider-actions"><button id="online-quick-match" class="btn primary" type="button">Find a table</button><button id="online-create-room" class="btn plate" type="button">Create invite room</button></div>
           <div class="online-join-row"><label for="online-join-code">Join with invite code</label><div><input id="online-join-code" maxlength="16" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="16-character code"><button id="online-join-room" class="btn plate" type="button">Join</button></div></div>
           <section id="online-room-card" class="online-room-card hidden" aria-labelledby="online-room-heading">
@@ -335,6 +358,7 @@
         <div class="sect">Players</div>
         <div class="presets" id="presets" role="group" aria-label="Choose player count"><button type="button" data-p="1v1" aria-pressed="false">1 v 1</button><button type="button" data-p="3" aria-pressed="false">3 players</button><button type="button" data-p="4" aria-pressed="false">4 players</button></div>
         <div id="seat-list" class="seat-list"></div>
+        <div class="stake-picker"><label for="entry-fee">Entry fee · virtual coins<select id="entry-fee"><option value="0">Free · no entry fee</option><option value="50">50 coins</option><option value="100">100 coins</option><option value="500">500 coins</option></select></label><p id="stake-note">Offline only. One local entry fee is reserved; winner receives a 2×/3×/4× virtual pool. No cash value.</p></div>
         <p id="setup-msg" class="setup-msg" role="status" aria-live="polite"></p>
         <div class="sect">House rules</div>
         <div class="rules-sum" id="rules-sum" role="group" aria-label="Current house rules"></div>
@@ -353,6 +377,7 @@
           <span id="online-turn-timer" class="online-turn-timer hidden"></span>
         </div>
         <div class="topbar-actions">
+          <button id="local-peer-open" class="icon-btn hidden" type="button" aria-label="Local room controls" title="Local room controls"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5a12 12 0 0 1 16 0M7.5 13a7 7 0 0 1 9 0M11 16.5a2 2 0 0 1 2 0M12 20h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
           <button id="btn-game-settings" class="icon-btn" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
           <button id="btn-exit-match" class="exit-match" type="button" aria-label="Exit match" title="Exit match"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20h-6v-6h-4v6H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 9.5h7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><span>Home</span></button>
         </div>
@@ -442,12 +467,54 @@
           <div class="r-coins"><span class="coin-ico"></span><b id="r-coins">+0</b><small>coins</small></div>
           <div class="r-xp"><b id="r-xp">+0</b><small>XP</small><span class="lvl-bar"><i id="r-lvl-fill"></i></span><small id="r-lvl">Level 1</small></div>
         </div>
+        <p id="r-wager" class="result-wager hidden" role="status" aria-live="polite"></p>
+        <p id="r-championship" class="result-championship hidden" role="status" aria-live="polite"></p>
         <button id="btn-r-double" class="btn rewarded-btn">▶ Watch an ad for 2× coins</button>
-        <p class="note tiny">Coins only unlock cosmetic skins. They can't be bought, bet or cashed out.</p>
+        <p class="note tiny">Coins are virtual in-game rewards only. They cannot be bought or cashed out; offline entry fees use this device's local balance.</p>
         <div class="panel-actions">
           <button id="btn-r-home" class="btn plate">Home</button>
           <button id="btn-r-again" class="btn primary">Play again</button>
         </div>
+      </div>
+    </div>
+
+    <!-- CHAMPIONSHIP -->
+    <div id="championship" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="championship-title" aria-describedby="championship-description">
+      <div class="panel wide championship-panel">
+        <div class="panel-head"><h3 id="championship-title">8-player Championship</h3><button class="icon-btn close" data-close="championship" aria-label="Close">✕</button></div>
+        <p id="championship-description" class="note">Three rounds to the crown: Quarter-final → Semi-final → Final. Seven bracket matches total; you play your three-match path against offline opponents.</p>
+        <div class="championship-bracket" aria-label="Three-round single-elimination bracket"><div><b>QUARTER-FINAL</b><span>You vs Ruby</span><span>Jade vs Saffron</span><span>Cobalt vs Pearl</span><span>Onyx vs Amber</span></div><i aria-hidden="true">›</i><div><b>SEMI-FINAL</b><span>QF winner vs QF winner</span><span>QF winner vs QF winner</span></div><i aria-hidden="true">›</i><div><b>FINAL</b><span>SF winner vs SF winner</span><span class="champ-crown">♛ Crown + coin jackpot</span></div></div>
+        <label class="championship-entry" for="championship-entry-fee">Championship entry<select id="championship-entry-fee"><option value="50">50 coins · 400-coin jackpot</option><option value="100">100 coins · 800-coin jackpot</option><option value="500">500 coins · 4,000-coin jackpot</option></select></label>
+        <p id="championship-notice" class="note" role="status" aria-live="polite">Bots' bracket results are simulated locally. The full coin jackpot and Champion Crown are awarded only for a final win.</p>
+        <div class="panel-actions"><button id="championship-cancel" class="btn plate" type="button">Close</button><button id="championship-start" class="btn primary" type="button">Enter Championship</button><button id="championship-resume" class="btn primary hidden" type="button">Resume Championship</button></div>
+      </div>
+    </div>
+
+    <!-- LOCAL PEER ROOM -->
+    <div id="local-room" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="local-room-title" aria-describedby="local-room-description">
+      <div class="panel wide local-room-panel">
+        <div class="panel-head"><h3 id="local-room-title">Local Room · two-phone Classic Ludo</h3><button class="icon-btn close" data-close="local-room" aria-label="Close">✕</button></div>
+        <p id="local-room-description" class="note">Connect two devices on the same Wi-Fi or hotspot with a local WebRTC data channel. No Supabase, STUN/TURN service, or internet signaling is used. Host controls the game state; keep both apps open and nearby.</p>
+        <ol class="local-room-steps"><li>Host creates an offer and shows its QR.</li><li>Joiner scans/copies it, pastes it here, and creates an answer.</li><li>Host scans/copies the answer, pastes it, then connects.</li></ol>
+        <p class="note tiny local-room-warning">A phone camera's built-in QR reader can copy the signal text; manual paste is the fallback. Some hotspots isolate devices, so local connection cannot be guaranteed. This peer mode is not server-authoritative or cheat-proof.</p>
+        <div class="local-room-grid">
+          <section class="local-room-step">
+            <b>Host</b>
+            <button id="local-host-offer" class="btn plate" type="button">Create host offer</button>
+            <button id="local-accept-answer" class="btn primary" type="button" disabled>Connect with answer</button>
+          </section>
+          <section class="local-room-step">
+            <b>Joiner</b>
+            <button id="local-join-offer" class="btn plate" type="button">Create answer from offer</button>
+          </section>
+        </div>
+        <label class="local-signal-label" for="local-signal-input">Paste scanned/copied offer or answer here</label>
+        <textarea id="local-signal-input" rows="3" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="Paste the other device's signal text"></textarea>
+        <label class="local-signal-label" for="local-signal-output">Your signal · show QR or copy text to the other device</label>
+        <textarea id="local-signal-output" rows="3" readonly spellcheck="false"></textarea>
+        <div class="local-signal-actions"><button id="local-copy-signal" class="btn plate" type="button" disabled>Copy signal</button><div id="local-signal-qr" class="local-signal-qr hidden" aria-label="Local WebRTC signal QR code"></div></div>
+        <p id="local-peer-status" class="local-peer-status" role="status" aria-live="polite">No local room yet.</p>
+        <div class="panel-actions"><button id="local-start-match" class="btn primary" type="button" disabled>Start Classic Ludo</button><button id="local-close-room" class="btn danger" type="button" disabled>End local room</button></div>
       </div>
     </div>
 
@@ -480,8 +547,10 @@
     <!-- STATS -->
     <div id="stats" class="overlay hidden">
       <div class="panel wide">
-        <div class="panel-head"><h3>Statistics</h3><button class="icon-btn close" data-close="stats" aria-label="Close">✕</button></div>
+        <div class="panel-head"><h3>Player Profile &amp; Roadmap</h3><button class="icon-btn close" data-close="stats" aria-label="Close">✕</button></div>
+        <div class="profile-snapshot"><span id="profile-avatar-frame" class="profile-avatar-frame" aria-hidden="true"><span>✦</span></span><span class="profile-snapshot-copy"><small>LOCAL PLAYER · LEVEL <b id="profile-level">1</b></small><b id="profile-xp">0 XP</b><span>Offline progress stays on this device.</span></span></div>
         <div id="stats-body" class="stats-grid"></div>
+        <section class="level-roadmap" aria-labelledby="level-roadmap-title"><h4 id="level-roadmap-title">Level rewards</h4><div id="level-roadmap-items" class="level-roadmap-items"></div></section>
       </div>
     </div>
 
@@ -524,14 +593,14 @@
           </ul>
         </div>
         <div class="rules-page hidden" data-page="mystery">
-          <p class="note">Mystery Tiles is a Crossfour mode with 8 special tiles on the track. End a move on one to spin its wheel. A tile rests for two rounds after it has been used. There's no entry fee or stake: every match is free and coins are cosmetic.</p>
+          <p class="note">Mystery Tiles is a Crossfour mode with 8 special tiles on the track. End a move on one to spin its wheel. A tile rests for two rounds after it has been used. The mode has no separate fee; an optional offline entry fee can still be selected before a match.</p>
           <div class="ev-head"><span class="tile-ico boost">?</span><b>Boost wheel</b><small>always helpful</small></div>
           <div class="ev-list" id="ev-boost"></div>
           <div class="ev-head"><span class="tile-ico chaos">!</span><b>Chaos wheel</b><small>high risk, high reward</small></div>
           <div class="ev-list" id="ev-chaos"></div>
         </div>
         <div class="rules-page hidden" data-page="lucky">
-          <p class="note"><b>Lucky Chaos Ludo: how to play.</b> Normal Ludo rules (Star-style rolls and your house rules), plus luck you can steer. No entry fee, no stakes: every match is free and coins are cosmetic.</p>
+          <p class="note"><b>Lucky Chaos Ludo: how to play.</b> Normal Ludo rules (Star-style rolls and your house rules), plus luck you can steer. The mode adds no separate fee; an optional offline entry fee can still be selected before a match.</p>
           <ul class="rules-list">
             <li><span class="tile-ico boost">?</span> <b>4 Boost tiles</b> and <span class="tile-ico chaos">!</span> <b>4 Chaos tiles</b>: end a move <b>exactly</b> on one to spin its wheel. A used tile rests for <b>2 rounds</b> (the number on it shows the rounds left).</li>
             <li><span class="tile-ico danger">!!</span> <b>4 Danger tiles, High Risk / High Reward</b>: a 50/50 spin of the Boost or Chaos wheel with <b>stronger</b> results (Jump +5, 2 extra rolls, Big Bomb, Back 5).</li>
@@ -556,7 +625,7 @@
             <li><b>Team Ludo, 2v2.</b> All four corners play. Partners sit opposite: Coral with Saffron, Jade with Cobalt. A team wins when <b>both</b> partners have every token home. You cannot capture your partner, and a partner's block does not stop you. Pass &amp; play, or you plus a computer partner against two computers.</li>
             <li><b>Arrow Ludo.</b> Each player starts with <b>1 token already on their start square</b> — no 6 needed for that token (others still need a 6). Amber arrows on board number 4 of each side; the <b>3 red squares after each arrow</b> are the danger zone the jump passes through. <b>Only if your move ends exactly on an arrow</b> does the token <b>jump 4 squares forward</b> and stop (rivals on that jump path — and an unsafe stop — are captured). <b>Passing over</b> an arrow with a higher roll is normal movement with no jump. No chaining. Safe squares still protect. House-rule “Arrow tiles” use the same rule.</li>
             <li><b>Friendly.</b> Captures are off. It is a pure race to home. Safe for a calmer game. The app as a whole stays 13+.</li>
-            <li>No mode has an entry fee, a stake or a bet. Coins stay cosmetic.</li>
+            <li>Entry fees are optional and use virtual coins only. Offline play uses the local balance; supported online Classic rooms use server-held cloud coins. Coins have no cash value.</li>
           </ul>
         </div>
         <div class="rules-page hidden" data-page="house">
@@ -598,7 +667,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.7.2 · © OfferPk</p>
+        <p class="ver">Crossfour v1.7.3 · © OfferPk</p>
       </div>
     </div>
 
@@ -606,25 +675,31 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
-  <script src="js/ads-config.js?v=1.7.2"></script>
-  <script src="js/adgate.js?v=1.7.2"></script>
-  <script src="js/ads.js?v=1.7.2"></script>
-  <script src="js/logic.js?v=1.7.2"></script>
-  <script src="js/sound.js?v=1.7.2"></script>
-  <script src="js/themes.js?v=1.7.2"></script>
-  <script src="js/token-evolution.js?v=1.7.2"></script>
-  <script src="js/skin-shop.js?v=1.7.2"></script>
-  <script src="js/art.js?v=1.7.2"></script>
-  <script src="js/save-store.js?v=1.7.2"></script>
-  <script src="js/dice-gesture.js?v=1.7.2"></script>
-  <script src="js/path-animation.js?v=1.7.2"></script>
-  <script src="js/celebration.js?v=1.7.2"></script>
-  <script src="js/game.js?v=1.7.2"></script>
-  <script src="js/community-fixtures.js?v=1.7.2"></script>
-  <script src="js/community.js?v=1.7.2"></script>
-  <script src="js/supabase-config.js?v=1.7.2"></script>
-  <script src="js/chess.js?v=1.7.2"></script>
-  <script src="js/online.js?v=1.7.2"></script>
-  <script src="js/ludo-chess-discovery.js?v=1.7.2"></script>
+  <script src="js/ads-config.js?v=1.7.3"></script>
+  <script src="js/adgate.js?v=1.7.3"></script>
+  <script src="js/ads.js?v=1.7.3"></script>
+  <script src="js/logic.js?v=1.7.3"></script>
+  <script src="js/sound.js?v=1.7.3"></script>
+  <script src="js/themes.js?v=1.7.3"></script>
+  <script src="js/daily-spin.js?v=1.7.3"></script>
+  <script src="js/progression-rewards.js?v=1.7.3"></script>
+  <script src="js/championship.js?v=1.7.3"></script>
+  <script src="js/token-evolution.js?v=1.7.3"></script>
+  <script src="js/skin-shop.js?v=1.7.3"></script>
+  <script src="js/art.js?v=1.7.3"></script>
+  <script src="js/save-store.js?v=1.7.3"></script>
+  <script src="js/dice-gesture.js?v=1.7.3"></script>
+  <script src="js/path-animation.js?v=1.7.3"></script>
+  <script src="js/celebration.js?v=1.7.3"></script>
+  <script src="js/game.js?v=1.7.3"></script>
+  <script src="js/local-peer.js?v=1.7.3"></script>
+  <script src="js/vendor/qrcode-generator.js?v=1.7.3"></script>
+  <script src="js/local-room.js?v=1.7.3"></script>
+  <script src="js/community-fixtures.js?v=1.7.3"></script>
+  <script src="js/community.js?v=1.7.3"></script>
+  <script src="js/supabase-config.js?v=1.7.3"></script>
+  <script src="js/chess.js?v=1.7.3"></script>
+  <script src="js/online.js?v=1.7.3"></script>
+  <script src="js/ludo-chess-discovery.js?v=1.7.3"></script>
 </body>
 </html>

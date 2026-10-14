@@ -72,7 +72,7 @@ function startLocalServer() {
         clientCalls: [], authCalls: [], rpcCalls: [], channels: [], authListeners: [],
         removedChannels: 0, activeRoomId: null, failRpc: null, failAuth: null, session: resumeFixture && resumeFixture.session || null,
         delayNextRead: null,
-        actionResponses: {}, chessActionResponses: {}, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false, dropNextDrawResponseAfterCommit: false,
+        actionResponses: {}, chessActionResponses: {}, championship: null, rollCount: 0, forceChessStale: false, dropChessResponseAfterCommit: false, dropNextDrawResponseAfterCommit: false,
         tables: resumeFixture && resumeFixture.tables || {
           profiles: [
             { id: 'user-one', handle: 'alice123', display_name: 'Alice' },
@@ -224,16 +224,35 @@ function startLocalServer() {
               state.rpcCalls.push({ name, args });
               if (state.failRpc === name) return Promise.resolve({ data: null, error: { message: 'The matching service is unavailable.' } });
               let data = {};
-              if (name === 'quick_match') {
+              if (name === 'online_stakes_enabled') {
+                data = { enabled: true, version: 2, championships: true };
+              } else if (name === 'get_my_online_championship') {
+                data = state.championship || { status: 'none' };
+              } else if (name === 'enter_online_championship') {
+                const wallet = state.tables.wallets.find(row => row.user_id === 'user-one');
+                if (!state.championship || state.championship.status === 'none') {
+                  wallet.coins -= args.p_entry_fee;
+                  state.championship = { status: 'waiting', participants: 1, entry_fee: args.p_entry_fee };
+                }
+                data = state.championship;
+              } else if (name === 'leave_online_championship') {
+                const wallet = state.tables.wallets.find(row => row.user_id === 'user-one');
+                const fee = state.championship ? state.championship.entry_fee : 0;
+                wallet.coins += fee;
+                state.championship = null;
+                data = { entry_fee: fee, refunded: true };
+              } else if (name === 'quick_match' || name === 'quick_match_wager') {
                 const roomId = args.p_mode === 'ludo_chess' ? 'quick-chess-room' : 'quick-room';
-                ensureRoom(roomId, 'user-two', args.p_mode, args.p_capacity);
+                const room = ensureRoom(roomId, 'user-two', args.p_mode, args.p_capacity);
+                if (Object.hasOwn(args, 'p_entry_fee')) room.entry_fee = args.p_entry_fee;
                 ensureMember(roomId, 'user-one', 1, 'member', false);
                 ensureMember(roomId, 'user-two', 0, 'host', true);
                 state.activeRoomId = roomId;
                 data = { room_id: roomId, status: 'waiting' };
-              } else if (name === 'create_room') {
+              } else if (name === 'create_room' || name === 'create_wager_room') {
                 const roomId = args.p_mode === 'ludo_chess' ? 'chess-room' : 'host-room';
-                ensureRoom(roomId, 'user-one', args.p_mode, args.p_capacity);
+                const room = ensureRoom(roomId, 'user-one', args.p_mode, args.p_capacity);
+                if (Object.hasOwn(args, 'p_entry_fee')) room.entry_fee = args.p_entry_fee;
                 ensureMember(roomId, 'user-one', 0, 'host', false);
                 ensureMember(roomId, 'user-two', 1, 'member', true);
                 state.activeRoomId = roomId;
@@ -471,8 +490,20 @@ function startLocalServer() {
     });
     await page.waitForFunction(() => document.querySelector('#online-wallet-coins').textContent === '2,500' && document.querySelector('#online-wallet-diamonds').textContent === '12');
 
+    await page.waitForFunction(() => !document.querySelector('#online-championship-enter').disabled);
+    await page.select('#online-championship-fee', '100');
+    await page.click('#online-championship-enter');
+    await page.waitForFunction(() => document.querySelector('#online-championship-status').textContent.includes('Waiting for entrants'));
+    await page.waitForFunction(() => document.querySelector('#online-wallet-coins').textContent === '2,400');
+    assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'enter_online_championship').args.p_entry_fee), 100, 'Championship entry uses the selected virtual buy-in');
+    assert.equal(await page.$eval('#online-wallet-coins', el => el.textContent), '2,400', 'server-held Championship entry is reflected in the cloud wallet');
+    await page.click('#online-championship-leave');
+    await page.waitForFunction(() => document.querySelector('#online-championship-status').textContent.startsWith('Eight signed-in players'));
+    await page.waitForFunction(() => document.querySelector('#online-wallet-coins').textContent === '2,500');
+    assert.equal(await page.$eval('#online-wallet-coins', el => el.textContent), '2,500', 'leaving while waiting refunds the selected cloud-coin entry');
+
     await page.click('#online-quick-match');
-    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-mode').textContent === 'Classic · 2 seats');
+    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-mode').textContent.startsWith('Classic · 2 seats'));
     assert.match(await page.$eval('#online-room-roster', el => el.textContent), /Alice Online[\s\S]*Bob/, 'matchmaking loads a room roster with cloud names');
     await page.evaluate(() => {
       const state = window.__mockBackend;
@@ -505,9 +536,23 @@ function startLocalServer() {
       await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 1' && document.querySelector('#online-match-dice').textContent.includes('rolled 6'));
       await page.evaluate(() => document.querySelector('#game .pod[data-seat="0"] .pdice').click());
       await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 2' && document.querySelector('#online-match-turn').textContent.includes('choose a legal token move'));
-      await page.waitForFunction(() => { const g = window.__cf.game; return g && g.online && g.st.phase === 'move' && g.st.moves.some(m => m.piece === 0); });
-      await page.evaluate(() => document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]').click());
-      await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 3' && window.__cf.game && window.__cf.game.st.pieces[0][0] === 0);
+      await page.waitForFunction(() => {
+        const g = window.__cf && window.__cf.game;
+        const pawn = document.querySelector('#pieces .pc[data-seat="0"][data-piece="0"]');
+        return g && g.online && g.st.phase === 'move' && g.st.moves.some(m => m.piece === 0) && !window.__cf.busy && pawn && !pawn.disabled;
+      });
+      await page.click('#pieces .pc[data-seat="0"][data-piece="0"]');
+      await page.waitForFunction(() => document.querySelector('#online-match-version').textContent === 'Version 3' && window.__cf.game && window.__cf.game.st.pieces[0][0] === 0, { timeout: 10000 }).catch(async error => {
+        const state = await page.evaluate(() => ({
+          status: document.querySelector('#online-status') && document.querySelector('#online-status').textContent,
+          version: document.querySelector('#online-match-version') && document.querySelector('#online-match-version').textContent,
+          game: window.__cf && window.__cf.game ? { online: window.__cf.game.online, phase: window.__cf.game.st.phase, turn: window.__cf.game.st.turn, pieces: window.__cf.game.st.pieces } : null,
+          calls: window.__mockBackend.rpcCalls.slice(-8).map(call => call.name),
+          match: window.__mockBackend.tables.match_states.find(row => row.room_id === window.__mockBackend.activeRoomId)
+        }));
+        console.error('Online move failure diagnostics:', JSON.stringify(state), 'page errors:', errors);
+        throw error;
+      });
       const matchCalls = await page.evaluate(() => window.__mockBackend.rpcCalls.filter(call => ['roll_match', 'move_match'].includes(call.name)));
       assert.equal(matchCalls[0].args.p_action_id, firstRollId, 'retry sends the same idempotency key after a dropped action');
       assert.equal(Object.hasOwn(matchCalls[0].args, 'p_die'), false, 'client cannot pass a dice face into the server roll RPC');
@@ -528,7 +573,7 @@ function startLocalServer() {
     await page.select('#online-mode', 'ludo_chess');
     await page.click('#online-create-room');
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'INVITEROOM123456');
-    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats');
+    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent.startsWith('Ludo Chess · 2 seats'));
     await page.click('#online-ready');
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     await page.click('#online-start-room');
@@ -859,7 +904,7 @@ function startLocalServer() {
     await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-invite-code').value === 'INVITEROOM123456');
     assert.equal(await page.evaluate(() => window.__mockBackend.rpcCalls.findLast(call => call.name === 'join_room').args.p_invite_code), 'INVITE-ROOM-CODE', 'join-by-code normalizes invite codes before calling the RPC');
 
-    await page.evaluate(() => { window.__mockBackend.failRpc = 'quick_match'; });
+    await page.evaluate(() => { window.__mockBackend.failRpc = 'quick_match_wager'; });
     await page.click('#online-quick-match');
     await page.waitForFunction(() => document.querySelector('#online-status').textContent.includes('Matchmaking failed: The matching service is unavailable.'));
     await page.evaluate(() => { window.__mockBackend.failRpc = null; });
@@ -951,7 +996,7 @@ function startLocalServer() {
     }
 
     await seedAndReload('classic', true);
-    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Classic · 2 seats' && document.querySelector('#online-match-version').textContent === 'Version 7');
+    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent.startsWith('Classic · 2 seats') && document.querySelector('#online-match-version').textContent === 'Version 7');
     assert.equal(await page.$eval('#online-room-connection', el => el.dataset.state), 'connected', 'refresh resumes the stored Classic room from authoritative version 7');
     assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.room')), 'resume-classic', 'refresh keeps the authenticated active room selected');
     const screenshotPath = path.resolve(__dirname, '../../artifacts/online-reconnect-mobile.png');
@@ -1011,7 +1056,7 @@ function startLocalServer() {
     assert.match(await page.$eval('#online-room-connection', el => el.textContent), /Room ended/, 'terminal room state is clearly displayed');
 
     await seedAndReload('ludo_chess', false);
-    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats' && document.querySelector('#online-match-version').textContent === 'Version 4');
+    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent.startsWith('Ludo Chess · 2 seats') && document.querySelector('#online-match-version').textContent === 'Version 4');
     assert.equal(await page.evaluate(() => sessionStorage.getItem('crossfour.online.room')), 'resume-ludo_chess', 'room recovery discovers an active Chess room when no room ID was persisted');
     assert.equal(await page.$eval('#online-room-connection', el => el.dataset.state), 'connected', 'discovered Chess room synchronizes its authoritative state');
     await page.evaluate(() => {
@@ -1088,7 +1133,7 @@ function startLocalServer() {
       state.session = { user: { id: 'user-one', email: 'alice@example.test' } };
       state.authListeners.forEach(callback => callback('SIGNED_IN', state.session));
     });
-    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats');
+    await page.waitForFunction(() => !document.querySelector('#online-room-card').classList.contains('hidden') && document.querySelector('#online-room-mode').textContent.startsWith('Ludo Chess · 2 seats'));
     await page.evaluate(() => {
       const state = window.__mockBackend;
       state.tables.rooms[0].status = 'completed';
@@ -1124,7 +1169,7 @@ function startLocalServer() {
       state.tables.ludo_chess_matches = state.tables.ludo_chess_matches.filter(row => row.room_id !== 'chess-room');
     });
     await page.click('#online-create-room');
-    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent === 'Ludo Chess · 2 seats' && document.querySelector('#online-room-status').textContent.includes('Waiting'));
+    await page.waitForFunction(() => document.querySelector('#online-room-mode').textContent.startsWith('Ludo Chess · 2 seats') && document.querySelector('#online-room-status').textContent.includes('Waiting'));
     await page.click('#online-ready');
     await page.waitForFunction(() => document.querySelector('#online-ready').textContent === 'Mark not ready');
     await page.click('#online-start-room');
