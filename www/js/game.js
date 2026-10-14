@@ -2279,6 +2279,7 @@
     renderSummary();
     if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
     render(); setCoins(); setLevel(); show('result');
+    if (entering) $('r-title').focus({ preventScroll: true }); // v1.8.7 (#111)
     if (entering) { spotlightWinner(winner); celebrateWin(winner); }
   }
   /** v1.8.2 match summary: this match's highlights, new unlocks, closest skin goal, today's challenge. */
@@ -2308,7 +2309,7 @@
       persist();
       if (dest === 'again' && championshipNext) startChampionshipRound();
       else if (dest === 'again' && championshipStage == null) startMatch(seats, mode, false, entryFee);
-      else showHome();
+      else { showHome(); var homeAction = $('btn-vs-ai'); if (homeAction) setTimeout(function () { if (!$('home').classList.contains('hidden')) homeAction.focus({ preventScroll: true }); }, 0); } // v1.8.7 (#111)
     });
   }
   function doubleCoins() {
@@ -3045,6 +3046,19 @@
       var firstDialogButton = dialogButtons[0], lastDialogButton = dialogButtons[dialogButtons.length - 1];
       if (e.shiftKey && document.activeElement === firstDialogButton) { e.preventDefault(); lastDialogButton.focus(); }
       else if (!e.shiftKey && document.activeElement === lastDialogButton) { e.preventDefault(); firstDialogButton.focus(); }
+      return;
+    }
+    if (isOpen('result') && !document.querySelector('.overlay:not(.hidden):not(#result)')) { // v1.8.7 (#111) focus trap
+      if (e.key === 'Tab') {
+        var resultDialog = $('result'), resultButtons = resultDialog.querySelectorAll('button:not([disabled]):not(.hidden)'), resultTitle = $('r-title');
+        if (!resultButtons.length) { e.preventDefault(); resultTitle.focus({ preventScroll: true }); }
+        else {
+          var firstResultButton = resultButtons[0], lastResultButton = resultButtons[resultButtons.length - 1];
+          if (!resultDialog.contains(document.activeElement)) { e.preventDefault(); (e.shiftKey ? lastResultButton : firstResultButton).focus(); }
+          else if (e.shiftKey && (document.activeElement === firstResultButton || document.activeElement === resultTitle)) { e.preventDefault(); lastResultButton.focus(); }
+          else if (!e.shiftKey && document.activeElement === lastResultButton) { e.preventDefault(); firstResultButton.focus(); }
+        }
+      }
       return;
     }
     if (!G || $('game').classList.contains('hidden') || paused) return;
