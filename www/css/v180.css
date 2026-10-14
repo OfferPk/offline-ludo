@@ -176,3 +176,26 @@ body.light .practice-note b,.light .practice-note b{color:#9a6200}
 #settings .reset-tips-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 #settings .reset-tips-row>span{flex:1 1 auto;min-width:0}
 #settings .reset-tips-row .btn{flex:0 0 auto;width:auto;min-width:0;max-width:45%;padding:8px 14px;white-space:nowrap;margin:0}
+
+/* v1.9.1 move speed + recent matches */
+#settings .move-speed-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#settings .move-speed-row>span{flex:1 1 140px;min-width:0}
+#settings .move-speed-row .seg{flex:0 0 auto}
+#settings .move-speed-row .seg button{padding:7px 10px;min-height:36px}
+#settings .move-speed-row .seg button:disabled{opacity:.45}
+.match-history{margin:14px 0 6px}
+.match-history h4{margin:0 0 8px}
+.history-list{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:280px;overflow:auto}
+.history-item{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+.history-item.won .history-place{color:#f5b93a}
+.history-place{font-weight:800;text-align:center}
+.history-copy{display:flex;flex-direction:column;min-width:0}
+.history-copy b{font-size:.92em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.history-copy small{opacity:.7}
+.history-reward{display:flex;flex-direction:column;align-items:flex-end;gap:3px;font-size:.82em;white-space:nowrap}
+.history-tag{font-size:.78em;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#2a1c00;background:#f5b93a;border-radius:999px;padding:2px 8px}
+.history-item.practice{border-color:rgba(245,185,58,.35)}
+body.light .history-item{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1)}
+
+/* v1.9.1: keep particle churn from invalidating layout outside the effects layer */
+#fx{contain:layout style}

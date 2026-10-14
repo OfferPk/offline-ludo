@@ -8,9 +8,9 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.9.0">
-  <link rel="stylesheet" href="css/v180.css?v=1.9.0">
-  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.9.0">
+  <link rel="stylesheet" href="css/style.css?v=1.9.1">
+  <link rel="stylesheet" href="css/v180.css?v=1.9.1">
+  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.9.1">
 </head>
 <body>
   <div id="app">
@@ -564,6 +564,7 @@
         <div class="panel-head"><h3>Player Profile &amp; Roadmap</h3><button class="icon-btn close" data-close="stats" aria-label="Close">✕</button></div>
         <div class="profile-snapshot"><span id="profile-avatar-frame" class="profile-avatar-frame" aria-hidden="true"><span>✦</span></span><span class="profile-snapshot-copy"><small>LOCAL PLAYER · LEVEL <b id="profile-level">1</b></small><b id="profile-xp">0 XP</b><span>Offline progress stays on this device.</span></span></div>
         <div id="stats-body" class="stats-grid"></div>
+        <section class="match-history" aria-labelledby="history-title"><h4 id="history-title">Recent matches</h4><p id="history-empty" class="note">Finished matches on this device appear here. Pass &amp; Play games with no computer seats are marked Practice.</p><ol id="history-list" class="history-list"></ol></section>
         <section class="level-roadmap" aria-labelledby="level-roadmap-title"><h4 id="level-roadmap-title">Level rewards</h4><div id="level-roadmap-items" class="level-roadmap-items"></div></section>
       </div>
     </div>
@@ -690,6 +691,7 @@
         <label class="row"><span>Turn timer <small>20 s per turn for human players</small></span><input type="checkbox" id="set-timer"><i class="sw"></i></label>
         <label class="row"><span>Computer chat &amp; emotes</span><input type="checkbox" id="set-chat"><i class="sw"></i></label>
         <label class="row"><span>Fast animations</span><input type="checkbox" id="set-fast"><i class="sw"></i></label>
+        <div class="row move-speed-row" role="group" aria-labelledby="move-speed-label"><span id="move-speed-label">Token move speed <small id="move-speed-note">How quickly tokens hop from square to square.</small></span><div class="seg" id="move-speed"><button type="button" data-speed="relaxed" aria-pressed="false">Relaxed</button><button type="button" data-speed="normal" aria-pressed="true" class="on">Normal</button><button type="button" data-speed="quick" aria-pressed="false">Quick</button></div></div>
         <div class="row reset-tips-row"><span>Gameplay tips <small id="reset-tips-status" role="status" aria-live="polite">Tips appear once, the first time you need them</small></span><button id="btn-reset-tips" class="btn plate small-btn" type="button">Reset tips</button></div>
         <section id="storage-protection" class="storage-protection" aria-labelledby="storage-protection-title" aria-busy="true">
           <div class="storage-protection-copy">
@@ -726,7 +728,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.9.0 · © OfferPk</p>
+        <p class="ver">Crossfour v1.9.1 · © OfferPk</p>
       </div>
     </div>
 
@@ -735,37 +737,37 @@
   </div>
 
   <div id="tip-card" class="tip-card hidden" role="status" aria-live="polite"><b id="tip-title"></b><p id="tip-text"></p><button id="tip-ok" class="btn primary" type="button">Got it</button></div>
-  <script src="js/ads-config.js?v=1.9.0"></script>
-  <script src="js/adgate.js?v=1.9.0"></script>
-  <script src="js/ads.js?v=1.9.0"></script>
-  <script src="js/logic.js?v=1.9.0"></script>
-  <script src="js/sound.js?v=1.9.0"></script>
-  <script src="js/themes.js?v=1.9.0"></script>
-  <script src="js/daily-spin.js?v=1.9.0"></script>
-  <script src="js/progression-rewards.js?v=1.9.0"></script>
-  <script src="js/championship.js?v=1.9.0"></script>
-  <script src="js/token-evolution.js?v=1.9.0"></script>
-  <script src="js/token-skins.js?v=1.9.0"></script>
-  <script src="js/daily.js?v=1.9.0"></script>
-  <script src="js/match-summary.js?v=1.9.0"></script>
-  <script src="js/skin-shop.js?v=1.9.0"></script>
-  <script src="js/art.js?v=1.9.0"></script>
-  <script src="js/save-store.js?v=1.9.0"></script>
-  <script src="js/offline-move-announcements.js?v=1.9.0"></script>
-  <script src="js/dice-gesture.js?v=1.9.0"></script>
-  <script src="js/path-animation.js?v=1.9.0"></script>
-  <script src="js/offline-roll-announcements.js?v=1.9.0"></script>
-  <script src="js/celebration.js?v=1.9.0"></script>
-  <script src="js/game.js?v=1.9.0"></script>
-  <script src="js/local-peer.js?v=1.9.0"></script>
-  <script src="js/vendor/qrcode-generator.js?v=1.9.0"></script>
-  <script src="js/local-room.js?v=1.9.0"></script>
-  <script src="js/community-fixtures.js?v=1.9.0"></script>
-  <script src="js/community.js?v=1.9.0"></script>
-  <script src="js/supabase-config.js?v=1.9.0"></script>
-  <script src="js/chess.js?v=1.9.0"></script>
-  <script src="js/online.js?v=1.9.0"></script>
-  <script src="js/ludo-chess-discovery.js?v=1.9.0"></script>
-  <script src="js/storage-protection.js?v=1.9.0"></script>
+  <script src="js/ads-config.js?v=1.9.1"></script>
+  <script src="js/adgate.js?v=1.9.1"></script>
+  <script src="js/ads.js?v=1.9.1"></script>
+  <script src="js/logic.js?v=1.9.1"></script>
+  <script src="js/sound.js?v=1.9.1"></script>
+  <script src="js/themes.js?v=1.9.1"></script>
+  <script src="js/daily-spin.js?v=1.9.1"></script>
+  <script src="js/progression-rewards.js?v=1.9.1"></script>
+  <script src="js/championship.js?v=1.9.1"></script>
+  <script src="js/token-evolution.js?v=1.9.1"></script>
+  <script src="js/token-skins.js?v=1.9.1"></script>
+  <script src="js/daily.js?v=1.9.1"></script>
+  <script src="js/match-summary.js?v=1.9.1"></script>
+  <script src="js/skin-shop.js?v=1.9.1"></script>
+  <script src="js/art.js?v=1.9.1"></script>
+  <script src="js/save-store.js?v=1.9.1"></script>
+  <script src="js/offline-move-announcements.js?v=1.9.1"></script>
+  <script src="js/dice-gesture.js?v=1.9.1"></script>
+  <script src="js/path-animation.js?v=1.9.1"></script>
+  <script src="js/offline-roll-announcements.js?v=1.9.1"></script>
+  <script src="js/celebration.js?v=1.9.1"></script>
+  <script src="js/game.js?v=1.9.1"></script>
+  <script src="js/local-peer.js?v=1.9.1"></script>
+  <script src="js/vendor/qrcode-generator.js?v=1.9.1"></script>
+  <script src="js/local-room.js?v=1.9.1"></script>
+  <script src="js/community-fixtures.js?v=1.9.1"></script>
+  <script src="js/community.js?v=1.9.1"></script>
+  <script src="js/supabase-config.js?v=1.9.1"></script>
+  <script src="js/chess.js?v=1.9.1"></script>
+  <script src="js/online.js?v=1.9.1"></script>
+  <script src="js/ludo-chess-discovery.js?v=1.9.1"></script>
+  <script src="js/storage-protection.js?v=1.9.1"></script>
 </body>
 </html>

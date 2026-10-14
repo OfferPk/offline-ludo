@@ -52,8 +52,19 @@
       },
       stats: { played: 0, won: 0, streak: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], quick: [0, 0], team: [0, 0], arrow: [0, 0], friendly: [0, 0], duel: [0, 0], four: [0, 0] },
       flags: { diamondCollection: true, crownFrame: false, championshipCrown: false },
-      dailySpinAt: 0, rewardClaims: [], championship: null, game: null, ad: {}, daily: DAILY ? DAILY.normalize({}) : {}
+      dailySpinAt: 0, rewardClaims: [], moveSpeed: 'normal', history: [], championship: null, game: null, ad: {}, daily: DAILY ? DAILY.normalize({}) : {}
     };
+  }
+  /* v1.9.1 token move speed (per-square hop time, ms) and a short local match history. */
+  var MOVE_SPEEDS = { relaxed: 210, normal: 150, quick: 100 }, HISTORY_MAX = 20;
+  var HISTORY_MODES = ['classic', 'mystery', 'lucky', 'quick', 'team', 'arrow', 'friendly'];
+  function normalizeHistory(a) {
+    if (!Array.isArray(a)) return [];
+    return a.filter(function (h) {
+      return isRecord(h) && isCount(h.at) && HISTORY_MODES.indexOf(h.mode) >= 0 && isInt(h.place, 1, 4) && isInt(h.players, 2, 4) && isCount(h.coins) && isCount(h.xp);
+    }).slice(0, HISTORY_MAX).map(function (h) {
+      return { at: h.at, mode: h.mode, place: h.place, players: h.players, coins: h.coins, xp: h.xp, practice: h.practice === true, vsAi: h.vsAi === true, champ: h.champ === true };
+    });
   }
   function isRecord(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
   function isInt(x, min, max) { return typeof x === 'number' && isFinite(x) && Math.floor(x) === x && x >= min && x <= max; }
@@ -121,6 +132,8 @@
     var d = defaults(), s = d;
     s.coins = safeCounter(raw.coins, d.coins); s.xp = safeCounter(raw.xp, d.xp);
     s.dailySpinAt = safeCounter(raw.dailySpinAt, 0);
+    s.moveSpeed = MOVE_SPEEDS[raw.moveSpeed] ? raw.moveSpeed : 'normal';
+    s.history = normalizeHistory(raw.history);
     s.rewardClaims = Array.isArray(raw.rewardClaims) ? raw.rewardClaims.filter(function (level, i, list) {
       return [2, 5, 10].indexOf(level) >= 0 && list.indexOf(level) === i;
     }) : [];
@@ -317,6 +330,11 @@
   };
   function tipsSeen() { try { var v = JSON.parse(window.localStorage.getItem(TIPS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
   function markTip(id) { var v = tipsSeen(); v[id] = 1; try { window.localStorage.setItem(TIPS_KEY, JSON.stringify(v)); } catch (e) {} }
+  /** v1.9.1: in-game tips don't follow the player out of the match (they count as seen). */
+  function closeGameTips() {
+    tipQueue = tipQueue.filter(function (id) { return ['arrow', 'danger', 'practice'].indexOf(id) < 0; });
+    if (tipShowing && ['arrow', 'danger', 'practice'].indexOf(tipShowing) >= 0) { markTip(tipShowing); nextTip(); }
+  }
   function resetTips() {
     tipQueue = []; nextTip();
     try { window.localStorage.removeItem(TIPS_KEY); } catch (e) {}
@@ -346,7 +364,7 @@
   function board() { for (var i = 0; i < SK.BOARDS.length; i++) if (SK.BOARDS[i].id === save.board) return SK.BOARDS[i]; return SK.BOARDS[0]; }
   function dice() { for (var i = 0; i < SK.DICE.length; i++) if (SK.DICE[i].id === save.dice) return SK.DICE[i]; return SK.DICE[0]; }
   function seatColor(s) { return board().seats[s]; }
-  function stepMs() { return save.settings.fast ? 85 : 150; }
+  function stepMs() { return save.settings.fast ? 85 : MOVE_SPEEDS[save.moveSpeed] || 150; }
   function aiDelay() { return save.settings.fast ? 300 : 600; }
 
   // ---------------- skins ----------------
@@ -1636,10 +1654,26 @@
   var LOW_END = (function () { try { var n = navigator; return (n.hardwareConcurrency && n.hardwareConcurrency <= 4) || (n.deviceMemory && n.deviceMemory <= 2); } catch (e) { return false; } })();
   function lowFx() { return LOW_END || !!(save && save.settings && save.settings.fast); }
   document.body.classList.toggle('lowfx', LOW_END);
-  function fxEl(cls, x, y) { var e = document.createElement('i'); e.className = cls; e.style.left = x + 'px'; e.style.top = y + 'px'; $('fx').appendChild(e); return e; }
+  /* v1.9.1 effect budget: cap live particles (48, or 20 on low-end/fast) so a capture during a long move can't flood the layer.
+   * Over budget, a detached element is returned: callers still style and remove it, but it never reaches layout or paint. */
+  var fxLayer = null;
+  function fxBudget() { return lowFx() ? 20 : 48; }
+  function fxEl(cls, x, y, essential) {
+    var e = document.createElement('i'); e.className = cls;
+    e.style.cssText = 'left:' + (+x).toFixed(1) + 'px;top:' + (+y).toFixed(1) + 'px';
+    if (!fxLayer || !fxLayer.isConnected) fxLayer = $('fx');
+    if (essential || fxLayer.childElementCount < fxBudget()) fxLayer.appendChild(e);
+    return e;
+  }
+  /** Restart a CSS animation class without forcing a synchronous layout (no offsetWidth read). */
+  function restartClass(el, cls, ms) {
+    if (!el) return;
+    el.classList.remove(cls);
+    requestAnimationFrame(function () { el.classList.add(cls); if (ms) setTimeout(function () { el.classList.remove(cls); }, ms); });
+  }
   function burst(x, y, col, n) {
     if (!fxOk()) return;
-    n = Math.min(n || 12, 22);
+    n = Math.min(n || 12, 22); if (lowFx()) n = Math.ceil(n / 2);
     for (var k = 0; k < n; k++) {
       var e = fxEl('burst', x, y), a = k / n * Math.PI * 2 + Math.random() * 0.35, d = CELL * (0.9 + Math.random() * 1.35);
       e.style.background = col; e.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px'); e.style.setProperty('--dy', (Math.sin(a) * d).toFixed(1) + 'px');
@@ -1659,13 +1693,13 @@
   }
   function bolt(x, y) { if (!fxOk()) return; var e = fxEl('bolt', x, y); e.innerHTML = ART.icon('zap', 40); setTimeout(function () { e.remove(); }, 700); }
   function iconPop(x, y, id, cls) { if (!fxOk()) return; var e = fxEl('iconpop ' + (cls || ''), x, y); e.innerHTML = ART.icon(id, 30); setTimeout(function () { e.remove(); }, 900); }
-  function shake() { if (!fxOk()) return; var w = $('board-wrap'); w.classList.remove('shake'); void w.offsetWidth; w.classList.add('shake'); }
+  function shake() { if (!fxOk()) return; restartClass($('board-wrap'), 'shake'); }
   /** Stronger kill/capture FX (~0.5–0.8s): impact shockwave + settle glow; transform/opacity only. */
   function killBurst(x, y, attackerCol, victimCol) {
     if (!fxOk()) return;
     burst(x, y, victimCol || attackerCol, 26);
     burst(x, y, attackerCol, 16);
-    for (var i = 0; i < 12; i++) {
+    for (var i = 0, nd = lowFx() ? 6 : 12; i < nd; i++) {
       var drop = fxEl('burst burst-splash', x, y), a = i / 12 * Math.PI * 2 + 0.15, d = CELL * (0.75 + (i % 4) * 0.32);
       drop.style.background = i % 2 ? attackerCol : (victimCol || attackerCol);
       drop.style.setProperty('--dx', (Math.cos(a) * d).toFixed(1) + 'px');
@@ -1842,7 +1876,7 @@
         onStep: function (k) {
           piecePos[id] = points[k];
           if (!prefersReducedMotion()) {
-            el.classList.remove('land'); void el.offsetWidth; el.classList.add('land');
+            restartClass(el, 'land');
             trailFx(points[k].x, points[k].y, skinForSeat(s), seatColor(s), k);
             hopStepFx(points[k].x, points[k].y, seatColor(s), evoLevelForSeat(s) > 1 && TOKEN_EVOLUTION ? TOKEN_EVOLUTION.levelOf(evoLevelForSeat(s)).particles : 0);
             if (from < 0 && k === 0) yardExitFx(s, points[k]);
@@ -1872,14 +1906,14 @@
   function captureImpactFx(s, caps, at) {
     if (!fxOk() || !at) return;
     var col = seatColor(s);
-    var hit = fxEl('cap-impact', at.x, at.y); hit.style.setProperty('--rc', col); setTimeout(function () { hit.remove(); }, 520);
-    var wave = fxEl('cap-wave', at.x, at.y); wave.style.setProperty('--rc', col); setTimeout(function () { wave.remove(); }, 640);
+    var hit = fxEl('cap-impact', at.x, at.y, true); hit.style.setProperty('--rc', col); setTimeout(function () { hit.remove(); }, 520);
+    var wave = fxEl('cap-wave', at.x, at.y, true); wave.style.setProperty('--rc', col); setTimeout(function () { wave.remove(); }, 640);
     captureImpactFeedback();
     caps.forEach(function (cp, n) {
       var ghost = fxEl('cap-pop', at.x + (n - (caps.length - 1) / 2) * CELL * 0.22, at.y); ghost.style.setProperty('--rc', seatColor(cp.seat)); setTimeout(function () { ghost.remove(); }, 520);
     });
     var me = G && G.lastMove ? pieceEls[G.lastMove.seat] && pieceEls[G.lastMove.seat][G.lastMove.piece] : null;
-    if (me && G.lastMove.seat === s) { me.classList.remove('cap-bounce'); void me.offsetWidth; me.classList.add('cap-bounce'); setTimeout(function () { me.classList.remove('cap-bounce'); }, 620); }
+    if (me && G.lastMove.seat === s) restartClass(me, 'cap-bounce', 620);
     for (var k = 0; k < 6; k++) {
       var sp = fxEl('cap-spark', at.x, at.y - CELL * 0.35), a = -Math.PI / 2 + (k - 2.5) * 0.42;
       sp.style.setProperty('--dx', (Math.cos(a) * CELL * 0.62).toFixed(1) + 'px'); sp.style.setProperty('--dy', (Math.sin(a) * CELL * 0.62).toFixed(1) + 'px');
@@ -2272,13 +2306,16 @@
           }
         }
       }
+      save.history = [{ at: Date.now(), mode: st.mode, place: Math.max(1, Math.min(4, best)), players: st.players.length, coins: G.coins + (G.stakePayout || 0) + (G.tournamentPayout || 0), xp: G.xp,
+        practice: !!G.practice, vsAi: ai.length > 0, champ: G.championshipStage != null }].concat(normalizeHistory(save.history)).slice(0, HISTORY_MAX);
       var S = save.stats; S.played++;
       if (G.practice) { /* friendly table: wins/streak untouched */ } else if (best === 1) { S.won++; S.streak = safeCounter(S.streak, 0) + 1; } else S.streak = 0;
       if (ai.length) { var top = ai.indexOf('hard') >= 0 ? 'hard' : ai.indexOf('medium') >= 0 ? 'medium' : 'easy'; S.vs[top][0]++; if (best === 1) S.vs[top][1]++; } else S.pass++;
-      if (st.mode === 'mystery') { S.mystery[0]++; if (best === 1) S.mystery[1]++; }
-      if (st.mode === 'lucky') { S.lucky[0]++; if (best === 1) S.lucky[1]++; }
-      ['quick', 'team', 'arrow', 'friendly'].forEach(function (m) { if (st.mode === m) { S[m][0]++; if (best === 1) S[m][1]++; } });
-      if (st.players.length === 2) { S.duel[0]++; if (best === 1) S.duel[1]++; } else if (st.players.length === 4) { S.four[0]++; if (best === 1) S.four[1]++; }
+      var rankedWin = best === 1 && !G.practice; // v1.9.1: practice wins don't feed per-mode win records either
+      if (st.mode === 'mystery') { S.mystery[0]++; if (rankedWin) S.mystery[1]++; }
+      if (st.mode === 'lucky') { S.lucky[0]++; if (rankedWin) S.lucky[1]++; }
+      ['quick', 'team', 'arrow', 'friendly'].forEach(function (m) { if (st.mode === m) { S[m][0]++; if (rankedWin) S[m][1]++; } });
+      if (st.players.length === 2) { S.duel[0]++; if (rankedWin) S.duel[1]++; } else if (st.players.length === 4) { S.four[0]++; if (rankedWin) S.four[1]++; }
       var previousBoards = save.owned.boards.slice(), previousDice = save.owned.dice.slice();
       var previousEvoU = save.tokenEvoUnlocked, previousEvo = save.tokenEvo;
       var previousSkinsOwned = (save.tokenSkinsOwned || []).slice(), previousSkinStats = JSON.parse(JSON.stringify(save.tokenSkinStats || {}));
@@ -2538,6 +2575,7 @@
   function showHome() {
     cancelFlow(); stopTimer(); paused = false; stopCelebration();
     ['result', 'menu', 'chat'].forEach(hide);
+    closeGameTips();
     $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
     screen('home'); updateHome(); setCoins(); setLevel(); updateDailyDot();
   }
@@ -2682,6 +2720,7 @@
       ['Wins vs Easy', S.vs.easy[1] + ' / ' + S.vs.easy[0]], ['Wins vs Normal', S.vs.medium[1] + ' / ' + S.vs.medium[0]], ['Wins vs Hard', S.vs.hard[1] + ' / ' + S.vs.hard[0]], ['Mystery events', S.events],
       ['Mystery wins', S.mystery[1] + ' / ' + S.mystery[0]], ['Lucky Chaos wins', (S.lucky||[0,0])[1] + ' / ' + (S.lucky||[0,0])[0]], ['Quick wins', (S.quick||[0,0])[1] + ' / ' + (S.quick||[0,0])[0]], ['Team wins', (S.team||[0,0])[1] + ' / ' + (S.team||[0,0])[0]], ['Arrow wins', (S.arrow||[0,0])[1] + ' / ' + (S.arrow||[0,0])[0]], ['Friendly wins', (S.friendly||[0,0])[1] + ' / ' + (S.friendly||[0,0])[0]], ['1 v 1 wins', S.duel[1] + ' / ' + S.duel[0]], ['4-player wins', S.four[1] + ' / ' + S.four[0]], ['Pass & Play', S.pass]];
     $('stats-body').innerHTML = cells.map(function (c) { return '<div><b>' + c[1] + '</b><span>' + c[0] + '</span></div>'; }).join('');
+    renderHistory();
     $('profile-level').textContent = lv.level;
     $('profile-xp').textContent = save.xp.toLocaleString('en-US') + ' XP · ' + lv.into + ' / ' + lv.need + ' to next level';
     var crowned = !!(save.flags.crownFrame || save.flags.championshipCrown), frame = $('profile-avatar-frame');
@@ -2699,6 +2738,37 @@
       var status = document.createElement('span'); status.className = 'roadmap-status'; status.textContent = reward.unlocked ? 'Claimed' : reward.reached ? 'Ready' : 'Upcoming';
       row.append(level, copy, status); $('level-roadmap-items').appendChild(row);
     });
+  }
+  var MODE_NAMES = { classic: 'Classic', mystery: 'Mystery Tiles', lucky: 'Lucky Chaos', quick: 'Quick', team: 'Team', arrow: 'Arrows', friendly: 'Friendly' };
+  function renderHistory() {
+    var list = $('history-list'); if (!list) return;
+    var items = normalizeHistory(save.history); list.replaceChildren();
+    $('history-empty').classList.toggle('hidden', items.length > 0);
+    items.forEach(function (h) {
+      var li = document.createElement('li'); li.className = 'history-item' + (h.practice ? ' practice' : '') + (h.place === 1 ? ' won' : '');
+      var place = document.createElement('span'); place.className = 'history-place'; place.textContent = h.place === 1 ? '1st' : h.place === 2 ? '2nd' : h.place === 3 ? '3rd' : '4th';
+      var copy = document.createElement('span'); copy.className = 'history-copy';
+      var title = document.createElement('b'); title.textContent = (MODE_NAMES[h.mode] || 'Classic') + (h.champ ? ' · Championship' : '');
+      var meta = document.createElement('small'); var d = new Date(h.at);
+      meta.textContent = (h.vsAi ? 'vs Computer' : 'Pass & Play') + ' · ' + h.players + 'P · ' + d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      copy.append(title, meta);
+      var reward = document.createElement('span'); reward.className = 'history-reward';
+      if (h.practice) { var tag = document.createElement('span'); tag.className = 'history-tag'; tag.textContent = 'Practice'; reward.appendChild(tag); }
+      reward.appendChild(document.createTextNode((h.coins ? '+' + h.coins + ' coins · ' : '') + '+' + h.xp + ' XP'));
+      li.setAttribute('aria-label', (h.practice ? 'Practice match. ' : '') + title.textContent + ', finished ' + place.textContent + ', ' + meta.textContent + ', ' + reward.textContent.replace(/^Practice/, ''));
+      li.append(place, copy, reward); list.appendChild(li);
+    });
+  }
+  function setMoveSpeed(v) {
+    if (!MOVE_SPEEDS[v]) return;
+    save.moveSpeed = v; persist();
+    document.documentElement.style.setProperty('--step-ms', stepMs() + 'ms');
+    renderMoveSpeed();
+  }
+  function renderMoveSpeed() {
+    var seg = $('move-speed'); if (!seg) return;
+    each(seg.querySelectorAll('button'), function (b) { var on = b.dataset.speed === save.moveSpeed; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.disabled = !!save.settings.fast; });
+    $('move-speed-note').textContent = save.settings.fast ? 'Fast animations is on, so tokens use the quickest speed.' : 'How quickly tokens hop from square to square.';
   }
   function updateHomeStats() {
     var S = save.stats, rate = S.played ? Math.round(S.won / S.played * 100) + '%' : '–';
@@ -2929,7 +2999,7 @@
   }
   function openSettings(opener) {
     settingsOpener = opener || document.activeElement;
-    syncSettingsUI();
+    syncSettingsUI(); renderMoveSpeed();
     show('settings');
     $('settings-title').focus();
   }
@@ -3085,6 +3155,7 @@
   $('btn-pass').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('pass'); });
   $('btn-setup-back').addEventListener('click', function () { SFX.click(); showHome(); });
   $('entry-fee').addEventListener('change', function () { selectedEntryFee = Number(this.value) || 0; renderSetup(); if (selectedEntryFee) tip('fee'); });
+  each($('move-speed').querySelectorAll('button'), function (b) { b.addEventListener('click', function () { SFX.click(); setMoveSpeed(b.dataset.speed); }); });
   $('btn-reset-tips').addEventListener('click', function () { SFX.click(); resetTips(); });
   $('tip-ok').addEventListener('click', function () { SFX.click(); dismissTip(); });
   each($('mode-seg').children, function (b) { b.addEventListener('click', function () { SFX.click(); setupMode = b.dataset.mode; save.setup.mode[setupKind] = setupMode; persist(); renderSetup(); }); });
@@ -3177,7 +3248,7 @@
     $('set-' + k).addEventListener('change', function () {
       save.settings[k] = $('set-' + k).checked; persist();
       if (k === 'sound') { SFX.setEnabled(save.settings.sound); SFX.unlock(); }
-      if (k === 'fast') document.documentElement.style.setProperty('--step-ms', stepMs() + 'ms');
+      if (k === 'fast') { document.documentElement.style.setProperty('--step-ms', stepMs() + 'ms'); renderMoveSpeed(); }
       if (k === 'undo' && !save.settings.undo && G) { G.undo = null; }
       if (k === 'timer' && G && !$('game').classList.contains('hidden') && !busy) { if (save.settings.timer) startTimer(); else stopTimer(); }
       if (G) render();
@@ -3508,7 +3579,8 @@
     showOnlineBoard: showOnlineBoard,
     celebrateWin: celebrateWin,
     openVault: openVault,
-    tip: tip, get tipShowing() { return tipShowing; }, dismissTip: dismissTip, resetTips: resetTips, get lowFx() { return lowFx(); },
+    tip: tip, get tipShowing() { return tipShowing; }, dismissTip: dismissTip, resetTips: resetTips, fxBench: { capture: function (x, y) { var at = { x: x, y: y }; captureImpactFx(0, [{ seat: 1, piece: 0 }], at); killBurst(x, y, seatColor(0), seatColor(1)); floatAt(x, y - CELL * 0.6, 'Captured!', 'float-kill'); shake(); },
+      hop: function (x, y, k) { trailFx(x, y, save.tokenSkin, seatColor(0), k); hopStepFx(x, y, seatColor(0), 3); }, get live() { return $('fx').childElementCount; } }, get stepMs() { return stepMs(); }, setMoveSpeed: setMoveSpeed, get lowFx() { return lowFx(); },
     get celebration() { return window.CamelCelebration ? window.CamelCelebration.state : 'idle'; }
   };
 })();

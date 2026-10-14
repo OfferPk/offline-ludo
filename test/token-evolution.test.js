@@ -20,10 +20,10 @@ const ok = (c, m) => { assert.ok(c, m); checks++; console.log('  ok -', m); };
 
 console.log('token-evolution.test.js');
 
-ok(pkg.version === '1.9.0', 'package version 1.9.0');
-ok(/versionCode 37/.test(gradle) && /versionName "1\.9\.0"/.test(gradle), 'gradle versionCode 37 / 1.9.0');
-ok(/Crossfour v1\.9\.0/.test(html) && /css\/style\.css\?v=1\.9\.0/.test(html), 'footer + asset cache-bust 1.9.0');
-ok(/token-evolution\.js\?v=1\.9\.0/.test(html), 'token-evolution.js script tagged');
+ok(pkg.version === '1.9.1', 'package version 1.9.1');
+ok(/versionCode 38/.test(gradle) && /versionName "1\.9\.1"/.test(gradle), 'gradle versionCode 38 / 1.9.1');
+ok(/Crossfour v1\.9\.1/.test(html) && /css\/style\.css\?v=1\.9\.1/.test(html), 'footer + asset cache-bust 1.9.1');
+ok(/token-evolution\.js\?v=1\.9\.1/.test(html), 'token-evolution.js script tagged');
 ok(/data-tab="tokens"/.test(html) && />Tokens</.test(html), 'Skins Tokens tab present');
 
 ok(Evo.maxLevel === 5 && Evo.LEVELS.length === 5, '5 evolution levels');
