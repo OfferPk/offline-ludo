@@ -1,4 +1,4 @@
-// v1.8.7 Token Skins + Token Vault + trails + capture FX (offline cosmetic only).
+// v1.8.8 Token Skins + Token Vault + trails + capture FX (offline cosmetic only).
 'use strict';
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -10,8 +10,8 @@ let n = 0; function ok(c, m) { assert.ok(c, m); n++; console.log('  ok -', m); }
 
 const pkg = JSON.parse(read('package.json')), gradle = read('android/app/build.gradle'), html = read('www/index.html');
 const game = read('www/js/game.js'), css = read('www/css/v180.css'), src = read('www/js/token-skins.js');
-ok(pkg.version === '1.8.7' && /versionCode 34/.test(gradle) && /versionName "1\.8\.7"/.test(gradle), 'version 1.8.7 / versionCode 34');
-ok(/js\/token-skins\.js\?v=1\.8\.7/.test(html) && /css\/v180\.css\?v=1\.8\.7/.test(html), 'token-skins.js + v180.css wired');
+ok(pkg.version === '1.8.8' && /versionCode 35/.test(gradle) && /versionName "1\.8\.8"/.test(gradle), 'version 1.8.8 / versionCode 35');
+ok(/js\/token-skins\.js\?v=1\.8\.8/.test(html) && /css\/v180\.css\?v=1\.8\.8/.test(html), 'token-skins.js + v180.css wired');
 ok(html.indexOf('token-skins.js') < html.indexOf('js/game.js'), 'token-skins loads before game.js');
 ok(/id="btn-vault"/.test(html) && /id="vault"/.test(html) && /id="vault-list"/.test(html) && /data-tab="tokenskins"/.test(html), 'Vault reachable from home + skins tab');
 ok(/btn-vault-skins/.test(game), 'Vault button inside Skins → Tokens');
@@ -58,7 +58,7 @@ ok(/function skinForSeat[\s\S]{0,200}!isHuman\(s\)\) return 'classic'/.test(game
 ok(/G\.online && G\.view != null && s !== G\.view\) return 'classic'/.test(game), 'online opponents stay Classic');
 // WebView safety + reduced motion
 const noComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
-ok(!/filter:(?!\s*none)/.test(noComments), 'no CSS filter in v1.8.7 styles (only filter:none)');
+ok(!/filter:(?!\s*none)/.test(noComments), 'no CSS filter in v1.8.8 styles (only filter:none)');
 ok(!/perspective|rotateX|rotateY|translateZ|preserve-3d/.test(noComments), 'no 3D transforms');
 ok(/prefers-reduced-motion: reduce[\s\S]*\.trail[\s\S]*\.cap-impact/.test(css), 'reduced-motion disables trails + capture FX');
 ok(/function trailFx[\s\S]{0,80}if \(!fxOk\(\)/.test(game) && /function captureImpactFx[\s\S]{0,80}if \(!fxOk\(\)/.test(game), 'JS FX gated on reduced motion');
