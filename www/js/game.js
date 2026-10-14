@@ -2472,8 +2472,16 @@
     if (G.st.phase === 'over') { finishMatch(); return; }
     advance();
   }
-  function openMenu() { if (!G) return; cancelFlow(); stopTimer(); paused = true; layoutPieces(true); render(); persist(); show('menu'); }
-  function resumeFromMenu() { hide('menu'); paused = false; layoutPieces(true); advance(); }
+  function openMenu() {
+    if (!G) return;
+    cancelFlow(); stopTimer(); paused = true; layoutPieces(true); render(); persist();
+    var menu = $('menu'); menu.removeAttribute('aria-hidden'); menu.setAttribute('aria-modal', 'true');
+    show('menu'); $('menu-title').focus({ preventScroll: true });
+  }
+  function resumeFromMenu() {
+    hide('menu'); paused = false; layoutPieces(true); advance();
+    $('btn-home').focus({ preventScroll: true });
+  }
   function askConfirm(title, text, yes, onYes, onNo) {
     $('confirm-title').textContent = title; $('confirm-text').textContent = text; $('confirm-yes').textContent = yes;
     $('confirm').classList.toggle('exit-confirm', title === 'Exit match?');
@@ -2532,7 +2540,7 @@
     $('home-win-rate').textContent = rate;
     $('btn-stats').setAttribute('aria-label', 'Open player statistics. ' + S.played + ' matches, ' + S.won + ' wins, ' + rate + ' win rate.');
   }
-  var skinTab = 'boards';
+  var skinTab = 'boards', rulesReturnFocus = null;
   function skinRequirement(it) {
     if (it.unlock === 'wins') return 'Unlock at ' + it.threshold + ' lifetime wins';
     if (it.unlock === 'streak') return 'Unlock with ' + it.threshold + ' consecutive wins';
@@ -2765,10 +2773,52 @@
     });
   }
   function openRules(tab) {
+    var alreadyOpen = isOpen('rules');
+    if (!alreadyOpen) {
+      rulesReturnFocus = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+      if (isOpen('menu')) {
+        var menu = $('menu');
+        menu.setAttribute('aria-hidden', 'true'); menu.setAttribute('aria-modal', 'false');
+        if (!rulesReturnFocus || !menu.contains(rulesReturnFocus)) rulesReturnFocus = $('btn-m-rules');
+      } else if (!rulesReturnFocus) rulesReturnFocus = setupVisible() ? $('btn-howto') : $('btn-rules');
+    }
     each($('rules-tabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
     each(document.querySelectorAll('.rules-page'), function (p) { p.classList.toggle('hidden', p.dataset.page !== tab); });
     show('rules');
+    if (!alreadyOpen) $('rules-title').focus({ preventScroll: true });
   }
+  function closeRules() {
+    hide('rules');
+    var menu = $('menu'), target = rulesReturnFocus;
+    rulesReturnFocus = null;
+    if (isOpen('menu')) { menu.removeAttribute('aria-hidden'); menu.setAttribute('aria-modal', 'true'); }
+    if (!target || !target.isConnected || target.disabled || target.closest('.hidden') || target.closest('[aria-hidden="true"]')) {
+      target = isOpen('menu') ? $('btn-m-rules') : setupVisible() ? $('btn-howto') : $('btn-rules');
+    }
+    if (target && typeof target.focus === 'function') target.focus({ preventScroll: true });
+  }
+  function handleGameDialogKeys(e) {
+    var overlays = Array.prototype.slice.call(document.querySelectorAll('.overlay:not(.hidden)'));
+    var dialog = overlays.length ? overlays[overlays.length - 1] : null;
+    if (dialog !== $('menu') && dialog !== $('rules')) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (dialog.id === 'menu') $('btn-m-resume').click();
+      else { var close = dialog.querySelector('[data-close="rules"]'); if (close) close.click(); }
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    var focusable = Array.prototype.slice.call(dialog.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(function (el) {
+      return !el.closest('.hidden') && !el.closest('[aria-hidden="true"]') && el.getClientRects().length > 0;
+    });
+    if (!focusable.length) { e.preventDefault(); var title = dialog.querySelector('[tabindex="-1"]'); if (title) title.focus({ preventScroll: true }); return; }
+    var first = focusable[0], last = focusable[focusable.length - 1];
+    if (!dialog.contains(document.activeElement)) { e.preventDefault(); (e.shiftKey ? last : first).focus({ preventScroll: true }); return; }
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog.querySelector('[tabindex="-1"]'))) {
+      e.preventDefault(); last.focus({ preventScroll: true });
+    } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus({ preventScroll: true }); }
+  }
+  document.addEventListener('keydown', handleGameDialogKeys);
   function setupVisible() { return !$('setup').classList.contains('hidden'); }
   function launchSetupMatch(seats, mode, offerTutorial, fee) {
     if (G && G.stakePaid > 0 && !G.stakeSettled) { save.coins += G.stakePaid; G.stakeSettled = true; }
@@ -2888,7 +2938,7 @@
   $('btn-settings').addEventListener('click', function () { SFX.unlock(); SFX.click(); syncSettingsUI(); show('settings'); });
   $('btn-game-settings').addEventListener('click', function () { SFX.click(); syncSettingsUI(); show('settings'); });
   each($('skin-tabs').children, function (b) { b.addEventListener('click', function () { skinTab = b.dataset.tab; SFX.click(); renderSkins(); }); });
-  each(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', function () { SFX.click(); hide(b.dataset.close); if (setupVisible()) renderSetup(); }); });
+  each(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', function () { SFX.click(); if (b.dataset.close === 'rules') closeRules(); else hide(b.dataset.close); if (setupVisible()) renderSetup(); }); });
   SETTINGS.forEach(function (k) {
     $('set-' + k).addEventListener('change', function () {
       save.settings[k] = $('set-' + k).checked; persist();
