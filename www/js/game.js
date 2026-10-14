@@ -2281,6 +2281,10 @@
     render(); setCoins(); setLevel(); show('result');
     if (entering) $('r-title').focus({ preventScroll: true }); // v1.8.7 (#111)
     if (entering) { spotlightWinner(winner); celebrateWin(winner); }
+    if (entering) {
+      var announcement = $('result-announcement');
+      if (announcement) announcement.textContent = 'Match over. ' + $('r-title').textContent;
+    }
   }
   /** v1.8.2 match summary: this match's highlights, new unlocks, closest skin goal, today's challenge. */
   function renderSummary() {
@@ -2302,6 +2306,8 @@
     if (!G || G.st.phase !== 'over') return;
     stopCelebration();
     hide('result');
+    var announcement = $('result-announcement');
+    if (announcement) announcement.textContent = '';
     var seats = G.seats, mode = G.mode, entryFee = G.entryFee || 0, championshipStage = G.championshipStage;
     var championshipNext = championshipStage != null && save.championship && save.championship.status === 'active' && save.championship.stage === championshipStage + 1;
     G = null; save.game = null; persist();
