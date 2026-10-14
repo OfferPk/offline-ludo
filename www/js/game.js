@@ -30,6 +30,9 @@
     { id: 'sapphire', rim0: '#eef4ff', rim1: '#a8c4e8', rim2: '#2a4e82', glassHi: '#b8d8ff', glassMid: '#3d7ef0', glassLo: '#143a78' }
   ];
   var TOKEN_EVOLUTION = window.TokenEvolution;
+  var DailySpin = window.DailySpin;
+  var ProgressionRewards = window.ProgressionRewards;
+  var Championship = window.Championship;
   var TOKEN_SKINS = window.TokenSkins;
   var DAILY = window.Daily;
   var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, MOVE_DECIDE_MS = 4000, FREE_UNDOS = 3;
@@ -47,8 +50,8 @@
         mode: { ai: 'classic', pass: 'classic' }
       },
       stats: { played: 0, won: 0, streak: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], quick: [0, 0], team: [0, 0], arrow: [0, 0], friendly: [0, 0], duel: [0, 0], four: [0, 0] },
-      flags: { diamondCollection: true }, game: null, ad: {}, daily: DAILY ? DAILY.normalize({}) : {}
-
+      flags: { diamondCollection: true, crownFrame: false, championshipCrown: false },
+      dailySpinAt: 0, rewardClaims: [], championship: null, game: null, ad: {}, daily: DAILY ? DAILY.normalize({}) : {}
     };
   }
   function isRecord(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
@@ -116,6 +119,11 @@
     if (!isRecord(raw)) return null;
     var d = defaults(), s = d;
     s.coins = safeCounter(raw.coins, d.coins); s.xp = safeCounter(raw.xp, d.xp);
+    s.dailySpinAt = safeCounter(raw.dailySpinAt, 0);
+    s.rewardClaims = Array.isArray(raw.rewardClaims) ? raw.rewardClaims.filter(function (level, i, list) {
+      return [2, 5, 10].indexOf(level) >= 0 && list.indexOf(level) === i;
+    }) : [];
+    s.championship = Championship && Championship.valid(raw.championship) ? JSON.parse(JSON.stringify(raw.championship)) : null;
     if (isRecord(raw.owned)) {
       ['boards', 'dice'].forEach(function (kind) { s.owned[kind] = window.SkinShop.normalizeOwned(raw.owned[kind], d.owned[kind]); });
     }
@@ -156,16 +164,19 @@
     if (validGame(raw.game)) {
       s.game = JSON.parse(JSON.stringify(raw.game));
       delete s.game.timerTk; delete s.game.actor; s.game.undo = null; s.game.sel = null;
+      if (!isCount(s.game.entryFee) || [0, 50, 100, 500].indexOf(s.game.entryFee) < 0) s.game.entryFee = 0;
+      if (!isCount(s.game.stakePaid)) s.game.stakePaid = 0;
+      if (s.game.championshipStage !== 0 && s.game.championshipStage !== 1 && s.game.championshipStage !== 2) s.game.championshipStage = null;
       s.game.st.moves = s.game.st.phase === 'move' ? L.queueMoves(s.game.st) : [];
     } else s.game = null;
     return s;
   }
   function validSave(s) {
-    if (!isRecord(s) || !Object.prototype.hasOwnProperty.call(s, 'game') || !isCount(s.coins) || !isCount(s.xp) || !isRecord(s.owned) || !Array.isArray(s.owned.boards) || !Array.isArray(s.owned.dice) ||
+    if (!isRecord(s) || !Object.prototype.hasOwnProperty.call(s, 'game') || !isCount(s.coins) || !isCount(s.xp) || !isCount(s.dailySpinAt) || !Array.isArray(s.rewardClaims) || !s.rewardClaims.every(function (level, i, claims) { return [2, 5, 10].indexOf(level) >= 0 && claims.indexOf(level) === i; }) || !isRecord(s.owned) || !Array.isArray(s.owned.boards) || !Array.isArray(s.owned.dice) ||
         !s.owned.boards.every(function (id) { return typeof id === 'string' && id.length <= 32; }) || !s.owned.dice.every(function (id) { return typeof id === 'string' && id.length <= 32; }) ||
         !isInt(s.tokenEvo, 1, 5) || !isInt(s.tokenEvoUnlocked, 1, 5) || s.tokenEvo > s.tokenEvoUnlocked || (TOKEN_SKINS && !TOKEN_SKINS.isValid(s)) ||
         !SK.BOARDS.some(function (x) { return x.id === s.board; }) || !SK.DICE.some(function (x) { return x.id === s.dice; }) || !isRecord(s.settings) ||
-        !isRecord(s.rules) || !isRecord(s.setup) || !isRecord(s.stats) || !isRecord(s.ad) || !(s.game === null || validGame(s.game))) return false;
+        !isRecord(s.rules) || !isRecord(s.setup) || !isRecord(s.stats) || !isRecord(s.ad) || !(s.championship === null || (Championship && Championship.valid(s.championship))) || !(s.game === null || validGame(s.game))) return false;
     if (!Object.keys(defaults().settings).every(function (k) { return typeof s.settings[k] === 'boolean'; })) return false;
     if (s.flags !== undefined && (!isRecord(s.flags) || !Object.keys(s.flags).every(function (k) { return typeof s.flags[k] === 'boolean'; }))) return false;
     if (!Object.keys(defaults().rules).every(function (k) { return k === 'rollStyle' ? ['star', 'classic'].indexOf(s.rules[k]) >= 0 : typeof s.rules[k] === 'boolean'; })) return false;
@@ -217,6 +228,7 @@
   var gate = window.AdGate.create(CFG, save.ad); save.ad = gate.state;
   gate.sessionStarted();
   persist();
+  if (ProgressionRewards) ProgressionRewards.collect(save, 0, L.levelFromXp(save.xp).level, persist);
 
   var G = validGame(save.game) ? save.game : null;
   if (!G) save.game = null;
@@ -258,8 +270,12 @@
   function show(id) { $(id).classList.remove('hidden'); }
   function hide(id) { $(id).classList.add('hidden'); }
   function isOpen(id) { return !$(id).classList.contains('hidden'); }
-  function setCoins() { each(document.querySelectorAll('.coins-val'), function (e) { e.textContent = save.coins; }); }
-  function setLevel() { var l = L.levelFromXp(save.xp); $('lvl-badge').textContent = l.level; $('lvl-fill').style.width = Math.round(l.into / l.need * 100) + '%'; }
+  function setCoins() {
+    each(document.querySelectorAll('.coins-val'), function (e) { e.textContent = save.coins.toLocaleString('en-US'); });
+    var wallet = $('btn-coins');
+    if (wallet) wallet.setAttribute('aria-label', save.coins.toLocaleString('en-US') + ' local coins. Open skins or choose an optional offline entry fee.');
+  }
+  function setLevel() { var l = L.levelFromXp(save.xp); $('lvl-badge').textContent = l.level; $('lvl-badge').classList.toggle('has-crown', !!(save.flags.crownFrame || save.flags.championshipCrown)); $('lvl-badge').title = save.flags.championshipCrown ? 'Tournament Champion' : save.flags.crownFrame ? 'Crown Frame unlocked' : 'Player level ' + l.level; $('lvl-fill').style.width = Math.round(l.into / l.need * 100) + '%'; }
   function board() { for (var i = 0; i < SK.BOARDS.length; i++) if (SK.BOARDS[i].id === save.board) return SK.BOARDS[i]; return SK.BOARDS[0]; }
   function dice() { for (var i = 0; i < SK.DICE.length; i++) if (SK.DICE[i].id === save.dice) return SK.DICE[i]; return SK.DICE[0]; }
   function seatColor(s) { return board().seats[s]; }
@@ -1209,7 +1225,7 @@
     $('hint').textContent = 'Pick ' + moves.map(function (m) { return m.v; }).join(' or ') + ' for this token';
   }
   function handleTokenTap(seat, piece, keyboard) {
-    if (!G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn) || G.online) return false;
+    if (!G || busy || paused || G.st.phase !== 'move' || !isHuman(G.st.turn)) return false;
     var opts = tokenDieMoves(seat, piece);
     if (!opts.length) return false;
     // Multi-die for this token: open the premium picker (overrides chip selection).
@@ -2056,13 +2072,20 @@
   }
 
   // ---------------- match lifecycle ----------------
-  function startMatch(seats, mode, offerTutorial) {
+  function startMatch(seats, mode, offerTutorial, entryFee, championshipStage) {
     cancelFlow(); stopCelebration();
+    entryFee = [0, 50, 100, 500].indexOf(Number(entryFee)) >= 0 ? Number(entryFee) : 0;
+    var humanSeats = seats.filter(function (seat) { return seat && seat.type === 'human'; }).length;
+    var stakePaid = championshipStage == null ? entryFee * humanSeats : 0;
+    if (stakePaid > save.coins) { toast('Not enough local coins for the entry fee.', 2200); showHome(); return false; }
+    var balanceBefore = save.coins; save.coins -= stakePaid;
     tutorial.active = offerTutorial === true && mode === 'classic' && !tutorialSeen();
     tutorial.intro = tutorial.active; tutorial.firstMove = false;
     var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
-    G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now() };
-    save.game = G; persist();
+    G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now(), entryFee: entryFee, stakePaid: stakePaid, stakeSettled: false, championshipStage: championshipStage == null ? null : championshipStage };
+    save.game = G;
+    if (!persist()) { save.coins = balanceBefore; G = null; save.game = null; return false; }
+    setCoins();
     spins = [0, 0, 0, 0];
     showGame();
     if (tutorial.intro) $('tutorial-start').focus(); else focusTurnControl();
@@ -2081,6 +2104,22 @@
       var ai = st.players.filter(function (s) { return st.seats[s].type === 'ai'; }).map(function (s) { return st.seats[s].level; });
       G.place = best; G.coins = L.coinsFor(best, st.players.length, ai, st.mode); G.xp = L.xpFor(best, st.players.length);
       save.coins += G.coins; save.xp += G.xp;
+      G.stakePayout = 0;
+      if (G.entryFee > 0 && !G.stakeSettled) {
+        if (best === 1) { G.stakePayout = G.entryFee * st.players.length; save.coins += G.stakePayout; }
+        G.stakeSettled = true;
+      }
+      var previousLevel = L.levelFromXp(save.xp - G.xp).level;
+      if (G.championshipStage != null && Championship && save.championship && save.championship.status === 'active' && save.championship.stage === G.championshipStage) {
+        var tournamentResult = Championship.record(save.championship, best === 1, Date.now());
+        if (tournamentResult.ok) {
+          save.championship = tournamentResult.tournament;
+          G.championshipResult = best === 1 ? (tournamentResult.completed ? 'champion' : 'advanced') : 'eliminated';
+          if (tournamentResult.completed) {
+            G.tournamentPayout = tournamentResult.jackpot; save.coins += tournamentResult.jackpot; save.flags.championshipCrown = true;
+          }
+        }
+      }
       var S = save.stats; S.played++;
       if (best === 1) { S.won++; S.streak = safeCounter(S.streak, 0) + 1; } else S.streak = 0;
       if (ai.length) { var top = ai.indexOf('hard') >= 0 ? 'hard' : ai.indexOf('medium') >= 0 ? 'medium' : 'easy'; S.vs[top][0]++; if (best === 1) S.vs[top][1]++; } else S.pass++;
@@ -2090,12 +2129,13 @@
       if (st.players.length === 2) { S.duel[0]++; if (best === 1) S.duel[1]++; } else if (st.players.length === 4) { S.four[0]++; if (best === 1) S.four[1]++; }
       var previousBoards = save.owned.boards.slice(), previousDice = save.owned.dice.slice();
       var previousEvoU = save.tokenEvoUnlocked, previousEvo = save.tokenEvo;
+      var previousSkinsOwned = (save.tokenSkinsOwned || []).slice(), previousSkinStats = JSON.parse(JSON.stringify(save.tokenSkinStats || {}));
       var newlyUnlocked = window.SkinShop.collectEligible(save, SK);
       var evoGranted = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.collectEligible(save) : [];
-      var previousSkinsOwned = (save.tokenSkinsOwned || []).slice(), previousSkinStats = JSON.parse(JSON.stringify(save.tokenSkinStats || {}));
       if (TOKEN_SKINS) TOKEN_SKINS.recordMatch(save, best === 1);
       var skinGranted = TOKEN_SKINS ? TOKEN_SKINS.collectEligible(save) : [];
       if (hs.length) { dailyEvent('play', 1); if (best === 1) dailyEvent('win', 1); }
+      if (ProgressionRewards) ProgressionRewards.collect(save, previousLevel, L.levelFromXp(save.xp).level, function () { return true; });
       gate.matchCompleted();
       if (!persist()) {
         save.owned.boards = previousBoards; save.owned.dice = previousDice;
@@ -2150,7 +2190,7 @@
     var teamWin = st.mode === 'team', tName = function (seat) { return L.teamOf(seat) ? 'Jade & Cobalt' : 'Coral & Saffron'; };
     $('r-title').textContent = teamWin ? (tName(winner) + ' win') : single ? (G.place === 1 ? 'You win!' : ['', '', '2nd place', '3rd place', '4th place'][G.place] || 'Match over') : NAMES[winner] + ' wins!';
     var MODE_KICK = { mystery: 'MYSTERY TILES · ', lucky: 'LUCKY CHAOS LUDO · ', quick: 'QUICK LUDO · ', team: 'TEAM LUDO · ', arrow: 'Arrow Ludo: 1 token starts on the board. Jump +4 only if the die move ends on an arrow — passing over is normal Ludo.', friendly: 'FRIENDLY · ' };
-    $('r-kicker').textContent = (MODE_KICK[st.mode] || '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
+    $('r-kicker').textContent = (G.championshipStage != null ? Championship.label(G.championshipStage).toUpperCase() + ' · CHAMPIONSHIP · ' : '') + (MODE_KICK[st.mode] || '') + (hasAI(st) ? 'VS COMPUTER' : 'PASS & PLAY');
     var sec = Math.round((G.elapsed || 0) / 1000), mm = Math.floor(sec / 60), ss = sec % 60;
     $('r-meta').textContent = (G.moves || 0) + ' moves · ' + mm + ':' + (ss < 10 ? '0' : '') + ss;
     $('r-rank').innerHTML = st.ranking.map(function (s, k) {
@@ -2159,6 +2199,20 @@
     }).join('');
     $('r-coins').textContent = '+' + (G.coins * (G.doubled ? 2 : 1));
     $('r-xp').textContent = '+' + G.xp;
+    var wager = $('r-wager');
+    if (G.entryFee > 0) {
+      wager.textContent = G.stakePayout > 0 ? 'Entry fee ' + G.stakePaid.toLocaleString('en-US') + ' · pool won +' + G.stakePayout.toLocaleString('en-US') + ' coins' : 'Entry fee ' + G.stakePaid.toLocaleString('en-US') + ' · no pool payout this match';
+      wager.classList.remove('hidden');
+    } else wager.classList.add('hidden');
+    var champ = $('r-championship'), champState = save.championship, canAdvance = G.championshipStage != null && champState && champState.status === 'active' && champState.stage === G.championshipStage + 1;
+    if (G.championshipStage != null && champState) {
+      if (champState.status === 'champion') champ.textContent = 'CHAMPION! +' + (G.tournamentPayout || champState.jackpot).toLocaleString('en-US') + ' jackpot coins · exclusive Champion Crown unlocked.';
+      else if (canAdvance) champ.textContent = Championship.label(G.championshipStage) + ' won · next up: ' + Championship.label(champState.stage) + ' · jackpot ' + champState.jackpot.toLocaleString('en-US') + ' coins.';
+      else champ.textContent = 'Eliminated in the ' + Championship.label(G.championshipStage) + '. The championship entry fee is not refundable.';
+      champ.classList.remove('hidden');
+    } else champ.classList.add('hidden');
+    $('btn-r-again').classList.toggle('hidden', G.championshipStage != null && !canAdvance);
+    $('btn-r-again').textContent = canAdvance ? 'Continue · ' + Championship.label(champState.stage) : 'Play again';
     var lv = L.levelFromXp(save.xp); $('r-lvl').textContent = 'Level ' + lv.level; $('r-lvl-fill').style.width = Math.round(lv.into / lv.need * 100) + '%';
     $('btn-r-double').classList.toggle('hidden', !G.coins || G.doubled);
     if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
@@ -2170,11 +2224,14 @@
     if (!G || G.st.phase !== 'over') return;
     stopCelebration();
     hide('result');
-    var seats = G.seats, mode = G.mode;
+    var seats = G.seats, mode = G.mode, entryFee = G.entryFee || 0, championshipStage = G.championshipStage;
+    var championshipNext = championshipStage != null && save.championship && save.championship.status === 'active' && save.championship.stage === championshipStage + 1;
     G = null; save.game = null; persist();
     Ads.maybeInterstitial(gate).then(function () {
       persist();
-      if (dest === 'again') startMatch(seats, mode); else showHome();
+      if (dest === 'again' && championshipNext) startChampionshipRound();
+      else if (dest === 'again' && championshipStage == null) startMatch(seats, mode, false, entryFee);
+      else showHome();
     });
   }
   function doubleCoins() {
@@ -2187,6 +2244,114 @@
 
   // ---------------- screens ----------------
   function screen(id) { ['home', 'setup', 'game'].forEach(function (k) { $(k).classList.toggle('hidden', k !== id); }); }
+  var dailySpinBusy = false, dailyWheelOrigin = null, selectedEntryFee = 0;
+  function dailyWheelSVG() {
+    var prizes = DailySpin ? DailySpin.PRIZES : [25, 50, 75, 100, 150, 250], n = prizes.length, out = '';
+    var colors = ['#e0a21c', '#c77b19'];
+    for (var i = 0; i < n; i++) {
+      var a0 = (i - 0.5) / n * Math.PI * 2 - Math.PI / 2, a1 = (i + 0.5) / n * Math.PI * 2 - Math.PI / 2, r = 96;
+      out += '<path d="M0 0 L' + (Math.cos(a0) * r).toFixed(2) + ' ' + (Math.sin(a0) * r).toFixed(2) + ' A' + r + ' ' + r + ' 0 0 1 ' + (Math.cos(a1) * r).toFixed(2) + ' ' + (Math.sin(a1) * r).toFixed(2) + 'Z" fill="' + colors[i % 2] + '" stroke="rgba(0,0,0,.28)" stroke-width="1"/>';
+      out += '<g transform="rotate(' + (i / n * 360) + ') translate(0 -60)"><text y="5" text-anchor="middle" font-size="15" font-weight="900" fill="#fff" font-family="Inter,system-ui,sans-serif">' + prizes[i] + '</text><text y="19" text-anchor="middle" font-size="8" font-weight="800" fill="#fff" font-family="Inter,system-ui,sans-serif">COINS</text></g>';
+    }
+    return out + '<circle r="96" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="3"/><circle r="19" fill="#12151b" stroke="#fff" stroke-width="3"/><text y="7" text-anchor="middle" font-size="18" font-weight="900" fill="#fff" font-family="Inter,system-ui,sans-serif">C</text>';
+  }
+  function restoreDailyWheel() {
+    if (!dailyWheelOrigin) return;
+    var w = $('wheel'), origin = dailyWheelOrigin;
+    if (origin.next && origin.next.parentNode === origin.parent) origin.parent.insertBefore(w, origin.next); else origin.parent.appendChild(w);
+    w.className = 'wheel hidden'; w.removeAttribute('data-daily'); dailyWheelOrigin = null;
+  }
+  function updateDailySpinButton() {
+    var button = $('btn-daily-spin');
+    if (!button || !DailySpin) return;
+    var left = DailySpin.remainingMs(save.dailySpinAt, Date.now()), status = $('daily-spin-status');
+    if (dailySpinBusy) { status.textContent = 'Spinning…'; button.disabled = true; }
+    else if (!left) { status.textContent = 'Ready · free prize from 25–250 coins'; button.disabled = false; }
+    else {
+      var hrs = Math.floor(left / 3600000), mins = Math.ceil((left % 3600000) / 60000);
+      status.textContent = 'Next free spin in ' + hrs + 'h ' + mins + 'm'; button.disabled = true;
+    }
+    button.setAttribute('aria-label', button.disabled ? status.textContent : 'Spin once for a free daily coin prize');
+  }
+  function spinDailyCoins() {
+    if (dailySpinBusy || !DailySpin || !DailySpin.available(save.dailySpinAt, Date.now())) return updateDailySpinButton();
+    var draw = DailySpin.claim(save.dailySpinAt, Date.now(), Math.random());
+    if (!draw.ok) return updateDailySpinButton();
+    var before = { coins: save.coins, lastAt: save.dailySpinAt };
+    save.coins += draw.prize; save.dailySpinAt = draw.lastAt;
+    if (!persist()) { save.coins = before.coins; save.dailySpinAt = before.lastAt; updateDailySpinButton(); return toast('Spin reward could not be saved. Please try again.', 2200); }
+    dailySpinBusy = true; updateDailySpinButton(); setCoins();
+    var w = $('wheel'), svg = $('wheel-svg'), result = $('wheel-result');
+    dailyWheelOrigin = { parent: w.parentNode, next: w.nextSibling };
+    $('app').appendChild(w); w.className = 'wheel boost home-daily'; w.setAttribute('data-daily', 'true');
+    $('wheel-title').textContent = 'Daily free spin · 24-hour reward';
+    $('wheel-note').textContent = 'One free spin per 24 hours · offline coins only';
+    result.innerHTML = '&nbsp;'; result.className = 'wheel-result'; svg.innerHTML = dailyWheelSVG();
+    svg.style.transition = 'none'; svg.style.transform = 'rotate(0deg)'; void svg.getBoundingClientRect();
+    var duration = save.settings.fast ? 1000 : 1650, target = -(draw.segment * 360 / DailySpin.PRIZES.length) - 360 * 5;
+    window.setTimeout(function () { svg.style.transition = 'transform ' + duration + 'ms cubic-bezier(.12,.72,.2,1)'; svg.style.transform = 'rotate(' + target + 'deg)'; }, 30);
+    var ticks = 0, timer = window.setInterval(function () { SFX.spinTick(ticks++); if (ticks > 14) window.clearInterval(timer); }, duration / 16);
+    show('wheel');
+    window.setTimeout(function () {
+      window.clearInterval(timer); result.innerHTML = '<b>+' + draw.prize + ' coins</b><span>Your next free spin is available in 24 hours.</span>'; result.className = 'wheel-result on good';
+      SFX.good(); haptic('success'); setCoins();
+      window.setTimeout(function () { hide('wheel'); restoreDailyWheel(); dailySpinBusy = false; updateDailySpinButton(); toast('Daily spin: +' + draw.prize + ' coins'); }, 1350);
+    }, duration + 80);
+  }
+  function updateHomeScrollHint() {
+    var home = $('home'), hint = $('home-scroll-hint');
+    if (!home || !hint) return;
+    var overflow = home.scrollHeight > home.clientHeight + 16;
+    var atBottom = home.scrollTop + home.clientHeight >= home.scrollHeight - 18;
+    hint.classList.toggle('hidden', !overflow || atBottom);
+  }
+  function updateChampionshipHome() {
+    var el = $('championship-home-status'), t = save.championship;
+    if (!el) return;
+    el.textContent = t && t.status === 'active' ? 'Resume · ' + Championship.label(t.stage) + ' · ' + t.wins + '/3 wins' :
+      t && t.status === 'champion' ? 'Champion Crown earned · enter a new bracket' :
+      t && t.status === 'eliminated' ? 'Last run ended · 8-player QF → SF → Final' : '8-player bracket · Quarter-final → Semi-final → Final';
+  }
+  function updateChampionshipDialog() {
+    var t = save.championship, active = !!(t && t.status === 'active');
+    $('championship-start').classList.toggle('hidden', active);
+    $('championship-resume').classList.toggle('hidden', !active);
+    $('championship-entry-fee').disabled = active;
+    if (active) {
+      $('championship-notice').textContent = Championship.label(t.stage) + ' in progress · ' + t.wins + '/3 wins · ' + t.jackpot.toLocaleString('en-US') + '-coin jackpot. Continue on this device.';
+    } else if (t && t.status === 'champion') {
+      $('championship-notice').textContent = 'Champion Crown earned. Enter a fresh 8-player bracket when ready.';
+    } else if (t && t.status === 'eliminated') {
+      $('championship-notice').textContent = 'Last bracket ended in the ' + Championship.label(t.stage) + '. Choose a new entry fee to try again.';
+    } else {
+      var fee = Number($('championship-entry-fee').value || 50);
+      $('championship-notice').textContent = 'Entry ' + fee + ' local coins · final jackpot ' + (fee * 8).toLocaleString('en-US') + ' coins · final win also grants the Champion Crown.';
+    }
+    $('championship-start').disabled = active || save.coins < Number($('championship-entry-fee').value || 50);
+  }
+  function openChampionshipDialog() { updateChampionshipDialog(); show('championship'); }
+  function startChampionship() {
+    if (!Championship || save.championship && save.championship.status === 'active') return;
+    var fee = Number($('championship-entry-fee').value || 50);
+    if (Championship.FEES.indexOf(fee) < 0) return toast('Choose a valid Championship entry.', 2000);
+    if (save.coins < fee) return toast('You need ' + fee + ' local coins to enter.', 2000);
+    var t = Championship.create(fee, Date.now() ^ Math.floor(Math.random() * 1e9), Date.now()), before = save.coins;
+    if (!t) return toast('Championship could not be started.', 2000);
+    save.coins -= fee; save.championship = t;
+    if (!persist()) { save.coins = before; save.championship = null; updateChampionshipDialog(); return toast('Championship entry could not be saved.', 2300); }
+    hide('championship'); setCoins(); updateChampionshipHome(); startChampionshipRound();
+  }
+  function startChampionshipRound() {
+    var t = save.championship;
+    if (!t || t.status !== 'active' || !Championship.valid(t)) return toast('No active Championship to resume.', 2200);
+    var levels = ['easy', 'medium', 'hard'], seats = [null, { type: 'ai', level: levels[t.stage] }, null, { type: 'human' }];
+    hide('championship'); startMatch(seats, 'classic', false, 0, t.stage);
+  }
+  function resumeChampionship() {
+    var t = save.championship;
+    if (G && G.championshipStage != null && t && t.status === 'active' && G.championshipStage === t.stage) { hide('championship'); showGame(); }
+    else startChampionshipRound();
+  }
   function showHome() {
     cancelFlow(); stopTimer(); paused = false; stopCelebration();
     ['result', 'menu', 'chat'].forEach(hide);
@@ -2195,12 +2360,14 @@
   }
   function updateHome() {
     var cont = G && G.st.phase !== 'over';
+    updateHomeStats();
+    updateDailySpinButton(); updateHomeScrollHint(); updateChampionshipHome();
     $('btn-continue').classList.toggle('hidden', !cont);
-    if (cont) { var st = G.st; $('continue-sub').textContent = (st.mode === 'mystery' ? 'Mystery Tiles · ' : st.mode === 'lucky' ? 'Lucky Chaos Ludo · ' : st.mode === 'quick' ? 'Quick Ludo · ' : st.mode === 'team' ? 'Team Ludo · ' : st.mode === 'arrow' ? 'Arrow Ludo · ' : st.mode === 'friendly' ? 'Friendly · ' : '') + (hasAI(st) ? 'vs Computer' : 'Pass & Play') + ' · ' + st.players.length + ' players'; }
+    if (cont) { var st = G.st; $('continue-sub').textContent = (G.championshipStage != null ? Championship.label(G.championshipStage) + ' · ' : '') + (st.mode === 'mystery' ? 'Mystery Tiles · ' : st.mode === 'lucky' ? 'Lucky Chaos Ludo · ' : st.mode === 'quick' ? 'Quick Ludo · ' : st.mode === 'team' ? 'Team Ludo · ' : st.mode === 'arrow' ? 'Arrow Ludo · ' : st.mode === 'friendly' ? 'Friendly · ' : '') + (hasAI(st) ? 'vs Computer' : 'Pass & Play') + ' · ' + st.players.length + ' players'; }
   }
   var setupKind = 'ai', setupMode = 'classic';
   function showSetup(kind, mode) {
-    setupKind = kind; setupMode = mode || save.setup.mode[kind] || 'classic'; screen('setup');
+    setupKind = kind; setupMode = mode || save.setup.mode[kind] || 'classic'; selectedEntryFee = 0; $('entry-fee').value = '0'; screen('setup');
     var TITLES = { mystery: 'Mystery Tiles', lucky: 'Lucky Chaos Ludo', quick: 'Quick Ludo', team: 'Team Ludo', arrow: 'Arrow Ludo', friendly: 'Friendly Ludo' };
     $('setup-title').textContent = TITLES[setupMode] || (kind === 'ai' ? 'Play vs Computer' : 'Pass & Play');
     renderSetup();
@@ -2259,8 +2426,13 @@
       list.appendChild(row);
     });
     var n = seats.filter(Boolean).length, h = seats.filter(function (x) { return x && x.type === 'human'; }).length;
-    var msg = setupMode === 'team' && n !== 4 ? 'Team Ludo needs all 4 corners. Partners sit opposite.' : n < 2 ? 'Choose at least 2 players.' : h < 1 ? 'At least one player must be human.' : setupMode === 'quick' && n > 4 ? '' : '';
+    var msg = setupMode === 'team' && n !== 4 ? 'Team Ludo needs all 4 corners. Partners sit opposite.' : n < 2 ? 'Choose at least 2 players.' : h < 1 ? 'At least one player must be human.' : '';
+    var stakeCost = selectedEntryFee * h, stakePool = selectedEntryFee * n;
+    var recoverableStake = G && G.stakePaid > 0 && !G.stakeSettled ? G.stakePaid : 0;
+    if (!msg && stakeCost > save.coins + recoverableStake) msg = 'Need ' + stakeCost.toLocaleString('en-US') + ' coins for this entry fee.';
     $('setup-msg').textContent = msg; $('btn-start').disabled = !!msg;
+    $('entry-fee').value = String(selectedEntryFee);
+    $('stake-note').textContent = selectedEntryFee ? ('Charge ' + selectedEntryFee.toLocaleString('en-US') + ' local coins per human seat (' + stakeCost.toLocaleString('en-US') + ' total). Winner takes the ' + n + '× pool: ' + stakePool.toLocaleString('en-US') + ' coins. Offline only; computer entries are virtual house-backed seats.') : 'Optional local wager · winner takes a 2×/3×/4× virtual pool. No cash value; online room stakes require the server-owned cloud wallet.';
     each($('presets').children, function (b) { var selected = (b.dataset.p === '1v1' && n === 2) || (b.dataset.p === '3' && n === 3) || (b.dataset.p === '4' && n === 4); b.setAttribute('aria-pressed', selected ? 'true' : 'false'); });
     var summary = $('rules-sum'); summary.innerHTML = '';
     rulesSummary().forEach(function (text) { var chip = document.createElement('span'); chip.className = 'rule-chip'; chip.textContent = text; summary.appendChild(chip); });
@@ -2297,8 +2469,11 @@
     if (!G || G.st.phase === 'over') return;
     cancelFlow(); stopTimer(); paused = true; hide('chat');
     layoutPieces(true); render(); persist();
-    askConfirm('Exit match?', 'Are you sure you want to exit the match? Progress will be lost.', 'Exit', function () {
-      cancelFlow(); stopTimer(); G = null; save.game = null; persist(); showHome();
+    var exitCopy = G.championshipStage != null ? 'This round will be discarded. Your paid Championship entry remains active and can be resumed from the Championship card.' : 'Match progress will be lost. Any unfinished local entry fee will be returned.';
+    askConfirm('Exit match?', exitCopy, 'Exit', function () {
+      cancelFlow(); stopTimer();
+      if (G && G.stakePaid > 0 && !G.stakeSettled) { save.coins += G.stakePaid; G.stakeSettled = true; setCoins(); }
+      G = null; save.game = null; persist(); showHome();
     }, function () {
       hide('menu'); paused = false;
       if (G) { buildPods(); buildTiles(); buildPieces(); layout(); render(); advance(); }
@@ -2312,6 +2487,30 @@
       ['Wins vs Easy', S.vs.easy[1] + ' / ' + S.vs.easy[0]], ['Wins vs Normal', S.vs.medium[1] + ' / ' + S.vs.medium[0]], ['Wins vs Hard', S.vs.hard[1] + ' / ' + S.vs.hard[0]], ['Mystery events', S.events],
       ['Mystery wins', S.mystery[1] + ' / ' + S.mystery[0]], ['Lucky Chaos wins', (S.lucky||[0,0])[1] + ' / ' + (S.lucky||[0,0])[0]], ['Quick wins', (S.quick||[0,0])[1] + ' / ' + (S.quick||[0,0])[0]], ['Team wins', (S.team||[0,0])[1] + ' / ' + (S.team||[0,0])[0]], ['Arrow wins', (S.arrow||[0,0])[1] + ' / ' + (S.arrow||[0,0])[0]], ['Friendly wins', (S.friendly||[0,0])[1] + ' / ' + (S.friendly||[0,0])[0]], ['1 v 1 wins', S.duel[1] + ' / ' + S.duel[0]], ['4-player wins', S.four[1] + ' / ' + S.four[0]], ['Pass & Play', S.pass]];
     $('stats-body').innerHTML = cells.map(function (c) { return '<div><b>' + c[1] + '</b><span>' + c[0] + '</span></div>'; }).join('');
+    $('profile-level').textContent = lv.level;
+    $('profile-xp').textContent = save.xp.toLocaleString('en-US') + ' XP · ' + lv.into + ' / ' + lv.need + ' to next level';
+    var crowned = !!(save.flags.crownFrame || save.flags.championshipCrown), frame = $('profile-avatar-frame');
+    frame.classList.toggle('has-crown', crowned); frame.title = save.flags.championshipCrown ? 'Tournament Champion' : save.flags.crownFrame ? 'Level 10 Crown Frame' : 'Player profile';
+    frame.querySelector('span').textContent = crowned ? '♛' : '✦';
+    var roadmap = ProgressionRewards ? ProgressionRewards.eligible(lv.level, save.rewardClaims) : [];
+    $('level-roadmap-items').replaceChildren();
+    roadmap.forEach(function (reward) {
+      var row = document.createElement('div'); row.className = 'roadmap-item' + (reward.reached ? ' reached' : '') + (reward.unlocked ? ' claimed' : '');
+      var level = document.createElement('span'); level.className = 'roadmap-level'; level.textContent = 'LV ' + reward.level;
+      var copy = document.createElement('span'); copy.className = 'roadmap-copy';
+      var title = document.createElement('b'); title.textContent = reward.title;
+      var detail = document.createElement('small'); detail.textContent = reward.kind === 'coins' ? 'One-time local coin boost' : reward.kind === 'dice' ? 'Gold Dice cosmetic unlock' : 'Profile crown frame';
+      copy.append(title, detail);
+      var status = document.createElement('span'); status.className = 'roadmap-status'; status.textContent = reward.unlocked ? 'Claimed' : reward.reached ? 'Ready' : 'Upcoming';
+      row.append(level, copy, status); $('level-roadmap-items').appendChild(row);
+    });
+  }
+  function updateHomeStats() {
+    var S = save.stats, rate = S.played ? Math.round(S.won / S.played * 100) + '%' : '–';
+    $('home-matches').textContent = S.played.toLocaleString('en-US');
+    $('home-wins').textContent = S.won.toLocaleString('en-US');
+    $('home-win-rate').textContent = rate;
+    $('btn-stats').setAttribute('aria-label', 'Open player statistics. ' + S.played + ' matches, ' + S.won + ' wins, ' + rate + ' win rate.');
   }
   var skinTab = 'boards';
   function skinRequirement(it) {
@@ -2550,9 +2749,23 @@
     show('rules');
   }
   function setupVisible() { return !$('setup').classList.contains('hidden'); }
+  function launchSetupMatch(seats, mode, offerTutorial, fee) {
+    if (G && G.stakePaid > 0 && !G.stakeSettled) { save.coins += G.stakePaid; G.stakeSettled = true; }
+    startMatch(seats, mode, offerTutorial, fee);
+  }
 
   // ---------------- input ----------------
   $('btn-continue').addEventListener('click', function () { SFX.unlock(); SFX.click(); if (G) showGame(); });
+  $('btn-daily-spin').addEventListener('click', function () { SFX.unlock(); SFX.click(); spinDailyCoins(); });
+  $('home').addEventListener('scroll', updateHomeScrollHint, { passive: true });
+  $('home-scroll-hint').addEventListener('click', function () { SFX.click(); $('home').scrollBy({ top: Math.max(180, Math.round($('home').clientHeight * 0.58)), behavior: 'smooth' }); });
+  window.addEventListener('resize', updateHomeScrollHint);
+  window.setInterval(updateDailySpinButton, 60000);
+  $('btn-championship').addEventListener('click', function () { SFX.click(); openChampionshipDialog(); });
+  $('championship-cancel').addEventListener('click', function () { SFX.click(); hide('championship'); });
+  $('championship-entry-fee').addEventListener('change', updateChampionshipDialog);
+  $('championship-start').addEventListener('click', function () { SFX.unlock(); SFX.click(); startChampionship(); });
+  $('championship-resume').addEventListener('click', function () { SFX.unlock(); SFX.click(); resumeChampionship(); });
   $('btn-vs-ai').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('ai', 'classic'); });
   $('btn-mystery').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('ai', 'mystery'); });
   $('btn-lucky').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('ai', 'lucky'); });
@@ -2572,6 +2785,7 @@
   });
   $('btn-pass').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('pass'); });
   $('btn-setup-back').addEventListener('click', function () { SFX.click(); showHome(); });
+  $('entry-fee').addEventListener('change', function () { selectedEntryFee = Number(this.value) || 0; renderSetup(); });
   each($('mode-seg').children, function (b) { b.addEventListener('click', function () { SFX.click(); setupMode = b.dataset.mode; save.setup.mode[setupKind] = setupMode; persist(); renderSetup(); }); });
   each($('presets').children, function (b) { b.addEventListener('click', function () { SFX.click(); applyPreset(b.dataset.p); }); });
   $('btn-edit-rules').addEventListener('click', function () { SFX.click(); syncSettingsUI(); show('settings'); });
@@ -2580,8 +2794,8 @@
     var seats = save.setup[setupKind].map(function (x) { return x ? { type: x.type, level: x.level } : null; }), mode = setupMode;
     var offerTutorial = mode === 'classic' && !tutorialSeen();
     save.setup.mode[setupKind] = mode;
-    if (G && G.st.phase !== 'over') askConfirm('Start a new match?', 'Your saved match will be replaced.', 'Start', function () { startMatch(seats, mode, offerTutorial); });
-    else startMatch(seats, mode, offerTutorial);
+    if (G && G.st.phase !== 'over') askConfirm('Start a new match?', 'Your saved match will be replaced. Any unfinished local entry fee will be returned.', 'Start', function () { launchSetupMatch(seats, mode, offerTutorial, selectedEntryFee); });
+    else launchSetupMatch(seats, mode, offerTutorial, selectedEntryFee);
   });
   $('tutorial-start').addEventListener('click', function () { SFX.click(); beginTutorial(); });
   $('tutorial-intro-skip').addEventListener('click', function () { SFX.click(); closeTutorial(); });
@@ -2621,12 +2835,20 @@
   $('btn-m-resume').addEventListener('click', function () { SFX.click(); resumeFromMenu(); });
   $('btn-m-rules').addEventListener('click', function () { SFX.click(); openRules(G && G.st.mode === 'mystery' ? 'mystery' : G && G.st.mode === 'lucky' ? 'lucky' : G && ['quick','team','arrow','friendly'].indexOf(G.st.mode) >= 0 ? 'modes' : 'basics'); });
   $('btn-m-home').addEventListener('click', function () { SFX.click(); hide('menu'); showHome(); });
-  $('btn-m-restart').addEventListener('click', function () { SFX.click(); hide('menu'); askConfirm('Restart the match?', 'The current match starts again with the same players.', 'Restart', function () { startMatch(G.seats, G.mode); }); });
+  $('btn-m-restart').addEventListener('click', function () {
+    SFX.click(); hide('menu');
+    var seats = G.seats, mode = G.mode, fee = G.entryFee || 0, championshipStage = G.championshipStage;
+    askConfirm('Restart the match?', 'The current match starts again with the same players. Any unfinished local entry fee will be returned and charged again.', 'Restart', function () {
+      if (G && G.stakePaid > 0 && !G.stakeSettled) { save.coins += G.stakePaid; G.stakeSettled = true; }
+      startMatch(seats, mode, false, fee, championshipStage);
+    });
+  });
   $('btn-r-again').addEventListener('click', function () { leaveResult('again'); });
   $('btn-r-home').addEventListener('click', function () { leaveResult('home'); });
   $('btn-r-double').addEventListener('click', doubleCoins);
   $('btn-exit-match').addEventListener('click', function () { SFX.click(); openExitConfirmation(); });
   $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); show('stats'); });
+  $('btn-coins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   if ($('btn-vault')) $('btn-vault').addEventListener('click', function () { SFX.click(); openVault(); });
   $('btn-skins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   $('btn-rules').addEventListener('click', function () { SFX.unlock(); SFX.click(); openRules('basics'); });

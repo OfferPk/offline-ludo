@@ -1,0 +1,25 @@
+'use strict';
+const assert = require('node:assert/strict');
+const DailySpin = require('../www/js/daily-spin.js');
+const Rewards = require('../www/js/progression-rewards.js');
+let checks = 0;
+const ok = (condition, message) => { assert.ok(condition, message); checks++; console.log('  ok -', message); };
+console.log('rewards.test.js');
+const day = DailySpin.COOLDOWN_MS;
+ok(DailySpin.available(0, 1), 'first daily spin is ready');
+ok(!DailySpin.available(1000, 1000 + day - 1) && DailySpin.remainingMs(1000, 1000 + day - 1) === 1, 'spin stays locked for the full 24 hours');
+ok(DailySpin.available(1000, 1000 + day), 'spin unlocks exactly at 24 hours');
+ok(DailySpin.claim(0, 5000, 0).prize === 25 && DailySpin.claim(0, 5000, 0.999).prize === 250, 'deterministic wheel segments map to configured coin prizes');
+ok(DailySpin.claim(5000, 5001, 0.5).reason === 'cooldown', 'a second claim within the window is rejected');
+function save() { return { coins: 0, owned: { dice: ['ivory'] }, rewardClaims: [], flags: {} }; }
+const granted = save();
+const result = Rewards.collect(granted, 1, 10, () => true);
+ok(result.ok && result.rewards.length === 3 && granted.coins === 100, 'crossing levels 2, 5, and 10 grants each milestone once');
+ok(granted.owned.dice.includes('gold-dice') && granted.flags.crownFrame && granted.rewardClaims.join(',') === '2,5,10', 'milestones unlock Gold Dice and Crown Frame and persist claim IDs');
+const again = Rewards.collect(granted, 1, 10, () => true);
+ok(again.ok && again.rewards.length === 0 && granted.coins === 100, 'claimed rewards cannot be duplicated');
+const rollback = save();
+const failed = Rewards.collect(rollback, 1, 10, () => false);
+ok(!failed.ok && failed.reason === 'save-failed' && rollback.coins === 0 && rollback.owned.dice.length === 1 && !rollback.flags.crownFrame, 'failed saves roll back all milestone rewards');
+ok(Rewards.eligible(4, [2])[0].unlocked && Rewards.eligible(4, [2])[1].reached === false, 'roadmap distinguishes claimed milestones from future rewards');
+console.log('reward checks passed (' + checks + ' checks).');

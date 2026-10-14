@@ -1,4 +1,5 @@
 // Responsive match-setup cards, accessibility, and fit across phone/tablet/desktop widths.
+// The Daily Reward utility card is separate from the four playable Ludo modes.
 // Usage: CHROME=/usr/bin/chromium node test/setup-layout.browser.test.js <url>
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
 const URL = (process.argv[2] || 'http://localhost:8781/').replace(/\/?$/, '/');
@@ -31,7 +32,7 @@ function ok(condition, message) {
         await page.goto(URL, { waitUntil: 'networkidle0' });
         await page.waitForSelector('#home:not(.hidden)');
         if (!homeCheckDone) {
-          const cards = await page.$$eval('#home .mode-card', buttons => buttons.map(button => {
+          const cards = await page.$$eval('#home .mode-card:not(.mode-daily)', buttons => buttons.map(button => {
             const style = getComputedStyle(button), r = button.getBoundingClientRect();
             return { id: button.id, visible: r.width > 0 && style.display !== 'none', border: style.borderTopWidth !== '0px', glass: style.backdropFilter.includes('blur'), glow: style.boxShadow.includes('rgba') };
           }));

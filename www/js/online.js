@@ -37,6 +37,11 @@
   var profileChannel = null;
   var historyChannel = null;
   var client = null;
+  var onlineStakesEnabled = false;
+  var onlineChampionshipsEnabled = false;
+  var onlineChampionship = null;
+  var onlineChampionshipBusy = false;
+  var onlineChampionshipSequence = 0;
   var sdkLoading = null;
   var nativeCallbackConfigured = false;
   var pendingInvite = new URLSearchParams(window.location.search).get('room') || sessionStorage.getItem('crossfour.online.pending-invite') || '';
@@ -74,6 +79,123 @@
   }
   function modeLabel(mode) {
     return mode === 'ludo_chess' ? 'Ludo Chess' : String(mode || 'classic').charAt(0).toUpperCase() + String(mode || 'classic').slice(1);
+  }
+  function roomSelectColumns() {
+    return 'id,created_by,mode,capacity,status,updated_at' + (onlineStakesEnabled ? ',entry_fee' : '') + (onlineChampionshipsEnabled ? ',championship_match' : '');
+  }
+  function selectedOnlineEntryFee() {
+    if (!onlineStakesEnabled || $('online-mode').value !== 'classic') return 0;
+    var fee = Number($('online-entry-fee').value) || 0;
+    return [0, 50, 100, 500].indexOf(fee) >= 0 ? fee : 0;
+  }
+  function updateOnlineStakeControls() {
+    var selector = $('online-entry-fee'), note = $('online-stake-note');
+    if (!selector || !note) return;
+    var chess = $('online-mode').value === 'ludo_chess';
+    if (!onlineStakesEnabled || !currentUser) {
+      selector.disabled = true;
+      note.textContent = 'Online room fees are not enabled yet. Free online rooms remain available.';
+    } else if (chess) {
+      selector.value = '0'; selector.disabled = true;
+      note.textContent = 'Ludo Chess rooms stay free. Virtual entry fees are available for Online Classic only.';
+    } else {
+      selector.disabled = false;
+      note.textContent = 'Optional fee per player. It is debited from cloud coins only when the host starts; the winner gets the full pool, and a cancelled match refunds each fee. No cash value.';
+    }
+    var championshipFee = $('online-championship-fee');
+    var championshipEnter = $('online-championship-enter');
+    var championshipStatus = $('online-championship-status');
+    var canEnterChampionship = !!(onlineChampionshipsEnabled && currentUser && !recoveryMode);
+    if (championshipFee) championshipFee.disabled = !canEnterChampionship || !!(onlineChampionship && ['waiting', 'active'].indexOf(onlineChampionship.status) >= 0);
+    if (championshipEnter) championshipEnter.disabled = !canEnterChampionship || onlineChampionshipBusy;
+    if (!canEnterChampionship && championshipStatus) {
+      championshipStatus.textContent = currentUser
+        ? 'Championship support is not enabled on this server yet. Free online rooms remain available.'
+        : 'Sign in and install the reviewed Championship server migration to enter a bracket.';
+    }
+  }
+  function championshipRoundName(stage) {
+    return stage === 1 ? 'Quarter-final' : stage === 2 ? 'Semi-final' : stage === 3 ? 'Final' : 'Championship';
+  }
+  function renderOnlineChampionship(result) {
+    onlineChampionship = result && result.status !== 'none' ? result : null;
+    var status = $('online-championship-status');
+    var leave = $('online-championship-leave');
+    var open = $('online-championship-open');
+    var enter = $('online-championship-enter');
+    leave.classList.add('hidden'); open.classList.add('hidden');
+    if (!result || result.status === 'none') {
+      status.textContent = 'Eight signed-in players · Quarter-final → Semi-final → Final. Entry fees are held server-side; leave while waiting for an automatic refund.';
+      enter.textContent = 'Enter Championship';
+    } else if (result.status === 'waiting') {
+      status.textContent = 'Waiting for entrants · ' + Number(result.participants || 0) + '/8 players. ' + Number(result.entry_fee || 0).toLocaleString('en-US') + ' cloud coins are held; you can leave now for a refund.';
+      enter.textContent = 'Refresh bracket';
+      leave.classList.remove('hidden');
+    } else if (result.status === 'active' && result.entry_status === 'eliminated') {
+      status.textContent = 'Eliminated after the ' + championshipRoundName(Number(result.stage)) + '. Your bracket is finished; the remaining players continue.';
+      enter.textContent = 'View bracket status';
+    } else if (result.status === 'active' && result.room_id) {
+      status.textContent = championshipRoundName(Number(result.stage)) + ' · match ' + Number(result.match_no || 1) + ' of ' + (result.stage === 1 ? '4' : result.stage === 2 ? '2' : '1') + '. Entry: ' + Number(result.entry_fee || 0).toLocaleString('en-US') + ' cloud coins · full pool: ' + (Number(result.entry_fee || 0) * 8).toLocaleString('en-US') + '.';
+      enter.textContent = 'Refresh bracket';
+      open.classList.remove('hidden');
+    } else if (result.status === 'active') {
+      status.textContent = 'You advanced. Waiting for the other matches to finish before the next ' + championshipRoundName(Number(result.stage)) + ' is assigned.';
+      enter.textContent = 'Refresh bracket';
+    } else if (result.status === 'completed' && result.champion === true) {
+      status.textContent = 'Champion! ' + Number(result.prize || 0).toLocaleString('en-US') + ' cloud coins were paid to your wallet, and the exclusive Crown badge is unlocked.';
+      enter.textContent = 'Enter another Championship';
+    } else if (result.status === 'completed') {
+      status.textContent = 'Championship complete. The final winner received the ' + (Number(result.entry_fee || 0) * 8).toLocaleString('en-US') + '-coin pool.';
+      enter.textContent = 'Enter another Championship';
+    } else {
+      status.textContent = 'This Championship is no longer accepting entries.';
+      enter.textContent = 'Enter Championship';
+    }
+    updateOnlineStakeControls();
+  }
+  function refreshOnlineChampionship() {
+    if (!client || !currentUser || !onlineChampionshipsEnabled) return Promise.resolve(null);
+    var requestedUserId = currentUser.id;
+    var requestedSequence = ++onlineChampionshipSequence;
+    return callRpc('get_my_online_championship', {}).then(function (result) {
+      if (!currentUser || currentUser.id !== requestedUserId || requestedSequence !== onlineChampionshipSequence) return null;
+      renderOnlineChampionship(result);
+      return result;
+    }).catch(function (error) {
+      if (currentUser && currentUser.id === requestedUserId && requestedSequence === onlineChampionshipSequence) {
+        $('online-championship-status').textContent = 'Championship status could not be refreshed: ' + errorText(error);
+      }
+      return null;
+    });
+  }
+  function refreshOnlineStakeCapability() {
+    if (!client || !currentUser) {
+      onlineStakesEnabled = false;
+      onlineChampionshipsEnabled = false;
+      onlineChampionship = null;
+      updateOnlineStakeControls();
+      return Promise.resolve(false);
+    }
+    var requestedUserId = currentUser.id;
+    return callRpc('online_stakes_enabled', {}).then(function (result) {
+      if (!currentUser || currentUser.id !== requestedUserId) return false;
+      onlineStakesEnabled = result.enabled === true;
+      onlineChampionshipsEnabled = onlineStakesEnabled && result.championships === true;
+      updateOnlineStakeControls();
+      if (onlineStakesEnabled && currentRoomId) refreshRoom();
+      if (onlineChampionshipsEnabled) refreshOnlineChampionship();
+      else { onlineChampionship = null; renderOnlineChampionship(null); }
+      return onlineStakesEnabled;
+    }).catch(function () {
+      if (currentUser && currentUser.id === requestedUserId) {
+        onlineStakesEnabled = false;
+        onlineChampionshipsEnabled = false;
+        onlineChampionship = null;
+        updateOnlineStakeControls();
+        renderOnlineChampionship(null);
+      }
+      return false;
+    });
   }
   function setRoomConnectionState(state, message) {
     roomConnectionState = state;
@@ -170,6 +292,12 @@
     recoveryPanel.classList.toggle('hidden', !recovering);
     accountPanel.classList.toggle('hidden', !signedIn || recovering);
     roomPanel.classList.toggle('hidden', !signedIn || recovering);
+    if (!signedIn) {
+      onlineStakesEnabled = false;
+      onlineChampionshipsEnabled = false;
+      onlineChampionship = null;
+    }
+    updateOnlineStakeControls();
     $('online-signout').disabled = !signedIn;
     ['online-signin', 'online-signup', 'online-reset-request'].forEach(function (id) {
       $(id).disabled = !client || !emailPasswordEnabled();
@@ -275,6 +403,7 @@
   function refreshAccount() {
     if (!client || !currentUser) return Promise.resolve();
     var requestedUserId = currentUser.id;
+    refreshOnlineStakeCapability();
     return Promise.all([
       client.from('profiles').select('handle,display_name').eq('id', currentUser.id).maybeSingle(),
       client.from('wallets').select('coins,diamonds').eq('user_id', currentUser.id).maybeSingle()
@@ -329,13 +458,18 @@
     card.classList.toggle('hidden', !room);
     if (!room) { $('online-chess-resume').classList.add('hidden'); renderMatch(); return; }
     if (room.status === 'completed' || room.status === 'cancelled' || (room.matchState && room.matchState.state && room.matchState.state.phase === 'over')) setRoomConnectionState('ended');
-    $('online-room-mode').textContent = modeLabel(room.mode) + ' · ' + room.capacity + ' seats';
-    $('online-room-status').textContent = room.status === 'active'
-      ? (room.matchState ? (room.mode === 'ludo_chess' ? 'Ludo Chess is active. Legal moves and match state are validated by the server.' : 'Online Classic match is active. Dice and moves are validated by the server.') : 'This table predates the current online gameplay update. Create a new table to play online.')
-      : room.status === 'completed' ? 'This table is complete.' : room.status === 'cancelled' ? 'This table was cancelled.' : 'Waiting for players to join and ready up.';
+    var entryFee = Math.max(0, Number(room.entry_fee) || 0);
+    var pool = entryFee * (room.roster ? room.roster.length : 0);
+    $('online-room-mode').textContent = modeLabel(room.mode) + ' · ' + room.capacity + ' seats' + (room.championship_match ? ' · Championship bracket' : entryFee ? ' · ' + entryFee.toLocaleString('en-US') + ' cloud coins each' : ' · free');
+    $('online-room-status').textContent = room.championship_match
+      ? room.status === 'active' ? 'Championship match in progress. The server validates the board; leaving counts as a forfeit and advances your opponent.' : room.status === 'completed' ? 'Championship match complete. Refresh your bracket for the next round or final result.' : room.status === 'cancelled' ? 'Championship match forfeited or cancelled. The remaining player may advance.' : 'Championship match · both players are seated and ready. The host starts the round; leaving now advances the opponent by forfeit.'
+      : room.status === 'active'
+      ? (room.matchState ? (room.mode === 'ludo_chess' ? 'Ludo Chess is active. Legal moves and match state are validated by the server.' : 'Online Classic match is active. Dice and moves are validated by the server.' + (entryFee ? ' · ' + pool.toLocaleString('en-US') + ' cloud coins are in the winner pool.' : '')) : 'This table predates the current online gameplay update. Create a new table to play online.')
+      : room.status === 'completed' ? 'This table is complete.' + (entryFee ? ' The full ' + pool.toLocaleString('en-US') + '-coin pool has been settled to the winner.' : '') : room.status === 'cancelled' ? 'This table was cancelled.' + (entryFee ? ' Escrowed entry fees were returned.' : '') : 'Waiting for players to join and ready up.' + (entryFee ? ' Each player pays ' + entryFee.toLocaleString('en-US') + ' cloud coins when the host starts; current pool: ' + pool.toLocaleString('en-US') + '.' : '');
     $('online-invite-code').value = room.inviteCode || '';
     $('online-start-room').classList.toggle('hidden', room.status !== 'waiting' || room.created_by !== (currentUser && currentUser.id));
-    $('online-ready').classList.toggle('hidden', room.status !== 'waiting');
+    $('online-start-room').textContent = room.championship_match ? 'Start Championship match' : 'Start table';
+    $('online-ready').classList.toggle('hidden', room.status !== 'waiting' || !!room.championship_match);
     $('online-ready').textContent = room.myReady ? 'Mark not ready' : 'Ready';
     $('online-ready').setAttribute('aria-pressed', String(!!room.myReady));
     $('online-room-roster').replaceChildren();
@@ -743,7 +877,7 @@
       if (restoreToken !== roomRestoreSequence || !currentUser || currentUser.id !== userId) return null;
       var roomIds = Array.from(new Set((membershipResult.data || []).map(function (member) { return member.room_id; }).filter(Boolean)));
       if (!roomIds.length) return { rooms: [] };
-      return client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').in('id', roomIds).then(function (roomResult) {
+      return client.from('rooms').select(roomSelectColumns()).in('id', roomIds).then(function (roomResult) {
         if (roomResult.error) throw roomResult.error;
         return { rooms: roomResult.data || [] };
       });
@@ -801,7 +935,7 @@
     var userId = currentUser.id;
     var requestSequence = ++roomRefreshSequence;
     return Promise.all([
-      client.from('rooms').select('id,created_by,mode,capacity,status,updated_at').eq('id', requestedRoomId).maybeSingle(),
+      client.from('rooms').select(roomSelectColumns()).eq('id', requestedRoomId).maybeSingle(),
       client.from('room_members').select('user_id,seat,role,ready').eq('room_id', requestedRoomId),
       client.from('room_invites').select('invite_code').eq('room_id', requestedRoomId).limit(1).maybeSingle(),
       client.from('match_states').select('room_id,version,state,updated_at').eq('room_id', requestedRoomId).maybeSingle(),
@@ -1001,7 +1135,7 @@
     currentRoom = null;
     sessionStorage.setItem('crossfour.online.room', currentRoomId);
     setRoomConnectionState('connecting');
-    announce(result.status === 'waiting' ? 'Room ready. Share the code to invite another player.' : 'Joined the waiting room.');
+    announce(result.championship ? 'Championship match room opened. Both players are pre-seated and ready.' : result.status === 'waiting' ? 'Room ready. Share the code to invite another player.' : 'Joined the waiting room.');
     subscribeRoom();
     return refreshRoom();
   }
@@ -1051,6 +1185,7 @@
       if (capacityBeforeChess && Array.prototype.some.call(capacity.options, function (option) { return option.value === capacityBeforeChess; })) capacity.value = capacityBeforeChess;
       $('online-mode-note').textContent = 'Classic Ludo plays on the same board as offline. House rules lock when the room is created. Mystery and Lucky Chaos remain offline modes.';
     }
+    updateOnlineStakeControls();
   }
   function bindEvents() {
     $('btn-online').addEventListener('click', openOnline);
@@ -1063,7 +1198,35 @@
     $('online-reset-request').addEventListener('click', requestPasswordReset);
     $('online-recovery-form').addEventListener('submit', updateRecoveredPassword);
     $('online-mode').addEventListener('change', updateRoomModeOptions);
+    $('online-entry-fee').addEventListener('change', updateOnlineStakeControls);
     $('online-capacity').addEventListener('change', function () { if ($('online-mode').value !== 'ludo_chess') capacityBeforeChess = $('online-capacity').value; });
+    $('online-championship-enter').addEventListener('click', function () {
+      if (!client || !currentUser || !onlineChampionshipsEnabled || onlineChampionshipBusy) return;
+      var fee = Number($('online-championship-fee').value);
+      onlineChampionshipBusy = true; updateOnlineStakeControls();
+      callRpc('enter_online_championship', { p_entry_fee: fee }).then(function (result) {
+        renderOnlineChampionship(result);
+        announce(result.status === 'waiting' ? 'Championship entry recorded. Your coins are held until the bracket fills; you can leave now for a refund.' : result.status === 'active' ? 'Championship status refreshed. Open your assigned match when ready.' : 'Championship status refreshed.');
+        refreshAccount();
+      }).catch(function (error) {
+        announce('Championship entry could not be completed: ' + errorText(error), true);
+      }).finally(function () { onlineChampionshipBusy = false; updateOnlineStakeControls(); });
+    });
+    $('online-championship-leave').addEventListener('click', function () {
+      if (!client || !currentUser || !onlineChampionshipsEnabled || onlineChampionshipBusy) return;
+      onlineChampionshipBusy = true; updateOnlineStakeControls();
+      callRpc('leave_online_championship', {}).then(function (result) {
+        announce('Waiting entry cancelled. ' + Number(result.entry_fee || 0).toLocaleString('en-US') + ' cloud coins were refunded.');
+        refreshAccount();
+      }).catch(function (error) {
+        announce('Championship entry could not be cancelled: ' + errorText(error), true);
+      }).finally(function () { onlineChampionshipBusy = false; updateOnlineStakeControls(); });
+    });
+    $('online-championship-open').addEventListener('click', function () {
+      if (!onlineChampionship || !onlineChampionship.room_id) return;
+      attachRoom({ room_id: onlineChampionship.room_id, status: 'waiting', championship: true })
+        .catch(function (error) { announce('Championship match could not be opened: ' + errorText(error), true); });
+    });
     updateRoomModeOptions();
     $('online-signout').addEventListener('click', function () {
       if (!client) return;
@@ -1096,6 +1259,7 @@
     }
     function roomRpcArgs() {
       var args = { p_mode: $('online-mode').value, p_capacity: Number($('online-capacity').value) };
+      if (onlineStakesEnabled) args.p_entry_fee = selectedOnlineEntryFee();
       if (args.p_mode === 'classic') args.p_rules = classicRulesPayload();
       return args;
     }
@@ -1106,8 +1270,9 @@
     $('online-create-room').addEventListener('click', function () {
       if (!client) return;
       var args = roomRpcArgs();
-      callRpc('create_room', args).then(attachRoom).catch(function (error) {
-        if (args.p_rules && missingRulesRpc(error)) {
+      var useStakeRpc = onlineStakesEnabled;
+      callRpc(useStakeRpc ? 'create_wager_room' : 'create_room', args).then(attachRoom).catch(function (error) {
+        if (!useStakeRpc && args.p_rules && missingRulesRpc(error)) {
           announce('This server has not applied the v1.4.0 rules migration, so house rules cannot be locked yet. Creating the room with the previous server rules.', true);
           return callRpc('create_room', { p_mode: args.p_mode, p_capacity: args.p_capacity }).then(attachRoom);
         }
@@ -1117,8 +1282,9 @@
     $('online-quick-match').addEventListener('click', function () {
       if (!client) return;
       var args = roomRpcArgs();
-      callRpc('quick_match', args).then(attachRoom).catch(function (error) {
-        if (args.p_rules && missingRulesRpc(error)) {
+      var useStakeRpc = onlineStakesEnabled;
+      callRpc(useStakeRpc ? 'quick_match_wager' : 'quick_match', args).then(attachRoom).catch(function (error) {
+        if (!useStakeRpc && args.p_rules && missingRulesRpc(error)) {
           announce('This server has not applied the v1.4.0 rules migration, so quick match cannot lock house rules yet. Searching with the previous server rules.', true);
           return callRpc('quick_match', { p_mode: args.p_mode, p_capacity: args.p_capacity }).then(attachRoom);
         }
@@ -1259,6 +1425,12 @@
     if (oldUserId && oldUserId !== nextUserId) {
       clearAccountChannels();
       clearRoomSelection(true);
+    }
+    if (identityChanged) {
+      onlineStakesEnabled = false;
+      onlineChampionshipsEnabled = false;
+      onlineChampionship = null;
+      onlineChampionshipSequence++;
     }
     if (!nextUser) {
       recoveryMode = false;
