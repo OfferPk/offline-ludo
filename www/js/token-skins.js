@@ -113,6 +113,16 @@
       stats: n.stats[id] || blankStats()
     };
   }
+  /* v1.8.4 Skin Mastery: 0-3 stars per skin, derived only from that skin's own Kills/Wins (cosmetic, no save change). */
+  var MASTERY = [{ wins: 1, kills: 5, name: 'Bronze' }, { wins: 5, kills: 25, name: 'Silver' }, { wins: 15, kills: 75, name: 'Gold' }];
+  function mastery(stats) {
+    var r = stats && typeof stats === 'object' ? stats : blankStats(), w = r.wins || 0, k = r.kills || 0, stars = 0;
+    MASTERY.forEach(function (t, i) { if (w >= t.wins || k >= t.kills) stars = i + 1; });
+    var next = MASTERY[stars] || null;
+    return { stars: stars, name: stars ? MASTERY[stars - 1].name : 'None', next: next,
+      pct: next ? Math.min(1, Math.max(w / next.wins, k / next.kills)) : 1,
+      text: next ? 'next: ' + next.wins + ' wins or ' + next.kills + ' kills' : 'Mastered' };
+  }
   function commit(save, persist, mutate) {
     var snap = { coins: save.coins, owned: (save.tokenSkinsOwned || []).slice(), eq: save.tokenSkin };
     mutate();
@@ -211,6 +221,6 @@
     byId: byId, rarityOf: rarityOf, normalize: normalize, applyNormalize: applyNormalize, isValid: isValid,
     milestoneMet: milestoneMet, milestoneText: milestoneText, unlockText: unlockText,
     state: state, unlock: unlock, equip: equip, collectEligible: collectEligible,
-    recordKills: recordKills, recordMatch: recordMatch, material: material, blend: blend
+    recordKills: recordKills, recordMatch: recordMatch, MASTERY: MASTERY, mastery: mastery, material: material, blend: blend
   };
 });

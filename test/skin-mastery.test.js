@@ -1,0 +1,11 @@
+'use strict';
+const assert = require('node:assert');
+const TS = require('../www/js/token-skins.js');
+assert.strictEqual(TS.mastery({ wins: 0, kills: 0 }).stars, 0);
+assert.strictEqual(TS.mastery({ wins: 1, kills: 0 }).stars, 1);
+assert.strictEqual(TS.mastery({ wins: 0, kills: 25 }).stars, 2);
+assert.strictEqual(TS.mastery({ wins: 15, kills: 0 }).stars, 3);
+assert.strictEqual(TS.mastery({ wins: 15, kills: 0 }).text, 'Mastered');
+assert.strictEqual(TS.mastery(null).stars, 0);
+const m = TS.mastery({ wins: 2, kills: 20 }); assert.ok(m.stars === 1 && m.pct === 0.8, JSON.stringify(m));
+console.log('skin-mastery ok');

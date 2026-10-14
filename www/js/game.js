@@ -2132,12 +2132,14 @@
       var previousSkinsOwned = (save.tokenSkinsOwned || []).slice(), previousSkinStats = JSON.parse(JSON.stringify(save.tokenSkinStats || {}));
       var newlyUnlocked = window.SkinShop.collectEligible(save, SK);
       var evoGranted = TOKEN_EVOLUTION ? TOKEN_EVOLUTION.collectEligible(save) : [];
+      var masteryBefore = TOKEN_SKINS ? TOKEN_SKINS.mastery(TOKEN_SKINS.state(save.tokenSkin, save).stats).stars : 0;
       if (TOKEN_SKINS) TOKEN_SKINS.recordMatch(save, best === 1);
       var skinGranted = TOKEN_SKINS ? TOKEN_SKINS.collectEligible(save) : [];
       if (hs.length) { dailyEvent('play', 1); if (best === 1) dailyEvent('win', 1); }
       if (ProgressionRewards) ProgressionRewards.collect(save, previousLevel, L.levelFromXp(save.xp).level, function () { return true; });
       gate.matchCompleted();
       G.unlocks = [].concat(newlyUnlocked.map(function (x) { return /dice/i.test(x.name) ? x.name : x.name + ' board'; }), evoGranted.map(function (x) { return 'Lv' + x.level + ' ' + x.name; }), skinGranted.map(function (x) { return x.name + ' skin'; }));
+      if (TOKEN_SKINS) { var mAfter = TOKEN_SKINS.mastery(TOKEN_SKINS.state(save.tokenSkin, save).stats); if (mAfter.stars > masteryBefore) G.unlocks.push(TOKEN_SKINS.byId(save.tokenSkin).name + ' ' + mAfter.name + ' Mastery'); }
       if (!persist()) {
         G.unlocks = [];
         save.owned.boards = previousBoards; save.owned.dice = previousDice;
@@ -2675,6 +2677,7 @@
       var prog = st.owned || sk.starter ? '' : '<small class="vault-prog">Progress: ' + (sk.wins ? st.progressWins + '/' + sk.wins + ' wins ' : '') + (sk.kills ? st.progressKills + '/' + sk.kills + ' captures ' : '') + '· ' + Math.min(save.coins, sk.coins).toLocaleString('en-US') + '/' + sk.coins.toLocaleString('en-US') + ' coins</small>';
       info.innerHTML = '<div class="vault-name"><b>' + sk.name + '</b><span class="rarity-chip" style="--rar:' + r.color + '">' + r.name + '</span></div>' +
         '<div class="vault-state">' + stateHtml + '</div>' + prog +
+        (!st.owned ? '' : '<div class="vault-mastery" title="Skin Mastery">' + (function (m) { return '<span class="m-stars" aria-label="Mastery ' + m.stars + ' of 3">' + [1, 2, 3].map(function (n) { return '<i class="' + (n <= m.stars ? 'on' : '') + '">★</i>'; }).join('') + '</span><small>' + m.name + ' · ' + m.text + '</small>'; })(TOKEN_SKINS.mastery(st.stats)) + '</div>') +
         '<div class="vault-stats"><span>Level ' + evo + '/5</span><span>Kills ' + st.stats.kills + '</span><span>Wins ' + st.stats.wins + '</span></div>';
       row.appendChild(info);
       row.appendChild(skinButton(sk.id));
