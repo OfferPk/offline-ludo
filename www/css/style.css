@@ -1630,6 +1630,25 @@ body.online-classic-board #online-match-retry:not(.hidden) { position: fixed; z-
   .camel-cel .cc-halo, .camel-cel .cc-bouquet { transform: none; }
 }
 
+/* v1.8.1 Daily card + panel. WebView-safe: no filter / 3D on buttons. */
+.mode-card.mode-daily { --mode-color: 255,92,214; grid-column: 1 / -1; backdrop-filter: none; border-color: rgba(255,92,214,.6);
+  background: linear-gradient(120deg, rgba(255,92,214,.16), rgba(80,220,255,.12) 60%, rgba(255,255,255,.03)); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 0 0 1px rgba(80,220,255,.18), 0 0 18px rgba(255,92,214,.22); }
+.mode-daily .mode-card-icon { color: #ff9be8; background: linear-gradient(145deg, rgba(255,92,214,.26), rgba(80,220,255,.16)); }
+.mode-daily .mode-card-title { color: #ffe3f7; text-shadow: 0 0 8px rgba(255,92,214,.55); }
+.daily-dot { font-style: normal; color: #6ff2ff; margin-left: 6px; font-size: 12px; animation: dailyPulse 1.6s ease-in-out infinite; }
+@keyframes dailyPulse { 50% { opacity: .35; } }
+.daily-cal { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin: 10px 0 6px; }
+.dcell { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px; border-radius: 12px; border: 1px solid rgba(255,92,214,.28); background: rgba(255,92,214,.06); }
+.dcell small { opacity: .75; font-size: 11px; } .dcell b { font-size: 15px; }
+.dcell.big { grid-column: span 2; border-color: rgba(255,206,92,.6); background: linear-gradient(130deg, rgba(255,206,92,.16), rgba(255,92,214,.12)); }
+.dcell.now { border-color: #6ff2ff; box-shadow: 0 0 0 2px rgba(111,242,255,.35), 0 0 14px rgba(111,242,255,.3); }
+.dcell.got { opacity: .62; } .dcell i { position: absolute; top: 4px; right: 7px; font-style: normal; color: #6fe3a0; font-weight: 800; }
+.daily-row { display: flex; gap: 8px; margin: 6px 0 4px; } .daily-row .btn { flex: 1; }
+.daily-h { margin: 12px 0 6px; font-size: 15px; }
+.daily-chal { display: grid; gap: 6px; padding: 10px; border-radius: 12px; border: 1px solid rgba(80,220,255,.3); background: rgba(80,220,255,.06); }
+.chal-bar { height: 8px; border-radius: 6px; background: rgba(255,255,255,.1); overflow: hidden; } .chal-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ff5cd6, #50dcff); transition: width .4s ease; }
+@media (prefers-reduced-motion: reduce) { .daily-dot { animation: none; } .chal-bar i { transition: none; } }
+
 /* ---------------- v1.6.4 · Light theme contrast polish (original Crossfour look) ----------------
    Light skins only (body.light). Darker text, stronger icons, clearer borders/shadows.
    Dark skins are untouched; the board canvas keeps its own palette. --muted is deepened in JS (applySkin). */
@@ -1761,3 +1780,9 @@ body.light .online-chess-screen .online-room-connection { color: #9ad9ff !import
 body.light .online-chess-screen .online-room-connection[data-state="reconnecting"] { color: #ffd37a !important; background: rgba(244,183,64,.08); }
 body.light .online-chess-screen .online-room-connection[data-state="ended"] { color: #b8e7ce !important; background: rgba(115,224,176,.08); }
 
+body.light .mode-card.mode-daily { border-color: rgba(196,40,160,.55); background: linear-gradient(120deg, rgba(255,92,214,.14), rgba(40,170,220,.12) 60%, rgba(255,255,255,.6)); }
+body.light .mode-daily .mode-card-title { color: #8a1670; text-shadow: none; }
+body.light .mode-daily .mode-card-icon { color: #b0208f; }
+body.light .daily-dot { color: #0a7f95; }
+body.light .dcell { border-color: rgba(176,32,143,.35); background: rgba(176,32,143,.06); }
+body.light .daily-chal { border-color: rgba(10,127,149,.35); }
