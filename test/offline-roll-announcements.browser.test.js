@@ -48,7 +48,7 @@ async function main() {
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: process.env.CHROME || '/usr/bin/chromium',
+      executablePath: process.env.CHROME || ['/usr/bin/chromium', '/usr/bin/google-chrome', '/usr/bin/chromium-browser'].find(p => require('fs').existsSync(p)),
       headless: 'new',
       args: ['--no-sandbox', '--disable-dev-shm-usage']
     });
