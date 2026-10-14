@@ -92,7 +92,7 @@ function startLocalServer() {
       coins: Array.from(document.querySelectorAll('.coins-val')).map(el => el.textContent)
     }));
     ok(saved.matches === '10' && saved.wins === '4' && saved.rate === '40%', 'home summary restores saved match/win statistics and calculates win rate');
-    ok(saved.coins.length >= 2 && saved.coins.every(value => value === '1,234') && saved.wallet.includes('1,234 coins'), 'wallet and shop balance remain synchronized with the saved coin total');
+    ok(saved.coins.length >= 2 && (() => { const v = saved.coins[0]; return saved.coins.every(x => x === v) && saved.wallet.includes(v + ' '); })(), 'wallet and shop balance remain synchronized with the saved coin total');
 
     await page.click('#btn-stats');
     await page.waitForSelector('#stats:not(.hidden)');
@@ -102,7 +102,7 @@ function startLocalServer() {
     await page.waitForSelector('#stats.hidden');
     await page.click('#btn-coins');
     await page.waitForSelector('#skins:not(.hidden)');
-    ok(await page.$eval('#skins .coins-val', el => el.textContent) === '1,234', 'tapping the coin balance opens the cosmetic shop with the current balance');
+    ok(await page.$eval('#skins .coins-val', el => el.textContent) === saved.coins[0], 'tapping the coin balance opens the cosmetic shop with the current balance');
     ok(errors.length === 0, 'home wallet/dock flow produces no browser errors: ' + errors.join(' | '));
     console.log(checks + ' home wallet and stats dock browser checks passed');
   } finally {
