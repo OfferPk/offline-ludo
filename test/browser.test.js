@@ -3,6 +3,7 @@
 // Fails on any console error / failed request.
 // Usage: PUPPETEER=puppeteer-core node test/browser.test.js <url> [screenshot dir]
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
+const APP_VERSION = require('../package.json').version;
 const URL = (process.argv[2] || 'http://localhost:8781/').replace(/\/?$/, '/');
 const OUT = process.argv[3] || '/tmp';
 const W = 360, H = 740;
@@ -66,7 +67,8 @@ function ok(cond, msg) { if (!cond) throw new Error('FAILED: ' + msg); n++; cons
   ok(await visible('#home') && !(await visible('#btn-continue')), 'home on launch, nothing to continue');
   ok(await visible('#btn-mystery'), 'Mystery Tiles mode on home screen');
   ok((await ev(() => window.__cf.gate.state.sessions)) === 1, 'first session counted');
-  ok(/1\.3\.0/.test(await ev(() => document.body.innerText + document.documentElement.innerHTML)), 'version 1.3.0 in page');
+  const pageText = await ev(() => document.body.innerText + document.documentElement.innerHTML);
+  ok(pageText.includes('Crossfour v' + APP_VERSION), 'version ' + APP_VERSION + ' in page');
 
   const failedSave = await ev(() => {
     const proto = Storage.prototype, original = proto.setItem;
