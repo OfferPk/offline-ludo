@@ -127,7 +127,7 @@ function startLocalServer() {
     assert.equal(await page.evaluate(() => document.activeElement.id), focusables[0], 'Tab wraps back to the first action');
 
     const rollingBefore = await page.evaluate(() => window.__cf.game.st.moveCount);
-    await page.focus('#r-title'); // v1.8.7: keep Space off the result actions (the first one is now the Daily shortcut)
+    await page.focus('#r-title'); // v1.8.8: keep Space off the result actions (the first one is now the Daily shortcut)
     await page.keyboard.press('Space');
     await page.keyboard.press('1');
     assert.equal(await page.evaluate(() => window.__cf.game.st.moveCount), rollingBefore,

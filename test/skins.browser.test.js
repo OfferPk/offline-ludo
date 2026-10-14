@@ -3,7 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
-let URL = process.argv[2] ? process.argv[2].replace(/\/?$/, '/') : null; // v1.8.7: self-serves www/ when no URL is given
+let URL = process.argv[2] ? process.argv[2].replace(/\/?$/, '/') : null; // v1.8.8: self-serves www/ when no URL is given
 const OUT = process.argv[3] || '/tmp/crossfour-skin-screenshots';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let checks = 0;
@@ -49,7 +49,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await seedSave('crossfour.save.v1', v1);
     let migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
     ok(migrated.status === 'migrated-v1' && migrated.save.coins >= 77 /* +level reward from #122 */ && migrated.save.board === 'linen' && migrated.save.dice === 'brass', 'v1 save migration retains coins and selected legacy skins');
-    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true /* Diamond event ON for everyone (John, v1.8.7) */ && migrated.save.owned.boards.includes('linen') && migrated.save.owned.dice.includes('brass'), 'v1 gains safe streak/event defaults without losing owned skins');
+    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true /* Diamond event ON for everyone (John, v1.8.8) */ && migrated.save.owned.boards.includes('linen') && migrated.save.owned.dice.includes('brass'), 'v1 gains safe streak/event defaults without losing owned skins');
 
     const legacyV2 = await page.evaluate(() => {
       const s = JSON.parse(JSON.stringify(window.__cf.save));
@@ -59,7 +59,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await seedSave('crossfour.save.v2', legacyV2);
     migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
     ok(migrated.status === 'migrated-v2' && migrated.save.coins === 321 && migrated.save.board === 'walnut' && migrated.save.dice === 'frost', 'v2 save migration retains progression and selected legacy skins');
-    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true /* Diamond event ON for everyone (John, v1.8.7) */, 'v2 receives backward-compatible achievement and event defaults');
+    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true /* Diamond event ON for everyone (John, v1.8.8) */, 'v2 receives backward-compatible achievement and event defaults');
 
     const legacyV3 = await page.evaluate(() => {
       const s = JSON.parse(JSON.stringify(window.__cf.save));
@@ -74,7 +74,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     await reload();
     migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
     ok(migrated.status === 'loaded' && migrated.save.coins === 432 && migrated.save.board === 'aurora' && migrated.save.dice === 'ember', 'old v3 primary snapshot is accepted and keeps its selected IDs');
-    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true /* Diamond event ON for everyone (John, v1.8.7) */, 'old v3 primary/checkpoint are normalized without schema loss');
+    ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === true /* Diamond event ON for everyone (John, v1.8.8) */, 'old v3 primary/checkpoint are normalized without schema loss');
 
     // Start shop tests from a clean local-only profile.
     await page.evaluate(() => { localStorage.clear(); localStorage.setItem('crossfour.tutorial.v1', '1'); }); await reload();
@@ -107,7 +107,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     ok(failedPurchase.coins === beforeFail.coins && failedPurchase.board === beforeFail.board && !failedPurchase.owned.includes('ocean') && failedPurchase.warning, 'storage failure rolls back coins, ownership and selection without a false success');
     await page.evaluate(() => { Storage.prototype.setItem = window.__skinOriginalSetItem; window.__cf.persist(); document.querySelector('#skin-tabs [data-tab="boards"]').click(); });
 
-    const c0 = await page.evaluate(() => (window.__c0 = window.__cf.save.coins)); // v1.8.7: balance-relative (level rewards from #122 change the start balance)
+    const c0 = await page.evaluate(() => (window.__c0 = window.__cf.save.coins)); // v1.8.8: balance-relative (level rewards from #122 change the start balance)
     await page.$eval('[data-id="galaxy"] button', button => button.click());
     let purchased = await page.evaluate(() => {
       const c = window.__cf, snapshot = JSON.parse(localStorage.getItem('crossfour.save.v3'));

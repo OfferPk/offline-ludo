@@ -9,6 +9,7 @@
   var SAVE_KEY = 'crossfour.save.v3', CHECKPOINT_KEY = 'crossfour.save.checkpoint.v3';
   var V2_KEY = 'crossfour.save.v2', OLD_KEY = 'crossfour.save.v1';
   var TUTORIAL_KEY = 'crossfour.tutorial.v1';
+  var lastOfflineTurnAnnouncement = '';
   var tutorial = { active: false, intro: false, firstMove: false };
   var NAMES = SK.SEAT_NAMES;
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
@@ -1134,6 +1135,34 @@
     if (lk.forceSix && st.turn === s) h += '<span class="pw-on">6!</span>';
     return h;
   }
+  function announceOfflineTurn(st) {
+    var region = $('offline-turn-announcement');
+    if (!region) return;
+    if (G.online) {
+      lastOfflineTurnAnnouncement = '';
+      if (region.textContent) region.textContent = '';
+      return;
+    }
+    if (busy) return;
+    var name = nameOf(st.turn), message;
+    if (st.phase === 'over') {
+      message = st.ranking.length ? 'Match over. ' + nameOf(st.ranking[0]) + ' wins.' : 'Match over.';
+    } else if (!isHuman(st.turn)) {
+      message = name + (st.phase === 'choose' ? ' is choosing.' : ' is playing.');
+    } else {
+      var who = name === 'You' ? 'Your turn.' : name + "'s turn.";
+      var action;
+      if (st.phase === 'choose') action = 'Make your choice.';
+      else if (st.phase === 'move') action = st.queue.length > 1 ? 'Choose a die result, then a token to move.' : 'Choose a token to move.';
+      else if (L.mustChoose(st)) action = 'Choose a die result.';
+      else if (st.queue.length || st.bonus || st.sixes || st.rollAgain) action = 'Roll again.';
+      else action = 'Roll the die.';
+      message = who + ' ' + action;
+    }
+    if (message === lastOfflineTurnAnnouncement) return;
+    lastOfflineTurnAnnouncement = message;
+    region.textContent = message;
+  }
   function render() {
     if (!G) return;
     var st = G.st, over = st.phase === 'over';
@@ -1203,6 +1232,7 @@
       else if (st.phase === 'move') hint = st.queue.length > 1 ? 'Pick a chip, then a token' : 'Pick a token';
     } else if (!over && !isHuman(s)) hint = NAMES[s] + ' is thinking…';
     $('hint').textContent = hint;
+    announceOfflineTurn(st);
     var u = $('btn-undo'), showU = save.settings.undo && humans(st).length > 0 && !over;
     u.classList.toggle('hidden', !showU);
     var act = undoActive();
@@ -1839,6 +1869,34 @@
     SFX.capture(); if (!fxOk()) captureImpactFeedback();
   }
 
+  var offlineMoveAnnouncementTimer = null;
+  function clearOfflineMoveAnnouncement() {
+    if (offlineMoveAnnouncementTimer != null) clearTimeout(offlineMoveAnnouncementTimer);
+    offlineMoveAnnouncementTimer = null;
+    var region = $('offline-move-announcement');
+    if (region) region.textContent = '';
+  }
+  function announceOfflineMove(seat, piece, result) {
+    var region = $('offline-move-announcement'), formatter = window.OfflineMoveAnnouncements;
+    if (!region || !formatter || !G || G.online || !result) return;
+    var position = G.st.pieces[seat] && G.st.pieces[seat][piece];
+    var destination = position === L.HOME ? 'home' : position < 0 ? 'base' : position >= L.COL0 ? 'home-lane' : 'track';
+    var captures = (result.captures || []).map(function (capture) { return { actor: nameOf(capture.seat), piece: capture.piece }; });
+    var message = formatter.format({
+      actor: nameOf(seat), piece: piece, fromBase: result.from < 0, destination: destination,
+      spaces: result.path && result.path.length, captures: captures,
+      finished: !!result.finishedPlayer, event: !!result.event
+    });
+    if (!message) return;
+    if (offlineMoveAnnouncementTimer != null) clearTimeout(offlineMoveAnnouncementTimer);
+    region.textContent = '';
+    var match = G;
+    offlineMoveAnnouncementTimer = window.setTimeout(function () {
+      offlineMoveAnnouncementTimer = null;
+      if (G === match && !G.online) region.textContent = message;
+    }, 60);
+  }
+
   function doMove(piece, v, keyboard) {
     if (!G || busy || G.st.phase !== 'move' || paused) return;
     if (G.online) {
@@ -1880,6 +1938,7 @@
       if (res.kingCaptured) { pause = Math.max(pause, 900); toast(nameOf(s) + ' toppled a King! +2 Lucky Charge', 1600); later(function () { SFX.mega(); }, 300); }
       if (res.crowned) { pause = Math.max(pause, 900); later(function () { crownFx(res.crowned); }, res.captures.length ? 420 : 0); }
       var done = function () {
+        announceOfflineMove(s, piece, res);
         if (human && tutorial.active && !tutorial.intro) tutorial.firstMove = true;
         layoutPieces(); busy = false; G.actor = null;
         if (human && !res.over && st.turn === s && st.phase === 'roll') toast(st.boost[s] === 'choose' ? 'Pick a number for your next roll' : 'Bonus roll!', 1000);
@@ -2128,6 +2187,8 @@
   // ---------------- match lifecycle ----------------
   function startMatch(seats, mode, offerTutorial, entryFee, championshipStage) {
     cancelFlow(); stopCelebration();
+    clearOfflineMoveAnnouncement();
+    lastOfflineTurnAnnouncement = '';
     entryFee = [0, 50, 100, 500].indexOf(Number(entryFee)) >= 0 ? Number(entryFee) : 0;
     var humanSeats = seats.filter(function (seat) { return seat && seat.type === 'human'; }).length;
     var stakePaid = championshipStage == null ? entryFee * humanSeats : 0;
@@ -2281,6 +2342,10 @@
     render(); setCoins(); setLevel(); show('result');
     if (entering) $('r-title').focus({ preventScroll: true }); // v1.8.7 (#111)
     if (entering) { spotlightWinner(winner); celebrateWin(winner); }
+    if (entering) {
+      var announcement = $('result-announcement');
+      if (announcement) announcement.textContent = 'Match over. ' + $('r-title').textContent;
+    }
   }
   /** v1.8.2 match summary: this match's highlights, new unlocks, closest skin goal, today's challenge. */
   function renderSummary() {
@@ -2302,6 +2367,8 @@
     if (!G || G.st.phase !== 'over') return;
     stopCelebration();
     hide('result');
+    var announcement = $('result-announcement');
+    if (announcement) announcement.textContent = '';
     var seats = G.seats, mode = G.mode, entryFee = G.entryFee || 0, championshipStage = G.championshipStage;
     var championshipNext = championshipStage != null && save.championship && save.championship.status === 'active' && save.championship.stage === championshipStage + 1;
     G = null; save.game = null; persist();
@@ -2524,6 +2591,7 @@
   }
   function showGame() {
     ['result', 'menu', 'chat'].forEach(hide);
+    lastOfflineTurnAnnouncement = '';
     screen('game'); paused = false;
     if (G.view == null) G.view = viewOf(G.st);
     buildPods(); buildTiles(); buildPieces(); layout(); render();
@@ -2537,7 +2605,7 @@
     show('menu'); $('menu-title').focus({ preventScroll: true });
   }
   function resumeFromMenu() {
-    hide('menu'); paused = false; layoutPieces(true); advance();
+    hide('menu'); paused = false; lastOfflineTurnAnnouncement = ''; layoutPieces(true); advance();
     $('btn-home').focus({ preventScroll: true });
   }
   function askConfirm(title, text, yes, onYes, onNo) {
@@ -2811,6 +2879,25 @@
   }
   var SETTINGS = ['sound', 'haptics', 'auto', 'undo', 'timer', 'chat', 'fast'];
   var RULE_KEYS = ['safeSquares', 'captureToEnter', 'blocks', 'bonusOnCapture', 'bonusOnHome', 'arrows', 'noCapture'];
+  var settingsOpener = null;
+  var SETTINGS_FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function settingsFocusableControls() {
+    return Array.prototype.slice.call($('settings').querySelectorAll(SETTINGS_FOCUSABLE)).filter(function (el) {
+      return !el.closest('.hidden') && el.getClientRects().length > 0;
+    });
+  }
+  function openSettings(opener) {
+    settingsOpener = opener || document.activeElement;
+    syncSettingsUI();
+    show('settings');
+    $('settings-title').focus();
+  }
+  function closeSettings(restoreFocus) {
+    var opener = settingsOpener;
+    settingsOpener = null;
+    hide('settings');
+    if (restoreFocus !== false && opener && document.documentElement.contains(opener) && !opener.disabled) opener.focus();
+  }
   function syncSettingsUI() {
     var locked = !!(G && G.online);
     SETTINGS.forEach(function (k) { $('set-' + k).checked = !!save.settings[k]; });
@@ -2818,6 +2905,48 @@
     each($('rule-style').children, function (b) { b.classList.toggle('on', b.dataset.v === save.rules.rollStyle); b.disabled = locked; });
     if ($('rule-lock-note')) $('rule-lock-note').classList.toggle('hidden', !locked);
     $('btn-privacy-options').classList.toggle('hidden', !(native && Ads.privacyOptionsRequired()));
+    $('btn-restore-backup').disabled = locked;
+    if (locked) $('local-restore-help').textContent = 'Backup restore is disabled during an online match so its connection is not interrupted.';
+    else $('local-restore-help').textContent = 'Choose a Crossfour JSON backup saved on this device. Restoring replaces your offline progress and saved match; nothing is uploaded.';
+  }
+  function setRestoreStatus(message) {
+    var status = $('local-restore-status');
+    if (status) status.textContent = message;
+  }
+  function bindLocalRestore() {
+    var button = $('btn-restore-backup'), input = $('local-restore-file');
+    button.addEventListener('click', function () {
+      if (G && G.online) { setRestoreStatus('Backup restore is unavailable during an online match.'); return; }
+      SFX.click(); input.click();
+    });
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      input.value = '';
+      if (!file) return;
+      if (G && G.online) { setRestoreStatus('Backup restore is unavailable during an online match.'); return; }
+      if (file.size > 1024 * 1024) { setRestoreStatus('That file is too large. Choose a backup no larger than 1 MB. Nothing was changed.'); return; }
+      if (typeof FileReader !== 'function') { setRestoreStatus('This browser cannot read a backup file. Your save was not changed.'); return; }
+      var reader = new FileReader();
+      reader.onerror = reader.onabort = function () { setRestoreStatus('The backup file could not be read. Your save was not changed.'); };
+      reader.onload = function () {
+        var snapshot;
+        try { snapshot = JSON.parse(String(reader.result)); }
+        catch (e) { setRestoreStatus('That file is not valid JSON. Your save was not changed.'); return; }
+        var inspected = saveStore.inspectSnapshot(snapshot);
+        if (!inspected.ok) { setRestoreStatus('That file is not a valid backup for this game version. Your save was not changed.'); return; }
+        var date = new Date(inspected.savedAt), dated = isFinite(date.getTime()) ? ' Backup date: ' + date.toLocaleString() + '.' : '';
+        askConfirm('Restore offline save?', 'This will replace the offline profile, settings, statistics and saved match on this device.' + dated + ' The current save is checkpointed before replacement. Online account data is not affected. Continue?', 'Restore', function () {
+          if (G && G.online) { setRestoreStatus('Restore cancelled because an online match is active.'); return; }
+          if (!persist()) { setRestoreStatus('Restore stopped: the current save could not be checkpointed. Check device storage and try again.'); return; }
+          var result = saveStore.importSnapshot(snapshot);
+          if (!result.ok) { setRestoreStatus('Restore failed. Your current saved progress was kept. Check device storage and try again.'); return; }
+          setRestoreStatus('Backup restored. Reloading the saved offline game…');
+          window.setTimeout(function () { window.location.reload(); }, 800);
+        }, function () { setRestoreStatus('Restore cancelled. Your current save was not changed.'); });
+      };
+      try { reader.readAsText(file); }
+      catch (e) { setRestoreStatus('The backup file could not be read. Your save was not changed.'); }
+    });
   }
   function buildRulesEvents() {
     ['boost', 'chaos'].forEach(function (k) {
@@ -2917,7 +3046,7 @@
   $('entry-fee').addEventListener('change', function () { selectedEntryFee = Number(this.value) || 0; renderSetup(); });
   each($('mode-seg').children, function (b) { b.addEventListener('click', function () { SFX.click(); setupMode = b.dataset.mode; save.setup.mode[setupKind] = setupMode; persist(); renderSetup(); }); });
   each($('presets').children, function (b) { b.addEventListener('click', function () { SFX.click(); applyPreset(b.dataset.p); }); });
-  $('btn-edit-rules').addEventListener('click', function () { SFX.click(); syncSettingsUI(); show('settings'); });
+  $('btn-edit-rules').addEventListener('click', function () { SFX.click(); openSettings(this); });
   $('btn-start').addEventListener('click', function () {
     SFX.unlock(); SFX.click();
     var seats = save.setup[setupKind].map(function (x) { return x ? { type: x.type, level: x.level } : null; }), mode = setupMode;
@@ -2996,11 +3125,11 @@
     }
   });
   each($('rules-tabs').children, function (b) { b.addEventListener('click', function () { SFX.click(); openRules(b.dataset.tab); }); });
-  $('btn-settings').addEventListener('click', function () { SFX.unlock(); SFX.click(); syncSettingsUI(); show('settings'); });
-  $('btn-game-settings').addEventListener('click', function () { SFX.click(); syncSettingsUI(); show('settings'); });
+  $('btn-settings').addEventListener('click', function () { SFX.unlock(); SFX.click(); openSettings(this); });
+  $('btn-game-settings').addEventListener('click', function () { SFX.click(); openSettings(this); });
   $('btn-export-backup').addEventListener('click', exportLocalBackup);
   each($('skin-tabs').children, function (b) { b.addEventListener('click', function () { skinTab = b.dataset.tab; SFX.click(); renderSkins(); }); });
-  each(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', function () { SFX.click(); if (b.dataset.close === 'rules') closeRules(); else hide(b.dataset.close); if (setupVisible()) renderSetup(); }); });
+  each(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', function () { SFX.click(); if (b.dataset.close === 'settings') closeSettings(true); else if (b.dataset.close === 'rules') closeRules(); else hide(b.dataset.close); if (setupVisible()) renderSetup(); }); });
   SETTINGS.forEach(function (k) {
     $('set-' + k).addEventListener('change', function () {
       save.settings[k] = $('set-' + k).checked; persist();
@@ -3016,7 +3145,7 @@
   each($('rule-style').children, function (b) { b.addEventListener('click', function () { if (G && G.online) return; save.rules.rollStyle = b.dataset.v; persist(); SFX.click(); syncSettingsUI(); if (setupVisible()) renderSetup(); }); });
   $('btn-privacy-options').addEventListener('click', function () { Ads.showPrivacyOptions(); });
   $('btn-reset').addEventListener('click', function () {
-    hide('settings');
+    closeSettings(false);
     askConfirm('Reset progress?', 'Coins, XP, skins, statistics and the saved match will be deleted.', 'Reset', function () {
       var resetData = defaults(); resetData.ad = save.ad;
       var resetResult = saveStore.reset(resetData);
@@ -3048,6 +3177,18 @@
       else if (!e.shiftKey && document.activeElement === lastDialogButton) { e.preventDefault(); firstDialogButton.focus(); }
       return;
     }
+    if (isOpen('settings')) {
+      if (e.key === 'Escape') { e.preventDefault(); closeSettings(true); return; }
+      if (e.key === 'Tab') {
+        var controls = settingsFocusableControls();
+        if (!controls.length) { e.preventDefault(); $('settings-title').focus(); return; }
+        var first = controls[0], last = controls[controls.length - 1], active = document.activeElement;
+        if (e.shiftKey && (active === first || active === $('settings-title') || !$('settings').contains(active))) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && (active === last || !$('settings').contains(active))) { e.preventDefault(); first.focus(); }
+        return;
+      }
+      return;
+    }
     if (isOpen('result') && !document.querySelector('.overlay:not(.hidden):not(#result)')) { // v1.8.7 (#111) focus trap
       if (e.key === 'Tab') {
         var resultDialog = $('result'), resultButtons = resultDialog.querySelectorAll('button:not([disabled]):not(.hidden)'), resultTitle = $('r-title');
@@ -3073,7 +3214,7 @@
   });
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState !== 'visible') { if (G) { cancelFlow(); stopTimer(); layoutPieces(true); persist(); } }
-    else if (G && !$('game').classList.contains('hidden') && !paused && !isOpen('result')) { layoutPieces(true); render(); advance(); }
+    else if (G && !$('game').classList.contains('hidden') && !paused && !isOpen('result')) { lastOfflineTurnAnnouncement = ''; layoutPieces(true); render(); advance(); }
   });
   window.addEventListener('resize', function () { layout(); });
   if (window.ResizeObserver) new ResizeObserver(function () { layout(); }).observe($('stage'));
@@ -3089,7 +3230,7 @@
 
   // ---------------- boot ----------------
   SFX.setEnabled(save.settings.sound);
-  applySkin(); setCoins(); setLevel(); updateHome(); buildChat(); buildRulesEvents();
+  applySkin(); setCoins(); setLevel(); updateHome(); buildChat(); buildRulesEvents(); bindLocalRestore();
   if (loadResult.status === 'recovered') toast('Recovered your last safe save. Some recent moves may be missing.', 5000);
   // consent + SDK init only: no interstitial is ever shown on launch; the banner sits on the menu / game screens
   if (Ads) Ads.init().then(function () { syncSettingsUI(); Ads.showBanner(); });
