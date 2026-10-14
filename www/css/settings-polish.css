@@ -1,0 +1,331 @@
+/* v1.9.3 Settings polish — visual-only; setting controls and save behavior are unchanged. */
+#settings .panel {
+  --settings-pad: clamp(16px, 4vw, 24px);
+  width: min(560px, 100%);
+  max-height: calc(100% - 24px);
+  padding: var(--settings-pad);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 55%, transparent) transparent;
+  border-color: rgba(145, 190, 230, .17);
+  border-radius: 24px;
+  background:
+    radial-gradient(120% 55% at 0 0, rgba(82, 162, 220, .12), transparent 58%),
+    linear-gradient(160deg, color-mix(in srgb, var(--page) 94%, #26364c), var(--page) 62%);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .48), inset 0 1px 0 rgba(255, 255, 255, .07);
+}
+#settings .panel-head {
+  position: sticky;
+  z-index: 4;
+  top: calc(0px - var(--settings-pad));
+  margin: calc(0px - var(--settings-pad)) calc(0px - var(--settings-pad)) 12px;
+  padding: 14px var(--settings-pad) 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  background: color-mix(in srgb, var(--page) 94%, #26364c);
+  backdrop-filter: blur(18px) saturate(1.15);
+}
+#settings .panel-head h3 {
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -.035em;
+}
+#settings .panel-head .close {
+  flex: none;
+  border: 1px solid var(--surface-edge);
+  background: var(--surface);
+  transition: background .16s ease, border-color .16s ease, transform .16s ease;
+}
+#settings .row {
+  min-height: 58px;
+  gap: 16px;
+  padding: 13px 7px;
+  border-bottom-color: color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.35;
+  transition: background-color .16s ease, border-color .16s ease;
+}
+#settings .row span {
+  line-height: 1.38;
+}
+#settings .row small,
+#settings .row .note {
+  max-width: 48ch;
+  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+#settings .row .sw {
+  width: 46px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, .12);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .22);
+}
+#settings .row .sw::after {
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .3), inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+#settings .row input:checked + .sw {
+  border-color: color-mix(in srgb, var(--accent) 76%, white);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 15%, transparent), inset 0 1px 2px rgba(0, 0, 0, .12);
+}
+#settings .row input:focus-visible + .sw {
+  position: relative;
+  z-index: 2;
+}
+#settings .move-speed-row {
+  align-items: flex-start;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+#settings .move-speed-row > span {
+  padding-top: 7px;
+}
+#settings .seg {
+  flex: none;
+  width: min(250px, 52%);
+  min-width: 190px;
+  padding: 4px;
+  gap: 4px;
+  border: 1px solid var(--surface-edge);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 68%, transparent);
+}
+#settings .seg button {
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 750;
+  transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+}
+#settings .seg button.on {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ink) 96%, white), var(--ink));
+  color: var(--bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .2), inset 0 1px 0 rgba(255, 255, 255, .25);
+}
+#settings .sect {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 7px;
+  padding: 0 2px;
+  color: color-mix(in srgb, var(--accent) 72%, var(--muted));
+  font-size: 10px;
+  letter-spacing: .16em;
+}
+#settings .sect::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 32%, transparent), transparent);
+}
+#settings #rule-lock-note {
+  margin: 8px 2px 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  font-size: 11px;
+}
+#settings .storage-protection,
+#settings .local-backup,
+#settings .local-restore {
+  border-color: color-mix(in srgb, var(--ink) 12%, transparent);
+  border-radius: 16px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ink) 5%, transparent), var(--surface));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .045);
+}
+#settings .storage-protection {
+  margin-top: 14px;
+  padding: 14px;
+}
+#settings .storage-protection .btn {
+  min-width: 112px;
+  min-height: 44px;
+  border-radius: 11px;
+}
+#settings .storage-protection.is-protected {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 9%, transparent), var(--surface));
+}
+#settings .storage-protection.is-protected h4::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin: 0 7px 1px 0;
+  border-radius: 50%;
+  background: #54d7ae;
+  box-shadow: 0 0 10px rgba(84, 215, 174, .42);
+}
+#settings .local-backup,
+#settings .local-restore {
+  margin-top: 12px;
+  padding: 14px;
+}
+#settings .local-backup > b,
+#settings .local-restore > b {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+#settings .local-backup > p,
+#settings .local-restore > p {
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+#settings .local-backup > .btn,
+#settings .local-restore > .btn {
+  min-height: 44px;
+  border-radius: 11px;
+  font-size: 13px;
+}
+#settings .reset-tips-row .small-btn {
+  min-height: 40px;
+  padding: 8px 13px;
+  border-radius: 11px;
+  font-size: 12px;
+}
+#settings .panel-actions {
+  gap: 8px;
+  margin-top: 18px;
+}
+#settings .panel-actions .btn {
+  min-height: 46px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+#settings .panel-actions .btn.danger {
+  border-color: rgba(255, 107, 107, .24);
+  background: rgba(255, 107, 107, .07);
+}
+#settings .ver {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: .04em;
+  text-align: center;
+}
+#settings button:focus-visible,
+#settings a:focus-visible,
+#settings .row input:focus-visible + .sw {
+  outline-width: 3px;
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  #settings .panel-head .close:hover {
+    border-color: color-mix(in srgb, var(--accent) 44%, var(--surface-edge));
+    background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+    transform: translateY(-1px);
+  }
+  #settings .row:hover {
+    background: color-mix(in srgb, var(--ink) 3%, transparent);
+  }
+  #settings .panel-actions .btn:hover,
+  #settings .storage-protection .btn:hover,
+  #settings .local-backup > .btn:hover,
+  #settings .local-restore > .btn:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+}
+
+body.light #settings .panel {
+  border-color: rgba(35, 70, 108, .16);
+  background:
+    radial-gradient(120% 55% at 0 0, rgba(78, 155, 207, .11), transparent 58%),
+    linear-gradient(160deg, color-mix(in srgb, var(--page) 95%, white), var(--page) 62%);
+  box-shadow: 0 24px 70px rgba(40, 34, 24, .28), inset 0 1px 0 rgba(255, 255, 255, .9);
+}
+body.light #settings .panel-head {
+  border-bottom-color: rgba(28, 48, 70, .10);
+  background: color-mix(in srgb, var(--page) 96%, white);
+}
+body.light #settings .row {
+  border-bottom-color: rgba(28, 48, 70, .10);
+}
+body.light #settings .row .sw {
+  background: rgba(116, 128, 145, .42);
+  border-color: rgba(155, 170, 190, .4);
+  box-shadow: inset 0 1px 3px rgba(28, 32, 44, .12);
+}
+body.light #settings .row input:checked + .sw {
+  background: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 76%, white);
+}
+body.light #settings .row .sw::after {
+  background: linear-gradient(145deg, #fff, #f0f3f6);
+}
+body.light #settings .seg {
+  border-color: rgba(28, 48, 70, .10);
+  background: rgba(28, 48, 70, .055);
+}
+body.light #settings .seg button.on {
+  background: linear-gradient(145deg, #fff, #e8edf3);
+  color: #1b2736;
+  box-shadow: 0 1px 4px rgba(30, 40, 55, .15), inset 0 1px 0 #fff;
+}
+body.light #settings .storage-protection,
+body.light #settings .local-backup,
+body.light #settings .local-restore {
+  border-color: rgba(28, 48, 70, .12);
+  background: linear-gradient(145deg, rgba(255, 255, 255, .82), rgba(36, 96, 156, .035));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 2px 8px rgba(30, 40, 55, .035);
+}
+body.light #settings .storage-protection.is-protected {
+  border-color: rgba(24, 139, 108, .38);
+  background: linear-gradient(145deg, rgba(24, 139, 108, .07), rgba(255, 255, 255, .8));
+}
+body.light #settings .storage-protection h4 { color: #273345; }
+body.light #settings .storage-protection p { color: #536174; }
+body.light #settings .panel-actions .btn.danger {
+  border-color: rgba(180, 35, 24, .18);
+  background: rgba(180, 35, 24, .045);
+}
+
+@media (max-width: 430px) {
+  #settings .panel {
+    border-radius: 21px;
+  }
+  #settings .move-speed-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  #settings .move-speed-row > span {
+    flex: none;
+    width: 100%;
+    padding-top: 0;
+  }
+  #settings .move-speed-row .seg {
+    width: 100%;
+    min-width: 0;
+  }
+}
+@media (max-width: 370px) {
+  #settings .storage-protection {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  #settings .storage-protection .btn {
+    width: 100%;
+  }
+  #settings .panel-actions .btn {
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #settings .panel-head .close,
+  #settings .row,
+  #settings .seg button {
+    transition: none;
+  }
+}
