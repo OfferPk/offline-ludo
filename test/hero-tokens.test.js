@@ -17,9 +17,9 @@ const ok = (c, m) => { assert.ok(c, m); checks++; console.log('  ok -', m); };
 
 console.log('hero-tokens.test.js');
 
-ok(pkg.version === '1.7.2', 'package version 1.7.2');
-ok(/versionCode 26/.test(gradle) && /versionName "1\.7\.2"/.test(gradle), 'gradle versionCode 26 / 1.7.2');
-ok(/Crossfour v1\.7\.2/.test(html) && /css\/style\.css\?v=1\.7\.2/.test(html), 'footer + asset cache-bust 1.7.2');
+ok(pkg.version === '1.8.0', 'package version 1.8.0');
+ok(/versionCode 27/.test(gradle) && /versionName "1\.8\.0"/.test(gradle), 'gradle versionCode 27 / 1.8.0');
+ok(/Crossfour v1\.8\.0/.test(html) && /css\/style\.css\?v=1\.8\.0/.test(html), 'footer + asset cache-bust 1.8.0');
 
 // Tall classic Ludo pawn SVG (not flat/bowl circle).
 ok(/Tall classic Ludo pawn/.test(game), 'tall pawn comment present');

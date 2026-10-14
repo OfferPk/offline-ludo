@@ -1760,3 +1760,4 @@ body.light .online-chess-screen .btn:not(.primary):not(.rewarded-btn) { backgrou
 body.light .online-chess-screen .online-room-connection { color: #9ad9ff !important; background: rgba(105,205,255,.07); }
 body.light .online-chess-screen .online-room-connection[data-state="reconnecting"] { color: #ffd37a !important; background: rgba(244,183,64,.08); }
 body.light .online-chess-screen .online-room-connection[data-state="ended"] { color: #b8e7ce !important; background: rgba(115,224,176,.08); }
+
