@@ -37,6 +37,7 @@
     "test:reduced-motion": "node test/reduced-motion.browser.test.js",
     "test:settings-a11y": "node test/settings-accessibility.browser.test.js",
     "test:result-announce": "node test/offline-result-announcement.browser.test.js",
+    "test:turn-announce": "node test/offline-turn-announcements.browser.test.js",
     "test:v185": "node test/v185-flows.browser.test.js",
     "test:v182": "node test/v182-summary.browser.test.js"
   },
