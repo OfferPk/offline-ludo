@@ -77,7 +77,10 @@ function ok(condition, message) {
           cards: buttonData,
           compact: boxes.every(box => box.width > 0 && box.height >= 88 && box.height <= 128),
           belowGrid: utilityBox.top >= cardsBottom && communityBox.top >= utilityBox.bottom,
-          utilitiesVisible: ['btn-skins', 'btn-rules', 'btn-settings', 'btn-community'].every(id => visible(document.getElementById(id))),
+          utilitiesPresent: ['btn-skins', 'btn-rules', 'btn-settings', 'btn-community'].every(id => {
+            const element = document.getElementById(id), style = getComputedStyle(element), box = element.getBoundingClientRect();
+            return style.display !== 'none' && style.visibility === 'visible' && box.width > 0 && box.height > 0;
+          }),
           horizontalFit: document.documentElement.scrollWidth <= innerWidth,
           gridStyle: getComputedStyle(buttons[0]).backdropFilter
         };
@@ -86,12 +89,25 @@ function ok(condition, message) {
       ok(layout.cards.every(card => card.visible && card.hitTarget), width + '×' + height + ': every card is visibly rendered and its center is clickable');
       ok(layout.cards.every(card => card.native && card.labelled && card.described && card.boldTitle && card.subtleSubtitle && card.distinctIcon), width + '×' + height + ': cards expose native button semantics, named titles, descriptions, distinct decorative icons, and clear text hierarchy');
       ok(layout.distinctIcons && layout.compact && layout.gridStyle.includes('blur'), width + '×' + height + ': crystal cards have four unique icons and compact frosted styling');
-      ok(layout.belowGrid && layout.utilitiesVisible && layout.horizontalFit, width + '×' + height + ': Skins, Rules, Settings, and Leaderboard remain balanced below the grid without horizontal overflow');
+      ok(layout.belowGrid && layout.utilitiesPresent && layout.horizontalFit, width + '×' + height + ': Skins, Rules, Settings, and Leaderboard remain in order below the grid without horizontal overflow');
+      await page.evaluate(() => { const home = document.getElementById('home'); home.scrollTop = home.scrollHeight; });
+      const utilitiesReachable = await page.evaluate(() => {
+        const dock = document.querySelector('.home-dock').getBoundingClientRect();
+        return ['btn-skins', 'btn-rules', 'btn-settings', 'btn-community'].every(id => {
+          const button = document.getElementById(id), box = button.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+          return box.top >= 0 && box.bottom <= dock.top && (hit === button || button.contains(hit));
+        });
+      });
+      ok(utilitiesReachable, width + '×' + height + ': scrolling reveals all home utilities above the pinned dock');
       if (width === 390) {
+        await page.keyboard.press('Tab');
+        const walletFocus = await page.evaluate(() => ({ id: document.activeElement.id, outline: getComputedStyle(document.activeElement).outlineStyle }));
+        ok(walletFocus.id === 'btn-coins' && walletFocus.outline === 'solid', 'phone keyboard navigation reaches the coin wallet first with a visible focus ring');
         await page.keyboard.press('Tab');
         await page.keyboard.press('Tab');
         const focused = await page.evaluate(() => ({ id: document.activeElement.id, outline: getComputedStyle(document.activeElement).outlineStyle }));
-        ok(focused.id === 'btn-vs-ai' && focused.outline === 'solid', 'phone keyboard navigation reaches the first card with a visible focus ring');
+        ok(focused.id === 'btn-vs-ai' && focused.outline === 'solid', 'phone keyboard navigation reaches the first game card with a visible focus ring');
         await page.keyboard.press('Enter');
         await page.waitForSelector('#setup:not(.hidden)');
         ok(true, 'the focused Play vs Computer card activates the existing setup flow with Enter');

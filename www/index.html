@@ -16,8 +16,8 @@
     <!-- HOME -->
     <section id="home" class="screen">
       <div class="home-top">
-        <button id="btn-stats" class="chip lvl-chip"><span class="lvl-badge" id="lvl-badge">1</span><span class="lvl-bar"><i id="lvl-fill"></i></span></button>
-        <div class="coins"><span class="coin-ico"></span><span class="coins-val">0</span></div>
+        <span class="home-top-label">YOUR GAME</span>
+        <button id="btn-coins" class="coins coin-wallet" type="button" aria-label="Coins: 0. Open the skins shop to spend coins on cosmetics" title="Coins are earned in matches and spent on cosmetic skins"><span class="coin-ico" aria-hidden="true"></span><span class="coins-val">0</span><span class="coin-wallet-action" aria-hidden="true">Shop ›</span></button>
       </div>
       <div class="home-main">
         <div class="logo">
@@ -93,6 +93,20 @@
         </button>
         <a class="home-link" href="privacy.html">Privacy policy</a>
       </div>
+      <footer class="home-dock">
+        <button id="btn-stats" class="home-stats-button" type="button" aria-label="Open player statistics">
+          <span class="home-dock-heading">
+            <span class="lvl-badge" id="lvl-badge">1</span>
+            <span class="home-dock-level"><small>LEVEL PROGRESS</small><span class="lvl-bar"><i id="lvl-fill"></i></span></span>
+            <span class="home-dock-link" aria-hidden="true">STATS ›</span>
+          </span>
+          <span class="home-dock-metrics" aria-hidden="true">
+            <span><b id="home-matches">0</b><small>Matches</small></span>
+            <span><b id="home-wins">0</b><small>Wins</small></span>
+            <span><b id="home-win-rate">–</b><small>Win rate</small></span>
+          </span>
+        </button>
+      </footer>
     </section>
 
     <!-- COMMUNITY (presentation-only mock leaderboard and referral dashboard) -->

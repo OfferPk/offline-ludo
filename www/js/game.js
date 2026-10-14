@@ -254,7 +254,11 @@
   function show(id) { $(id).classList.remove('hidden'); }
   function hide(id) { $(id).classList.add('hidden'); }
   function isOpen(id) { return !$(id).classList.contains('hidden'); }
-  function setCoins() { each(document.querySelectorAll('.coins-val'), function (e) { e.textContent = save.coins; }); }
+  function setCoins() {
+    each(document.querySelectorAll('.coins-val'), function (e) { e.textContent = save.coins.toLocaleString('en-US'); });
+    var wallet = $('btn-coins');
+    if (wallet) wallet.setAttribute('aria-label', save.coins.toLocaleString('en-US') + ' coins. Open the skins shop to spend coins on cosmetics.');
+  }
   function setLevel() { var l = L.levelFromXp(save.xp); $('lvl-badge').textContent = l.level; $('lvl-fill').style.width = Math.round(l.into / l.need * 100) + '%'; }
   function board() { for (var i = 0; i < SK.BOARDS.length; i++) if (SK.BOARDS[i].id === save.board) return SK.BOARDS[i]; return SK.BOARDS[0]; }
   function dice() { for (var i = 0; i < SK.DICE.length; i++) if (SK.DICE[i].id === save.dice) return SK.DICE[i]; return SK.DICE[0]; }
@@ -2089,6 +2093,7 @@
   }
   function updateHome() {
     var cont = G && G.st.phase !== 'over';
+    updateHomeStats();
     $('btn-continue').classList.toggle('hidden', !cont);
     if (cont) { var st = G.st; $('continue-sub').textContent = (st.mode === 'mystery' ? 'Mystery Tiles · ' : st.mode === 'lucky' ? 'Lucky Chaos Ludo · ' : st.mode === 'quick' ? 'Quick Ludo · ' : st.mode === 'team' ? 'Team Ludo · ' : st.mode === 'arrow' ? 'Arrow Ludo · ' : st.mode === 'friendly' ? 'Friendly · ' : '') + (hasAI(st) ? 'vs Computer' : 'Pass & Play') + ' · ' + st.players.length + ' players'; }
   }
@@ -2206,6 +2211,13 @@
       ['Wins vs Easy', S.vs.easy[1] + ' / ' + S.vs.easy[0]], ['Wins vs Normal', S.vs.medium[1] + ' / ' + S.vs.medium[0]], ['Wins vs Hard', S.vs.hard[1] + ' / ' + S.vs.hard[0]], ['Mystery events', S.events],
       ['Mystery wins', S.mystery[1] + ' / ' + S.mystery[0]], ['Lucky Chaos wins', (S.lucky||[0,0])[1] + ' / ' + (S.lucky||[0,0])[0]], ['Quick wins', (S.quick||[0,0])[1] + ' / ' + (S.quick||[0,0])[0]], ['Team wins', (S.team||[0,0])[1] + ' / ' + (S.team||[0,0])[0]], ['Arrow wins', (S.arrow||[0,0])[1] + ' / ' + (S.arrow||[0,0])[0]], ['Friendly wins', (S.friendly||[0,0])[1] + ' / ' + (S.friendly||[0,0])[0]], ['1 v 1 wins', S.duel[1] + ' / ' + S.duel[0]], ['4-player wins', S.four[1] + ' / ' + S.four[0]], ['Pass & Play', S.pass]];
     $('stats-body').innerHTML = cells.map(function (c) { return '<div><b>' + c[1] + '</b><span>' + c[0] + '</span></div>'; }).join('');
+  }
+  function updateHomeStats() {
+    var S = save.stats, rate = S.played ? Math.round(S.won / S.played * 100) + '%' : '–';
+    $('home-matches').textContent = S.played.toLocaleString('en-US');
+    $('home-wins').textContent = S.won.toLocaleString('en-US');
+    $('home-win-rate').textContent = rate;
+    $('btn-stats').setAttribute('aria-label', 'Open player statistics. ' + S.played + ' matches, ' + S.won + ' wins, ' + rate + ' win rate.');
   }
   var skinTab = 'boards';
   function skinRequirement(it) {
@@ -2446,6 +2458,7 @@
   $('btn-r-double').addEventListener('click', doubleCoins);
   $('btn-exit-match').addEventListener('click', function () { SFX.click(); openExitConfirmation(); });
   $('btn-stats').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderStats(); show('stats'); });
+  $('btn-coins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   $('btn-skins').addEventListener('click', function () { SFX.unlock(); SFX.click(); renderSkins(); show('skins'); });
   $('btn-rules').addEventListener('click', function () { SFX.unlock(); SFX.click(); openRules('basics'); });
   if ($('btn-howto-home')) $('btn-howto-home').addEventListener('click', function () {
