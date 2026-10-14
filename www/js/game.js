@@ -317,6 +317,11 @@
   };
   function tipsSeen() { try { var v = JSON.parse(window.localStorage.getItem(TIPS_KEY) || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } }
   function markTip(id) { var v = tipsSeen(); v[id] = 1; try { window.localStorage.setItem(TIPS_KEY, JSON.stringify(v)); } catch (e) {} }
+  function resetTips() {
+    tipQueue = []; nextTip();
+    try { window.localStorage.removeItem(TIPS_KEY); } catch (e) {}
+    var st = document.getElementById('reset-tips-status'); if (st) st.textContent = 'Tips reset. You will see each tip again when it applies.';
+  }
   function tip(id) {
     if (!TIPS[id] || tipsSeen()[id] || tipShowing === id || tipQueue.indexOf(id) >= 0) return;
     tipQueue.push(id); if (!tipShowing) nextTip();
@@ -2563,6 +2568,8 @@
   }
   function renderSetup() {
     var seats = save.setup[setupKind], list = $('seat-list'); list.innerHTML = '';
+    var activeSeats = seats.filter(Boolean);
+    $('practice-note').classList.toggle('hidden', !(activeSeats.length >= 2 && activeSeats.every(function (x) { return x.type === 'human'; })));
     each($('mode-seg').children, function (b) { var selected = b.dataset.mode === setupMode; b.classList.toggle('on', selected); b.setAttribute('aria-pressed', selected ? 'true' : 'false'); });
     var NOTES = {
       mystery: 'Mystery Tiles: ? and ! tiles on the track spin a wheel of events (shield, jump, swap, zap, freeze…). No stakes: every match is free.',
@@ -3078,7 +3085,8 @@
   $('btn-pass').addEventListener('click', function () { SFX.unlock(); SFX.click(); showSetup('pass'); });
   $('btn-setup-back').addEventListener('click', function () { SFX.click(); showHome(); });
   $('entry-fee').addEventListener('change', function () { selectedEntryFee = Number(this.value) || 0; renderSetup(); if (selectedEntryFee) tip('fee'); });
-  if ($('tip-ok')) $('tip-ok').addEventListener('click', function () { SFX.click(); dismissTip(); });
+  $('btn-reset-tips').addEventListener('click', function () { SFX.click(); resetTips(); });
+  $('tip-ok').addEventListener('click', function () { SFX.click(); dismissTip(); });
   each($('mode-seg').children, function (b) { b.addEventListener('click', function () { SFX.click(); setupMode = b.dataset.mode; save.setup.mode[setupKind] = setupMode; persist(); renderSetup(); }); });
   each($('presets').children, function (b) { b.addEventListener('click', function () { SFX.click(); applyPreset(b.dataset.p); }); });
   $('btn-edit-rules').addEventListener('click', function () { SFX.click(); openSettings(this); });
@@ -3500,7 +3508,7 @@
     showOnlineBoard: showOnlineBoard,
     celebrateWin: celebrateWin,
     openVault: openVault,
-    tip: tip, get tipShowing() { return tipShowing; }, dismissTip: dismissTip, get lowFx() { return lowFx(); },
+    tip: tip, get tipShowing() { return tipShowing; }, dismissTip: dismissTip, resetTips: resetTips, get lowFx() { return lowFx(); },
     get celebration() { return window.CamelCelebration ? window.CamelCelebration.state : 'idle'; }
   };
 })();

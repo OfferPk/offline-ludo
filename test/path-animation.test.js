@@ -52,6 +52,20 @@ test('multi-step hops are eased in legal path order and end at the exact path en
   assert.strictEqual(frames.pending, 0);
 });
 
+test('v1.9.0 timeline: a slow frame settles every passed square in order without drifting', () => {
+  const el = new FakeElement(), frames = fakeFrames(), steps = []; let completes = 0;
+  PathAnimation.animate({
+    el, start: { x: 0, y: 0 }, points: [{ x: 10, y: 0 }, { x: 20, y: 0 }, { x: 30, y: 0 }, { x: 40, y: 0 }], duration: 100,
+    requestAnimationFrame: frames.requestAnimationFrame.bind(frames), cancelAnimationFrame: frames.cancelAnimationFrame.bind(frames),
+    onStep(i) { steps.push(i); }, onComplete() { completes++; }
+  });
+  frames.tick(0); frames.tick(250);
+  assert.deepStrictEqual(steps, [0, 1], 'two squares passed during one 250ms frame');
+  assert.match(el.style.transform, /^translate\(25\.00px,/, 'third hop is already halfway (leftover time carried)');
+  frames.tick(400);
+  assert.deepStrictEqual(steps, [0, 1, 2, 3]); assert.strictEqual(completes, 1); assert.strictEqual(frames.pending, 0);
+});
+
 test('interruption cancels scheduled frames, clears hop styles, and does not double-complete', () => {
   const el = new FakeElement(), frames = fakeFrames(); let completes = 0, cancels = 0;
   const cancel = PathAnimation.animate({

@@ -8,9 +8,9 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.8.9">
-  <link rel="stylesheet" href="css/v180.css?v=1.8.9">
-  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.8.9">
+  <link rel="stylesheet" href="css/style.css?v=1.9.0">
+  <link rel="stylesheet" href="css/v180.css?v=1.9.0">
+  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.9.0">
 </head>
 <body>
   <div id="app">
@@ -364,7 +364,8 @@
         <div class="sect">Players</div>
         <div class="presets" id="presets" role="group" aria-label="Choose player count"><button type="button" data-p="1v1" aria-pressed="false">1 v 1</button><button type="button" data-p="3" aria-pressed="false">3 players</button><button type="button" data-p="4" aria-pressed="false">4 players</button></div>
         <div id="seat-list" class="seat-list"></div>
-        <div class="stake-picker"><label for="entry-fee">Entry fee · virtual coins<select id="entry-fee"><option value="0">Free · no entry fee</option><option value="50">50 coins</option><option value="100">100 coins</option><option value="500">500 coins</option></select></label><p id="stake-note">Offline only. One local entry fee is reserved; winner receives a 2×/3×/4× virtual pool. No cash value.</p><details class="fee-explainer"><summary>How entry fees work</summary><ul><li>Entry fees use this device's virtual coins only. Coins can't be bought, sold or cashed out.</li><li>The fee is taken from each human seat when the match starts. Every seat, computer seats included, adds one fee to the pool, and the winner gets the whole pool. Other places get nothing back.</li><li>If you exit or restart before the match ends, your unfinished fee is returned.</li><li>Free matches (no entry fee) still pay normal match coins and XP.</li></ul></details></div>
+        <p id="practice-note" class="note practice-note hidden" role="note"><b>Pass &amp; Play practice.</b> With no computer seats, the match is just for fun: no coins, wins, streaks or skin mastery. Everyone still gets 10 XP. Add a computer seat to play a ranked match.</p>
+        <div class="stake-picker"><label for="entry-fee">Entry fee · virtual coins<select id="entry-fee"><option value="0">Free · no entry fee</option><option value="50">50 coins</option><option value="100">100 coins</option><option value="500">500 coins</option></select></label><p id="stake-note">Offline only. One local entry fee is reserved; winner receives a 2×/3×/4× virtual pool. No cash value.</p><details class="fee-explainer"><summary>How entry fees work</summary><ul><li>Entry fees use this device's virtual coins only. Coins can't be bought, sold or cashed out.</li><li>The fee is taken from each human seat when the match starts. Every seat, computer seats included, adds one fee to the pool, and the winner gets the whole pool. Other places get nothing back.</li><li>If you exit or restart before the match ends, your unfinished fee is returned.</li><li>Free matches (no entry fee) against the computer still pay normal match coins and XP. All-human Pass &amp; Play is practice and pays only 10 XP.</li></ul></details></div>
         <p id="setup-msg" class="setup-msg" role="status" aria-live="polite"></p>
         <div class="sect">House rules</div>
         <div class="rules-sum" id="rules-sum" role="group" aria-label="Current house rules"></div>
@@ -689,6 +690,7 @@
         <label class="row"><span>Turn timer <small>20 s per turn for human players</small></span><input type="checkbox" id="set-timer"><i class="sw"></i></label>
         <label class="row"><span>Computer chat &amp; emotes</span><input type="checkbox" id="set-chat"><i class="sw"></i></label>
         <label class="row"><span>Fast animations</span><input type="checkbox" id="set-fast"><i class="sw"></i></label>
+        <div class="row reset-tips-row"><span>Gameplay tips <small id="reset-tips-status" role="status" aria-live="polite">Tips appear once, the first time you need them</small></span><button id="btn-reset-tips" class="btn plate small-btn" type="button">Reset tips</button></div>
         <section id="storage-protection" class="storage-protection" aria-labelledby="storage-protection-title" aria-busy="true">
           <div class="storage-protection-copy">
             <h4 id="storage-protection-title">Protect saved progress</h4>
@@ -724,7 +726,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.8.9 · © OfferPk</p>
+        <p class="ver">Crossfour v1.9.0 · © OfferPk</p>
       </div>
     </div>
 
@@ -733,37 +735,37 @@
   </div>
 
   <div id="tip-card" class="tip-card hidden" role="status" aria-live="polite"><b id="tip-title"></b><p id="tip-text"></p><button id="tip-ok" class="btn primary" type="button">Got it</button></div>
-  <script src="js/ads-config.js?v=1.8.9"></script>
-  <script src="js/adgate.js?v=1.8.9"></script>
-  <script src="js/ads.js?v=1.8.9"></script>
-  <script src="js/logic.js?v=1.8.9"></script>
-  <script src="js/sound.js?v=1.8.9"></script>
-  <script src="js/themes.js?v=1.8.9"></script>
-  <script src="js/daily-spin.js?v=1.8.9"></script>
-  <script src="js/progression-rewards.js?v=1.8.9"></script>
-  <script src="js/championship.js?v=1.8.9"></script>
-  <script src="js/token-evolution.js?v=1.8.9"></script>
-  <script src="js/token-skins.js?v=1.8.9"></script>
-  <script src="js/daily.js?v=1.8.9"></script>
-  <script src="js/match-summary.js?v=1.8.9"></script>
-  <script src="js/skin-shop.js?v=1.8.9"></script>
-  <script src="js/art.js?v=1.8.9"></script>
-  <script src="js/save-store.js?v=1.8.9"></script>
-  <script src="js/offline-move-announcements.js?v=1.8.9"></script>
-  <script src="js/dice-gesture.js?v=1.8.9"></script>
-  <script src="js/path-animation.js?v=1.8.9"></script>
-  <script src="js/offline-roll-announcements.js?v=1.8.9"></script>
-  <script src="js/celebration.js?v=1.8.9"></script>
-  <script src="js/game.js?v=1.8.9"></script>
-  <script src="js/local-peer.js?v=1.8.9"></script>
-  <script src="js/vendor/qrcode-generator.js?v=1.8.9"></script>
-  <script src="js/local-room.js?v=1.8.9"></script>
-  <script src="js/community-fixtures.js?v=1.8.9"></script>
-  <script src="js/community.js?v=1.8.9"></script>
-  <script src="js/supabase-config.js?v=1.8.9"></script>
-  <script src="js/chess.js?v=1.8.9"></script>
-  <script src="js/online.js?v=1.8.9"></script>
-  <script src="js/ludo-chess-discovery.js?v=1.8.9"></script>
-  <script src="js/storage-protection.js?v=1.8.9"></script>
+  <script src="js/ads-config.js?v=1.9.0"></script>
+  <script src="js/adgate.js?v=1.9.0"></script>
+  <script src="js/ads.js?v=1.9.0"></script>
+  <script src="js/logic.js?v=1.9.0"></script>
+  <script src="js/sound.js?v=1.9.0"></script>
+  <script src="js/themes.js?v=1.9.0"></script>
+  <script src="js/daily-spin.js?v=1.9.0"></script>
+  <script src="js/progression-rewards.js?v=1.9.0"></script>
+  <script src="js/championship.js?v=1.9.0"></script>
+  <script src="js/token-evolution.js?v=1.9.0"></script>
+  <script src="js/token-skins.js?v=1.9.0"></script>
+  <script src="js/daily.js?v=1.9.0"></script>
+  <script src="js/match-summary.js?v=1.9.0"></script>
+  <script src="js/skin-shop.js?v=1.9.0"></script>
+  <script src="js/art.js?v=1.9.0"></script>
+  <script src="js/save-store.js?v=1.9.0"></script>
+  <script src="js/offline-move-announcements.js?v=1.9.0"></script>
+  <script src="js/dice-gesture.js?v=1.9.0"></script>
+  <script src="js/path-animation.js?v=1.9.0"></script>
+  <script src="js/offline-roll-announcements.js?v=1.9.0"></script>
+  <script src="js/celebration.js?v=1.9.0"></script>
+  <script src="js/game.js?v=1.9.0"></script>
+  <script src="js/local-peer.js?v=1.9.0"></script>
+  <script src="js/vendor/qrcode-generator.js?v=1.9.0"></script>
+  <script src="js/local-room.js?v=1.9.0"></script>
+  <script src="js/community-fixtures.js?v=1.9.0"></script>
+  <script src="js/community.js?v=1.9.0"></script>
+  <script src="js/supabase-config.js?v=1.9.0"></script>
+  <script src="js/chess.js?v=1.9.0"></script>
+  <script src="js/online.js?v=1.9.0"></script>
+  <script src="js/ludo-chess-discovery.js?v=1.9.0"></script>
+  <script src="js/storage-protection.js?v=1.9.0"></script>
 </body>
 </html>
