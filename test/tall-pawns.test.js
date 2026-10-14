@@ -19,9 +19,9 @@ const ok = (c, m) => { assert.ok(c, m); checks++; console.log('  ok -', m); };
 
 console.log('tall-pawns.test.js');
 
-ok(pkg.version === '1.8.0', 'package version 1.8.0');
-ok(/versionCode 27/.test(gradle) && /versionName "1\.8\.0"/.test(gradle), 'gradle versionCode 27 / 1.8.0');
-ok(/Crossfour v1\.8\.0/.test(html) && /css\/style\.css\?v=1\.8\.0/.test(html), 'footer + asset cache-bust 1.8.0');
+ok(pkg.version === '1.8.1', 'package version 1.8.1');
+ok(/versionCode 28/.test(gradle) && /versionName "1\.8\.1"/.test(gradle), 'gradle versionCode 28 / 1.8.1');
+ok(/Crossfour v1\.8\.1/.test(html) && /css\/style\.css\?v=1\.8\.1/.test(html), 'footer + asset cache-bust 1.8.1');
 
 ok(/Tall classic Ludo pawn/.test(game), 'tall pawn comment in game.js');
 ok(/Tall classic Ludo pawn tokens/.test(css), 'tall pawn CSS banner');

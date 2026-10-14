@@ -8,9 +8,9 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.8.0">
-  <link rel="stylesheet" href="css/v180.css?v=1.8.0">
-  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.8.0">
+  <link rel="stylesheet" href="css/style.css?v=1.8.1">
+  <link rel="stylesheet" href="css/v180.css?v=1.8.1">
+  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.8.1">
 </head>
 <body>
   <div id="app">
@@ -43,6 +43,10 @@
           <button id="btn-pass" class="mode-card mode-pass" type="button" aria-labelledby="mode-pass-title" aria-describedby="mode-pass-subtitle">
             <span class="mode-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><circle cx="8.5" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="16.5" cy="9" r="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 19c.3-3.2 2-4.8 5-4.8s4.7 1.6 5 4.8M14.2 15.2c3.7-.8 5.8.6 6.3 3.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span>
             <span class="mode-card-copy"><span class="mode-card-title" id="mode-pass-title">Pass &amp; Play</span><span class="mode-card-subtitle" id="mode-pass-subtitle">2–4 players on one phone</span></span>
+          </button>
+          <button id="btn-daily" class="mode-card mode-daily" type="button" aria-labelledby="mode-daily-title" aria-describedby="mode-daily-subtitle">
+            <span class="mode-card-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><rect x="3.5" y="5" width="17" height="15" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 9.5h17M8 3v4M16 3v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="m12 11.6 1.2 2.4 2.6.4-1.9 1.8.5 2.6-2.4-1.3-2.4 1.3.5-2.6-1.9-1.8 2.6-.4Z" fill="currentColor"/></svg></span>
+            <span class="mode-card-copy"><span class="mode-card-title"><span id="mode-daily-title">Daily Reward</span><em id="daily-dot" class="daily-dot hidden" aria-label="Ready to claim">●</em></span><span class="mode-card-subtitle" id="mode-daily-subtitle">7-day streak · today's challenge</span></span>
           </button>
           <div class="mode-grid">
             <button id="btn-quick" class="btn plate"><span><em class="new-badge">NEW</em>Quick Ludo</span><small>2 tokens · fast games</small></button>
@@ -483,6 +487,20 @@
       </div>
     </div>
 
+    <!-- DAILY (v1.8.1) -->
+    <div id="daily" class="overlay hidden" role="dialog" aria-labelledby="daily-title">
+      <div class="panel wide daily-panel">
+        <div class="panel-head"><h3 id="daily-title">Daily Reward</h3><div class="coins"><span class="coin-ico"></span><span class="coins-val">0</span></div><button class="icon-btn close" data-close="daily" aria-label="Close">✕</button></div>
+        <p class="note">Come back each day (your phone's local date). Miss a day and the streak starts again from Day 1. Coins are cosmetic only — they can't be bought, bet or cashed out.</p>
+        <div id="daily-cal" class="daily-cal" role="list"></div>
+        <p class="note daily-msg" id="daily-msg"></p>
+        <div class="daily-row"><button id="daily-claim" class="btn primary" type="button">Claim</button><button id="daily-2x" class="btn plate hidden" type="button">Watch ad · 2x</button></div>
+        <h4 class="daily-h">Today's challenge</h4>
+        <div class="daily-chal"><b id="chal-title"></b><span class="chal-bar"><i id="chal-fill"></i></span><small id="chal-prog"></small></div>
+        <div class="daily-row"><button id="chal-claim" class="btn primary" type="button">Claim</button><button id="chal-2x" class="btn plate hidden" type="button">Watch ad · 2x</button></div>
+      </div>
+    </div>
+
     <!-- TOKEN VAULT (v1.8.0) -->
     <div id="vault" class="overlay hidden" role="dialog" aria-labelledby="vault-title">
       <div class="panel wide">
@@ -575,7 +593,7 @@
       <div class="panel">
         <div class="panel-head"><h3>Settings</h3><button class="icon-btn close" data-close="settings" aria-label="Close">✕</button></div>
         <label class="row"><span>Sound effects</span><input type="checkbox" id="set-sound"><i class="sw"></i></label>
-        <label class="row"><span>Haptics <small>dice roll and captures</small></span><input type="checkbox" id="set-haptics"><i class="sw"></i></label>
+        <label class="row"><span>Vibration <small>dice roll and capture impact</small></span><input type="checkbox" id="set-haptics"><i class="sw"></i></label>
         <label class="row"><span>Auto-move when only one move</span><input type="checkbox" id="set-auto"><i class="sw"></i></label>
         <label class="row"><span>Undo <small>on by default. Off removes undo completely, including the ad undo</small></span><input type="checkbox" id="set-undo"><i class="sw"></i></label>
         <label class="row"><span>Turn timer <small>20 s per turn for human players</small></span><input type="checkbox" id="set-timer"><i class="sw"></i></label>
@@ -596,7 +614,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.8.0 · © OfferPk</p>
+        <p class="ver">Crossfour v1.8.1 · © OfferPk</p>
       </div>
     </div>
 
@@ -604,26 +622,27 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
-  <script src="js/ads-config.js?v=1.8.0"></script>
-  <script src="js/adgate.js?v=1.8.0"></script>
-  <script src="js/ads.js?v=1.8.0"></script>
-  <script src="js/logic.js?v=1.8.0"></script>
-  <script src="js/sound.js?v=1.8.0"></script>
-  <script src="js/themes.js?v=1.8.0"></script>
-  <script src="js/token-evolution.js?v=1.8.0"></script>
-  <script src="js/token-skins.js?v=1.8.0"></script>
-  <script src="js/skin-shop.js?v=1.8.0"></script>
-  <script src="js/art.js?v=1.8.0"></script>
-  <script src="js/save-store.js?v=1.8.0"></script>
-  <script src="js/dice-gesture.js?v=1.8.0"></script>
-  <script src="js/path-animation.js?v=1.8.0"></script>
-  <script src="js/celebration.js?v=1.8.0"></script>
-  <script src="js/game.js?v=1.8.0"></script>
-  <script src="js/community-fixtures.js?v=1.8.0"></script>
-  <script src="js/community.js?v=1.8.0"></script>
-  <script src="js/supabase-config.js?v=1.8.0"></script>
-  <script src="js/chess.js?v=1.8.0"></script>
-  <script src="js/online.js?v=1.8.0"></script>
-  <script src="js/ludo-chess-discovery.js?v=1.8.0"></script>
+  <script src="js/ads-config.js?v=1.8.1"></script>
+  <script src="js/adgate.js?v=1.8.1"></script>
+  <script src="js/ads.js?v=1.8.1"></script>
+  <script src="js/logic.js?v=1.8.1"></script>
+  <script src="js/sound.js?v=1.8.1"></script>
+  <script src="js/themes.js?v=1.8.1"></script>
+  <script src="js/token-evolution.js?v=1.8.1"></script>
+  <script src="js/token-skins.js?v=1.8.1"></script>
+  <script src="js/daily.js?v=1.8.1"></script>
+  <script src="js/skin-shop.js?v=1.8.1"></script>
+  <script src="js/art.js?v=1.8.1"></script>
+  <script src="js/save-store.js?v=1.8.1"></script>
+  <script src="js/dice-gesture.js?v=1.8.1"></script>
+  <script src="js/path-animation.js?v=1.8.1"></script>
+  <script src="js/celebration.js?v=1.8.1"></script>
+  <script src="js/game.js?v=1.8.1"></script>
+  <script src="js/community-fixtures.js?v=1.8.1"></script>
+  <script src="js/community.js?v=1.8.1"></script>
+  <script src="js/supabase-config.js?v=1.8.1"></script>
+  <script src="js/chess.js?v=1.8.1"></script>
+  <script src="js/online.js?v=1.8.1"></script>
+  <script src="js/ludo-chess-discovery.js?v=1.8.1"></script>
 </body>
 </html>

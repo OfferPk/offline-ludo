@@ -31,6 +31,7 @@
   ];
   var TOKEN_EVOLUTION = window.TokenEvolution;
   var TOKEN_SKINS = window.TokenSkins;
+  var DAILY = window.Daily;
   var UNDO_MS = 2200, TIMER_MS = 20000, AUTO_ROLL_MS = 4000, MOVE_DECIDE_MS = 4000, FREE_UNDOS = 3;
   var PHRASES = ['Good luck!', 'Nice move!', 'Oops!', 'So close!', 'Well played!', "Let's go!", 'Not again…', 'Your turn!'];
 
@@ -46,7 +47,7 @@
         mode: { ai: 'classic', pass: 'classic' }
       },
       stats: { played: 0, won: 0, streak: 0, captures: 0, home: 0, sixes: 0, pass: 0, events: 0, vs: { easy: [0, 0], medium: [0, 0], hard: [0, 0] }, mystery: [0, 0], lucky: [0, 0], quick: [0, 0], team: [0, 0], arrow: [0, 0], friendly: [0, 0], duel: [0, 0], four: [0, 0] },
-      flags: { diamondCollection: true }, game: null, ad: {}
+      flags: { diamondCollection: true }, game: null, ad: {}, daily: DAILY ? DAILY.normalize({}) : {}
 
     };
   }
@@ -124,6 +125,7 @@
       if (s.tokenEvo > s.tokenEvoUnlocked) s.tokenEvo = s.tokenEvoUnlocked;
     } else { s.tokenEvo = 1; s.tokenEvoUnlocked = 1; }
     if (TOKEN_SKINS) { var nsk = TOKEN_SKINS.normalize(raw); s.tokenSkinsOwned = nsk.owned; s.tokenSkin = nsk.equipped; s.tokenSkinStats = nsk.stats; }
+    if (DAILY) s.daily = DAILY.normalize(raw.daily);
     s.board = SK.BOARDS.some(function (x) { return x.id === raw.board; }) ? raw.board : d.board;
     s.dice = SK.DICE.some(function (x) { return x.id === raw.dice; }) ? raw.dice : d.dice;
     if (isRecord(raw.settings)) Object.keys(d.settings).forEach(function (k) { s.settings[k] = typeof raw.settings[k] === 'boolean' ? raw.settings[k] : d.settings[k]; });
@@ -235,7 +237,7 @@
   function haptic(kind) {
     if (!save.settings.haptics) return;
     if (!native) {
-      if (navigator.vibrate) { try { navigator.vibrate(kind === 'heavy' || kind === 'warn' ? 36 : kind === 'success' ? [16, 30, 16] : 12); } catch (e) {} }
+      if (navigator.vibrate) { try { navigator.vibrate(kind === 'impact' ? 34 : kind === 'heavy' || kind === 'warn' ? 36 : kind === 'success' ? [16, 30, 16] : 12); } catch (e) {} }
       return;
     }
     var Hp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
@@ -244,7 +246,7 @@
       var task;
       if (kind === 'success') task = Hp.notification({ type: 'SUCCESS' });
       else if (kind === 'warn') task = Hp.notification({ type: 'WARNING' });
-      else task = Hp.impact({ style: kind === 'heavy' ? 'HEAVY' : kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
+      else task = Hp.impact({ style: kind === 'heavy' || kind === 'impact' ? 'HEAVY' : kind === 'medium' ? 'MEDIUM' : 'LIGHT' });
       if (task && typeof task.catch === 'function') task.catch(function () {});
     } catch (e) {}
   }
@@ -758,6 +760,7 @@
   function trailFx(x, y, skinId, col, k) {
     if (!fxOk() || !TOKEN_SKINS) return;
     var sk = TOKEN_SKINS.byId(skinId) || TOKEN_SKINS.SKINS[0], type = sk.trail || 'default', n = TRAIL_N[type] || 1;
+    if (k === 1) SFX.swoosh();
     for (var j = 0; j < n; j++) {
       var e = fxEl('trail trail-' + type, x + (j - (n - 1) / 2) * CELL * 0.16, y + CELL * 0.18);
       e.style.setProperty('--rc', col);
@@ -1447,7 +1450,7 @@
     var snap = human && save.settings.undo ? L.clone(st) : null;
     G.undo = null;
     var r = L.roll(st, chosen != null ? chosen : forced.length ? forced.shift() : undefined);
-    if (human && r.raw === 6) save.stats.sixes++;
+    if (human && r.raw === 6) { save.stats.sixes++; dailyEvent('six', 1); }
     render(); persist();
     animateDice(s, r.raw, function () {
       busy = false;
@@ -1714,7 +1717,7 @@
             var stepPos = path[k];
             if (stepPos >= L.COL0 && stepPos < L.HOME) homeLaneFx(points[k].x, points[k].y, seatColor(s), false);
           }
-          if (from < 0 && k === 0) SFX.leave(); else SFX.step(k);
+          if (from < 0 && k === 0) SFX.leave(); else { SFX.step(k); SFX.stepClick(k); }
           if (SFX.crystal) SFX.crystal(k);
         },
         onComplete: complete,
@@ -1739,6 +1742,7 @@
     var col = seatColor(s);
     var hit = fxEl('cap-impact', at.x, at.y); hit.style.setProperty('--rc', col); setTimeout(function () { hit.remove(); }, 520);
     var wave = fxEl('cap-wave', at.x, at.y); wave.style.setProperty('--rc', col); setTimeout(function () { wave.remove(); }, 640);
+    captureImpactFeedback();
     caps.forEach(function (cp, n) {
       var ghost = fxEl('cap-pop', at.x + (n - (caps.length - 1) / 2) * CELL * 0.22, at.y); ghost.style.setProperty('--rc', seatColor(cp.seat)); setTimeout(function () { ghost.remove(); }, 520);
     });
@@ -1751,12 +1755,18 @@
       setTimeout(function (el) { el.remove(); }.bind(null, sp), 760);
     }
   }
+  /** v1.8.1: one short (~34ms) vibration + thud exactly when the shockwave spawns. Fires once per capture. */
+  var impactFedAt = 0;
+  function captureImpactFeedback() {
+    var now = Date.now(); if (now - impactFedAt < 120) return; impactFedAt = now;
+    haptic('impact'); SFX.captureThud();
+  }
   function captureFx(s, caps, at) {
     captureImpactFx(s, caps, at);
     caps.forEach(function (cp) { killBurst(at.x, at.y, seatColor(s), seatColor(cp.seat)); sendToBase(cp.seat, cp.piece); });
     floatAt(at.x, at.y - CELL * 0.6, caps.length > 1 ? 'Captures!' : 'Captured!', 'float-kill');
     shake();
-    SFX.capture(); haptic('heavy');
+    SFX.capture(); if (!fxOk()) captureImpactFeedback();
   }
 
   function doMove(piece, v, keyboard) {
@@ -1773,6 +1783,7 @@
     busy = true; G.actor = s; clearHighlights(); closeUndo(); stopTimer(); stopAutoRollTimer(false); stopMoveDecide(false); hideDiePick(); hide('chat');
     var res = L.move(st, piece, v, forcedEvents.length ? forcedEvents.shift() : undefined);
     if (human && TOKEN_SKINS && res.captures.length) TOKEN_SKINS.recordKills(save, res.captures.length);
+    if (human) { if (res.captures.length) dailyEvent('capture', res.captures.length); if (res.arrowJump) dailyEvent('arrow', 1); if (res.finish) dailyEvent('home', 1); }
     if (human) { save.stats.captures += res.captures.length; if (res.finish) save.stats.home++; if (res.event) save.stats.events++; }
     G.sel = null;
     G.lastMove = { seat: s, piece: piece, cells: res.path.map(function (pp) { return L.cellOf(s, pp, piece); }) };
@@ -2084,6 +2095,7 @@
       var previousSkinsOwned = (save.tokenSkinsOwned || []).slice(), previousSkinStats = JSON.parse(JSON.stringify(save.tokenSkinStats || {}));
       if (TOKEN_SKINS) TOKEN_SKINS.recordMatch(save, best === 1);
       var skinGranted = TOKEN_SKINS ? TOKEN_SKINS.collectEligible(save) : [];
+      if (hs.length) { dailyEvent('play', 1); if (best === 1) dailyEvent('win', 1); }
       gate.matchCompleted();
       if (!persist()) {
         save.owned.boards = previousBoards; save.owned.dice = previousDice;
@@ -2094,7 +2106,7 @@
         if (newlyUnlocked.length) notes.push('Achievement unlocked: ' + newlyUnlocked.map(function (x) { return x.name; }).join(', '));
         if (evoGranted.length) notes.push('Token Evolution: ' + evoGranted.map(function (x) { return 'Lv' + x.level + ' ' + x.name; }).join(', '));
         if (skinGranted.length) notes.push('Token Vault: ' + skinGranted.map(function (x) { return x.name; }).join(', ') + ' unlocked');
-        if (notes.length) toast(notes.join(' · '), 3200);
+        if (notes.length) { toast(notes.join(' · '), 3200); SFX.unlockChime(); }
       }
       if (!isHuman(st.ranking[0])) aiReact('win', st.ranking[0]);
       if (gate.canShow(Date.now())) Ads.prepareInterstitial();
@@ -2179,7 +2191,7 @@
     cancelFlow(); stopTimer(); paused = false; stopCelebration();
     ['result', 'menu', 'chat'].forEach(hide);
     $('tutorial-intro').classList.add('hidden'); $('tutorial-coach').classList.add('hidden');
-    screen('home'); updateHome(); setCoins(); setLevel();
+    screen('home'); updateHome(); setCoins(); setLevel(); updateDailyDot();
   }
   function updateHome() {
     var cont = G && G.st.phase !== 'over';
@@ -2504,7 +2516,7 @@
           else if (result.reason === 'event-locked') toast('Diamond skins are reserved for a future event.', 2400);
           return;
         }
-        if (result.newlyOwned && result.price > 0) SFX.coin(); else SFX.click();
+        if (result.newlyOwned) { if (result.price > 0) SFX.coin(); SFX.unlockChime(); } else SFX.click();
         applySkin(); renderSkins(); setCoins();
         if (!$('game').classList.contains('hidden')) { buildPods(); buildTiles(); buildPieces(); layout(); render(); }
       });
@@ -2832,6 +2844,48 @@
     if (G) { G.undo = null; G.sel = null; }
   }
 
+
+  // ---------------- v1.8.1 Daily reward + challenge (cosmetic coins only) ----------------
+  function today() { return DAILY.localDate(new Date()); }
+  function dailyEvent(kind, n) {
+    if (!DAILY || !save.daily) return;
+    if (DAILY.record(save.daily, today(), kind, n)) setTimeout(function () { toast('Daily challenge complete! Claim it from Daily Reward.', 2600); }, 900);
+  }
+  function syncDailyCard() { var a = $('btn-daily'), b = $('btn-vs-ai'); if (!a || !b || !b.offsetHeight) return; a.style.minHeight = ''; a.style.minHeight = b.offsetHeight + 'px'; }
+  window.addEventListener('resize', function () { syncDailyCard(); });
+  function updateDailyDot() { syncDailyCard(); if (DAILY && $('daily-dot')) $('daily-dot').classList.toggle('hidden', !DAILY.hasPending(save.daily, today())); }
+  function renderDaily() {
+    var t = today(), st = DAILY.status(save.daily, t), cs = DAILY.challengeStatus(save.daily, t), html = '';
+    DAILY.REWARDS.forEach(function (c, i) {
+      var day = i + 1, cls = day < st.day || (st.claimedToday && day === st.day) ? 'got' : day === st.day ? 'now' : '';
+      html += '<div role="listitem" class="dcell ' + cls + (day === 7 ? ' big' : '') + '"><small>Day ' + day + '</small><span class="coin-ico"></span><b>' + c + '</b>' + (cls === 'got' ? '<i aria-label="claimed">✓</i>' : '') + '</div>';
+    });
+    $('daily-cal').innerHTML = html;
+    $('daily-msg').textContent = st.claimedToday ? 'Claimed Day ' + st.day + '. Come back tomorrow for Day ' + (st.day % 7 + 1) + '.' : (st.broken ? 'Streak reset — a day was missed. ' : '') + 'Day ' + st.day + ' reward: ' + st.reward + ' coins.';
+    $('daily-claim').disabled = !st.canClaim; $('daily-claim').textContent = st.canClaim ? 'Claim ' + st.reward : 'Claimed ✓';
+    $('daily-2x').classList.toggle('hidden', !DAILY.canDouble(save.daily, t, 'streak'));
+    $('chal-title').textContent = cs.title + ' · ' + cs.coins + ' coins';
+    $('chal-fill').style.width = Math.round(cs.progress / cs.goal * 100) + '%';
+    $('chal-prog').textContent = cs.progress + ' / ' + cs.goal + (cs.claimed ? ' · claimed ✓' : '');
+    $('chal-claim').disabled = !cs.done || cs.claimed; $('chal-claim').textContent = cs.claimed ? 'Claimed ✓' : cs.done ? 'Claim ' + cs.coins : 'In progress';
+    $('chal-2x').classList.toggle('hidden', !DAILY.canDouble(save.daily, t, 'challenge'));
+    setCoins(); updateDailyDot();
+  }
+  function openDaily() { if (!DAILY) return; renderDaily(); show('daily'); }
+  function dailyPay(coins, msg) { if (coins > 0) { save.coins += coins; persist(); SFX.dailyClaim(); toast(msg.replace('%', coins)); } renderDaily(); }
+  function dailyAd(which) {
+    SFX.click();
+    Ads.showRewarded(function () { dailyPay(DAILY.double(save.daily, today(), which), '+% bonus coins'); },
+      function () { toast('No ad available right now. Try again later.'); });
+  }
+  if ($('btn-daily')) {
+    $('btn-daily').addEventListener('click', function () { SFX.click(); openDaily(); });
+    $('daily-claim').addEventListener('click', function () { dailyPay(DAILY.claim(save.daily, today()).coins, '+% coins · streak saved'); });
+    $('chal-claim').addEventListener('click', function () { dailyPay(DAILY.claimChallenge(save.daily, today()).coins, '+% coins · challenge done'); });
+    $('daily-2x').addEventListener('click', function () { dailyAd('streak'); });
+    $('chal-2x').addEventListener('click', function () { dailyAd('challenge'); });
+    updateDailyDot();
+  }
   window.__cf = {
     get game() { return G; }, get save() { return save; }, get loadStatus() { return loadResult.status; }, logic: L, gate: gate,
     native: native, haptic: haptic,

@@ -47,8 +47,23 @@
     var g = c.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
     o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.05);
   }
+  /** v1.8.1 soft filtered-noise swoosh (low volume). */
+  function swish(t, from, to, vol, dur) {
+    var c = ctx, src = c.createBufferSource(); src.buffer = noise(c);
+    var f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.2;
+    f.frequency.setValueAtTime(from, t); f.frequency.exponentialRampToValueAtTime(to, t + dur);
+    var g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.35); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(master); src.start(t); src.stop(t + dur + 0.02);
+  }
   var S = {
     setEnabled: function (v) { enabled = !!v; },
+    isEnabled: function () { return enabled; },
+    /* v1.8.1 original synthesized cues (quiet by design) */
+    stepClick: function (i) { if (!enabled || !ac()) return; var t = ctx.currentTime; tick(t, 1500 + ((i || 0) % 4) * 90, 0.09, 0.022); },
+    swoosh: function () { if (!enabled || !ac()) return; swish(ctx.currentTime, 700, 2600, 0.07, 0.22); },
+    captureThud: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; thud(t, 0.32); swish(t, 1800, 400, 0.05, 0.18); },
+    unlockChime: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [784, 988, 1175, 1568].forEach(function (f, i) { ting(t + i * 0.08, f, 0.09, 0.7); }); },
+    dailyClaim: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [1047, 1319, 1568].forEach(function (f, i) { ting(t + i * 0.06, f, 0.08, 0.45); }); tick(t + 0.2, 2600, 0.06, 0.03); tick(t + 0.26, 3100, 0.05, 0.03); },
     unlock: function () { if (enabled) ac(); },
     roll: function () {
       if (!enabled || !ac()) return;
