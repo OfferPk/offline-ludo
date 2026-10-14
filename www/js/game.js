@@ -1869,6 +1869,34 @@
     SFX.capture(); if (!fxOk()) captureImpactFeedback();
   }
 
+  var offlineMoveAnnouncementTimer = null;
+  function clearOfflineMoveAnnouncement() {
+    if (offlineMoveAnnouncementTimer != null) clearTimeout(offlineMoveAnnouncementTimer);
+    offlineMoveAnnouncementTimer = null;
+    var region = $('offline-move-announcement');
+    if (region) region.textContent = '';
+  }
+  function announceOfflineMove(seat, piece, result) {
+    var region = $('offline-move-announcement'), formatter = window.OfflineMoveAnnouncements;
+    if (!region || !formatter || !G || G.online || !result) return;
+    var position = G.st.pieces[seat] && G.st.pieces[seat][piece];
+    var destination = position === L.HOME ? 'home' : position < 0 ? 'base' : position >= L.COL0 ? 'home-lane' : 'track';
+    var captures = (result.captures || []).map(function (capture) { return { actor: nameOf(capture.seat), piece: capture.piece }; });
+    var message = formatter.format({
+      actor: nameOf(seat), piece: piece, fromBase: result.from < 0, destination: destination,
+      spaces: result.path && result.path.length, captures: captures,
+      finished: !!result.finishedPlayer, event: !!result.event
+    });
+    if (!message) return;
+    if (offlineMoveAnnouncementTimer != null) clearTimeout(offlineMoveAnnouncementTimer);
+    region.textContent = '';
+    var match = G;
+    offlineMoveAnnouncementTimer = window.setTimeout(function () {
+      offlineMoveAnnouncementTimer = null;
+      if (G === match && !G.online) region.textContent = message;
+    }, 60);
+  }
+
   function doMove(piece, v, keyboard) {
     if (!G || busy || G.st.phase !== 'move' || paused) return;
     if (G.online) {
@@ -1910,6 +1938,7 @@
       if (res.kingCaptured) { pause = Math.max(pause, 900); toast(nameOf(s) + ' toppled a King! +2 Lucky Charge', 1600); later(function () { SFX.mega(); }, 300); }
       if (res.crowned) { pause = Math.max(pause, 900); later(function () { crownFx(res.crowned); }, res.captures.length ? 420 : 0); }
       var done = function () {
+        announceOfflineMove(s, piece, res);
         if (human && tutorial.active && !tutorial.intro) tutorial.firstMove = true;
         layoutPieces(); busy = false; G.actor = null;
         if (human && !res.over && st.turn === s && st.phase === 'roll') toast(st.boost[s] === 'choose' ? 'Pick a number for your next roll' : 'Bonus roll!', 1000);
@@ -2158,6 +2187,7 @@
   // ---------------- match lifecycle ----------------
   function startMatch(seats, mode, offerTutorial, entryFee, championshipStage) {
     cancelFlow(); stopCelebration();
+    clearOfflineMoveAnnouncement();
     lastOfflineTurnAnnouncement = '';
     entryFee = [0, 50, 100, 500].indexOf(Number(entryFee)) >= 0 ? Number(entryFee) : 0;
     var humanSeats = seats.filter(function (seat) { return seat && seat.type === 'human'; }).length;
