@@ -1,6 +1,6 @@
 {
   "name": "offline-ludo",
-  "version": "1.8.6",
+  "version": "1.8.7",
   "description": "Crossfour: offline, pass-and-play, local Wi-Fi Ludo, daily rewards and online rooms with a Capacitor Android build and AdMob.",
   "private": true,
   "license": "MIT",
@@ -34,6 +34,7 @@
     "test:native-back": "node test/native-back-button.browser.test.js",
     "test:save-conflict": "node test/local-save-conflict.browser.test.js",
     "test:result-focus": "node test/offline-result-focus.browser.test.js",
+    "test:reduced-motion": "node test/reduced-motion.browser.test.js",
     "test:v185": "node test/v185-flows.browser.test.js",
     "test:v182": "node test/v182-summary.browser.test.js"
   },

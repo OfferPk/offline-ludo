@@ -3,7 +3,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
-let URL = process.argv[2] ? process.argv[2].replace(/\/?$/, '/') : null; // v1.8.6: self-serves www/ when no URL is given
+let URL = process.argv[2] ? process.argv[2].replace(/\/?$/, '/') : null; // v1.8.7: self-serves www/ when no URL is given
 const OUT = process.argv[3] || '/tmp/crossfour-skin-screenshots';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let checks = 0;

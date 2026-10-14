@@ -133,7 +133,7 @@ let local;
       `Classic Wood tagline ${measured.timber.b.tag.toFixed(2)} -> ${measured.timber.a.tag.toFixed(2)} (cream on walnut)`);
 
     // ---- dark skins untouched: graphite home renders identically before/after (before any match is saved)
-    // v1.8.6: the home screen has changed a lot since v1.6.3 (Daily, Championship, wallet), so a pixel match is no longer meaningful.
+    // v1.8.7: the home screen has changed a lot since v1.6.3 (Daily, Championship, wallet), so a pixel match is no longer meaningful.
     // Check instead that dark Graphite still renders dark chrome with readable text.
     await openHome(page, local.url, 'graphite'); const gd = await page.evaluate(contrastFn);
     ok(!gd.light && gd.tag >= 4.5 && gd.subtitle >= 4.5, `Graphite (dark) home keeps dark chrome with readable text (tag ${gd.tag.toFixed(2)}, subtitle ${gd.subtitle.toFixed(2)})`);
