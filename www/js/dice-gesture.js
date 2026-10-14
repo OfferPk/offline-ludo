@@ -82,6 +82,9 @@
     button.addEventListener('pointerdown', down);
     button.addEventListener('pointerup', up);
     button.addEventListener('pointercancel', cancel);
+    // Browsers may release capture without a separate pointercancel when an
+    // interaction is interrupted (for example, by a context or DOM change).
+    button.addEventListener('lostpointercapture', cancel);
     button.addEventListener('click', click);
 
     return function unbind() {
@@ -90,6 +93,7 @@
       button.removeEventListener('pointerdown', down);
       button.removeEventListener('pointerup', up);
       button.removeEventListener('pointercancel', cancel);
+      button.removeEventListener('lostpointercapture', cancel);
       button.removeEventListener('click', click);
     };
   }
