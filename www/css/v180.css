@@ -155,3 +155,16 @@ body.light .chal-bar { background: rgba(0,0,0,.12); }
 .fee-explainer summary { cursor: pointer; font-weight: 700; color: var(--accent); min-height: 32px; display: flex; align-items: center; }
 .fee-explainer ul { margin: 4px 0 4px 16px; padding: 0; color: var(--muted); line-height: 1.45; }
 body.light .fee-explainer summary { color: #7a5408; }
+
+/* ---- v1.8.9 tips, friendly Pass & Play note, low-end mode ---- */
+.tip-card { position: fixed; left: 12px; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 64px); z-index: 70; max-width: 460px; margin: 0 auto;
+  padding: 12px 14px; border-radius: 16px; background: rgba(22,28,38,.97); color: #eef4fb; border: 1px solid rgba(244,183,64,.55);
+  box-shadow: 0 14px 34px rgba(0,0,0,.45); display: grid; gap: 6px; animation: tipIn .28s ease-out both; }
+.tip-card b { color: #f4b740; font-size: 14px; } .tip-card p { margin: 0; font-size: 13px; line-height: 1.45; }
+.tip-card .btn { justify-self: end; min-height: 40px; padding: 8px 16px; }
+@keyframes tipIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+body.light .tip-card { background: rgba(255,253,248,.98); color: #23262c; border-color: rgba(176,120,10,.55); } body.light .tip-card b { color: #8a5a06; }
+.r-practice { margin: 4px 0; padding: 6px 10px; border-radius: 10px; background: var(--surface); text-align: center; }
+body.lowfx .overlay, body.lowfx .overlay .panel { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.lowfx .confetti-piece:nth-child(n+13) { display: none; }
+@media (prefers-reduced-motion: reduce) { .tip-card { animation: none; } }

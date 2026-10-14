@@ -1,5 +1,5 @@
 'use strict';
-// v1.8.8 Audio & Haptics: capture impact vibration + original synthesized SFX.
+// v1.8.9 Audio & Haptics: capture impact vibration + original synthesized SFX.
 const assert = require('node:assert');
 const fs = require('node:fs');
 const game = fs.readFileSync(__dirname + '/../www/js/game.js', 'utf8');
@@ -20,7 +20,7 @@ for (const k of ['stepClick', 'swoosh', 'captureThud', 'unlockChime', 'dailyClai
 }
 assert.ok(!/\.mp3|\.ogg|\.wav|new Audio\(/.test(snd + game), 'no audio files');
 // quiet: every new cue uses gains <= 0.32
-const block = snd.slice(snd.indexOf('v1.8.8 original'), snd.indexOf('dailyClaim') + 300);
+const block = snd.slice(snd.indexOf('v1.8.9 original'), snd.indexOf('dailyClaim') + 300);
 (block.match(/0\.\d+/g) || []).filter(x => /, 0\.\d+, 0\.\d+\)/.test(x)).forEach(() => {});
 assert.ok(!/ting\([^)]*, 0\.[4-9]\d*, /.test(block), 'chime volumes low');
 // haptics
@@ -34,4 +34,4 @@ const cfx = game.slice(game.indexOf('function captureFx('), game.indexOf('functi
 assert.ok(!/haptic\('heavy'\)/.test(cfx), 'no second capture buzz');
 assert.ok(/id="set-haptics"/.test(html) && />Vibration </.test(html), 'Vibration toggle in settings');
 assert.ok(/SFX\.dailyClaim\(\)/.test(game) && /SFX\.unlockChime\(\)/.test(game) && /SFX\.swoosh\(\)/.test(game) && /SFX\.stepClick\(k\)/.test(game), 'cues wired');
-console.log('  ok - audio & haptics (v1.8.8)');
+console.log('  ok - audio & haptics (v1.8.9)');
