@@ -2082,7 +2082,7 @@
     tutorial.active = offerTutorial === true && mode === 'classic' && !tutorialSeen();
     tutorial.intro = tutorial.active; tutorial.firstMove = false;
     var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
-    G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now(), entryFee: entryFee, stakePaid: stakePaid, stakeSettled: false, championshipStage: championshipStage == null ? null : championshipStage };
+    G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now(), entryFee: entryFee, stakePaid: stakePaid, stakeSettled: false, championshipStage: championshipStage == null ? null : championshipStage, tally: window.MatchSummary ? window.MatchSummary.blank() : null };
     save.game = G;
     if (!persist()) { save.coins = balanceBefore; G = null; save.game = null; return false; }
     setCoins();
@@ -2137,7 +2137,9 @@
       if (hs.length) { dailyEvent('play', 1); if (best === 1) dailyEvent('win', 1); }
       if (ProgressionRewards) ProgressionRewards.collect(save, previousLevel, L.levelFromXp(save.xp).level, function () { return true; });
       gate.matchCompleted();
+      G.unlocks = [].concat(newlyUnlocked.map(function (x) { return /dice/i.test(x.name) ? x.name : x.name + ' board'; }), evoGranted.map(function (x) { return 'Lv' + x.level + ' ' + x.name; }), skinGranted.map(function (x) { return x.name + ' skin'; }));
       if (!persist()) {
+        G.unlocks = [];
         save.owned.boards = previousBoards; save.owned.dice = previousDice;
         save.tokenEvoUnlocked = previousEvoU; save.tokenEvo = previousEvo;
         save.tokenSkinsOwned = previousSkinsOwned; save.tokenSkinStats = previousSkinStats;
@@ -2146,7 +2148,7 @@
         if (newlyUnlocked.length) notes.push('Achievement unlocked: ' + newlyUnlocked.map(function (x) { return x.name; }).join(', '));
         if (evoGranted.length) notes.push('Token Evolution: ' + evoGranted.map(function (x) { return 'Lv' + x.level + ' ' + x.name; }).join(', '));
         if (skinGranted.length) notes.push('Token Vault: ' + skinGranted.map(function (x) { return x.name; }).join(', ') + ' unlocked');
-        if (notes.length) { toast(notes.join(' · '), 3200); SFX.unlockChime(); }
+        if (notes.length) SFX.unlockChime(); // v1.8.2: unlocks are listed on the result card instead of a toast
       }
       if (!isHuman(st.ranking[0])) aiReact('win', st.ranking[0]);
       if (gate.canShow(Date.now())) Ads.prepareInterstitial();
@@ -2215,9 +2217,25 @@
     $('btn-r-again').textContent = canAdvance ? 'Continue · ' + Championship.label(champState.stage) : 'Play again';
     var lv = L.levelFromXp(save.xp); $('r-lvl').textContent = 'Level ' + lv.level; $('r-lvl-fill').style.width = Math.round(lv.into / lv.need * 100) + '%';
     $('btn-r-double').classList.toggle('hidden', !G.coins || G.doubled);
+    renderSummary();
     if (entering) { if (G.place === 1 || !single) SFX.win(); else SFX.lose(); haptic(G.place === 1 ? 'success' : 'light'); }
     render(); setCoins(); setLevel(); show('result');
     if (entering) { spotlightWinner(winner); celebrateWin(winner); }
+  }
+  /** v1.8.2 match summary: this match's highlights, new unlocks, closest skin goal, today's challenge. */
+  function renderSummary() {
+    var esc = function (x) { return String(x).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+    var MS = window.MatchSummary, box = $('r-summary'), pr = $('r-progress');
+    if (!box || !pr) return;
+    if (!MS || G.online) { box.innerHTML = ''; pr.innerHTML = ''; return; }
+    box.innerHTML = MS.chips(G.tally).map(function (c) { return '<span class="r-chip k-' + c.kind + (c.value ? ' on' : '') + '"><b>' + c.value + '</b><small>' + c.label + '</small></span>'; }).join('');
+    var html = '';
+    if (G.unlocks && G.unlocks.length) html += '<div class="r-unlock"><span aria-hidden="true">★</span> New: ' + G.unlocks.map(esc).join(' · ') + '</div>';
+    var g = MS.nextGoal(save, TOKEN_SKINS);
+    if (g) html += '<div class="r-goal"><div class="r-goal-top"><span>Next skin: <b>' + esc(g.name) + '</b></span><small>' + esc(g.text) + '</small></div><span class="lvl-bar"><i style="width:' + Math.round(g.pct * 100) + '%"></i></span></div>';
+    if (DAILY && save.daily) { var cs = DAILY.challengeStatus(save.daily, today()); html += '<button type="button" class="r-daily' + (cs.done && !cs.claimed ? ' ready' : '') + '" id="btn-r-daily"><span>Daily: ' + esc(cs.title) + '</span><b>' + (cs.claimed ? '✓ Claimed' : cs.done ? 'Claim ' + cs.coins : cs.progress + '/' + cs.goal) + '</b></button>'; }
+    pr.innerHTML = html;
+    var db = $('btn-r-daily'); if (db) db.onclick = function () { SFX.click(); stopCelebration(); openDaily(); };
   }
   /** The ONLY place an interstitial may appear: leaving the result screen after a finished match. */
   function leaveResult(dest) {
@@ -3070,6 +3088,7 @@
   // ---------------- v1.8.1 Daily reward + challenge (cosmetic coins only) ----------------
   function today() { return DAILY.localDate(new Date()); }
   function dailyEvent(kind, n) {
+    if (G && G.tally && window.MatchSummary) window.MatchSummary.add(G.tally, kind, n);
     if (!DAILY || !save.daily) return;
     if (DAILY.record(save.daily, today(), kind, n)) setTimeout(function () { toast('Daily challenge complete! Claim it from Daily Reward.', 2600); }, 900);
   }
@@ -3131,6 +3150,7 @@
     clearOnline: clearOnline,
     showOnlineBoard: showOnlineBoard,
     celebrateWin: celebrateWin,
+    openVault: openVault,
     get celebration() { return window.CamelCelebration ? window.CamelCelebration.state : 'idle'; }
   };
 })();
