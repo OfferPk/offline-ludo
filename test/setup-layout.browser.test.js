@@ -49,7 +49,7 @@ function ok(condition, message) {
           presetPressed: [...document.querySelectorAll('#presets button')].filter(button => button.getAttribute('aria-pressed') === 'true').length,
           cards: [...document.querySelectorAll('.seat')].map(card => ({
             name: card.querySelector('.sname').childNodes[0].textContent.trim(),
-            position: card.querySelector('.sname small').textContent,
+            position: card.querySelector('.sname small').textContent.split(' · ')[0],
             group: card.getAttribute('aria-label'),
             box: (() => { const r = card.getBoundingClientRect(); return { left:r.left, right:r.right, top:r.top, bottom:r.bottom, width:r.width, height:r.height }; })(),
             controls: [...card.querySelectorAll('.seat-options button')].map(button => {
