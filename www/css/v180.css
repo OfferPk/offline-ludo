@@ -199,3 +199,15 @@ body.light .history-item{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1)}
 
 /* v1.9.1: keep particle churn from invalidating layout outside the effects layer */
 #fx{contain:layout style}
+
+/* v1.9.2 landing ripple restarts in the same frame: alternate keyframe names (identical motion) */
+.pc.land.land-b::after { animation-name: gem-ripple-b; }
+@keyframes gem-ripple-b { from { opacity: .72; transform: scale(.58); box-shadow: 0 0 6px var(--pc); } to { opacity: 0; transform: scale(1.42); box-shadow: 0 0 14px var(--pc); } }
+@media (prefers-reduced-motion: reduce) { .pc.land.land-b::after { animation: none !important; } }
+
+/* v1.9.2 history filters */
+.history-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.history-head h4{margin:0}
+.history-head .btn{width:auto;flex:0 0 auto;padding:6px 12px;margin:0}
+.history-head .btn:disabled{opacity:.45}
+.history-filter{margin:0 0 8px;flex:none}

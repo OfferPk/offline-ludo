@@ -15,7 +15,7 @@
   var LEVEL_NAMES = { easy: 'Easy', medium: 'Normal', hard: 'Hard' };
   var ACCENT = { graphite: ['#f4b740', '#1c1504'], linen: ['#2b3140', '#ffffff'], walnut: ['#e0a232', '#231605'], aurora: ['#27e0b3', '#03261d'], midnight: ['#6aa8ff', '#071018'], timber: ['#c47a32', '#2a1808'],
     // v1.6.4 light-theme contrast: deep accents on pale skins (pale amber on cream was unreadable).
-    desert: ['#8f5212', '#ffffff'], candy: ['#a3306b', '#ffffff'], sakura: ['#a3364b', '#ffffff'], frost: ['#28609f', '#ffffff'] };
+    desert: ['#8f5212', '#ffffff'], candy: ['#a3306b', '#ffffff'], sakura: ['#a3364b', '#ffffff'], frost: ['#28609f', '#ffffff'], monsoon: ['#2fd6a7', '#04241c'], 'kite-festival': ['#b8401f', '#ffffff'] };
   // v1.6.4 UI chrome tokens. The board canvas keeps each skin's own palette untouched; only page text/chrome changes.
   // Classic Wood has a light board on a dark walnut page, so its chrome (text, chips, cards) follows the dark styles.
   var UI_CHROME = { timber: { dark: true, ink: '#fdf5e6', muted: '#ead6b4' } };
@@ -1070,7 +1070,7 @@
     return TOKEN_SKINS.byId(save.tokenSkin) ? save.tokenSkin : 'classic';
   }
   function nameOf(s) { var st = G.st; var named = st.seats[s] && st.seats[s].name; if (named) return named; if (st.seats[s].type === 'human' && humans(st).length === 1) return 'You'; return NAMES[s]; }
-  function levelOf(s) { var pl = G.st.seats[s]; if (pl.type === 'remote') return 'Online'; return pl.type === 'human' ? (humans(G.st).length === 1 ? 'Lv ' + L.levelFromXp(save.xp).level : 'P' + (humans(G.st).indexOf(s) + 1)) : LEVEL_NAMES[pl.level]; }
+  function levelOf(s) { var pl = G.st.seats[s]; if (pl.type === 'remote') return 'Online'; return pl.type === 'human' ? (humans(G.st).length === 1 ? 'Lv ' + L.levelFromXp(save.xp).level : 'P' + (humans(G.st).indexOf(s) + 1)) : LEVEL_NAMES[pl.level] + (AI_PERSONA[pl.level] ? ' · ' + AI_PERSONA[pl.level].name : ''); }
   function undoActive() { return !!(G && G.undo && G.undo.until > Date.now()); }
 
   var forced = [], forcedEvents = [], forcedMega = []; // test hooks
@@ -1596,6 +1596,7 @@
     G.undo = null;
     var r = L.roll(st, chosen != null ? chosen : forced.length ? forced.shift() : undefined);
     if (human && hasAI(st) && r.raw === 6) { save.stats.sixes++; dailyEvent('six', 1); }
+    if (!human && r.raw === 6) aiReact('six', st.turn);
     render(); persist();
     animateDice(s, r.raw, function () {
       busy = false;
@@ -1664,6 +1665,13 @@
     if (!fxLayer || !fxLayer.isConnected) fxLayer = $('fx');
     if (essential || fxLayer.childElementCount < fxBudget()) fxLayer.appendChild(e);
     return e;
+  }
+  /** v1.9.2: per-square landing ripple, same frame as the step and with no forced layout. Swapping between two classes whose
+   * animations have different names makes the browser restart the ripple immediately. The old remove/reflow/add pattern forced a layout. */
+  function landRipple(el) {
+    if (!el) return;
+    var b = el.classList.contains('land') && !el.classList.contains('land-b');
+    el.classList.add('land'); el.classList.toggle('land-b', b);
   }
   /** Restart a CSS animation class without forcing a synchronous layout (no offsetWidth read). */
   function restartClass(el, cls, ms) {
@@ -1861,7 +1869,7 @@
       settled = true;
       delete moving[id];
       if (activeMotions[id] === entry) delete activeMotions[id];
-      if (el) { el.classList.remove('hop'); if (clearEffects) el.classList.remove('land'); }
+      if (el) { el.classList.remove('hop'); if (clearEffects) el.classList.remove('land', 'land-b'); }
     }
     function complete() {
       if (settled) return;
@@ -1876,7 +1884,7 @@
         onStep: function (k) {
           piecePos[id] = points[k];
           if (!prefersReducedMotion()) {
-            restartClass(el, 'land');
+            landRipple(el);
             trailFx(points[k].x, points[k].y, skinForSeat(s), seatColor(s), k);
             hopStepFx(points[k].x, points[k].y, seatColor(s), evoLevelForSeat(s) > 1 && TOKEN_EVOLUTION ? TOKEN_EVOLUTION.levelOf(evoLevelForSeat(s)).particles : 0);
             if (from < 0 && k === 0) yardExitFx(s, points[k]);
@@ -2219,6 +2227,22 @@
   function say(seat, item) { if (!item) return; if (item.charAt(0) === ':') bubble(seat, ART.emote(item.slice(1), 38), true); else bubble(seat, item.replace(/</g, '&lt;')); }
   function pickOne(a) { return a[Math.floor(Math.random() * a.length)]; }
   /** Computer players react now and then (rate-limited; can be switched off in Settings). */
+  /* v1.9.2 computer personalities: each difficulty has its own name and voice (original, 13+ friendly). */
+  var AI_PERSONA = {
+    easy: { name: 'Pip', blurb: 'cheerful rookie',
+      capture: ['Oh! Did I do that?', 'Sorry, sorry!', ':smile', 'Lucky me!'], captured: ['Aww…', ':sad', 'I liked that spot!', 'Oops!'],
+      home: ['I made it home!', ':love', 'Yay!'], six: ['A six! A six!', ':wow'], forfeit: ['Three sixes? Is that bad?', ':think'],
+      win: ['I won?! Wow!', ':love', 'Best game ever!'], lose: ['That was fun anyway!', ':smile'] },
+    medium: { name: 'Sable', blurb: 'calm planner',
+      capture: ['Right on schedule.', ':cool', 'Nothing personal.'], captured: ['Noted.', ':think', 'I will remember that.'],
+      home: ['One safely home.', ':cool'], six: ['Good, options.', ':think'], forfeit: ['The dice disagree today.', ':think'],
+      win: ['Well played, all of you.', ':cool'], lose: ['Good game. Next time.', ':smile'] },
+    hard: { name: 'Vex', blurb: 'fierce rival',
+      capture: ['Back to base!', ':laugh', 'Too slow!', 'Mine now.'], captured: ['You will pay for that.', ':angry', 'Lucky roll.'],
+      home: ['Unstoppable.', ':cool', 'Catch me if you can.'], six: ['Here I come.', ':cool'], forfeit: ['…that never happened.', ':angry'],
+      win: ['As expected.', ':cool', 'Better luck next time!'], lose: ['Rematch. Now.', ':angry', 'Fine. Well played.'] }
+  };
+  function personaOf(seat) { var x = G && G.st.seats[seat]; return x && x.type === 'ai' ? AI_PERSONA[x.level] || AI_PERSONA.medium : null; }
   function aiReact(kind, s, caps) {
     if (!G || !save.settings.chat) return;
     var now = Date.now(), st = G.st;
@@ -2226,12 +2250,17 @@
       if (!st.seats[seat] || st.seats[seat].type !== 'ai' || now - lastChat[seat] < 6000 || Math.random() > chance) return;
       lastChat[seat] = now; setTimeout(function () { if (G) say(seat, pickOne(list)); }, 350);
     }
+    function lines(seat, k, fallback) { var p = personaOf(seat); return p && p[k] ? p[k] : fallback; }
     if (kind === 'capture') {
-      speak(s, ['Gotcha!', ':laugh', ':cool', 'Sorry!', ':smile'], 0.55);
-      (caps || []).forEach(function (c) { speak(c.seat, [':angry', ':sad', 'Not again…', 'Oops!', ':wow'], 0.5); });
-    } else if (kind === 'home') speak(s, ["Let's go!", ':cool', ':love'], 0.3);
-    else if (kind === 'forfeit') speak(s, [':sad', 'Oops!', ':think'], 0.5);
-    else if (kind === 'win') speak(s, ['Well played!', ':cool', ':smile'], 0.9);
+      speak(s, lines(s, 'capture', ['Gotcha!', ':laugh', ':cool', 'Sorry!', ':smile']), 0.55);
+      (caps || []).forEach(function (c) { speak(c.seat, lines(c.seat, 'captured', [':angry', ':sad', 'Not again…', 'Oops!', ':wow']), 0.5); });
+    } else if (kind === 'home') speak(s, lines(s, 'home', ["Let's go!", ':cool', ':love']), 0.3);
+    else if (kind === 'six') speak(s, lines(s, 'six', [':wow']), 0.18);
+    else if (kind === 'forfeit') speak(s, lines(s, 'forfeit', [':sad', 'Oops!', ':think']), 0.5);
+    else if (kind === 'win') {
+      speak(s, lines(s, 'win', ['Well played!', ':cool', ':smile']), 0.9);
+      st.players.forEach(function (x) { if (x !== s) speak(x, lines(x, 'lose', [':smile']), 0.35); });
+    } else if (kind === 'lose') st.players.forEach(function (x) { if (x !== s) speak(x, lines(x, 'lose', ['Well played!', ':smile']), 0.6); });
     else if (kind === 'reply') {
       var ais = st.players.filter(function (x) { return st.seats[x].type === 'ai'; }); if (!ais.length) return;
       var map = { 'Good luck!': ['Good luck!', ':smile'], 'Nice move!': [':cool', 'Thanks!'], 'Oops!': [':laugh', ':think'], 'So close!': [':wow', 'So close!'], 'Well played!': ['Well played!', ':smile'], "Let's go!": [':cool', "Let's go!"], 'Not again…': [':laugh', ':sad'], 'Your turn!': [':think', 'Hmm…'] };
@@ -2341,7 +2370,7 @@
         if (skinGranted.length) notes.push('Token Vault: ' + skinGranted.map(function (x) { return x.name; }).join(', ') + ' unlocked');
         if (notes.length) SFX.unlockChime(); // v1.8.2: unlocks are listed on the result card instead of a toast
       }
-      if (!isHuman(st.ranking[0])) aiReact('win', st.ranking[0]);
+      if (!isHuman(st.ranking[0])) aiReact('win', st.ranking[0]); else aiReact('lose', st.ranking[0]);
       if (gate.canShow(Date.now())) Ads.prepareInterstitial();
     }
     showResult();
@@ -2391,7 +2420,7 @@
     $('r-meta').textContent = (G.moves || 0) + ' moves · ' + mm + ':' + (ss < 10 ? '0' : '') + ss;
     $('r-rank').innerHTML = st.ranking.map(function (s, k) {
       return '<li class="rank-row ' + (isHuman(s) ? 'me ' : '') + (k === 0 ? 'winner' : '') + '" style="--winner-color:' + seatColor(s) + ';--rank-delay:' + (k * 90) + 'ms"><span class="medal m' + (k + 1) + '">' + (k + 1) + '</span><span class="pdot" style="background:' + seatColor(s) + '"></span>' + nameOf(s) +
-        '<small>' + levelOf(s) + (st.seats[s].type === 'ai' ? ' AI' : '') + ' · ' + st.pieces[s].filter(function (p) { return p === L.HOME; }).length + '/' + (st.nPieces || 4) + ' home</small></li>';
+        '<small>' + (st.seats[s].type === 'ai' && AI_PERSONA[st.seats[s].level] ? LEVEL_NAMES[st.seats[s].level] + ' AI · ' + AI_PERSONA[st.seats[s].level].name : levelOf(s) + (st.seats[s].type === 'ai' ? ' AI' : '')) + ' · ' + st.pieces[s].filter(function (p) { return p === L.HOME; }).length + '/' + (st.nPieces || 4) + ' home</small></li>';
     }).join('');
     $('r-coins').textContent = '+' + (G.coins * (G.doubled ? 2 : 1));
     $('r-xp').textContent = '+' + G.xp;
@@ -2628,7 +2657,7 @@
       var head = document.createElement('div'); head.className = 'seat-head';
       var dot = document.createElement('span'); dot.className = 'sw-dot'; dot.style.background = seatColor(s); dot.setAttribute('aria-hidden', 'true');
       var name = document.createElement('span'); name.className = 'sname'; name.textContent = NAMES[s];
-      var position = document.createElement('small'); position.textContent = pos[s]; name.appendChild(position); head.appendChild(dot); head.appendChild(name); row.appendChild(head);
+      var position = document.createElement('small'); var per = x && x.type === 'ai' ? AI_PERSONA[x.level] : null; position.textContent = pos[s] + (per ? ' · ' + per.name + ', ' + per.blurb : ''); name.appendChild(position); head.appendChild(dot); head.appendChild(name); row.appendChild(head);
       var seg = document.createElement('div'); seg.className = 'seg seat-options'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', NAMES[s] + ' player type');
       [['off', 'Off'], ['human', 'Human'], ['easy', 'Easy'], ['medium', 'Normal'], ['hard', 'Hard']].forEach(function (o) {
         var b = document.createElement('button'); b.type = 'button'; b.textContent = o[1]; b.dataset.v = o[0]; b.dataset.seat = s;
@@ -2740,10 +2769,21 @@
     });
   }
   var MODE_NAMES = { classic: 'Classic', mystery: 'Mystery Tiles', lucky: 'Lucky Chaos', quick: 'Quick', team: 'Team', arrow: 'Arrows', friendly: 'Friendly' };
+  var historyFilter = 'all';
+  function clearHistory() {
+    askConfirm('Clear match history?', 'This removes the Recent matches list on this device. Coins, XP, stats and unlocks are kept.', 'Clear', function () {
+      SFX.click(); save.history = []; persist(); renderHistory(); toast('Match history cleared.');
+    }, function () { renderHistory(); });
+  }
   function renderHistory() {
     var list = $('history-list'); if (!list) return;
-    var items = normalizeHistory(save.history); list.replaceChildren();
+    var all = normalizeHistory(save.history), items = all.filter(function (h) { return historyFilter === 'all' || (historyFilter === 'practice' ? h.practice : !h.practice); });
+    list.replaceChildren();
+    each($('history-filter').querySelectorAll('button'), function (b) { var on = b.dataset.filter === historyFilter; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    $('btn-clear-history').disabled = !all.length;
     $('history-empty').classList.toggle('hidden', items.length > 0);
+    $('history-empty').textContent = !all.length ? 'Finished matches on this device appear here. Pass & Play games with no computer seats are marked Practice.' :
+      historyFilter === 'practice' ? 'No practice matches yet. All-human Pass & Play games show up here.' : 'No ranked matches yet. Games with a computer seat show up here.';
     items.forEach(function (h) {
       var li = document.createElement('li'); li.className = 'history-item' + (h.practice ? ' practice' : '') + (h.place === 1 ? ' won' : '');
       var place = document.createElement('span'); place.className = 'history-place'; place.textContent = h.place === 1 ? '1st' : h.place === 2 ? '2nd' : h.place === 3 ? '3rd' : '4th';
@@ -3156,6 +3196,8 @@
   $('btn-setup-back').addEventListener('click', function () { SFX.click(); showHome(); });
   $('entry-fee').addEventListener('change', function () { selectedEntryFee = Number(this.value) || 0; renderSetup(); if (selectedEntryFee) tip('fee'); });
   each($('move-speed').querySelectorAll('button'), function (b) { b.addEventListener('click', function () { SFX.click(); setMoveSpeed(b.dataset.speed); }); });
+  each($('history-filter').querySelectorAll('button'), function (b) { b.addEventListener('click', function () { SFX.click(); historyFilter = b.dataset.filter; renderHistory(); }); });
+  $('btn-clear-history').addEventListener('click', function () { SFX.click(); clearHistory(); });
   $('btn-reset-tips').addEventListener('click', function () { SFX.click(); resetTips(); });
   $('tip-ok').addEventListener('click', function () { SFX.click(); dismissTip(); });
   each($('mode-seg').children, function (b) { b.addEventListener('click', function () { SFX.click(); setupMode = b.dataset.mode; save.setup.mode[setupKind] = setupMode; persist(); renderSetup(); }); });
@@ -3579,7 +3621,7 @@
     showOnlineBoard: showOnlineBoard,
     celebrateWin: celebrateWin,
     openVault: openVault,
-    tip: tip, get tipShowing() { return tipShowing; }, dismissTip: dismissTip, resetTips: resetTips, fxBench: { capture: function (x, y) { var at = { x: x, y: y }; captureImpactFx(0, [{ seat: 1, piece: 0 }], at); killBurst(x, y, seatColor(0), seatColor(1)); floatAt(x, y - CELL * 0.6, 'Captured!', 'float-kill'); shake(); },
+    tip: tip, get tipShowing() { return tipShowing; }, dismissTip: dismissTip, resetTips: resetTips, landRipple: landRipple, persona: function (level) { return AI_PERSONA[level]; }, aiReact: function (k, s, c) { lastChat = [0, 0, 0, 0]; aiReact(k, s, c); }, fxBench: { capture: function (x, y) { var at = { x: x, y: y }; captureImpactFx(0, [{ seat: 1, piece: 0 }], at); killBurst(x, y, seatColor(0), seatColor(1)); floatAt(x, y - CELL * 0.6, 'Captured!', 'float-kill'); shake(); },
       hop: function (x, y, k) { trailFx(x, y, save.tokenSkin, seatColor(0), k); hopStepFx(x, y, seatColor(0), 3); }, get live() { return $('fx').childElementCount; } }, get stepMs() { return stepMs(); }, setMoveSpeed: setMoveSpeed, get lowFx() { return lowFx(); },
     get celebration() { return window.CamelCelebration ? window.CamelCelebration.state : 'idle'; }
   };

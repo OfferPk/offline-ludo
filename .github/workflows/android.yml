@@ -37,6 +37,12 @@ jobs:
       - name: Tests (moves, captures, safe squares, exact home, triple 6, rule toggles, AI, 1000 AI-vs-AI games, ad pacing)
         run: npm test
 
+      - name: Legacy browser regression (headless Chrome, full offline match flows)
+        timeout-minutes: 12
+        env:
+          CHROME: /usr/bin/google-chrome
+        run: npm run test:legacy-browser || (echo "retrying once (timing-sensitive)"; npm run test:legacy-browser)
+
       - name: Capacitor sync
         run: npx cap sync android
 
