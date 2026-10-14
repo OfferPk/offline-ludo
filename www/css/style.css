@@ -1287,6 +1287,8 @@ body.light .theme-card, body.light .theme-preview-card { border-color: rgba(77,1
 .online-room-roster small, .online-history-list small { color: var(--muted); font-size: 10px; text-align: right; }
 .online-history-list li { align-items: flex-start; flex-direction: column; }
 .online-history-list small { text-align: left; }
+.online-history-load-more { display: block; width: 100%; margin-top: 10px; }
+.online-history-more-status { margin: 8px 0 0; color: var(--muted); font-size: 10px; text-align: center; }
 .online-mode-note { margin: 6px 1px 10px; font-size: 11px !important; }
 .online-stake-note { margin: 0 1px 10px; color: var(--muted); font-size: 11px !important; line-height: 1.45; }
 .online-championship-card { margin: 12px 0; padding: 12px; border: 1px solid rgba(244,183,64,.28); border-radius: 13px; background: linear-gradient(135deg, rgba(244,183,64,.07), rgba(255,255,255,.018)); }
