@@ -2,8 +2,8 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const puppeteer = require(process.env.PUPPETE || 'puppeteer-core');
-const URL = (process.argv[2] || 'http://localhost:8781/').replace(/\/?$/, '/');
+const puppeteer = require(process.env.PUPPETEER || 'puppeteer-core');
+let URL = process.argv[2] ? process.argv[2].replace(/\/?$/, '/') : null; // v1.8.6: self-serves www/ when no URL is given
 const OUT = process.argv[3] || '/tmp/crossfour-skin-screenshots';
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let checks = 0;
@@ -11,8 +11,16 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
+  let server = null;
+  if (!URL) {
+    const root = path.resolve(__dirname, '..', 'www'), types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
+    server = require('http').createServer((req, res) => { const f = path.resolve(root, decodeURIComponent(req.url.split('?')[0]).replace(/^\/+/, '') || 'index.html');
+      if (!f.startsWith(root)) { res.writeHead(403).end(); return; }
+      fs.readFile(f, (e, d) => { if (e) { res.writeHead(404).end(); return; } res.writeHead(200, { 'Content-Type': types[path.extname(f)] || 'application/octet-stream' }); res.end(d); }); });
+    await new Promise(r => server.listen(0, '127.0.0.1', r)); URL = 'http://127.0.0.1:' + server.address().port + '/';
+  }
   const origin = new URLCtor(URL).origin;
-  const browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/chromium', headless: 'new', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+  const browser = await puppeteer.launch({ executablePath: process.env.CHROME || ['/usr/bin/chromium', '/usr/bin/google-chrome', '/usr/bin/chromium-browser'].find(p => require('fs').existsSync(p)), headless: 'new', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
   const page = await browser.newPage();
   await page.emulate({ viewport: { width: 320, height: 740, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36' });
   const errors = [], remoteRequests = [];
@@ -40,7 +48,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
       stats: { played: 4, won: 2 }, settings: { sound: false, fast: true }, ad: { matchesCompleted: 3 } };
     await seedSave('crossfour.save.v1', v1);
     let migrated = await page.evaluate(() => ({ status: window.__cf.loadStatus, save: window.__cf.save }));
-    ok(migrated.status === 'migrated-v1' && migrated.save.coins === 77 && migrated.save.board === 'linen' && migrated.save.dice === 'brass', 'v1 save migration retains coins and selected legacy skins');
+    ok(migrated.status === 'migrated-v1' && migrated.save.coins >= 77 /* +level reward from #122 */ && migrated.save.board === 'linen' && migrated.save.dice === 'brass', 'v1 save migration retains coins and selected legacy skins');
     ok(migrated.save.stats.streak === 0 && migrated.save.flags.diamondCollection === false && migrated.save.owned.boards.includes('linen') && migrated.save.owned.dice.includes('brass'), 'v1 gains safe streak/event defaults without losing owned skins');
 
     const legacyV2 = await page.evaluate(() => {
@@ -164,6 +172,7 @@ function ok(condition, message) { assert.ok(condition, message); checks++; conso
     console.log(`\n${checks} skin browser checks passed. Screenshots: ${OUT}`);
   } finally {
     await browser.close();
+    if (server) server.close();
   }
 })().catch(error => { console.error(error.stack || error); process.exitCode = 1; });
 

@@ -35,7 +35,7 @@ function startLocalServer() {
   if (!url) { localServer = await startLocalServer(); url = localServer.url; }
   const origin = new URL(url).origin;
   const browser = await puppeteer.launch({
-    executablePath: process.env.CHROME || '/usr/bin/chromium',
+    executablePath: process.env.CHROME || ['/usr/bin/chromium', '/usr/bin/google-chrome', '/usr/bin/chromium-browser'].find(p => require('fs').existsSync(p)),
     headless: 'new',
     args: ['--no-sandbox']
   });

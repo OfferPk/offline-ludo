@@ -225,6 +225,29 @@
     }
     return true;
   }
+  function exportLocalBackup() {
+    var status = $('local-backup-status');
+    function report(message) { if (status) status.textContent = message; }
+    if (!persist()) { report('Backup not created: the current save could not be written. Check the save warning and device storage.'); return; }
+    var snapshot = saveStore.exportSnapshot(save);
+    if (!snapshot) { report('Backup not created: the current offline save did not pass validation.'); return; }
+    if (typeof Blob !== 'function' || !window.URL || typeof window.URL.createObjectURL !== 'function') {
+      report('This browser cannot download a save file. Your local save was not changed.'); return;
+    }
+    var filename = 'crossfour-offline-save-' + new Date().toISOString().slice(0, 10) + '.json';
+    var url = null, link = null;
+    try {
+      url = window.URL.createObjectURL(new Blob([JSON.stringify(snapshot, null, 2) + '\n'], { type: 'application/json' }));
+      link = document.createElement('a'); link.href = url; link.download = filename; link.style.display = 'none';
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(function () { window.URL.revokeObjectURL(url); }, 1000);
+      SFX.click(); report('Offline save exported as ' + filename + '. The file is not uploaded.');
+    } catch (e) {
+      if (link && link.parentNode) link.parentNode.removeChild(link);
+      if (url) window.URL.revokeObjectURL(url);
+      report('Could not export the offline save. Your saved progress was not changed.');
+    }
+  }
   var gate = window.AdGate.create(CFG, save.ad); save.ad = gate.state;
   gate.sessionStarted();
   persist();
@@ -1451,6 +1474,21 @@
     show('picker');
   }
 
+  function announceOfflineRoll(seat, result) {
+    var region = $('offline-roll-announcement'), formatter = window.OfflineRollAnnouncements;
+    if (!region || !formatter || !G || G.online || !isHuman(seat)) return;
+    var legalTokens = [];
+    (G.st.moves || []).forEach(function (move) {
+      if (move.seat === seat && legalTokens.indexOf(move.piece) < 0) legalTokens.push(move.piece);
+    });
+    var message = formatter.format({
+      actor: nameOf(seat), raw: result.raw, value: result.value, chosen: result.chosen,
+      doubled: result.doubled, forfeit: result.forfeit, next: result.next,
+      queue: G.st.turn === seat ? G.st.queue : [], legalTokenCount: legalTokens.length
+    });
+    if (message) region.textContent = message;
+  }
+
   function doRoll(chosen) {
     if (!G || busy || G.st.phase !== 'roll' || paused) return;
     if (G.online) {
@@ -1472,6 +1510,7 @@
     animateDice(s, r.raw, function () {
       busy = false;
       if (snap) { G.undo = { snap: snap, until: Date.now() + UNDO_MS, seat: s }; startUndoBar(); later(expireUndo, UNDO_MS + 30); }
+      announceOfflineRoll(s, r);
       if (r.doubled) { var pc = podEl(s), pr = pc.getBoundingClientRect(), br = $('board-wrap').getBoundingClientRect(); floatAt(pr.left + pr.width / 2 - br.left, slotOf(s) < 2 ? 8 : BS - 8, '×2 → ' + r.value); }
       if (r.forfeit) {
         SFX.forfeit(); haptic('warn');
@@ -2476,8 +2515,16 @@
     if (G.st.phase === 'over') { finishMatch(); return; }
     advance();
   }
-  function openMenu() { if (!G) return; cancelFlow(); stopTimer(); paused = true; layoutPieces(true); render(); persist(); show('menu'); }
-  function resumeFromMenu() { hide('menu'); paused = false; layoutPieces(true); advance(); }
+  function openMenu() {
+    if (!G) return;
+    cancelFlow(); stopTimer(); paused = true; layoutPieces(true); render(); persist();
+    var menu = $('menu'); menu.removeAttribute('aria-hidden'); menu.setAttribute('aria-modal', 'true');
+    show('menu'); $('menu-title').focus({ preventScroll: true });
+  }
+  function resumeFromMenu() {
+    hide('menu'); paused = false; layoutPieces(true); advance();
+    $('btn-home').focus({ preventScroll: true });
+  }
   function askConfirm(title, text, yes, onYes, onNo) {
     $('confirm-title').textContent = title; $('confirm-text').textContent = text; $('confirm-yes').textContent = yes;
     $('confirm').classList.toggle('exit-confirm', title === 'Exit match?');
@@ -2536,7 +2583,7 @@
     $('home-win-rate').textContent = rate;
     $('btn-stats').setAttribute('aria-label', 'Open player statistics. ' + S.played + ' matches, ' + S.won + ' wins, ' + rate + ' win rate.');
   }
-  var skinTab = 'boards';
+  var skinTab = 'boards', rulesReturnFocus = null;
   function skinRequirement(it) {
     if (it.unlock === 'wins') return 'Unlock at ' + it.threshold + ' lifetime wins';
     if (it.unlock === 'streak') return 'Unlock with ' + it.threshold + ' consecutive wins';
@@ -2769,10 +2816,52 @@
     });
   }
   function openRules(tab) {
+    var alreadyOpen = isOpen('rules');
+    if (!alreadyOpen) {
+      rulesReturnFocus = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+      if (isOpen('menu')) {
+        var menu = $('menu');
+        menu.setAttribute('aria-hidden', 'true'); menu.setAttribute('aria-modal', 'false');
+        if (!rulesReturnFocus || !menu.contains(rulesReturnFocus)) rulesReturnFocus = $('btn-m-rules');
+      } else if (!rulesReturnFocus) rulesReturnFocus = setupVisible() ? $('btn-howto') : $('btn-rules');
+    }
     each($('rules-tabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === tab); });
     each(document.querySelectorAll('.rules-page'), function (p) { p.classList.toggle('hidden', p.dataset.page !== tab); });
     show('rules');
+    if (!alreadyOpen) $('rules-title').focus({ preventScroll: true });
   }
+  function closeRules() {
+    hide('rules');
+    var menu = $('menu'), target = rulesReturnFocus;
+    rulesReturnFocus = null;
+    if (isOpen('menu')) { menu.removeAttribute('aria-hidden'); menu.setAttribute('aria-modal', 'true'); }
+    if (!target || !target.isConnected || target.disabled || target.closest('.hidden') || target.closest('[aria-hidden="true"]')) {
+      target = isOpen('menu') ? $('btn-m-rules') : setupVisible() ? $('btn-howto') : $('btn-rules');
+    }
+    if (target && typeof target.focus === 'function') target.focus({ preventScroll: true });
+  }
+  function handleGameDialogKeys(e) {
+    var overlays = Array.prototype.slice.call(document.querySelectorAll('.overlay:not(.hidden)'));
+    var dialog = overlays.length ? overlays[overlays.length - 1] : null;
+    if (dialog !== $('menu') && dialog !== $('rules')) return;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (dialog.id === 'menu') $('btn-m-resume').click();
+      else { var close = dialog.querySelector('[data-close="rules"]'); if (close) close.click(); }
+      return;
+    }
+    if (e.key !== 'Tab') return;
+    var focusable = Array.prototype.slice.call(dialog.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')).filter(function (el) {
+      return !el.closest('.hidden') && !el.closest('[aria-hidden="true"]') && el.getClientRects().length > 0;
+    });
+    if (!focusable.length) { e.preventDefault(); var title = dialog.querySelector('[tabindex="-1"]'); if (title) title.focus({ preventScroll: true }); return; }
+    var first = focusable[0], last = focusable[focusable.length - 1];
+    if (!dialog.contains(document.activeElement)) { e.preventDefault(); (e.shiftKey ? last : first).focus({ preventScroll: true }); return; }
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === dialog.querySelector('[tabindex="-1"]'))) {
+      e.preventDefault(); last.focus({ preventScroll: true });
+    } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus({ preventScroll: true }); }
+  }
+  document.addEventListener('keydown', handleGameDialogKeys);
   function setupVisible() { return !$('setup').classList.contains('hidden'); }
   function launchSetupMatch(seats, mode, offerTutorial, fee) {
     if (G && G.stakePaid > 0 && !G.stakeSettled) { save.coins += G.stakePaid; G.stakeSettled = true; }
@@ -2885,14 +2974,18 @@
     var card = $('howto-card'); if (card) card.classList.toggle('is-open', open);
     if (open && card && card.scrollIntoView) {
       var r = card.getBoundingClientRect();
-      if (r.bottom > window.innerHeight) card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      if (r.bottom > window.innerHeight) {
+        var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        card.scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' });
+      }
     }
   });
   each($('rules-tabs').children, function (b) { b.addEventListener('click', function () { SFX.click(); openRules(b.dataset.tab); }); });
   $('btn-settings').addEventListener('click', function () { SFX.unlock(); SFX.click(); syncSettingsUI(); show('settings'); });
   $('btn-game-settings').addEventListener('click', function () { SFX.click(); syncSettingsUI(); show('settings'); });
+  $('btn-export-backup').addEventListener('click', exportLocalBackup);
   each($('skin-tabs').children, function (b) { b.addEventListener('click', function () { skinTab = b.dataset.tab; SFX.click(); renderSkins(); }); });
-  each(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', function () { SFX.click(); hide(b.dataset.close); if (setupVisible()) renderSetup(); }); });
+  each(document.querySelectorAll('[data-close]'), function (b) { b.addEventListener('click', function () { SFX.click(); if (b.dataset.close === 'rules') closeRules(); else hide(b.dataset.close); if (setupVisible()) renderSetup(); }); });
   SETTINGS.forEach(function (k) {
     $('set-' + k).addEventListener('change', function () {
       save.settings[k] = $('set-' + k).checked; persist();
@@ -2916,7 +3009,9 @@
         lastSaveError = { reason: resetResult.reason, stage: resetResult.stage };
         saveWriteFailed = true;
         var warning = $('save-warning');
-        warning.textContent = 'Reset failed. Your existing progress was not cleared. Check device storage and try again.';
+        warning.textContent = resetResult.recoveryRestored === false
+          ? 'Reset failed, and device storage could not restore every recovery copy. Check device storage before continuing.'
+          : 'Reset failed. Your existing progress was not cleared. Check device storage and try again.';
         warning.classList.remove('hidden');
         toast('Progress was not reset', 2400);
         return;

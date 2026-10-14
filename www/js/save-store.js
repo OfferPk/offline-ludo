@@ -41,6 +41,13 @@
     function makeSnapshot(payload) {
       return { schemaVersion: version, savedAt: clock(), payload: clone(payload) };
     }
+    function exportSnapshot(payload) {
+      try {
+        if (!validate(payload)) return null;
+        var snapshot = makeSnapshot(payload);
+        return validSnapshot(snapshot, version, validate) ? clone(snapshot) : null;
+      } catch (e) { return null; }
+    }
     function parse(storage, key) {
       var raw;
       try { raw = storage.getItem(key); }
@@ -173,7 +180,15 @@
       var storage;
       try { storage = typeof storageProvider === 'function' ? storageProvider() : storageProvider; }
       catch (e) { storage = null; }
-      if (!storage || typeof storage.setItem !== 'function' || typeof storage.removeItem !== 'function') return { ok: false, reason: 'storage-unavailable', stage: 'access' };
+      if (!storage || typeof storage.setItem !== 'function' || typeof storage.removeItem !== 'function' || typeof storage.getItem !== 'function') return { ok: false, reason: 'storage-unavailable', stage: 'access' };
+      // Keep exact recovery bytes so a failed multi-key reset can roll back its cleanup.
+      var recoveryKeys = [checkpointKey, legacyV2Key, legacyV1Key], previousRecovery = {};
+      try {
+        recoveryKeys.forEach(function (key) {
+          var raw = storage.getItem(key);
+          previousRecovery[key] = raw == null ? null : String(raw);
+        });
+      } catch (e) { return { ok: false, reason: 'storage-unavailable', stage: 'backup', error: e }; }
       var stage = 'validate';
       try {
         if (!validate(payload)) return { ok: false, reason: 'invalid-snapshot', stage: 'validate' };
@@ -186,7 +201,14 @@
         storage.setItem(primaryKey, serialized);
         lastGood = clone(next);
       } catch (e) {
-        return { ok: false, reason: 'write-failed', stage: stage, error: e };
+        var recoveryRestored = true;
+        if (stage === 'cleanup' || stage === 'primary') recoveryKeys.forEach(function (key) {
+          var raw = previousRecovery[key];
+          try {
+            if (raw !== null) storage.setItem(key, raw);
+          } catch (restoreError) { recoveryRestored = false; }
+        });
+        return { ok: false, reason: 'write-failed', stage: stage, error: e, recoveryRestored: recoveryRestored };
       }
       try {
         storage.setItem(checkpointKey, serialized);
@@ -200,6 +222,7 @@
     return {
       load: load,
       save: save,
+      exportSnapshot: exportSnapshot,
       reset: reset,
       get lastKnownGood() { return lastGood ? clone(lastGood) : null; },
       keys: { primary: primaryKey, checkpoint: checkpointKey, legacyV2: legacyV2Key, legacyV1: legacyV1Key },

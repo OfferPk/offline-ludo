@@ -131,9 +131,10 @@ let local;
       `Classic Wood tagline ${measured.timber.b.tag.toFixed(2)} -> ${measured.timber.a.tag.toFixed(2)} (cream on walnut)`);
 
     // ---- dark skins untouched: graphite home renders identically before/after (before any match is saved)
-    await openHome(page, before.url, 'graphite'); const gb = await page.screenshot({ encoding: 'base64' });
-    await openHome(page, local.url, 'graphite'); const ga = await page.screenshot({ encoding: 'base64' });
-    ok(gb === ga, 'Graphite (dark) home is pixel-identical to v1.6.3');
+    // v1.8.6: the home screen has changed a lot since v1.6.3 (Daily, Championship, wallet), so a pixel match is no longer meaningful.
+    // Check instead that dark Graphite still renders dark chrome with readable text.
+    await openHome(page, local.url, 'graphite'); const gd = await page.evaluate(contrastFn);
+    ok(!gd.light && gd.tag >= 4.5 && gd.subtitle >= 4.5, `Graphite (dark) home keeps dark chrome with readable text (tag ${gd.tag.toFixed(2)}, subtitle ${gd.subtitle.toFixed(2)})`);
     await shot('v164-light-graphite-home-after.png');
     // ---- after: How to play open, setup, online, settings, in-game (linen)
     await openHome(page, local.url, 'linen');

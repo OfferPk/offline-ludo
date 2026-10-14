@@ -32,9 +32,9 @@ function validate(data) {
     Number.isSafeInteger(data.stats?.played) && (data.game === null || !!(data.game && data.game.st && data.game.st.v === 2));
 }
 class MemoryStorage {
-  constructor() { this.values = new Map(); this.failKey = null; }
+  constructor() { this.values = new Map(); this.failKey = null; this.failKeys = new Set(); }
   getItem(key) { return this.values.has(key) ? this.values.get(key) : null; }
-  setItem(key, value) { if (this.failKey === key) throw new Error('quota exceeded'); this.values.set(key, String(value)); }
+  setItem(key, value) { if (this.failKey === key || this.failKeys.has(key)) throw new Error('quota exceeded'); this.values.set(key, String(value)); }
   removeItem(key) { this.values.delete(key); }
 }
 function make(storage, now) {
@@ -147,6 +147,37 @@ test('confirmed reset replaces current data and removes all older recovery sourc
   assert.strictEqual(reloaded.status, 'loaded'); assert.strictEqual(reloaded.data.coins, 0);
   assert.strictEqual(reloaded.data.ad.matchesCompleted, 8, 'the app-selected ad pacing state remains local and intact');
 });
+test('failed reset preserves checkpoint and legacy recovery when primary write fails', () => {
+  const storage = new MemoryStorage(), old = defaults(); old.coins = 777; old.xp = 1500;
+  const primary = '{corrupt primary snapshot}';
+  const checkpoint = JSON.stringify({ schemaVersion: 3, savedAt: 42, payload: old });
+  const legacyV2 = JSON.stringify(old), legacyV1 = JSON.stringify(old);
+  storage.setItem('crossfour.save.v3', primary);
+  storage.setItem('crossfour.save.checkpoint.v3', checkpoint);
+  storage.setItem('crossfour.save.v2', legacyV2); storage.setItem('crossfour.save.v1', legacyV1);
+  const store = make(storage), loaded = store.load();
+  assert.strictEqual(loaded.status, 'recovered'); assert.strictEqual(loaded.data.coins, 777);
+  storage.failKey = 'crossfour.save.v3';
+  const failed = store.reset(defaults());
+  assert.strictEqual(failed.ok, false); assert.strictEqual(failed.reason, 'write-failed');
+  assert.strictEqual(failed.stage, 'primary'); assert.strictEqual(failed.recoveryRestored, true);
+  assert.strictEqual(storage.getItem('crossfour.save.v3'), primary);
+  assert.strictEqual(storage.getItem('crossfour.save.checkpoint.v3'), checkpoint);
+  assert.strictEqual(storage.getItem('crossfour.save.v2'), legacyV2);
+  assert.strictEqual(storage.getItem('crossfour.save.v1'), legacyV1);
+  const reloaded = make(storage).load();
+  assert.strictEqual(reloaded.status, 'recovered'); assert.strictEqual(reloaded.data.coins, 777);
+});
+test('failed reset reports when storage prevents restoring a recovery copy', () => {
+  const storage = new MemoryStorage(), old = defaults(); old.coins = 777;
+  storage.setItem('crossfour.save.v3', '{corrupt primary snapshot}');
+  storage.setItem('crossfour.save.checkpoint.v3', JSON.stringify({ schemaVersion: 3, savedAt: 42, payload: old }));
+  const store = make(storage); assert.strictEqual(store.load().status, 'recovered');
+  storage.failKey = 'crossfour.save.v3'; storage.failKeys.add('crossfour.save.checkpoint.v3');
+  const failed = store.reset(defaults());
+  assert.strictEqual(failed.ok, false); assert.strictEqual(failed.stage, 'primary');
+  assert.strictEqual(failed.recoveryRestored, false);
+});
 test('JSON snapshot round-trip preserves match state and deterministic RNG continuation', () => {
   const seats = [{ type: 'human' }, { type: 'human' }, null, null];
   const original = L.newGame(seats, {}, 314159, 'classic');
@@ -159,6 +190,18 @@ test('JSON snapshot round-trip preserves match state and deterministic RNG conti
   const expected = clone(original), continued = clone(restored);
   const rollA = L.roll(expected), rollB = L.roll(continued);
   assert.deepStrictEqual(rollA, rollB); assert.deepStrictEqual(continued, expected);
+});
+test('exports a detached validated snapshot without writing or mutating the save', () => {
+  const storage = new MemoryStorage(), store = make(storage), source = defaults();
+  source.coins = 74; source.settings.sound = false;
+  const snapshot = store.exportSnapshot(source);
+  assert.strictEqual(snapshot.schemaVersion, 3);
+  assert.strictEqual(snapshot.payload.coins, 74);
+  assert.strictEqual(snapshot.payload.settings.sound, false);
+  snapshot.payload.coins = 999;
+  assert.strictEqual(source.coins, 74, 'changing the export does not alter live data');
+  assert.strictEqual(storage.getItem('crossfour.save.v3'), null, 'export does not write storage');
+  assert.strictEqual(store.exportSnapshot({ invalid: true }), null, 'invalid payloads are not exported');
 });
 
 console.log(`\n${pass} save-store checks passed`);
