@@ -168,3 +168,11 @@ body.light .tip-card { background: rgba(255,253,248,.98); color: #23262c; border
 body.lowfx .overlay, body.lowfx .overlay .panel { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
 body.lowfx .confetti-piece:nth-child(n+13) { display: none; }
 @media (prefers-reduced-motion: reduce) { .tip-card { animation: none; } }
+
+/* v1.9.0 */
+.practice-note{border:1px solid rgba(255,196,64,.45);background:rgba(255,196,64,.10);border-radius:12px;padding:10px 12px;margin:8px 0}
+.practice-note b{color:#f5b93a}
+body.light .practice-note b,.light .practice-note b{color:#9a6200}
+#settings .reset-tips-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#settings .reset-tips-row>span{flex:1 1 auto;min-width:0}
+#settings .reset-tips-row .btn{flex:0 0 auto;width:auto;min-width:0;max-width:45%;padding:8px 14px;white-space:nowrap;margin:0}

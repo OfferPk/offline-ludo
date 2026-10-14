@@ -10,8 +10,8 @@ let n = 0; function ok(c, m) { assert.ok(c, m); n++; console.log('  ok -', m); }
 
 const pkg = JSON.parse(read('package.json')), gradle = read('android/app/build.gradle'), html = read('www/index.html');
 const game = read('www/js/game.js'), css = read('www/css/v180.css'), src = read('www/js/token-skins.js');
-ok(pkg.version === '1.8.9' && /versionCode 36/.test(gradle) && /versionName "1\.8\.9"/.test(gradle), 'version 1.8.9 / versionCode 36');
-ok(/js\/token-skins\.js\?v=1\.8\.9/.test(html) && /css\/v180\.css\?v=1\.8\.9/.test(html), 'token-skins.js + v180.css wired');
+ok(pkg.version === '1.9.0' && /versionCode 37/.test(gradle) && /versionName "1\.9\.0"/.test(gradle), 'version 1.9.0 / versionCode 37');
+ok(/js\/token-skins\.js\?v=1\.9\.0/.test(html) && /css\/v180\.css\?v=1\.9\.0/.test(html), 'token-skins.js + v180.css wired');
 ok(html.indexOf('token-skins.js') < html.indexOf('js/game.js'), 'token-skins loads before game.js');
 ok(/id="btn-vault"/.test(html) && /id="vault"/.test(html) && /id="vault-list"/.test(html) && /data-tab="tokenskins"/.test(html), 'Vault reachable from home + skins tab');
 ok(/btn-vault-skins/.test(game), 'Vault button inside Skins → Tokens');

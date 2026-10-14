@@ -89,37 +89,35 @@
       return cancel;
     }
 
+    // v1.9.0: one continuous timeline. Leftover time carries into the next hop, so a late frame never
+    // adds a pause between squares, and several squares can settle in one slow frame without drifting.
+    var began = null;
     try {
       el.style.transition = 'none';
+      el.style.willChange = 'transform';
       el.classList.add('hop');
       apply(start, 0, 1, 1);
-      runSegment();
+      schedule(frame);
     } catch (error) { fail(error); }
 
-    function runSegment() {
+    function frame(time) {
+      frameId = null;
       if (settled) return;
-      if (index >= points.length) { complete(); return; }
-      var from = index === 0 ? start : points[index - 1];
-      var to = points[index], began = null;
-      schedule(function frame(time) {
-        frameId = null;
-        if (settled) return;
-        try {
-          if (began == null) began = typeof time === 'number' ? time : Date.now();
-          var now = typeof time === 'number' ? time : Date.now();
-          var linear = Math.max(0, Math.min(1, (now - began) / duration));
-          var eased = linear * linear * (3 - 2 * linear);
-          var arc = Math.sin(Math.PI * eased);
-          var point = { x: from.x + (to.x - from.x) * eased, y: from.y + (to.y - from.y) * eased };
-          apply(point, arcHeight * arc, 1 + 0.07 * arc, 1 - 0.09 * arc);
-          if (linear < 1) { schedule(frame); return; }
-          apply(to, 0, 1, 1);
-          stepSound(index);
-          index++;
-          if (index >= points.length) complete();
-          else runSegment();
-        } catch (error) { fail(error); }
-      });
+      try {
+        var now = typeof time === 'number' ? time : Date.now();
+        if (began == null) began = now;
+        var elapsed = Math.max(0, now - began);
+        var target = Math.min(points.length, Math.floor(elapsed / duration));
+        while (index < target) { apply(points[index], 0, 1, 1); stepSound(index); index++; }
+        if (index >= points.length) { apply(points[points.length - 1], 0, 1, 1); try { el.style.willChange = ''; } catch (e) {} complete(); return; }
+        var from = index === 0 ? start : points[index - 1], to = points[index];
+        var linear = Math.max(0, Math.min(1, (elapsed - index * duration) / duration));
+        var eased = linear < 0.5 ? 4 * linear * linear * linear : 1 - Math.pow(-2 * linear + 2, 3) / 2;
+        var arc = 4 * linear * (1 - linear);
+        apply({ x: from.x + (to.x - from.x) * eased, y: from.y + (to.y - from.y) * eased }, arcHeight * arc,
+          1 + 0.07 * arc, 1 - 0.09 * arc);
+        schedule(frame);
+      } catch (error) { fail(error); }
     }
     return cancel;
   }
