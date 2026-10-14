@@ -34,7 +34,7 @@ function startLocalServer() {
   const local = await startLocalServer();
   let browser = null;
   try {
-    browser = await puppeteer.launch({ executablePath: process.env.CHROME || '/usr/bin/chromium', headless: 'new', args: ['--no-sandbox'] });
+    browser = await puppeteer.launch({ executablePath: process.env.CHROME || ['/usr/bin/chromium', '/usr/bin/google-chrome', '/usr/bin/chromium-browser'].find(p => require('fs').existsSync(p)), headless: 'new', args: ['--no-sandbox'] });
     const page = await browser.newPage();
     await page.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
     const errors = [];
