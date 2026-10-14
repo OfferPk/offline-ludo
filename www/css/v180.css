@@ -1,0 +1,109 @@
+/* ===================== v1.8.0 Expensive feel · Token Skins · Trails · Capture · Token Vault =====================
+   Original Crossfour art. WebView-safe: no CSS filter / 3D on the interactive token buttons — depth comes from SVG gradients.
+   Seat colour always lives on the base band (.sk-band), so every skin stays readable in play. */
+.pc { width: calc(var(--cell) * .6); height: calc(var(--cell) * .98); margin: calc(var(--cell) * -.78) 0 0 calc(var(--cell) * -.3); }
+.pc, .pc *, .pc[data-evo] .gem-token, .pc.can .gem-token, .pc.sel .gem-token, .pc.done .gem-token, .pc.is-frozen .gem-token { filter: none !important; }
+/* calmer light: soft internal core + faint aura instead of a big halo */
+.pc .jugnu { opacity: calc(.12 * var(--evo-glow, 1)); width: 112%; height: 92%; animation-name: jugnu-soft; }
+@keyframes jugnu-soft { 0%, 100% { opacity: calc(.08 * var(--evo-glow, 1)); } 50% { opacity: calc(.16 * var(--evo-glow, 1)); } }
+.pc .gem-jugnu-glow, .pc[data-evo] .gem-jugnu-glow { opacity: calc(.14 * var(--evo-glow, 1)); animation: none; mix-blend-mode: normal; }
+.pc .gem-core { opacity: .62; animation-name: gem-core-soft; }
+@keyframes gem-core-soft { 0%, 100% { opacity: .45; } 50% { opacity: .72; } }
+.pc .gem-glint { opacity: .82; } .pc .gem-glint-soft { opacity: .34; } .pc .gem-spec { opacity: .8; }
+.pc .gem-sheen { opacity: calc(.62 * var(--evo-gloss, 1)); mix-blend-mode: normal; }
+.pc .gem-rim { stroke-width: 1.25; }
+.pc .gem-pad { fill-opacity: .14; stroke-opacity: .4; }
+.pc .gem-shadow { opacity: 1; }
+/* subtle but clear selection: thin white ring + seat-colour line, gentle breathe, no glow blob */
+.pc.is-turn::before { inset: -8% -20%; border-width: 1.5px; border-color: rgba(255,255,255,.85); box-shadow: 0 0 0 1.5px var(--pc), 0 2px 4px rgba(0,0,0,.22); animation: ring-breathe 1.4s ease-in-out infinite; }
+.pc.sel::before { inset: -16% -26%; border-radius: 46% / 30%; border: 2px solid #fff; box-shadow: 0 0 0 2px var(--accent), 0 3px 6px rgba(0,0,0,.28); animation: ring-breathe 1s ease-in-out infinite; }
+@keyframes ring-breathe { 0%, 100% { transform: scale(.97); opacity: .95; } 50% { transform: scale(1.03); opacity: .7; } }
+.pc.done::after { box-shadow: none; border-color: rgba(255,220,120,.45); }
+.pc.is-shielded { box-shadow: 0 0 0 2px #8fe0ff, 0 3px 6px rgba(0,0,0,.35); }
+/* ---- skin layers ---- */
+.pc .sk-band { fill: var(--pcband, var(--pc)); stroke: var(--pcrim2); stroke-width: .45; }
+.pc .sk-band-hi { fill: none; stroke: var(--pcbandhi, #fff); stroke-width: .5; opacity: .7; stroke-linecap: round; }
+.pc[data-skin="classic"] .sk-band { fill-opacity: .55; }
+.pc .sk-crown { fill: #ffd34d; stroke: #8a5c0c; stroke-width: .35; stroke-linejoin: round; }
+.pc .sk-crown-gem { fill: var(--pcband, #e33); stroke: #fff6c8; stroke-width: .2; }
+.pc .sk-filigree { fill: none; stroke: #ffe28a; stroke-width: .4; opacity: .85; stroke-linecap: round; }
+.pc .sk-facet { fill: none; stroke: #fff; stroke-width: .32; opacity: .55; stroke-linejoin: round; }
+.pc .sk-facet-gem { stroke: #fff; opacity: .6; fill: var(--pcgem); fill-opacity: .35; }
+.pc .sk-inlay { fill: var(--pcgem); stroke: rgba(255,255,255,.75); stroke-width: .3; }
+.pc .sk-asterism { fill: none; stroke: #fff; stroke-width: .38; opacity: .72; stroke-linecap: round; }
+.pc .sk-prism { fill: #fff; opacity: .9; animation: sk-twinkle 2.6s ease-in-out infinite; }
+.pc .sk-prism-b { animation-delay: 1.2s; fill: #cfe9ff; }
+.pc .sk-nebula { fill: var(--pcband); opacity: .55; }
+.pc .sk-nebula-b { fill: #a46bff; opacity: .45; }
+.pc .sk-stars circle { fill: #fff; }
+.pc .sk-stars { animation: sk-twinkle 2.2s ease-in-out infinite; }
+.pc .sk-stars-b { animation-delay: 1.1s; }
+@keyframes sk-twinkle { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+.pc .sk-flame { fill: #ff7a1a; opacity: .82; transform-origin: 12px 27px; animation: sk-flicker 1.1s ease-in-out infinite; }
+.pc .sk-flame-core { fill: #ffd27a; opacity: .92; transform-origin: 12px 27px; animation: sk-flicker 0.8s ease-in-out infinite reverse; }
+@keyframes sk-flicker { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(.94, 1.06); } }
+.pc .sk-circuit { fill: none; stroke: var(--pcneon); stroke-width: .55; stroke-linecap: round; stroke-linejoin: round; animation: sk-neon 1.8s ease-in-out infinite; }
+.pc .sk-nodes circle { fill: #fff; stroke: var(--pcneon); stroke-width: .35; }
+@keyframes sk-neon { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
+.pc .sk-sweep { fill: #fff; opacity: .32; animation: sk-sweep 3.2s ease-in-out infinite; }
+@keyframes sk-sweep { 0% { transform: rotate(18deg) translateX(-4px); opacity: 0; } 20% { opacity: .36; } 55% { transform: rotate(18deg) translateX(34px); opacity: 0; } 100% { transform: rotate(18deg) translateX(34px); opacity: 0; } }
+.pc .sk-sweep { transform-box: view-box; transform-origin: 12px 18px; }
+.pc .sk-crest { fill: #fff4ff; stroke: #7b4bc4; stroke-width: .3; }
+.pc .sk-iris { fill: none; stroke: #ffd6f5; stroke-width: .45; opacity: .7; }
+.pc[data-skin="diamond"] .gem-body { stroke: rgba(255,255,255,.95); }
+.pc[data-skin="cyber"] .gem-rim { stroke-width: 1.4; }
+/* capture: attacker bounce (transform on an inner layer, never the positioned button) */
+.pc.cap-bounce .gem-token { animation: cap-bounce .5s cubic-bezier(.3,1.6,.5,1) both; transform-origin: 50% 95%; }
+@keyframes cap-bounce { 0% { transform: scale(1, 1); } 30% { transform: scale(1.12, .88); } 60% { transform: scale(.94, 1.08) translateY(-8%); } 100% { transform: none; } }
+/* ---- move trails ---- */
+.trail { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; pointer-events: none; background: var(--rc, #fff); opacity: 0; animation: trail-rise .5s ease-out forwards; }
+@keyframes trail-rise { 0% { transform: translate(0, 0) scale(1); opacity: .8; } 100% { transform: translate(var(--dx, 0), var(--dy, -8px)) scale(.3); opacity: 0; } }
+.trail-default { opacity: 0; width: 5px; height: 5px; background: color-mix(in srgb, var(--rc, #fff) 60%, #fff); }
+.trail-fire { width: 7px; height: 9px; border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%; background: radial-gradient(circle at 50% 70%, #fff3b0 0%, #ffb02e 40%, #ff4a12 80%, transparent 100%); }
+.trail-frost { width: 7px; height: 7px; border-radius: 2px; background: none; }
+.trail-frost::before, .trail-frost::after { content: ''; position: absolute; left: 50%; top: 0; width: 1.4px; height: 100%; margin-left: -.7px; background: #e9fbff; }
+.trail-frost::after { transform: rotate(90deg); }
+.trail-electric { width: 3px; height: 12px; border-radius: 1px; background: linear-gradient(#fff, #6ff3ff); transform: rotate(25deg); animation-name: trail-zap; animation-duration: .32s; }
+@keyframes trail-zap { 0% { opacity: 1; transform: rotate(25deg) scaleY(1); } 50% { opacity: .3; } 100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, -6px)) rotate(-20deg) scaleY(.4); } }
+.trail-stars { width: 6px; height: 6px; background: #fff; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.trail-gold { width: 5px; height: 5px; background: radial-gradient(circle, #fff6c8, #ffc83a 60%, #a8740c); }
+.trail-mythic { width: 6px; height: 6px; background: linear-gradient(135deg, #ff9ae6, #9ad8ff, #fff4a8); }
+/* ---- capture (≤ .75s total) ---- */
+.cap-impact { position: absolute; width: calc(var(--cell) * 1.1); height: calc(var(--cell) * 1.1); margin: calc(var(--cell) * -.55) 0 0 calc(var(--cell) * -.55); border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--rc, #fff) 60%, transparent) 40%, transparent 70%); animation: cap-impact .32s ease-out forwards; }
+@keyframes cap-impact { 0% { transform: scale(.3); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
+.cap-wave { position: absolute; width: calc(var(--cell) * 2.2); height: calc(var(--cell) * 2.2); margin: calc(var(--cell) * -1.1) 0 0 calc(var(--cell) * -1.1); border-radius: 50%; pointer-events: none;
+  border: 2px solid var(--rc, #fff); animation: cap-wave .55s cubic-bezier(.2,.8,.3,1) forwards; }
+@keyframes cap-wave { 0% { transform: scale(.2); opacity: .9; } 100% { transform: scale(1.15); opacity: 0; } }
+.cap-pop { position: absolute; width: calc(var(--cell) * .5); height: calc(var(--cell) * .8); margin: calc(var(--cell) * -.62) 0 0 calc(var(--cell) * -.25); border-radius: 46% 46% 38% 38% / 34% 34% 30% 30%; pointer-events: none;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--rc) 50%, #fff), var(--rc)); animation: cap-pop .45s ease-in forwards; }
+@keyframes cap-pop { 0% { transform: scale(1); opacity: 1; } 35% { transform: scale(1.22, .82); opacity: 1; } 100% { transform: scale(.1) translateY(-40%); opacity: 0; } }
+.cap-spark { position: absolute; width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; pointer-events: none; background: #ffe38a; opacity: 0;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); animation: cap-spark .42s ease-out forwards; }
+@keyframes cap-spark { 0% { transform: translate(0, 0) scale(.4); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.1); opacity: 0; } }
+/* ---- skins grid + Token Vault ---- */
+.vault-prev { position: relative; width: 60px; height: 80px; flex: 0 0 60px; border-radius: 14px; display: grid; place-items: center;
+  background: radial-gradient(circle at 45% 30%, rgba(255,255,255,.14), rgba(0,0,0,.28) 75%); }
+.vault-prev .pc-prev { position: relative; left: auto; top: auto; margin: 0; width: 40px; height: 66px; transform: none; display: block; pointer-events: none; }
+.rarity-chip { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 800; color: var(--rar, #aab6c4); border: 1px solid var(--rar, #aab6c4); background: color-mix(in srgb, var(--rar, #aab6c4) 14%, transparent); }
+.vault-link-row { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.vault-link-row .note { margin: 0; flex: 1; }
+.vault-list { display: flex; flex-direction: column; gap: 8px; max-height: 64vh; overflow-y: auto; }
+.vault-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: var(--surface); border: 1.5px solid transparent; border-left: 4px solid var(--rar, transparent); }
+.vault-row.on { border-color: var(--accent); }
+.vault-row.locked .vault-prev { opacity: .78; }
+.vault-row.r-common { --rar: #aab6c4; } .vault-row.r-rare { --rar: #4fa8ff; } .vault-row.r-epic { --rar: #b678ff; } .vault-row.r-legendary { --rar: #ffb02e; } .vault-row.r-mythic { --rar: #ff6fb5; }
+.vault-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 12.5px; }
+.vault-name { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+.vault-own { color: #4fd18b; font-weight: 800; }
+.vault-lock { color: var(--muted); }
+.vault-prog { color: var(--muted); font-size: 11px; }
+.vault-stats { display: flex; gap: 10px; white-space: nowrap; font-size: 11.5px; color: var(--muted); }
+.vault-row .btn { flex: 0 0 auto; min-width: 82px; padding: 8px 10px; font-size: 13px; }
+.tskin .btn { width: 100%; }
+@media (prefers-reduced-motion: reduce) {
+  .trail, .cap-impact, .cap-wave, .cap-pop, .cap-spark { animation: none !important; opacity: 0 !important; }
+  .pc .sk-flame, .pc .sk-flame-core, .pc .sk-stars, .pc .sk-prism, .pc .sk-circuit, .pc .sk-sweep, .pc .jugnu, .pc .gem-core, .pc.cap-bounce .gem-token { animation: none !important; }
+  .pc .sk-sweep { opacity: 0; }
+  .pc.is-turn::before, .pc.sel::before { animation: none !important; }
+}

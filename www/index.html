@@ -8,8 +8,9 @@
   <title>Online Ludo</title>
   <link rel="icon" type="image/png" href="icon.png">
   <link rel="apple-touch-icon" href="icon.png">
-  <link rel="stylesheet" href="css/style.css?v=1.7.2">
-  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.7.2">
+  <link rel="stylesheet" href="css/style.css?v=1.8.0">
+  <link rel="stylesheet" href="css/v180.css?v=1.8.0">
+  <link rel="stylesheet" href="css/ludo-chess-discovery.css?v=1.8.0">
 </head>
 <body>
   <div id="app">
@@ -80,6 +81,7 @@
         </div>
         <div class="home-row">
           <button id="btn-skins" class="btn plate">Skins</button>
+          <button id="btn-vault" class="btn plate">Token Vault</button>
           <button id="btn-rules" class="btn plate">Rules</button>
           <button id="btn-settings" class="btn plate">Settings</button>
         </div>
@@ -476,8 +478,18 @@
       <div class="panel wide">
         <div class="panel-head"><h3>Skins</h3><div class="coins"><span class="coin-ico"></span><span class="coins-val">0</span></div><button class="icon-btn close" data-close="skins" aria-label="Close">✕</button></div>
         <p class="note">Cosmetic only. Earn coins by finishing matches. Token Evolution unlocks with coins or wins. Coins can't be bought, bet or cashed out.</p>
-        <div class="tabs" id="skin-tabs"><button data-tab="boards" class="on">Boards</button><button data-tab="dice">Dice</button><button data-tab="tokens">Tokens</button></div>
+        <div class="tabs" id="skin-tabs"><button data-tab="boards" class="on">Boards</button><button data-tab="dice">Dice</button><button data-tab="tokenskins">Tokens</button><button data-tab="tokens">Evolution</button></div>
         <div id="skin-grid" class="skin-grid"></div>
+      </div>
+    </div>
+
+    <!-- TOKEN VAULT (v1.8.0) -->
+    <div id="vault" class="overlay hidden" role="dialog" aria-labelledby="vault-title">
+      <div class="panel wide">
+        <div class="panel-head"><h3 id="vault-title">Token Vault</h3><div class="coins"><span class="coin-ico"></span><span class="coins-val">0</span></div><button class="icon-btn close" data-close="vault" aria-label="Close">✕</button></div>
+        <p class="note">Cosmetic only. Unlock free with win / capture milestones, or with coins earned in matches. Coins can't be bought, bet or cashed out. Kills and wins count while a skin is equipped.</p>
+        <p class="note vault-count" id="vault-count"></p>
+        <div id="vault-list" class="vault-list"></div>
       </div>
     </div>
 
@@ -584,7 +596,7 @@
           <button id="btn-privacy-options" class="btn plate hidden">Ad privacy options</button>
           <button id="btn-reset" class="btn plate danger">Reset progress</button>
         </div>
-        <p class="ver">Crossfour v1.7.2 · © OfferPk</p>
+        <p class="ver">Crossfour v1.8.0 · © OfferPk</p>
       </div>
     </div>
 
@@ -592,25 +604,26 @@
     <div id="toast" class="toast hidden"></div>
   </div>
 
-  <script src="js/ads-config.js?v=1.7.2"></script>
-  <script src="js/adgate.js?v=1.7.2"></script>
-  <script src="js/ads.js?v=1.7.2"></script>
-  <script src="js/logic.js?v=1.7.2"></script>
-  <script src="js/sound.js?v=1.7.2"></script>
-  <script src="js/themes.js?v=1.7.2"></script>
-  <script src="js/token-evolution.js?v=1.7.2"></script>
-  <script src="js/skin-shop.js?v=1.7.2"></script>
-  <script src="js/art.js?v=1.7.2"></script>
-  <script src="js/save-store.js?v=1.7.2"></script>
-  <script src="js/dice-gesture.js?v=1.7.2"></script>
-  <script src="js/path-animation.js?v=1.7.2"></script>
-  <script src="js/celebration.js?v=1.7.2"></script>
-  <script src="js/game.js?v=1.7.2"></script>
-  <script src="js/community-fixtures.js?v=1.7.2"></script>
-  <script src="js/community.js?v=1.7.2"></script>
-  <script src="js/supabase-config.js?v=1.7.2"></script>
-  <script src="js/chess.js?v=1.7.2"></script>
-  <script src="js/online.js?v=1.7.2"></script>
-  <script src="js/ludo-chess-discovery.js?v=1.7.2"></script>
+  <script src="js/ads-config.js?v=1.8.0"></script>
+  <script src="js/adgate.js?v=1.8.0"></script>
+  <script src="js/ads.js?v=1.8.0"></script>
+  <script src="js/logic.js?v=1.8.0"></script>
+  <script src="js/sound.js?v=1.8.0"></script>
+  <script src="js/themes.js?v=1.8.0"></script>
+  <script src="js/token-evolution.js?v=1.8.0"></script>
+  <script src="js/token-skins.js?v=1.8.0"></script>
+  <script src="js/skin-shop.js?v=1.8.0"></script>
+  <script src="js/art.js?v=1.8.0"></script>
+  <script src="js/save-store.js?v=1.8.0"></script>
+  <script src="js/dice-gesture.js?v=1.8.0"></script>
+  <script src="js/path-animation.js?v=1.8.0"></script>
+  <script src="js/celebration.js?v=1.8.0"></script>
+  <script src="js/game.js?v=1.8.0"></script>
+  <script src="js/community-fixtures.js?v=1.8.0"></script>
+  <script src="js/community.js?v=1.8.0"></script>
+  <script src="js/supabase-config.js?v=1.8.0"></script>
+  <script src="js/chess.js?v=1.8.0"></script>
+  <script src="js/online.js?v=1.8.0"></script>
+  <script src="js/ludo-chess-discovery.js?v=1.8.0"></script>
 </body>
 </html>
