@@ -54,7 +54,7 @@ function startLocalServer() {
     await page.click('#btn-vault');
     await page.waitForSelector('#vault:not(.hidden)');
     const rows = await page.$$eval('#vault-list .vault-row', els => els.map(e => ({ id: e.dataset.skin, owned: e.classList.contains('owned'), txt: e.textContent })));
-    ok(rows.length === 10, '10 vault rows');
+    ok(rows.length === 12, '12 vault rows');
     ok(rows.find(r => r.id === 'classic').owned && rows.find(r => r.id === 'mythic').txt.includes('🔒'), 'Classic owned, Mythic locked with condition');
     ok(rows.every(r => /Level \d\/5/.test(r.txt) && /Kills \d+/.test(r.txt) && /Wins \d+/.test(r.txt)), 'Level x/5, Kills, Wins on every row');
     ok(['Common', 'Rare', 'Epic', 'Legendary', 'Mythic'].every(n => rows.some(r => r.txt.includes(n))), 'rarities shown');

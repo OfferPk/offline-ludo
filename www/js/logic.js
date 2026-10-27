@@ -63,6 +63,108 @@
     calm: { name: 'Calm', text: 'Nothing happens.', good: null }
   };
 
+  // ---------- Sovereign pawn perks (Phase L1: data-driven registry) ----------
+  // Token skins are cosmetic by default. A skin whose catalog entry carries a `perk`
+  // id opts its seat into gameplay perks; Classic (no perk id) plays exactly the
+  // classic rules — every hook below is a no-op when perkOf() returns null.
+  // Later kings are added as DATA: a new PERK_DEFS entry reusing these effect
+  // functions (or adding one), plus a skin entry pointing at it — no engine change.
+  // State (all JSON-safe, so save/load carries them; legacy states without these
+  // fields keep working because every reader defaults them):
+  //   st.perkSkin[seat]  perk id equipped by that seat, or null
+  //   st.perkStep[seat]  per-piece pending +1 step bonus flags (Demetrius star)
+  //   st.perkCoin[seat]  sticky match flag: a George capture doubled this seat's coins
+  var PERK_DEFS = {
+    demetrius: { id: 'demetrius', name: 'King Demetrius I of Georgia', banner: 'VINEYARD SHIELD',
+      onStar: ['allyStep1', 'vineAdjacent'] },
+    george: { id: 'george', name: 'King George III of Georgia', banner: 'GOLDEN AGE SPRINT',
+      onCapture: ['sprint2', 'coinDouble'] }
+  };
+  function perkOf(st, seat) { var a = st.perkSkin; var id = Array.isArray(a) ? a[seat] : null; return (id && PERK_DEFS[id]) || null; }
+  function setPerkSkin(st, seat, perkId) {
+    if (!Array.isArray(st.perkSkin) || st.perkSkin.length !== 4) st.perkSkin = [null, null, null, null];
+    st.perkSkin[seat] = PERK_DEFS[perkId] ? perkId : null;
+  }
+  function perkStepArr(st, seat) {
+    if (!Array.isArray(st.perkStep) || st.perkStep.length !== 4) st.perkStep = [null, null, null, null];
+    if (!Array.isArray(st.perkStep[seat]) || st.perkStep[seat].length !== nPieces(st)) {
+      var a = []; for (var k = 0; k < nPieces(st); k++) a.push(false); st.perkStep[seat] = a;
+    }
+    return st.perkStep[seat];
+  }
+  function perkStepActive(st, seat, piece) {
+    return !!(Array.isArray(st.perkStep) && Array.isArray(st.perkStep[seat]) && st.perkStep[seat][piece]);
+  }
+  function perkCoinArr(st) { if (!Array.isArray(st.perkCoin) || st.perkCoin.length !== 4) st.perkCoin = [false, false, false, false]; return st.perkCoin; }
+  function coinMultiplier(st, seat) { return (Array.isArray(st.perkCoin) && st.perkCoin[seat]) ? 2 : 1; }
+  function isVineShielded(st, seat, piece) { return hasEffect(st, 'vine', seat, piece); }
+  function circDistAbs(a, b) { var d = Math.abs(a - b) % TRACK; return Math.min(d, TRACK - d); }
+  // Effect implementations, one per registry effect name. Extra arguments are ignored
+  // by effects that do not need them, so dispatch stays a plain loop over def lists.
+  function fxAllyStep1(st, seat) {
+    var granted = [];
+    for (var i = 0; i < nPieces(st); i++) if (onTrack(st.pieces[seat][i])) { perkStepArr(st, seat)[i] = true; granted.push(i); }
+    return granted;
+  }
+  function fxVineAdjacent(st, seat, piece, abs) {
+    var shielded = [];
+    for (var i = 0; i < nPieces(st); i++) {
+      if (i === piece) continue;
+      var p = st.pieces[seat][i];
+      if (!onTrack(p) || isVineShielded(st, seat, i)) continue;
+      if (circDistAbs(absOf(seat, p), abs) <= 1) { st.effects.push({ type: 'vine', seat: seat, piece: i, at: st.turnCount }); shielded.push(i); }
+    }
+    return shielded;
+  }
+  function sprintPath(st, seat, from) {
+    var path = [], c = from, enter = canEnter(st, seat);
+    for (var k = 0; k < 2; k++) {
+      var nx = stepFwd(c, enter);
+      if (nx === null || !onTrack(nx)) break; // sprint stays on the main track (never into the home column)
+      if (opponentBlockAt(st, seat, absOf(seat, nx))) break;
+      path.push(nx); c = nx;
+    }
+    return path;
+  }
+  function fxSprint2(st, seat) {
+    var moved = [];
+    for (var i = 0; i < nPieces(st); i++) {
+      var p = st.pieces[seat][i];
+      if (!onTrack(p) || isFrozen(st, seat, i)) continue;
+      var path = sprintPath(st, seat, p);
+      if (!path.length) continue;
+      st.pieces[seat][i] = path[path.length - 1];
+      moved.push({ piece: i, from: p, to: path[path.length - 1] });
+    }
+    return moved;
+  }
+  function fxCoinDouble(st, seat) { perkCoinArr(st)[seat] = true; return true; }
+  var PERK_EFFECTS = { allyStep1: fxAllyStep1, vineAdjacent: fxVineAdjacent, sprint2: fxSprint2, coinDouble: fxCoinDouble };
+  function applyStarPerk(st, seat, piece, abs) {
+    var def = perkOf(st, seat); if (!def || !def.onStar) return null;
+    var out = { id: def.id, trigger: 'star', banner: def.banner, stepBonus: [], vineShield: [] };
+    def.onStar.forEach(function (name) {
+      var r = PERK_EFFECTS[name](st, seat, piece, abs);
+      if (name === 'allyStep1') out.stepBonus = r;
+      if (name === 'vineAdjacent') out.vineShield = r;
+    });
+    return out;
+  }
+  function applyCapturePerk(st, seat, piece) {
+    var def = perkOf(st, seat); if (!def || !def.onCapture) return null;
+    var out = { id: def.id, trigger: 'capture', banner: def.banner, sprint: [], coinDouble: false };
+    def.onCapture.forEach(function (name) {
+      var r = PERK_EFFECTS[name](st, seat, piece);
+      if (name === 'sprint2') out.sprint = r;
+      if (name === 'coinDouble') out.coinDouble = !!r;
+    });
+    return out;
+  }
+  /** Vine-shielded enemies sitting on `abs` that an attack just landed on: the attack reflects. */
+  function vineReflectTargets(st, seat, abs) {
+    return tokensAt(st, abs, seat).filter(function (t) { return isVineShielded(st, t.seat, t.piece); });
+  }
+
   // ---------- RNG (mulberry32 with serialisable state) ----------
   function rngNext(state) {
     state.rng = (state.rng + 0x6D2B79F5) >>> 0;
@@ -110,13 +212,14 @@
   /**
    * seats: array of 4 entries, each null (empty seat) or { type: 'human' | 'ai', level?: 'easy'|'medium'|'hard' }.
    * Needs at least 2 players. mode: 'classic' | 'mystery'.
+   * perks (optional): array of 4 perk ids (or null) equipped by each seat; unknown ids are ignored.
    */
   function nPieces(st) { return (st && st.nPieces) || PIECES; }
   /** Team Ludo: partners sit opposite. Team 0 is seats 0 and 2, team 1 is seats 1 and 3. */
   function teamOf(seat) { return seat % 2; }
   function partnerOf(seat) { return (seat + 2) % 4; }
   function arrowsOn(st) { return !!(st && st.rules && (st.mode === 'arrow' || st.rules.arrows)); }
-  function newGame(seats, rules, seed, mode) {
+  function newGame(seats, rules, seed, mode, perks) {
     var players = [];
     for (var i = 0; i < 4; i++) if (seats[i]) players.push(i);
     var md = MODES.indexOf(mode) >= 0 ? mode : 'classic';
@@ -141,6 +244,9 @@
       players: players,
       pieces: seats.map(function (x) { return x ? startPieces() : null; }),
       rules: rr,
+      perkSkin: [null, null, null, null],
+      perkStep: [null, null, null, null],
+      perkCoin: [false, false, false, false],
       moveCount: 0,
       turn: players[0],
       phase: 'roll',        // 'roll' | 'move' | 'over'
@@ -162,6 +268,7 @@
       rng: (seed >>> 0) || 1,
       last: null
     };
+    if (Array.isArray(perks)) perks.forEach(function (p, s) { if (s < 4 && PERK_DEFS[p]) st.perkSkin[s] = p; });
     return st;
   }
 
@@ -203,6 +310,7 @@
     if (st.rules.safeSquares && isSafeAbs(abs)) return [];
     return tokensAt(st, abs, seat).filter(function (t) {
       if (isShielded(st, t.seat, t.piece)) return false;
+      if (isVineShielded(st, t.seat, t.piece)) return false; // vine aura: shielded, and the attack reflects (see move())
       if (st.mode === 'team' && teamOf(t.seat) === teamOf(seat)) return false; // partners are not captured
       return true;
     });
@@ -271,22 +379,26 @@
     if (p < 0) { if (v !== 6) return null; path = [0]; }
     else {
       var kg = st.lk && isKing(st, seat, piece);  // King's stride: +1 square when it fits
-      path = (kg && pathOf(p, v + 1, canEnter(st, seat), st, seat)) || pathOf(p, v, canEnter(st, seat), st, seat); if (!path) return null; // exact roll needed to reach home
+      var sb = perkStepActive(st, seat, piece) ? 1 : 0; // Sovereign step bonus: +1 when it fits
+      var steps = v + (kg ? 1 : 0) + sb;
+      path = pathOf(p, steps, canEnter(st, seat), st, seat) || ((kg || sb) && pathOf(p, v, canEnter(st, seat), st, seat)); if (!path) return null; // exact roll needed to reach home
     }
     to = path[path.length - 1];
     for (var k = 0; k < path.length; k++) if (onTrack(path[k]) && opponentBlockAt(st, seat, absOf(seat, path[k]))) return null; // blocks can't be passed or landed on
     var caps = capturesOnPath(st, seat, path);
     var tile = tileAt(st, to, seat);
-    var jumped = !!(st && arrowsOn(st) && path.length === (p < 0 ? 1 : v) + ARROW_JUMP);
-    // King stride uses v+1 die steps before optional jump
-    if (st && arrowsOn(st) && p >= 0 && st.lk && isKing(st, seat, piece) && path.length === (v + 1) + ARROW_JUMP) jumped = true;
+    var dieLen = p < 0 ? 1 : v + ((st.lk && isKing(st, seat, piece)) ? 1 : 0) + (perkStepActive(st, seat, piece) ? 1 : 0);
+    var jumped = !!(st && arrowsOn(st) && path.length === (p < 0 ? 1 : dieLen) + ARROW_JUMP);
     if (jumped) {
       var landAt = path[path.length - 1 - ARROW_JUMP];
       if (!(onTrack(landAt) && ARROW_SQUARES.indexOf(absOf(seat, landAt)) >= 0)) jumped = false;
     }
+    var usedLen = jumped ? path.length - ARROW_JUMP : path.length;
+    var usedBonus = p >= 0 && perkStepActive(st, seat, piece) && usedLen === dieLen && dieLen > v;
     return { seat: seat, piece: piece, v: v, from: p, to: to, path: path, captures: caps, leave: p < 0, finish: to === HOME,
-      entersHomeColumn: p <= CIRCLE && to >= COL0 && to < HOME, tile: tile ? tile.kind : null, stride: !!(st.lk && isKing(st, seat, piece) && p >= 0 && path.length === v + 1),
-      arrowJump: jumped };
+      entersHomeColumn: p <= CIRCLE && to >= COL0 && to < HOME, tile: tile ? tile.kind : null,
+      stride: !!(st.lk && isKing(st, seat, piece) && p >= 0 && usedLen === v + 1 + (usedBonus ? 1 : 0)),
+      perkStep: usedBonus, arrowJump: jumped };
   }
   /** Legal moves for `seat` with die value v. */
   function legalMoves(st, seat, v) {
@@ -415,6 +527,7 @@
   function sendHome(st, byseat, t, bypiece) {
     var wasKing = isKing(st, t.seat, t.piece);
     st.pieces[t.seat][t.piece] = -1; clearEffects(st, t.seat, t.piece);
+    if (Array.isArray(st.perkStep) && Array.isArray(st.perkStep[t.seat])) st.perkStep[t.seat][t.piece] = false; // a captured pawn loses its pending step bonus
     if (byseat != null) { st.stats[byseat].captures++; st.stats[t.seat].captured++; st.capd[byseat] = true; }
     if (st.lk) {
       st.lk.kills[t.seat][t.piece] = 0;
@@ -447,9 +560,9 @@
   function eventTarget(st, ev, seat, piece) {
     var p = st.pieces[seat][piece], abs = absOf(seat, p);
     if (ev === 'freeze') return nearestRival(st, seat, abs, 12, 1, function (t) { return !isFrozen(st, t.seat, t.piece); });
-    if (ev === 'zap') return nearestRival(st, seat, abs, 3, 0, function (t) { return !(st.rules.safeSquares && isSafeAbs(t.abs)) && !isShielded(st, t.seat, t.piece) && !inBlock(st, t.seat, t.piece); });
+    if (ev === 'zap') return nearestRival(st, seat, abs, 3, 0, function (t) { return !(st.rules.safeSquares && isSafeAbs(t.abs)) && !isShielded(st, t.seat, t.piece) && !isVineShielded(st, t.seat, t.piece) && !inBlock(st, t.seat, t.piece); });
     if (ev === 'swap') return nearestRival(st, seat, abs, 26, 0, function (t) {
-      return !isShielded(st, t.seat, t.piece) && !inBlock(st, t.seat, t.piece) && posFromAbs(seat, t.abs) <= LAST_TRACK && posFromAbs(t.seat, abs) <= LAST_TRACK && st.pieces[t.seat][t.piece] <= LAST_TRACK;
+      return !isShielded(st, t.seat, t.piece) && !isVineShielded(st, t.seat, t.piece) && !inBlock(st, t.seat, t.piece) && posFromAbs(seat, t.abs) <= LAST_TRACK && posFromAbs(t.seat, abs) <= LAST_TRACK && st.pieces[t.seat][t.piece] <= LAST_TRACK;
     });
     return null;
   }
@@ -532,8 +645,23 @@
     m.captures.forEach(function (t) { sendHome(st, seat, t, piece); });
     if (m.captures.length && st.rules.bonusOnCapture) st.bonus++;
     if (m.finish) { st.stats[seat].home++; clearEffects(st, seat, piece); if (st.rules.bonusOnHome) st.bonus++; }
+    // Sovereign perk hooks (all no-ops when the seat has no perk skin equipped).
+    var perk = null;
+    if (m.perkStep) perkStepArr(st, seat)[piece] = false; // step bonus spent on this move
+    if (!m.finish && onTrack(m.to)) {
+      var landAbs = absOf(seat, m.to);
+      var vines = vineReflectTargets(st, seat, landAbs);
+      if (vines.length) {
+        // The attack reflects off the golden vine aura: the attacker goes home instead.
+        sendHome(st, vines[0].seat, { seat: seat, piece: piece }, vines[0].piece);
+        perk = { id: 'demetrius', trigger: 'reflect', banner: PERK_DEFS.demetrius.banner, reflect: { by: vines[0] } };
+      } else if (STAR_SQUARES.indexOf(landAbs) >= 0) {
+        perk = applyStarPerk(st, seat, piece, landAbs);
+      }
+    }
+    if (m.captures.length && !perk) perk = applyCapturePerk(st, seat, piece);
     var res = { seat: seat, piece: piece, v: m.v, from: m.from, to: m.to, path: m.path, captures: m.captures, finish: m.finish, event: null, finishedPlayer: false, over: false, next: null,
-      stride: !!m.stride, crowned: null, kingCaptured: kingCaps.length > 0,
+      stride: !!m.stride, crowned: null, kingCaptured: kingCaps.length > 0, perk: perk, perkStep: !!m.perkStep,
       leave: !!m.leave, entersHomeColumn: !!m.entersHomeColumn, arrowJump: !!m.arrowJump };
     if (st.lk && m.captures.length && checkKing(st, seat, piece)) res.crowned = { seat: seat, piece: piece };
     var tile = !m.finish ? tileAt(st, m.to, seat) : null;
@@ -615,8 +743,8 @@
     return false;
   }
   function kingOf(st, seat, piece) { if (!st.lk) return null; for (var i = 0; i < st.lk.kings.length; i++) { var k = st.lk.kings[i]; if (k.seat === seat && k.piece === piece) return k; } return null; }
-  /** Immune to Chaos effects (shielded tokens and Kings). */
-  function immune(st, seat, piece) { return isShielded(st, seat, piece) || isKing(st, seat, piece); }
+  /** Immune to Chaos effects (shielded tokens, vine-shielded tokens and Kings). */
+  function immune(st, seat, piece) { return isShielded(st, seat, piece) || isVineShielded(st, seat, piece) || isKing(st, seat, piece); }
   function onMainTrack(p) { return p >= 0 && (p <= LAST_TRACK || p === CIRCLE); }
   /** Comeback level 0..2 from the progress gap to the leader (capped). */
   function comebackLevel(st, seat) {
@@ -1148,6 +1276,7 @@
     cellOf: cellOf, absOf: absOf, posFromAbs: posFromAbs, onTrack: onTrack, isSafeAbs: isSafeAbs, advance: advance, rngNext: rngNext, rollDie: rollDie,
     normRules: normRules, newGame: newGame, nPieces: nPieces, teamOf: teamOf, partnerOf: partnerOf, arrowsOn: arrowsOn, legalMoves: legalMoves, queueMoves: queueMoves, moveFor: moveFor, pathOf: pathOf, roll: roll, move: move, mustChoose: mustChoose,
     nextTurn: nextTurn, activeLeft: activeLeft, progressOf: progressOf, canEnter: canEnter, isShielded: isShielded, isFrozen: isFrozen, opponentBlockAt: opponentBlockAt,
+    PERK_DEFS: PERK_DEFS, perkOf: perkOf, setPerkSkin: setPerkSkin, isVineShielded: isVineShielded, coinMultiplier: coinMultiplier, perkStepActive: perkStepActive,
     tileAt: tileAt, applyEvent: applyEvent, eventValid: eventValid, eventTarget: eventTarget,
     threatsTo: threatsTo, evalHard: evalHard, chooseMove: chooseMove, bestAutoMove: bestAutoMove, chooseDieValue: chooseDieValue, distinctMoves: distinctMoves,
     coinsFor: coinsFor, xpFor: xpFor, levelFromXp: levelFromXp, simulate: simulate, clone: clone, aiStep: aiStep, continueTurn: continueTurn,

@@ -110,6 +110,7 @@
       var t = ctx.currentTime; softTap(t, 2400, 0.07); tick(t, 3400, 0.1, 0.018);
     },
     coin: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; ting(t, 1760, 0.18, 0.3); ting(t + 0.07, 2350, 0.16, 0.35); },
+    perk: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [880, 1109, 1319, 1760].forEach(function (f, i) { ting(t + i * 0.07, f, 0.12, 0.6); }); },
     spinTick: function (i) { if (!enabled || !ac()) return; tick(ctx.currentTime, 2400 + (i % 3) * 200, 0.12, 0.02); },
     good: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; [880, 1109, 1319].forEach(function (f, i) { ting(t + i * 0.07, f, 0.13, 0.55); }); },
     bad: function () { if (!enabled || !ac()) return; var t = ctx.currentTime; thud(t, 0.35); ting(t + 0.03, 247, 0.14, 0.5); ting(t + 0.12, 208, 0.12, 0.5); },
