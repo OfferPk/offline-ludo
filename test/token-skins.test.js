@@ -16,8 +16,8 @@ ok(html.indexOf('token-skins.js') < html.indexOf('js/game.js'), 'token-skins loa
 ok(/id="btn-vault"/.test(html) && /id="vault"/.test(html) && /id="vault-list"/.test(html) && /data-tab="tokenskins"/.test(html), 'Vault reachable from home + skins tab');
 ok(/btn-vault-skins/.test(game), 'Vault button inside Skins → Tokens');
 
-const want = ['classic', 'royal', 'ruby', 'emerald', 'sapphire', 'diamond', 'galaxy', 'inferno', 'cyber', 'mythic'];
-ok(TS.SKINS.length === 10 && want.every(id => TS.byId(id)), '10 skins present');
+const want = ['classic', 'royal', 'ruby', 'emerald', 'sapphire', 'diamond', 'galaxy', 'inferno', 'cyber', 'mythic', 'demetrius', 'george'];
+ok(TS.SKINS.length === 12 && want.every(id => TS.byId(id)), '12 skins present');
 ok(['common', 'rare', 'epic', 'legendary', 'mythic'].every(r => TS.SKINS.some(s => s.rarity === r)), 'all 5 rarities used');
 ok(TS.SKINS.filter(s => s.coins === 0 && !s.starter).length === 0 && TS.SKINS.every(s => s.starter || s.wins || s.kills), 'every non-starter skin has a free milestone and a coin price');
 ok(TS.byId('royal').trail === 'gold' && TS.byId('inferno').trail === 'fire' && TS.byId('diamond').trail === 'frost' && TS.byId('cyber').trail === 'electric' && TS.byId('galaxy').trail === 'stars', 'trail per signature skin');
@@ -38,7 +38,7 @@ ok(TS.unlock(save, 'mythic', persist).reason === 'locked' && save.coins === 50, 
 // milestone unlock (free)
 const vet = { coins: 0, stats: { won: 40, captures: 100 } }; TS.applyNormalize(vet);
 const granted = TS.collectEligible(vet).map(x => x.id);
-ok(['galaxy', 'inferno', 'diamond', 'royal', 'cyber', 'sapphire', 'ruby', 'emerald'].every(id => granted.includes(id)) && !granted.includes('mythic'), 'milestones grant free skins, Mythic still needs 75 wins + 150 captures');
+ok(['galaxy', 'inferno', 'diamond', 'royal', 'cyber', 'sapphire', 'ruby', 'emerald', 'demetrius'].every(id => granted.includes(id)) && !granted.includes('mythic') && !granted.includes('george'), 'milestones grant free skins, Mythic still needs 75 wins + 150 captures, George still needs 50 wins');
 ok(vet.tokenSkin === 'classic', 'collectEligible does not change equip');
 // save failure rolls back
 const s2 = { coins: 999, stats: {} }; TS.applyNormalize(s2);

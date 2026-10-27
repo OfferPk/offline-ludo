@@ -98,7 +98,7 @@
     })) return false;
     var ruleKeys = Object.keys(L.normRules({}));
     if (!ruleKeys.every(function (k) { return k === 'rollStyle' ? (st.rules[k] === 'star' || st.rules[k] === 'classic') : typeof st.rules[k] === 'boolean'; })) return false;
-    if (!st.effects.every(function (e) { return isRecord(e) && ['shield', 'freeze'].indexOf(e.type) >= 0 && isInt(e.seat, 0, 3) && isInt(e.piece, 0, 3) && isCount(e.at); })) return false;
+    if (!st.effects.every(function (e) { return isRecord(e) && ['shield', 'freeze', 'vine'].indexOf(e.type) >= 0 && isInt(e.seat, 0, 3) && isInt(e.piece, 0, 3) && isCount(e.at); })) return false;
     if (!st.tiles.every(function (t) { return isRecord(t) && isInt(t.abs, 0, 51) && ['boost', 'chaos', 'danger'].indexOf(t.kind) >= 0 && isCount(t.until); })) return false;
     if (st.phase === 'choose' && (!isRecord(st.pending) || ['revenge', 'swap', 'wild'].indexOf(st.pending.type) < 0 || !isInt(st.pending.seat, 0, 3) || !Array.isArray(st.pending.options))) return false;
     if (st.phase !== 'choose' && st.pending != null) return false;
@@ -852,6 +852,12 @@
         inner = '<rect class="sk-facet sk-facet-gem" x="9.2" y="4" width="5.6" height="6.4" rx=".6"/><rect class="sk-facet sk-facet-gem" x="10.4" y="5.2" width="3.2" height="4" rx=".3"/><ellipse class="sk-inlay" cx="12" cy="24.4" rx="2.6" ry="1.2"/>'; break;
       case 'sapphire':
         inner = '<path class="sk-asterism" d="M12 4.4v6.6M9.15 6.05l5.7 3.3M14.85 6.05l-5.7 3.3"/><ellipse class="sk-inlay" cx="12" cy="24.4" rx="2.6" ry="1.2"/>'; break;
+      case 'demetrius':
+        inner = '<path class="sk-vine" d="M12 28c0-6 .5-12 2-17M12 22c-2.5-.3-4-1.8-4.4-4 2.6.2 4.2 1.7 4.4 4ZM13.5 16c2.4-.6 3.8-2.2 4-4.6-2.5.4-4 2-4 4.6Z"/>' +
+          '<path class="sk-crown" d="M8.6 9.4 9 5.9l1.55 1.55L12 4.9l1.45 2.55L15 5.9l.4 3.5Z"/>'; break;
+      case 'george':
+        inner = '<path class="sk-crown" d="M8.6 9.4 9 5.9l1.55 1.55L12 4.9l1.45 2.55L15 5.9l.4 3.5Z"/><circle class="sk-crown-gem" cx="12" cy="7.9" r=".62"/>' +
+          '<path class="sk-laurel" d="M7.2 23.6c1.4.7 3 1 4.8 1s3.4-.3 4.8-1M8.4 21.6c1.1.45 2.3.65 3.6.65s2.5-.2 3.6-.65M6.8 19.4c.9.4 1.9.6 2.9.6M14.3 19.4c-.9.4-1.9.6-2.9.6"/>'; break;
       default: inner = '';
     }
     return '<defs>' + clip + '</defs><g class="sk sk-' + id + '" clip-path="url(#gem-clip-' + gid + ')">' + inner + '</g>' + band;
@@ -1004,6 +1010,8 @@
         el.classList.toggle('done', p === L.HOME);
         var shielded = L.isShielded(st, s, i), frozen = L.isFrozen(st, s, i), king = !!(st.lk && L.isKing(st, s, i));
         el.classList.toggle('shield', shielded); el.classList.toggle('is-shielded', shielded);
+        var vine = L.isVineShielded(st, s, i);
+        el.classList.toggle('vine', vine); el.classList.toggle('is-vine', vine);
         el.classList.toggle('frozen', frozen); el.classList.toggle('is-frozen', frozen);
         el.classList.toggle('king', king); el.classList.toggle('is-king', king);
         el.classList.toggle('sel', selected);
@@ -2010,6 +2018,7 @@
         SFX.home(); haptic('success'); if (!human) aiReact('home', s);
       }
       if (res.stride) floatAt(c.x, c.y + CELL * 0.7, 'King +1');
+      if (res.perk) { toast(res.perk.banner, 2000); SFX.perk(); if (res.perk.sprint && res.perk.sprint.length) floatAt(c.x, c.y + CELL * 0.7, 'Sprint +2'); }
       if (res.kingCaptured) { pause = Math.max(pause, 900); toast(nameOf(s) + ' toppled a King! +2 Lucky Charge', 1600); later(function () { SFX.mega(); }, 300); }
       if (res.crowned) { pause = Math.max(pause, 900); later(function () { crownFx(res.crowned); }, res.captures.length ? 420 : 0); }
       var done = function () {
@@ -2292,7 +2301,9 @@
     var balanceBefore = save.coins; save.coins -= stakePaid;
     tutorial.active = offerTutorial === true && mode === 'classic' && !tutorialSeen();
     tutorial.intro = tutorial.active; tutorial.firstMove = false;
-    var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode);
+    // Sovereign perks are opt-in via the equipped token skin (Classic has none). Human seats share the local save's skin.
+    var perks = seats.map(function (s) { return s && s.type === 'human' && TOKEN_SKINS ? ((TOKEN_SKINS.byId(save.tokenSkin) || {}).perk || null) : null; });
+    var st = L.newGame(seats, save.rules, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0, mode, perks);
     G = { st: st, seats: seats, mode: st.mode, view: viewOf(st), undoLeft: FREE_UNDOS, undo: null, sel: null, coins: 0, xp: 0, doubled: false, counted: false, started: Date.now(), entryFee: entryFee, stakePaid: stakePaid, stakeSettled: false, championshipStage: championshipStage == null ? null : championshipStage, tally: window.MatchSummary ? window.MatchSummary.blank() : null };
     save.game = G;
     if (!persist()) { save.coins = balanceBefore; G = null; save.game = null; return false; }
@@ -2318,6 +2329,8 @@
       // no coins, and doesn't count toward wins, skin milestones, mastery or the Daily challenge, so one player can't farm by playing every seat.
       G.practice = !ai.length;
       G.coins = G.practice ? 0 : L.coinsFor(best, st.players.length, ai, st.mode); G.xp = G.practice ? 10 : L.xpFor(best, st.players.length);
+      // Sovereign perk: a George III capture anywhere in the match doubles the match coin award (cosmetic coins only).
+      if (!G.practice && humans(st).some(function (s) { return L.coinMultiplier(st, s) === 2; })) { G.coins *= 2; G.perkDoubled = true; }
       save.coins += G.coins; save.xp += G.xp;
       G.stakePayout = 0;
       if (G.entryFee > 0 && !G.stakeSettled) {

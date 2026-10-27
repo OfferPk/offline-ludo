@@ -37,7 +37,11 @@
     { id: 'inferno', name: 'Inferno', rarity: 'legendary', coins: 1500, wins: 0, kills: 100, trail: 'fire', fx: 'inferno', dark: '#2a0904', gem: '#ff7a1a',
       metal: ['#ffd9a8', '#c4642a', '#3a1306'], core: '#ffd27a', blurb: 'Blackened bronze rim with a living flame inside. Fire trail.' },
     { id: 'mythic', name: 'Mythic', rarity: 'mythic', coins: 3000, wins: 75, kills: 150, trail: 'mythic', fx: 'mythic', gem: '#ff9ae6',
-      metal: ['#ffffff', '#f2c6ff', '#7b4bc4'], core: '#fff4ff', blurb: 'Iridescent premium glass with an animated light sweep and crest. Prism trail.' }
+      metal: ['#ffffff', '#f2c6ff', '#7b4bc4'], core: '#fff4ff', blurb: 'Iridescent premium glass with an animated light sweep and crest. Prism trail.' },
+    { id: 'demetrius', name: 'King Demetrius I', rarity: 'epic', coins: 900, wins: 30, kills: 0, trail: 'gold', fx: 'vine', gem: '#3fae5a', perk: 'demetrius',
+      metal: ['#fff7d2', '#e8bf52', '#875c10'], core: '#eafff0', blurb: 'Sovereign Royal Hymnodist King pawn: golden vine inlay, seat-tinted glass. Star landings rally allies (+1 step, vine shield).' },
+    { id: 'george', name: 'King George III', rarity: 'legendary', coins: 1500, wins: 50, kills: 0, trail: 'gold', fx: 'crown', gem: '#ffd34d', perk: 'george',
+      metal: ['#fffbe8', '#f0c75e', '#7a5200'], core: '#ffe9a8', blurb: 'Sovereign Golden Age Architect Monarch pawn: laurel crown, seat-tinted glass. Captures sprint allies +2 and double match coins.' }
   ];
 
   var IDS = SKINS.map(function (s) { return s.id; });
@@ -210,6 +214,10 @@
       out.glassHi = blend(seatHex, s.dark, 0.38); out.glassMid = blend(seatHex, s.dark, 0.66); out.glassLo = s.dark;
     } else if (s.id === 'royal') {
       out.glassHi = blend(seatHex, '#fff4cc', 0.5); out.glassMid = seatHex; out.glassLo = blend(seatHex, '#2a1600', 0.5);
+    } else if (s.id === 'demetrius') {
+      out.glassHi = blend(seatHex, '#eafff0', 0.35); out.glassMid = seatHex; out.glassLo = blend(seatHex, '#0d2b12', 0.5);
+    } else if (s.id === 'george') {
+      out.glassHi = blend(seatHex, '#fff4cc', 0.55); out.glassMid = seatHex; out.glassLo = blend(seatHex, '#2a1600', 0.45);
     } else if (s.id === 'mythic') {
       out.glassHi = blend(seatHex, '#ffffff', 0.62); out.glassMid = blend(seatHex, '#f3d9ff', 0.18); out.glassLo = blend(seatHex, '#2a0f4a', 0.45);
     }

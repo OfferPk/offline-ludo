@@ -20,11 +20,14 @@
 @keyframes ring-breathe { 0%, 100% { transform: scale(.97); opacity: .95; } 50% { transform: scale(1.03); opacity: .7; } }
 .pc.done::after { box-shadow: none; border-color: rgba(255,220,120,.45); }
 .pc.is-shielded { box-shadow: 0 0 0 2px #8fe0ff, 0 3px 6px rgba(0,0,0,.35); }
+.pc.is-vine { box-shadow: 0 0 0 2px #d4af37, 0 0 10px 2px rgba(63,174,90,.8), 0 3px 6px rgba(0,0,0,.35); }
 /* ---- skin layers ---- */
 .pc .sk-band { fill: var(--pcband, var(--pc)); stroke: var(--pcrim2); stroke-width: .45; }
 .pc .sk-band-hi { fill: none; stroke: var(--pcbandhi, #fff); stroke-width: .5; opacity: .7; stroke-linecap: round; }
 .pc[data-skin="classic"] .sk-band { fill-opacity: .55; }
 .pc .sk-crown { fill: #ffd34d; stroke: #8a5c0c; stroke-width: .35; stroke-linejoin: round; }
+.pc .sk-vine { fill: none; stroke: #3fae5a; stroke-width: .6; stroke-linecap: round; stroke-linejoin: round; }
+.pc .sk-laurel { fill: none; stroke: #ffd34d; stroke-width: .4; stroke-linecap: round; }
 .pc .sk-crown-gem { fill: var(--pcband, #e33); stroke: #fff6c8; stroke-width: .2; }
 .pc .sk-filigree { fill: none; stroke: #ffe28a; stroke-width: .4; opacity: .85; stroke-linecap: round; }
 .pc .sk-facet { fill: none; stroke: #fff; stroke-width: .32; opacity: .55; stroke-linejoin: round; }
