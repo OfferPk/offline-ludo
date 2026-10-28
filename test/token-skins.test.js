@@ -17,7 +17,7 @@ ok(/id="btn-vault"/.test(html) && /id="vault"/.test(html) && /id="vault-list"/.t
 ok(/btn-vault-skins/.test(game), 'Vault button inside Skins → Tokens');
 
 const want = ['classic', 'royal', 'ruby', 'emerald', 'sapphire', 'diamond', 'galaxy', 'inferno', 'cyber', 'mythic', 'demetrius', 'george'];
-ok(TS.SKINS.length === 12 && want.every(id => TS.byId(id)), '12 skins present');
+ok(TS.SKINS.length === 52 && want.every(id => TS.byId(id)), '52 skins present');
 ok(['common', 'rare', 'epic', 'legendary', 'mythic'].every(r => TS.SKINS.some(s => s.rarity === r)), 'all 5 rarities used');
 ok(TS.SKINS.filter(s => s.coins === 0 && !s.starter).length === 0 && TS.SKINS.every(s => s.starter || s.wins || s.kills), 'every non-starter skin has a free milestone and a coin price');
 ok(TS.byId('royal').trail === 'gold' && TS.byId('inferno').trail === 'fire' && TS.byId('diamond').trail === 'frost' && TS.byId('cyber').trail === 'electric' && TS.byId('galaxy').trail === 'stars', 'trail per signature skin');

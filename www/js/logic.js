@@ -74,11 +74,120 @@
   //   st.perkSkin[seat]  perk id equipped by that seat, or null
   //   st.perkStep[seat]  per-piece pending +1 step bonus flags (Demetrius star)
   //   st.perkCoin[seat]  sticky match flag: a George capture doubled this seat's coins
+  // Phase L2 adds a generic trigger/effect system on top of the L1 engine.
+  // A perk def is DATA: trigger lists (onStar, onLand, onCapture, onSix,
+  // onHome, onCorner, onDivider, onHomeApproach, onHighRoll, onLowRoll,
+  // onProximity, onApproach, onAllyCaptured) plus passive traits (endure,
+  // mutual, vault, pierce, aegis, once). Effects are generic functions in
+  // PERK_EFFECTS; dispatch (applyTrigger) passes (st, seat, piece, abs,
+  // entry, extra) so no perk needs a one-off hook in move().
+  // Fair readings (documented per pawn in the phase report): durations
+  // written as "for 2 turns" become either a turnCount window checked at
+  // use time (rollFloor, relocate, disableStar, tileSanctuary) or an
+  // until-consumed aura (zoneEndure), because the effect system has no
+  // per-piece turn expiry; coin effects are match-end bonuses, not cash.
+  // State (all JSON-safe, so save/load carries them; legacy states without
+  // these fields keep working because every reader defaults them):
+  //   st.perkSkin[seat]  perk id equipped by that seat, or null
+  //   st.perkStep[seat]  per-piece pending step bonus (number, 0 = none)
+  //   st.perkCoin[seat]  sticky match flag: a George capture doubled this seat's coins
+  //   st.perkBonusCoins[seat]  flat match-end coin bonus (Rostom +50, Levan +25, David IV +50/capture)
+  //   st.perkRollFloor[seat]  turnCount until which rolls below 3 count as 3 (George V)
+  //   st.perkRelocate[seat]  turnCount until which a captured ally returns to the nearest star (Tamar)
+  //   st.perkRelic[seat]  { abs, piece } left by a captured Archil II, resolved on the next roll
+  //   st.perkUnsafe[]  { abs, until } star squares disabled by Bagrat VI (capturable while active)
+  //   st.perkSafeTiles[]  { abs, until|null } sanctuary squares (Alexander I x2, Vakhtang V, Archil relic)
+  //   st.perkOnceFired[seat]  { perkId: true } for once-per-match perks (George II of Georgia)
+  //   st.perkEndureSpent[seat]  per-piece flag: a consumed endure stand does not reform until recaptured
+  var DIVIDER_SQUARES = [0, 12, 13, 25, 26, 38, 39, 51]; // quadrant seams (start squares double as dividers)
+  function quadrant(abs) { return Math.floor(abs / 13); }
   var PERK_DEFS = {
     demetrius: { id: 'demetrius', name: 'King Demetrius I of Georgia', banner: 'VINEYARD SHIELD',
       onStar: ['allyStep1', 'vineAdjacent'] },
     george: { id: 'george', name: 'King George III of Georgia', banner: 'GOLDEN AGE SPRINT',
-      onCapture: ['sprint2', 'coinDouble'] }
+      onCapture: ['sprint2', 'coinDouble'] },
+    // --- Sovereign Kings pack (L2): one pawn per unique monarch, latest/most-specific V6 wording ---
+    'george-v': { id: 'george-v', name: 'King George V of Georgia', banner: 'BRILLIANT RESTORER',
+      onStar: ['allyLeap2', { e: 'rollFloor', turns: 2 }] },
+    'george-xii': { id: 'george-xii', name: 'King George XII of Georgia', banner: 'LAST CROWN',
+      onStar: ['allyStep1', 'coinDouble'] },
+    'heraclius-ii': { id: 'heraclius-ii', name: 'King Heraclius II of Georgia', banner: 'KARTLI SHIELD',
+      onLand: ['allyStep1', { e: 'zoneEndure', r: 3 }] },
+    jesse: { id: 'jesse', name: 'Jesse of Kakheti and Kartli', banner: 'DUAL THRONE',
+      onStar: [{ e: 'zoneEndure', r: 2 }] },
+    'solomon-i': { id: 'solomon-i', name: 'Solomon I of Imereti', banner: 'IMERETI AWAKENING',
+      onCapture: ['breakout', 'selfSprint2'] },
+    'vakhtang-vi': { id: 'vakhtang-vi', name: 'Vakhtang VI of Kartli', banner: 'LAW-GIVER',
+      onLand: [{ e: 'zoneEndure', r: 2 }] },
+    'erekle-i': { id: 'erekle-i', name: 'Erekle I of Kakheti and Kartli', banner: 'EAGLE SPRINT',
+      onHighRoll: [{ e: 'allyPropel2', r: 2 }] },
+    archil: { id: 'archil', name: 'Archil of Imereti and Kakheti', banner: 'ROYAL SUMMONS',
+      onHomeApproach: ['homeSummon2'] },
+    'teimuraz-i': { id: 'teimuraz-i', name: 'Teimuraz I of Kakheti', banner: "MARTYR'S RALLY",
+      onAllyCaptured: ['allyStep1'] },
+    'george-xi': { id: 'george-xi', name: 'George XI of Kartli', banner: 'SHIELD CLASH',
+      onProximity: ['proxStep', { e: 'repel', r: 2 }] },
+    rostom: { id: 'rostom', name: 'Rostom of Kartli', banner: "ROSTOM'S BOUNTY",
+      onStar: ['allyStep1', { e: 'coinBonus', amt: 50 }] },
+    'giorgi-vii': { id: 'giorgi-vii', name: 'Giorgi VII of Georgia', banner: 'NAKHICHEVAN STAND',
+      endure: { knock: 2, stun: true } },
+    'luarsab-i': { id: 'luarsab-i', name: 'Luarsab I of Kartli', banner: 'MUTUAL CLASH',
+      mutual: true },
+    levan: { id: 'levan', name: 'Levan of Kakheti', banner: 'KAKHETI VISION',
+      onStar: ['selfStep1', { e: 'coinBonus', amt: 25 }] },
+    'constantine-ii': { id: 'constantine-ii', name: 'Constantine II of Georgia', banner: 'CORNER BASTION',
+      onCorner: [{ e: 'zoneEndure', r: 2 }] },
+    'george-ii-kakheti': { id: 'george-ii-kakheti', name: 'George II of Kakheti', banner: 'IRON COUNTER-BASH',
+      endure: { knock: 2, stun: true } },
+    'alexander-i-kakheti': { id: 'alexander-i-kakheti', name: 'Alexander I of Kakheti', banner: 'DIPLOMATIC SANCTUARY',
+      onLand: [{ e: 'tileSanctuary', turns: 2 }] },
+    'alexander-ii-imereti': { id: 'alexander-ii-imereti', name: 'Alexander II of Imereti', banner: 'IMERETI BASTION',
+      onCorner: [{ e: 'zoneEndure', r: 2 }] },
+    'george-iv': { id: 'george-iv', name: 'George IV Lasha', banner: 'CHIVALRIC CHARGE',
+      onLand: [{ e: 'charge3', n: 3 }] },
+    rusudan: { id: 'rusudan', name: 'Queen Rusudan of Georgia', banner: 'GOLDEN DOUBLE',
+      onLowRoll: ['selfStepV'] },
+    'demetre-ii': { id: 'demetre-ii', name: 'Demetre II the Self-Sacrificer', banner: "MARTYR'S SURGE",
+      onAllyCaptured: ['allyStep2'] },
+    'bagrat-iii': { id: 'bagrat-iii', name: 'Bagrat III of Georgia', banner: "UNIFIER'S STEP",
+      onSix: ['allyStep1'], onHome: ['allyStep1'] },
+    'giorgi-vi': { id: 'giorgi-vi', name: 'Giorgi VI the Minor', banner: "MINOR'S AEGIS",
+      aegis: true },
+    'david-iv': { id: 'david-iv', name: 'David IV the Builder', banner: "BUILDER'S EDGE",
+      pierce: true, onCapture: [{ e: 'coinBonus', amt: 50 }] },
+    tamar: { id: 'tamar', name: 'Queen Tamar the Great', banner: "TAMAR'S GRACE",
+      onStar: ['allyStep1', { e: 'relocate', turns: 2 }] },
+    'alexander-i-georgia': { id: 'alexander-i-georgia', name: 'Alexander I of Georgia', banner: 'HOLY SANCTUARY',
+      onLand: [{ e: 'tileSanctuary', turns: 2 }] },
+    'vakhtang-v': { id: 'vakhtang-v', name: 'Vakhtang V of Kartli', banner: "PEACEMAKER'S VETO",
+      onLand: [{ e: 'tileSanctuary', turns: 1 }] },
+    'simon-i': { id: 'simon-i', name: 'Simon I of Kartli', banner: 'ARC CLEAVE',
+      onCapture: [{ e: 'cleave', n: 2 }] },
+    'george-viii': { id: 'george-viii', name: 'George VIII of Georgia', banner: 'BOUNDARY BARRIER',
+      onDivider: [{ e: 'zoneEndure', r: 3 }] },
+    'constantine-i': { id: 'constantine-i', name: 'Constantine I of Georgia', banner: 'RECIPROCAL STRIKE',
+      onAllyCaptured: ['allyStep1', 'reciprocalKill'] },
+    'david-vi': { id: 'david-vi', name: 'David VI of Georgia', banner: 'EAGLE VAULT',
+      vault: true },
+    'bagrat-iv': { id: 'bagrat-iv', name: 'Bagrat IV of Georgia', banner: 'IRON CHOKEPOINT',
+      endure: { knock: 1 } },
+    'archil-ii': { id: 'archil-ii', name: 'Archil II of Kakheti', banner: 'RELIC CROSS',
+      onAllyCaptured: ['relic'] },
+    'george-ii-georgia': { id: 'george-ii-georgia', name: 'George II of Georgia', banner: 'ROYAL TRANSFER',
+      onStar: ['allyStep2'], once: true },
+    'george-i': { id: 'george-i', name: 'George I of Georgia', banner: 'LANE PRESSURE',
+      onLand: ['selfStep1'] },
+    'david-viii': { id: 'david-viii', name: 'David VIII of Georgia', banner: 'FLANK AMBUSH',
+      onLand: [{ e: 'charge3', n: 3 }] },
+    'bagrat-vi': { id: 'bagrat-vi', name: 'Bagrat VI of Georgia', banner: 'SANCTUARY BREAKER',
+      onLand: [{ e: 'disableStar', turns: 2 }] },
+    // --- First cross-volume heroes trio (L2) ---
+    scipio: { id: 'scipio', name: 'Scipio Africanus', banner: 'ZAMA ENVELOPMENT',
+      onApproach: ['approachStep', 'approachFreeze'] },
+    'sitting-bull': { id: 'sitting-bull', name: 'Sitting Bull', banner: 'SUN DANCE RALLY',
+      onStar: ['cleanse', { e: 'allyPropel2', r: 2 }] },
+    zenobia: { id: 'zenobia', name: 'Queen Zenobia', banner: 'PALMYRA AURA',
+      onLand: ['quadrantStep1'] }
   };
   function perkOf(st, seat) { var a = st.perkSkin; var id = Array.isArray(a) ? a[seat] : null; return (id && PERK_DEFS[id]) || null; }
   function setPerkSkin(st, seat, perkId) {
@@ -88,22 +197,77 @@
   function perkStepArr(st, seat) {
     if (!Array.isArray(st.perkStep) || st.perkStep.length !== 4) st.perkStep = [null, null, null, null];
     if (!Array.isArray(st.perkStep[seat]) || st.perkStep[seat].length !== nPieces(st)) {
-      var a = []; for (var k = 0; k < nPieces(st); k++) a.push(false); st.perkStep[seat] = a;
+      var a = []; for (var k = 0; k < nPieces(st); k++) a.push(0); st.perkStep[seat] = a;
     }
     return st.perkStep[seat];
   }
-  function perkStepActive(st, seat, piece) {
-    return !!(Array.isArray(st.perkStep) && Array.isArray(st.perkStep[seat]) && st.perkStep[seat][piece]);
+  function perkStepValue(st, seat, piece) {
+    return (Array.isArray(st.perkStep) && Array.isArray(st.perkStep[seat]) && st.perkStep[seat][piece]) || 0;
   }
+  function perkStepActive(st, seat, piece) { return perkStepValue(st, seat, piece) > 0; }
   function perkCoinArr(st) { if (!Array.isArray(st.perkCoin) || st.perkCoin.length !== 4) st.perkCoin = [false, false, false, false]; return st.perkCoin; }
   function coinMultiplier(st, seat) { return (Array.isArray(st.perkCoin) && st.perkCoin[seat]) ? 2 : 1; }
+  function perkBonusArr(st) { if (!Array.isArray(st.perkBonusCoins) || st.perkBonusCoins.length !== 4) st.perkBonusCoins = [0, 0, 0, 0]; return st.perkBonusCoins; }
+  function perkBonusTotal(st, seat) { return (Array.isArray(st.perkBonusCoins) && st.perkBonusCoins[seat]) || 0; }
+  function perkUnsafeArr(st) { if (!Array.isArray(st.perkUnsafe)) st.perkUnsafe = []; return st.perkUnsafe; }
+  function perkSafeArr(st) { if (!Array.isArray(st.perkSafeTiles)) st.perkSafeTiles = []; return st.perkSafeTiles; }
+  function perkOnceFired(st, seat, id) { return !!(st.perkOnceFired && st.perkOnceFired[seat] && st.perkOnceFired[seat][id]); }
+  function markPerkOnce(st, seat, id) {
+    if (!Array.isArray(st.perkOnceFired) || st.perkOnceFired.length !== 4) st.perkOnceFired = [null, null, null, null];
+    if (!st.perkOnceFired[seat]) st.perkOnceFired[seat] = {};
+    st.perkOnceFired[seat][id] = true;
+  }
+  function perkEndureSpentArr(st, seat) {
+    if (!Array.isArray(st.perkEndureSpent) || st.perkEndureSpent.length !== 4) st.perkEndureSpent = [null, null, null, null];
+    if (!Array.isArray(st.perkEndureSpent[seat]) || st.perkEndureSpent[seat].length !== nPieces(st)) {
+      var a = []; for (var k = 0; k < nPieces(st); k++) a.push(false); st.perkEndureSpent[seat] = a;
+    }
+    return st.perkEndureSpent[seat];
+  }
+  function perkEndureSpent(st, seat, piece) { return !!(Array.isArray(st.perkEndureSpent) && Array.isArray(st.perkEndureSpent[seat]) && st.perkEndureSpent[seat][piece]); }
+  function markEndureSpent(st, seat, piece) { perkEndureSpentArr(st, seat)[piece] = true; }
   function isVineShielded(st, seat, piece) { return hasEffect(st, 'vine', seat, piece); }
   function circDistAbs(a, b) { var d = Math.abs(a - b) % TRACK; return Math.min(d, TRACK - d); }
-  // Effect implementations, one per registry effect name. Extra arguments are ignored
-  // by effects that do not need them, so dispatch stays a plain loop over def lists.
+  function nearestStarAbs(abs) { var best = STAR_SQUARES[0], bd = 99; STAR_SQUARES.forEach(function (s) { var d = circDistAbs(s, abs); if (d < bd) { bd = d; best = s; } }); return best; }
+  function isUnsafe(st, abs) { return perkUnsafeArr(st).some(function (e) { return e.abs === abs && st.turnCount <= e.until; }); }
+  /** A square is safe by geometry (start/star), by sanctuary, and never when disabled. */
+  function isSafeSquare(st, abs) {
+    if (isUnsafe(st, abs)) return false;
+    if (isSafeAbs(abs)) return true;
+    return perkSafeArr(st).some(function (e) { return e.abs === abs && (e.until == null || st.turnCount <= e.until); });
+  }
+  function hasEndure(st, seat, piece) { return hasEffect(st, 'endure', seat, piece); }
+  function endureEffect(st, seat, piece) { for (var i = 0; i < st.effects.length; i++) { var e = st.effects[i]; if (e.type === 'endure' && e.seat === seat && e.piece === piece) return e; } return null; }
+  function endureTargets(st, seat, abs) { return tokensAt(st, abs, seat).filter(function (t) { return hasEndure(st, t.seat, t.piece); }); }
+  function consumeEndure(st, seat, piece) { st.effects = st.effects.filter(function (e) { return !(e.type === 'endure' && e.seat === seat && e.piece === piece); }); }
+  function isMutual(st, seat, piece) { var def = perkOf(st, seat); return !!(def && def.mutual); }
+  function mutualTargets(st, seat, abs) { return tokensAt(st, abs, seat).filter(function (t) { return isMutual(st, t.seat, t.piece); }); }
+  function hasAllyWithin(st, seat, abs, r, exceptPiece) {
+    for (var i = 0; i < nPieces(st); i++) { if (i === exceptPiece) continue; var p = st.pieces[seat][i]; if (onTrack(p) && circDistAbs(absOf(seat, p), abs) <= r) return true; }
+    return false;
+  }
+  /** Slide a main-track piece `n` squares back (clamped at the start square). */
+  function knockBack(st, seat, piece, n) {
+    var from = st.pieces[seat][piece]; if (!onTrack(from)) return null;
+    var c = from;
+    for (var k = 0; k < n; k++) { if (c === CIRCLE) c = LAST_TRACK; else c = Math.max(0, c - 1); }
+    st.pieces[seat][piece] = c;
+    return { piece: piece, from: from, to: c };
+  }
+  // Effect implementations, one per registry effect name. Signature:
+  //   fn(st, seat, piece, abs, entry, extra)
+  // where `piece` is the triggering piece (or the victim for onAllyCaptured),
+  // `abs` the landing/capture square, `entry` the registry entry (params),
+  // and `extra` trigger context ({ v } for roll triggers, { attacker } for
+  // ally-captured, { moverSeat, moverPiece } for approach).
   function fxAllyStep1(st, seat) {
     var granted = [];
-    for (var i = 0; i < nPieces(st); i++) if (onTrack(st.pieces[seat][i])) { perkStepArr(st, seat)[i] = true; granted.push(i); }
+    for (var i = 0; i < nPieces(st); i++) if (onTrack(st.pieces[seat][i])) { perkStepArr(st, seat)[i] = Math.max(perkStepArr(st, seat)[i], 1); granted.push(i); }
+    return granted;
+  }
+  function fxAllyStep2(st, seat) {
+    var granted = [];
+    for (var i = 0; i < nPieces(st); i++) if (onTrack(st.pieces[seat][i])) { perkStepArr(st, seat)[i] = Math.max(perkStepArr(st, seat)[i], 2); granted.push(i); }
     return granted;
   }
   function fxVineAdjacent(st, seat, piece, abs) {
@@ -138,26 +302,227 @@
     }
     return moved;
   }
+  function fxAllyLeap2(st, seat) { // George V: every on-track ally leaps +2 now (not a pending bonus)
+    var moved = [];
+    for (var i = 0; i < nPieces(st); i++) {
+      var p = st.pieces[seat][i];
+      if (!onTrack(p) || isFrozen(st, seat, i)) continue;
+      var path = sprintPath(st, seat, p);
+      if (!path.length) continue;
+      st.pieces[seat][i] = path[path.length - 1];
+      moved.push({ piece: i, from: p, to: path[path.length - 1] });
+    }
+    return moved;
+  }
+  function fxSelfStep1(st, seat, piece) { if (!onTrack(st.pieces[seat][piece])) return false; perkStepArr(st, seat)[piece] = Math.max(perkStepArr(st, seat)[piece], 1); return true; }
+  function fxSelfStep2(st, seat, piece) { if (!onTrack(st.pieces[seat][piece])) return false; perkStepArr(st, seat)[piece] = Math.max(perkStepArr(st, seat)[piece], 2); return true; }
+  function fxSelfStepV(st, seat, piece, abs, ent, extra) { // Rusudan: pending += the roll just made (total becomes 2x)
+    if (!onTrack(st.pieces[seat][piece]) || !extra || !extra.v) return false;
+    perkStepArr(st, seat)[piece] = perkStepArr(st, seat)[piece] + extra.v; return extra.v;
+  }
+  function fxSelfSprint2(st, seat, piece) {
+    var p = st.pieces[seat][piece];
+    if (!onTrack(p) || isFrozen(st, seat, piece)) return null;
+    var path = sprintPath(st, seat, p);
+    if (!path.length) return null;
+    st.pieces[seat][piece] = path[path.length - 1];
+    return { piece: piece, from: p, to: path[path.length - 1] };
+  }
   function fxCoinDouble(st, seat) { perkCoinArr(st)[seat] = true; return true; }
-  var PERK_EFFECTS = { allyStep1: fxAllyStep1, vineAdjacent: fxVineAdjacent, sprint2: fxSprint2, coinDouble: fxCoinDouble };
-  function applyStarPerk(st, seat, piece, abs) {
-    var def = perkOf(st, seat); if (!def || !def.onStar) return null;
-    var out = { id: def.id, trigger: 'star', banner: def.banner, stepBonus: [], vineShield: [] };
-    def.onStar.forEach(function (name) {
-      var r = PERK_EFFECTS[name](st, seat, piece, abs);
-      if (name === 'allyStep1') out.stepBonus = r;
-      if (name === 'vineAdjacent') out.vineShield = r;
-    });
+  function fxCoinBonus(st, seat, piece, abs, ent) { var amt = (ent && ent.amt) || 0; perkBonusArr(st)[seat] += amt; return amt; }
+  function fxZoneEndure(st, seat, piece, abs, ent) { // aura: allies within r of the square survive the next strike each
+    var r = (ent && ent.r) || 2, granted = [];
+    for (var i = 0; i < nPieces(st); i++) {
+      var p = st.pieces[seat][i];
+      if (!onTrack(p) || hasEndure(st, seat, i)) continue;
+      if (circDistAbs(absOf(seat, p), abs) <= r) { st.effects.push({ type: 'endure', seat: seat, piece: i, knock: 0 }); granted.push(i); }
+    }
+    return granted;
+  }
+  function fxBreakout(st, seat) { // Solomon: every base pawn steps out onto the start square at once
+    var out = [];
+    for (var i = 0; i < nPieces(st); i++) if (st.pieces[seat][i] === -1) { st.pieces[seat][i] = 0; out.push(i); }
     return out;
   }
-  function applyCapturePerk(st, seat, piece) {
-    var def = perkOf(st, seat); if (!def || !def.onCapture) return null;
-    var out = { id: def.id, trigger: 'capture', banner: def.banner, sprint: [], coinDouble: false };
-    def.onCapture.forEach(function (name) {
-      var r = PERK_EFFECTS[name](st, seat, piece);
-      if (name === 'sprint2') out.sprint = r;
-      if (name === 'coinDouble') out.coinDouble = !!r;
+  function fxQuadrantStep1(st, seat, piece, abs) {
+    var q = quadrant(abs), granted = [];
+    for (var i = 0; i < nPieces(st); i++) { var p = st.pieces[seat][i]; if (onTrack(p) && quadrant(absOf(seat, p)) === q) { perkStepArr(st, seat)[i] = Math.max(perkStepArr(st, seat)[i], 1); granted.push(i); } }
+    return granted;
+  }
+  function fxHomeSummon2(st, seat, piece, abs) { // Archil: landing near the home stretch summons base pawns with +2
+    var rel = posFromAbs(seat, abs), granted = [];
+    if (rel < 49 || rel > 51) return granted;
+    for (var i = 0; i < nPieces(st); i++) if (st.pieces[seat][i] === -1) { perkStepArr(st, seat)[i] = Math.max(perkStepArr(st, seat)[i], 2); granted.push(i); }
+    return granted;
+  }
+  function fxDisableStar(st, seat, piece, abs, ent) { // Bagrat VI: nearest star in an enemy quadrant stops being safe
+    if (quadrant(abs) === seat) return null;
+    var star = nearestStarAbs(abs), until = st.turnCount + ((ent && ent.turns) || 2) * activeLeft(st).length;
+    var arr = perkUnsafeArr(st), found = false;
+    arr.forEach(function (e) { if (e.abs === star) { e.until = until; found = true; } });
+    if (!found) arr.push({ abs: star, until: until });
+    return star;
+  }
+  function fxTileSanctuary(st, seat, piece, abs, ent) { // Alexander I x2, Vakhtang V: the landing square becomes safe
+    var until = st.turnCount + ((ent && ent.turns) || 2) * activeLeft(st).length;
+    var arr = perkSafeArr(st), found = false;
+    arr.forEach(function (e) { if (e.abs === abs) { e.until = until; found = true; } });
+    if (!found) arr.push({ abs: abs, until: until });
+    return abs;
+  }
+  function fxRollFloor(st, seat, piece, abs, ent) { // George V: rolls below 3 count as 3 while the window holds
+    if (!Array.isArray(st.perkRollFloor) || st.perkRollFloor.length !== 4) st.perkRollFloor = [null, null, null, null];
+    st.perkRollFloor[seat] = st.turnCount + ((ent && ent.turns) || 2) * activeLeft(st).length;
+    return true;
+  }
+  function fxRelocate(st, seat, piece, abs, ent) { // Tamar: a captured ally returns to the nearest star, not the yard
+    if (!Array.isArray(st.perkRelocate) || st.perkRelocate.length !== 4) st.perkRelocate = [null, null, null, null];
+    st.perkRelocate[seat] = st.turnCount + ((ent && ent.turns) || 2) * activeLeft(st).length;
+    return true;
+  }
+  function fxRelic(st, seat, piece, abs) { // Archil II: the capture square keeps a relic cross for the next roll
+    if (!Array.isArray(st.perkRelic) || st.perkRelic.length !== 4) st.perkRelic = [null, null, null, null];
+    st.perkRelic[seat] = { abs: abs, piece: piece };
+    return st.perkRelic[seat];
+  }
+  function fxAllyPropel2(st, seat, piece, abs, ent) { // Erekle / Sitting Bull: nearest ally within r sprints +2 now
+    var r = (ent && ent.r) || 2, best = -1, bd = 99;
+    for (var i = 0; i < nPieces(st); i++) {
+      if (i === piece) continue;
+      var p = st.pieces[seat][i];
+      if (!onTrack(p) || isFrozen(st, seat, i)) continue;
+      var d = circDistAbs(absOf(seat, p), abs);
+      if (d <= r && d < bd) { bd = d; best = i; }
+    }
+    if (best < 0) return null;
+    var from = st.pieces[seat][best], path = sprintPath(st, seat, from);
+    if (!path.length) return null;
+    st.pieces[seat][best] = path[path.length - 1];
+    return { piece: best, from: from, to: path[path.length - 1] };
+  }
+  function fxCleave(st, seat, piece, abs, ent) { // Simon: strictly-adjacent enemies (not the captured one) slide back
+    var n = (ent && ent.n) || 2, out = [];
+    if (abs == null) return out;
+    for (var o = 0; o < 4; o++) {
+      if (!st.pieces[o] || o === seat) continue;
+      for (var i = 0; i < nPieces(st); i++) {
+        var p = st.pieces[o][i];
+        if (!onTrack(p)) continue;
+        var a = absOf(o, p);
+        if (circDistAbs(a, abs) !== 1) continue;
+        if (st.rules.safeSquares && isSafeSquare(st, a)) continue;
+        if (isShielded(st, o, i) || isVineShielded(st, o, i) || hasEndure(st, o, i) || isMutual(st, o, i)) continue;
+        var kb = knockBack(st, o, i, n);
+        if (kb) out.push({ seat: o, piece: i, from: kb.from, to: kb.to });
+      }
+    }
+    return out;
+  }
+  function fxRepel(st, seat, piece, abs, ent) { // George XI: mover + nearest ally within r repel attackers 1 tile
+    var r = (ent && ent.r) || 2, granted = [];
+    function arm(i) { if (onTrack(st.pieces[seat][i]) && !hasEndure(st, seat, i)) { st.effects.push({ type: 'endure', seat: seat, piece: i, knock: 1 }); granted.push(i); } }
+    arm(piece);
+    var best = -1, bd = 99;
+    for (var i = 0; i < nPieces(st); i++) {
+      if (i === piece) continue;
+      var p = st.pieces[seat][i];
+      if (!onTrack(p)) continue;
+      var d = circDistAbs(absOf(seat, p), abs);
+      if (d <= r && d < bd) { bd = d; best = i; }
+    }
+    if (best >= 0) arm(best);
+    return granted;
+  }
+  function fxProxStep(st, seat, piece, abs) { // George XI: landing near an ally lifts both paws' next move by +1
+    var out = { mover: false, ally: null };
+    if (onTrack(st.pieces[seat][piece])) { perkStepArr(st, seat)[piece] = Math.max(perkStepArr(st, seat)[piece], 1); out.mover = true; }
+    var best = -1, bd = 99;
+    for (var i = 0; i < nPieces(st); i++) {
+      if (i === piece) continue;
+      var p = st.pieces[seat][i];
+      if (!onTrack(p)) continue;
+      var d = circDistAbs(absOf(seat, p), abs);
+      if (d <= 2 && d < bd) { bd = d; best = i; }
+    }
+    if (best >= 0) { perkStepArr(st, seat)[best] = Math.max(perkStepArr(st, seat)[best], 1); out.ally = best; }
+    return out;
+  }
+  function fxCleanse(st, seat) { // Sitting Bull: the rally lifts freezes off the whole seat
+    var before = st.effects.length;
+    st.effects = st.effects.filter(function (e) { return !(e.type === 'freeze' && e.seat === seat); });
+    return before - st.effects.length;
+  }
+  function fxApproachStep(st, seat, piece, abs, ent) { // Scipio: the approached piece gains +2 on its next move
+    if (!onTrack(st.pieces[seat][piece])) return false;
+    perkStepArr(st, seat)[piece] = Math.max(perkStepArr(st, seat)[piece], (ent && ent.v) || 2);
+    return true;
+  }
+  function fxApproachFreeze(st, seat, piece, abs, ent, extra) { // Scipio: the bypassing enemy token is locked in place
+    if (!extra || extra.moverSeat == null) return false;
+    if (isFrozen(st, extra.moverSeat, extra.moverPiece)) return false;
+    st.effects.push({ type: 'freeze', seat: extra.moverSeat, piece: extra.moverPiece, at: st.turnCount });
+    return true;
+  }
+  function fxCharge(st, seat, piece, abs, ent) { // George IV / David VIII: rush a capturable foe up to n ahead
+    var n = (ent && ent.n) || 3;
+    if (abs == null || st.pieces[seat][piece] !== posFromAbs(seat, abs)) return null; // mover no longer on the square
+    for (var d = 1; d <= n; d++) {
+      var a2 = (abs + d) % TRACK;
+      var caps = capturesAt(st, seat, a2).filter(function (t) { return !(st.rules.blocks && countOwnAt(st, t.seat, a2) >= 2); });
+      if (!caps.length) continue;
+      var t = caps[0], from = st.pieces[seat][piece];
+      st.pieces[seat][piece] = posFromAbs(seat, a2);
+      sendHome(st, seat, t, piece);
+      st.bonus++; // the charge earns the extra turn the chronicle promises
+      return { target: t, from: from, to: st.pieces[seat][piece] };
+    }
+    return null;
+  }
+  var PERK_EFFECTS = { allyStep1: fxAllyStep1, allyStep2: fxAllyStep2, vineAdjacent: fxVineAdjacent,
+    sprint2: fxSprint2, allyLeap2: fxAllyLeap2, selfStep1: fxSelfStep1, selfStep2: fxSelfStep2, selfStepV: fxSelfStepV,
+    selfSprint2: fxSelfSprint2, coinDouble: fxCoinDouble, coinBonus: fxCoinBonus, zoneEndure: fxZoneEndure,
+    breakout: fxBreakout, quadrantStep1: fxQuadrantStep1, homeSummon2: fxHomeSummon2, disableStar: fxDisableStar,
+    tileSanctuary: fxTileSanctuary, rollFloor: fxRollFloor, relocate: fxRelocate, relic: fxRelic,
+    allyPropel2: fxAllyPropel2, cleave: fxCleave, repel: fxRepel, proxStep: fxProxStep, cleanse: fxCleanse,
+    approachStep: fxApproachStep, approachFreeze: fxApproachFreeze, charge3: fxCharge };
+  /** Generic trigger dispatch: runs every effect in def[key], collecting grants. */
+  function applyTrigger(st, seat, piece, abs, key, extra) {
+    var def = perkOf(st, seat); if (!def || !def[key]) return null;
+    if (def.once && perkOnceFired(st, seat, def.id)) return null;
+    var out = { id: def.id, trigger: key, banner: def.banner, grants: [] };
+    def[key].forEach(function (ent) {
+      var name = typeof ent === 'string' ? ent : ent.e;
+      if (name === 'reciprocalKill') { out.grants.push({ e: name, r: 'deferred' }); return; } // needs the attacker: see applyAllyCapturedPerk
+      var fn = PERK_EFFECTS[name]; if (!fn) return;
+      out.grants.push({ e: name, r: fn(st, seat, piece, abs, ent, extra) });
     });
+    if (def.once) markPerkOnce(st, seat, def.id);
+    return out;
+  }
+  function applyStarPerk(st, seat, piece, abs) { // L1 shape preserved: trigger 'star', stepBonus + vineShield fields
+    var out = applyTrigger(st, seat, piece, abs, 'onStar');
+    if (!out) return null;
+    out.trigger = 'star'; out.stepBonus = []; out.vineShield = [];
+    out.grants.forEach(function (g) { if (g.e === 'allyStep1') out.stepBonus = g.r; if (g.e === 'vineAdjacent') out.vineShield = g.r; });
+    return out;
+  }
+  function applyCapturePerk(st, seat, piece, abs) { // L1 shape preserved: trigger 'capture', sprint + coinDouble fields
+    var out = applyTrigger(st, seat, piece, abs, 'onCapture');
+    if (!out) return null;
+    out.trigger = 'capture'; out.sprint = []; out.coinDouble = false;
+    out.grants.forEach(function (g) { if (g.e === 'sprint2') out.sprint = g.r; if (g.e === 'coinDouble') out.coinDouble = !!g.r; });
+    return out;
+  }
+  /** Defender-side triggers for a captured pawn (victim seat, victim piece, capture square). */
+  function applyAllyCapturedPerk(st, seat, piece, abs, attacker) {
+    var def = perkOf(st, seat); if (!def || !def.onAllyCaptured) return null;
+    var out = applyTrigger(st, seat, piece, abs, 'onAllyCaptured', { attacker: attacker });
+    if (!out) return null;
+    out.trigger = 'allyCaptured';
+    if (def.onAllyCaptured.indexOf('reciprocalKill') >= 0 && attacker && onTrack(st.pieces[attacker.seat][attacker.piece])) {
+      sendHome(st, seat, { seat: attacker.seat, piece: attacker.piece }, piece);
+      out.reciprocal = { seat: attacker.seat, piece: attacker.piece };
+    }
     return out;
   }
   /** Vine-shielded enemies sitting on `abs` that an attack just landed on: the attack reflects. */
@@ -247,6 +612,14 @@
       perkSkin: [null, null, null, null],
       perkStep: [null, null, null, null],
       perkCoin: [false, false, false, false],
+      perkBonusCoins: [0, 0, 0, 0],
+      perkRollFloor: [null, null, null, null],
+      perkRelocate: [null, null, null, null],
+      perkRelic: [null, null, null, null],
+      perkUnsafe: [],
+      perkSafeTiles: [],
+      perkOnceFired: [null, null, null, null],
+      perkEndureSpent: [null, null, null, null],
       moveCount: 0,
       turn: players[0],
       phase: 'roll',        // 'roll' | 'move' | 'over'
@@ -269,6 +642,8 @@
       last: null
     };
     if (Array.isArray(perks)) perks.forEach(function (p, s) { if (s < 4 && PERK_DEFS[p]) st.perkSkin[s] = p; });
+    // Passive endure: Sovereign pieces that start on the track (arrow mode) stand entrenched from the first turn.
+    for (var s0 = 0; s0 < 4; s0++) { var d0 = st.perkSkin[s0] && PERK_DEFS[st.perkSkin[s0]]; if (d0 && d0.endure && st.pieces[s0]) for (var i0 = 0; i0 < np; i0++) if (onTrack(st.pieces[s0][i0])) st.effects.push({ type: 'endure', seat: s0, piece: i0, knock: d0.endure.knock || 0, stun: !!d0.endure.stun }); }
     return st;
   }
 
@@ -307,10 +682,17 @@
   /** Tokens that would be captured by `seat` landing on track square abs. */
   function capturesAt(st, seat, abs) {
     if (st.mode === 'friendly' || st.rules.noCapture) return [];
-    if (st.rules.safeSquares && isSafeAbs(abs)) return [];
+    if (st.rules.safeSquares && isSafeSquare(st, abs)) return [];
+    var pierce = !!(perkOf(st, seat) && perkOf(st, seat).pierce); // David IV: capture through single-layer shields
     return tokensAt(st, abs, seat).filter(function (t) {
-      if (isShielded(st, t.seat, t.piece)) return false;
-      if (isVineShielded(st, t.seat, t.piece)) return false; // vine aura: shielded, and the attack reflects (see move())
+      if (!pierce) {
+        if (isShielded(st, t.seat, t.piece)) return false;
+        if (isVineShielded(st, t.seat, t.piece)) return false; // vine aura: shielded, and the attack reflects (see move())
+        if (hasEndure(st, t.seat, t.piece)) return false; // entrenched Sovereign: the strike is absorbed
+        if (isMutual(st, t.seat, t.piece)) return false; // Luarsab clash: no capture, both bounce (see move())
+        var tdef = perkOf(st, t.seat);
+        if (tdef && tdef.aegis && hasAllyWithin(st, t.seat, abs, 1, t.piece)) return false; // Giorgi VI: an adjacent ally guards the victim
+      }
       if (st.mode === 'team' && teamOf(t.seat) === teamOf(seat)) return false; // partners are not captured
       return true;
     });
@@ -379,15 +761,17 @@
     if (p < 0) { if (v !== 6) return null; path = [0]; }
     else {
       var kg = st.lk && isKing(st, seat, piece);  // King's stride: +1 square when it fits
-      var sb = perkStepActive(st, seat, piece) ? 1 : 0; // Sovereign step bonus: +1 when it fits
+      var sb = perkStepValue(st, seat, piece); // Sovereign step bonus: +N when it fits (else the plain die value)
       var steps = v + (kg ? 1 : 0) + sb;
       path = pathOf(p, steps, canEnter(st, seat), st, seat) || ((kg || sb) && pathOf(p, v, canEnter(st, seat), st, seat)); if (!path) return null; // exact roll needed to reach home
     }
     to = path[path.length - 1];
-    for (var k = 0; k < path.length; k++) if (onTrack(path[k]) && opponentBlockAt(st, seat, absOf(seat, path[k]))) return null; // blocks can't be passed or landed on
+    // Blocks can't be landed on; intermediate blocks can only be vaulted over (David VI).
+    var vault = !!(perkOf(st, seat) && perkOf(st, seat).vault);
+    for (var k = 0; k < path.length; k++) if (onTrack(path[k]) && opponentBlockAt(st, seat, absOf(seat, path[k]))) { if (k === path.length - 1 || !vault) return null; }
     var caps = capturesOnPath(st, seat, path);
     var tile = tileAt(st, to, seat);
-    var dieLen = p < 0 ? 1 : v + ((st.lk && isKing(st, seat, piece)) ? 1 : 0) + (perkStepActive(st, seat, piece) ? 1 : 0);
+    var dieLen = p < 0 ? 1 : v + ((st.lk && isKing(st, seat, piece)) ? 1 : 0) + perkStepValue(st, seat, piece);
     var jumped = !!(st && arrowsOn(st) && path.length === (p < 0 ? 1 : dieLen) + ARROW_JUMP);
     if (jumped) {
       var landAt = path[path.length - 1 - ARROW_JUMP];
@@ -500,10 +884,23 @@
     if (st.lk) st.lk.used = null;
     var raw = value || rollDie(st), v = raw;
     if (boost === 'double') v = raw * 2;
+    // George V floor: while the window holds, a roll below 3 counts as 3.
+    var floored = false;
+    if (Array.isArray(st.perkRollFloor) && st.perkRollFloor[seat] != null && st.turnCount <= st.perkRollFloor[seat] && v < 3) { v = 3; floored = true; }
+    // Archil II relic: an odd roll resurrects the pawn on its cross tile (now a permanent sanctuary).
+    var relic = null;
+    if (st.perkRelic && st.perkRelic[seat]) {
+      var rc = st.perkRelic[seat]; st.perkRelic[seat] = null;
+      if (v % 2 === 1) {
+        st.pieces[seat][rc.piece] = posFromAbs(seat, rc.abs);
+        if (!perkSafeArr(st).some(function (e) { return e.abs === rc.abs; })) perkSafeArr(st).push({ abs: rc.abs, until: null });
+        relic = { restored: true, piece: rc.piece, abs: rc.abs };
+      } else { relic = { restored: false, piece: rc.piece, abs: rc.abs }; }
+    }
     st.boost[seat] = null;
-    st.faces[seat] = raw; st.rolls++; st.stats[seat].rolls++;
+    st.faces[seat] = floored ? v : raw; st.rolls++; st.stats[seat].rolls++;
     if (raw === 6) { st.stats[seat].sixes++; if (!free) st.sixes++; }
-    var res = { seat: seat, raw: raw, value: v, doubled: boost === 'double', chosen: boost === 'choose', lucky6: free, forfeit: false, again: false, next: null };
+    var res = { seat: seat, raw: raw, value: v, doubled: boost === 'double', chosen: boost === 'choose', lucky6: free, forfeit: false, again: false, next: null, perkRollFloor: floored, relic: relic };
     if (raw === 6 && st.sixes >= MAX_SIXES) {
       st.last = { type: 'forfeit', seat: seat, lost: st.queue.slice() };
       res.forfeit = true; res.lost = st.queue.slice();
@@ -527,7 +924,8 @@
   function sendHome(st, byseat, t, bypiece) {
     var wasKing = isKing(st, t.seat, t.piece);
     st.pieces[t.seat][t.piece] = -1; clearEffects(st, t.seat, t.piece);
-    if (Array.isArray(st.perkStep) && Array.isArray(st.perkStep[t.seat])) st.perkStep[t.seat][t.piece] = false; // a captured pawn loses its pending step bonus
+    if (Array.isArray(st.perkStep) && Array.isArray(st.perkStep[t.seat])) st.perkStep[t.seat][t.piece] = 0; // a captured pawn loses its pending step bonus
+    perkEndureSpentArr(st, t.seat)[t.piece] = false; // a recaptured stand reforms when the pawn re-enters
     if (byseat != null) { st.stats[byseat].captures++; st.stats[t.seat].captured++; st.capd[byseat] = true; }
     if (st.lk) {
       st.lk.kills[t.seat][t.piece] = 0;
@@ -560,7 +958,7 @@
   function eventTarget(st, ev, seat, piece) {
     var p = st.pieces[seat][piece], abs = absOf(seat, p);
     if (ev === 'freeze') return nearestRival(st, seat, abs, 12, 1, function (t) { return !isFrozen(st, t.seat, t.piece); });
-    if (ev === 'zap') return nearestRival(st, seat, abs, 3, 0, function (t) { return !(st.rules.safeSquares && isSafeAbs(t.abs)) && !isShielded(st, t.seat, t.piece) && !isVineShielded(st, t.seat, t.piece) && !inBlock(st, t.seat, t.piece); });
+    if (ev === 'zap') return nearestRival(st, seat, abs, 3, 0, function (t) { return !(st.rules.safeSquares && isSafeSquare(st, t.abs)) && !isShielded(st, t.seat, t.piece) && !isVineShielded(st, t.seat, t.piece) && !inBlock(st, t.seat, t.piece); });
     if (ev === 'swap') return nearestRival(st, seat, abs, 26, 0, function (t) {
       return !isShielded(st, t.seat, t.piece) && !isVineShielded(st, t.seat, t.piece) && !inBlock(st, t.seat, t.piece) && posFromAbs(seat, t.abs) <= LAST_TRACK && posFromAbs(t.seat, abs) <= LAST_TRACK && st.pieces[t.seat][t.piece] <= LAST_TRACK;
     });
@@ -639,29 +1037,91 @@
     if (!m) throw new Error('illegal move');
     var seat = st.turn;
     st.pieces[seat][piece] = m.to;
+    // Passive endure reforms on the track: a Sovereign stand is entrenched again after re-entering.
+    var mdef0 = perkOf(st, seat);
+    if (mdef0 && mdef0.endure && onTrack(m.to) && !hasEndure(st, seat, piece) && !perkEndureSpent(st, seat, piece)) st.effects.push({ type: 'endure', seat: seat, piece: piece, knock: mdef0.endure.knock || 0, stun: !!mdef0.endure.stun });
     st.moveCount = (st.moveCount || 0) + 1;
     removeQueueValue(st, m.v);
     var kingCaps = m.captures.filter(function (t) { return isKing(st, t.seat, t.piece); });
-    m.captures.forEach(function (t) { sendHome(st, seat, t, piece); });
+    // Defender-side triggers run as each victim is sent home (relocate, ally-captured rally, reciprocal kill).
+    var perkDefender = null, perkRelocated = [];
+    m.captures.forEach(function (t) {
+      var victimAbs = absOf(t.seat, st.pieces[t.seat][t.piece]); // read before sendHome clears the square
+      sendHome(st, seat, t, piece);
+      if (Array.isArray(st.perkRelocate) && st.perkRelocate[t.seat] != null && st.turnCount <= st.perkRelocate[t.seat]) {
+        var star = nearestStarAbs(victimAbs);
+        st.pieces[t.seat][t.piece] = posFromAbs(t.seat, star);
+        perkRelocated.push({ seat: t.seat, piece: t.piece, to: star });
+      }
+      var d = applyAllyCapturedPerk(st, t.seat, t.piece, victimAbs, { seat: seat, piece: piece });
+      if (d) perkDefender = d;
+    });
     if (m.captures.length && st.rules.bonusOnCapture) st.bonus++;
     if (m.finish) { st.stats[seat].home++; clearEffects(st, seat, piece); if (st.rules.bonusOnHome) st.bonus++; }
     // Sovereign perk hooks (all no-ops when the seat has no perk skin equipped).
-    var perk = null;
-    if (m.perkStep) perkStepArr(st, seat)[piece] = false; // step bonus spent on this move
+    // Firing order: vine reflect, endure absorb, mutual clash, star, land, capture,
+    // six, corner, divider, home-approach, high/low roll, proximity, approach, home.
+    var perksFired = [], perkKnock = null, perkMutual = null;
+    if (m.perkStep) perkStepArr(st, seat)[piece] = 0; // step bonus spent on this move
     if (!m.finish && onTrack(m.to)) {
       var landAbs = absOf(seat, m.to);
+      var reflectFired = false;
       var vines = vineReflectTargets(st, seat, landAbs);
       if (vines.length) {
         // The attack reflects off the golden vine aura: the attacker goes home instead.
         sendHome(st, vines[0].seat, { seat: seat, piece: piece }, vines[0].piece);
-        perk = { id: 'demetrius', trigger: 'reflect', banner: PERK_DEFS.demetrius.banner, reflect: { by: vines[0] } };
-      } else if (STAR_SQUARES.indexOf(landAbs) >= 0) {
-        perk = applyStarPerk(st, seat, piece, landAbs);
+        perksFired.push({ id: 'demetrius', trigger: 'reflect', banner: PERK_DEFS.demetrius.banner, reflect: { by: vines[0] } });
+        reflectFired = true;
+      }
+      // Entrenched enemies absorb the strike (safe squares never trigger combat).
+      if (!reflectFired && st.pieces[seat][piece] === m.to && !(st.rules.safeSquares && isSafeSquare(st, landAbs))) {
+        var endures = endureTargets(st, seat, landAbs);
+        if (endures.length) {
+          var maxKnock = 0, stunHit = false, eowner = null;
+          endures.forEach(function (t) { var e = endureEffect(st, t.seat, t.piece); if (e) { if (e.knock) maxKnock = Math.max(maxKnock, e.knock); if (e.stun) stunHit = true; if (!eowner) eowner = t; } consumeEndure(st, t.seat, t.piece); markEndureSpent(st, t.seat, t.piece); });
+          if (maxKnock > 0) perkKnock = knockBack(st, seat, piece, maxKnock);
+          if (stunHit && onTrack(st.pieces[seat][piece])) st.effects.push({ type: 'freeze', seat: seat, piece: piece, at: st.turnCount });
+          if (eowner) { var edef = perkOf(st, eowner.seat); perksFired.push({ id: edef ? edef.id : null, trigger: 'endure', banner: edef ? edef.banner : 'ENDURE', endure: { by: eowner, knock: maxKnock, stun: stunHit } }); }
+        }
+      }
+      // Mutual clash: both pieces bounce back 1, no capture, no bonus roll.
+      if (!reflectFired && st.pieces[seat][piece] === m.to && !(st.rules.safeSquares && isSafeSquare(st, landAbs))) {
+        var mutuals = mutualTargets(st, seat, landAbs);
+        if (mutuals.length) {
+          var mb = knockBack(st, seat, piece, 1);
+          var md = knockBack(st, mutuals[0].seat, mutuals[0].piece, 1);
+          perkMutual = { attacker: mb, defender: md, by: mutuals[0] };
+          var mdef = perkOf(st, mutuals[0].seat);
+          perksFired.push({ id: mdef ? mdef.id : null, trigger: 'mutual', banner: mdef ? mdef.banner : 'MUTUAL CLASH', mutual: perkMutual });
+        }
+      }
+      if (!reflectFired) {
+        var fired;
+        if (STAR_SQUARES.indexOf(landAbs) >= 0) { fired = applyStarPerk(st, seat, piece, landAbs); if (fired) perksFired.push(fired); }
+        fired = applyTrigger(st, seat, piece, landAbs, 'onLand'); if (fired) perksFired.push(fired);
+        if (m.captures.length) { fired = applyCapturePerk(st, seat, piece, landAbs); if (fired) perksFired.push(fired); }
+        if (m.v === 6) { fired = applyTrigger(st, seat, piece, landAbs, 'onSix'); if (fired) perksFired.push(fired); }
+        if (START_SQUARES.indexOf(landAbs) >= 0) { fired = applyTrigger(st, seat, piece, landAbs, 'onCorner'); if (fired) perksFired.push(fired); }
+        if (DIVIDER_SQUARES.indexOf(landAbs) >= 0) { fired = applyTrigger(st, seat, piece, landAbs, 'onDivider'); if (fired) perksFired.push(fired); }
+        if (m.to >= 49 && m.to <= 51) { fired = applyTrigger(st, seat, piece, landAbs, 'onHomeApproach'); if (fired) perksFired.push(fired); }
+        if (m.v >= 5) { fired = applyTrigger(st, seat, piece, landAbs, 'onHighRoll', { v: m.v }); if (fired) perksFired.push(fired); }
+        if (m.v <= 2) { fired = applyTrigger(st, seat, piece, landAbs, 'onLowRoll', { v: m.v }); if (fired) perksFired.push(fired); }
+        fired = applyTrigger(st, seat, piece, landAbs, 'onProximity'); if (fired) perksFired.push(fired);
+        // Approach: enemy Sovereign pieces near the landing square react to the bypass.
+        for (var s = 0; s < 4; s++) {
+          if (s === seat || !st.pieces[s]) continue;
+          var adef = perkOf(st, s);
+          if (!adef || !adef.onApproach) continue;
+          var best = -1, bestD = 99;
+          for (var i = 0; i < nPieces(st); i++) { var ap = st.pieces[s][i]; if (!onTrack(ap)) continue; var dd = circDistAbs(absOf(s, ap), landAbs); if (dd >= 1 && dd <= 3 && dd < bestD) { bestD = dd; best = i; } }
+          if (best >= 0) { fired = applyTrigger(st, s, best, landAbs, 'onApproach', { moverSeat: seat, moverPiece: piece }); if (fired) perksFired.push(fired); }
+        }
       }
     }
-    if (m.captures.length && !perk) perk = applyCapturePerk(st, seat, piece);
+    if (m.finish) { var hp = applyTrigger(st, seat, piece, null, 'onHome'); if (hp) perksFired.push(hp); }
+    var perk = perksFired.length ? perksFired[0] : null;
     var res = { seat: seat, piece: piece, v: m.v, from: m.from, to: m.to, path: m.path, captures: m.captures, finish: m.finish, event: null, finishedPlayer: false, over: false, next: null,
-      stride: !!m.stride, crowned: null, kingCaptured: kingCaps.length > 0, perk: perk, perkStep: !!m.perkStep,
+      stride: !!m.stride, crowned: null, kingCaptured: kingCaps.length > 0, perk: perk, perks: perksFired, perkDefender: perkDefender, perkRelocated: perkRelocated, perkKnock: perkKnock, perkMutual: perkMutual, perkStep: !!m.perkStep,
       leave: !!m.leave, entersHomeColumn: !!m.entersHomeColumn, arrowJump: !!m.arrowJump };
     if (st.lk && m.captures.length && checkKing(st, seat, piece)) res.crowned = { seat: seat, piece: piece };
     var tile = !m.finish ? tileAt(st, m.to, seat) : null;
@@ -1277,6 +1737,7 @@
     normRules: normRules, newGame: newGame, nPieces: nPieces, teamOf: teamOf, partnerOf: partnerOf, arrowsOn: arrowsOn, legalMoves: legalMoves, queueMoves: queueMoves, moveFor: moveFor, pathOf: pathOf, roll: roll, move: move, mustChoose: mustChoose,
     nextTurn: nextTurn, activeLeft: activeLeft, progressOf: progressOf, canEnter: canEnter, isShielded: isShielded, isFrozen: isFrozen, opponentBlockAt: opponentBlockAt,
     PERK_DEFS: PERK_DEFS, perkOf: perkOf, setPerkSkin: setPerkSkin, isVineShielded: isVineShielded, coinMultiplier: coinMultiplier, perkStepActive: perkStepActive,
+    perkStepValue: perkStepValue, perkBonusTotal: perkBonusTotal, isSafeSquare: isSafeSquare, nearestStarAbs: nearestStarAbs, DIVIDER_SQUARES: DIVIDER_SQUARES,
     tileAt: tileAt, applyEvent: applyEvent, eventValid: eventValid, eventTarget: eventTarget,
     threatsTo: threatsTo, evalHard: evalHard, chooseMove: chooseMove, bestAutoMove: bestAutoMove, chooseDieValue: chooseDieValue, distinctMoves: distinctMoves,
     coinsFor: coinsFor, xpFor: xpFor, levelFromXp: levelFromXp, simulate: simulate, clone: clone, aiStep: aiStep, continueTurn: continueTurn,
