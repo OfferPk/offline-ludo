@@ -860,6 +860,10 @@
           '<path class="sk-laurel" d="M7.2 23.6c1.4.7 3 1 4.8 1s3.4-.3 4.8-1M8.4 21.6c1.1.45 2.3.65 3.6.65s2.5-.2 3.6-.65M6.8 19.4c.9.4 1.9.6 2.9.6M14.3 19.4c-.9.4-1.9.6-2.9.6"/>'; break;
       default: inner = '';
     }
+    // L2 Sovereign pack: every perk skin without its own case shares the crown + laurel mark,
+    // so new kings render with original art instead of a blank pawn. The seat-colour base band stays.
+    if (!inner && typeof TOKEN_SKINS !== 'undefined' && TOKEN_SKINS) { var sk0 = TOKEN_SKINS.byId(id); if (sk0 && sk0.perk) inner = '<path class="sk-crown" d="M8.6 9.4 9 5.9l1.55 1.55L12 4.9l1.45 2.55L15 5.9l.4 3.5Z"/><circle class="sk-crown-gem" cx="12" cy="7.9" r=".62"/>' +
+      '<path class="sk-laurel" d="M7.2 23.6c1.4.7 3 1 4.8 1s3.4-.3 4.8-1M8.4 21.6c1.1.45 2.3.65 3.6.65s2.5-.2 3.6-.65"/>'; }
     return '<defs>' + clip + '</defs><g class="sk sk-' + id + '" clip-path="url(#gem-clip-' + gid + ')">' + inner + '</g>' + band;
   }
   var TRAIL_N = { fire: 3, frost: 3, electric: 2, stars: 3, gold: 3, mythic: 3, 'default': 1 };
@@ -2331,6 +2335,8 @@
       G.coins = G.practice ? 0 : L.coinsFor(best, st.players.length, ai, st.mode); G.xp = G.practice ? 10 : L.xpFor(best, st.players.length);
       // Sovereign perk: a George III capture anywhere in the match doubles the match coin award (cosmetic coins only).
       if (!G.practice && humans(st).some(function (s) { return L.coinMultiplier(st, s) === 2; })) { G.coins *= 2; G.perkDoubled = true; }
+      // L2 flat perk bonuses (Rostom +50, Levan +25, David IV +50/capture): match-end coins, never cash.
+      if (!G.practice) { var pb = humans(st).reduce(function (a, s) { return a + L.perkBonusTotal(st, s); }, 0); if (pb > 0) { G.coins += pb; G.perkBonus = pb; } }
       save.coins += G.coins; save.xp += G.xp;
       G.stakePayout = 0;
       if (G.entryFee > 0 && !G.stakeSettled) {
